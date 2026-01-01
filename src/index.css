@@ -1,0 +1,94 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    /* DEFAULT (DARK) THEME */
+    /* Format: R G B (for Tailwind opacity support) */
+    --color-primary: 217 185 129;
+    /* #D9B981 */
+    --color-background: 10 10 10;
+    /* #0a0a0a */
+    --color-surface: 30 30 30;
+    /* #1e1e1e */
+    --color-text-main: 255 255 255;
+    /* #FFFFFF */
+    --color-text-dark: 0 0 0;
+    /* #000000 */
+    --color-success: 0 123 102;
+    /* #007B66 */
+    --color-danger: 229 75 75;
+    /* #E54B4B */
+    --color-grey-dark: 46 46 46;
+    /* #2e2e2e */
+    --color-grey-medium: 136 136 136;
+    /* #888888 */
+    --color-grey-light: 204 204 204;
+    /* #cccccc */
+
+    --color-input: 20 20 20;
+    /* Dark Grey for inputs */
+
+    /* Semantic Colors */
+    --color-border: 255 255 255;
+    /* White for Dark Mode borders */
+
+    --font-sans: "Inter", "system-ui", "Avenir", "Helvetica", "Arial", sans-serif;
+  }
+
+  [data-theme="light"] {
+    --color-primary: 217 185 129;
+    /* #D9B981 (Keep Gold) */
+    --color-background: 240 242 245;
+    /* #F0F2F5 (Light Grey) */
+    --color-surface: 255 255 255;
+    /* #FFFFFF (White) */
+    --color-text-main: 26 26 26;
+    /* #1A1A1A (Near Black) */
+    --color-text-dark: 0 0 0;
+    /* #000000 (Keep Black on Gold) */
+    --color-success: 0 123 102;
+    /* #007B66 */
+    --color-danger: 220 53 69;
+    /* Red slightly darker for light bg? Keep same for now */
+    --color-grey-dark: 200 200 200;
+    --color-grey-medium: 100 100 100;
+    --color-grey-light: 46 46 46;
+    --color-input: 242 242 242;
+    /* Light Grey for inputs */
+
+    /* Semantic Colors */
+    --color-border: 220 220 220;
+    /* Lighter border for Light Mode */
+  }
+}
+
+@theme {
+  --color-primary: rgb(var(--color-primary) / <alpha-value>);
+  --color-background: rgb(var(--color-background) / <alpha-value>);
+  --color-surface: rgb(var(--color-surface) / <alpha-value>);
+  --color-input: rgb(var(--color-input) / <alpha-value>);
+  --color-text-main: rgb(var(--color-text-main) / <alpha-value>);
+  --color-text-dark: rgb(var(--color-text-dark) / <alpha-value>);
+  --color-success: rgb(var(--color-success) / <alpha-value>);
+  --color-danger: rgb(var(--color-danger) / <alpha-value>);
+  --color-grey-dark: rgb(var(--color-grey-dark) / <alpha-value>);
+  --color-grey-medium: rgb(var(--color-grey-medium) / <alpha-value>);
+  --color-grey-light: rgb(var(--color-grey-light) / <alpha-value>);
+
+  --color-border: rgb(var(--color-border) / <alpha-value>);
+
+  --font-sans: "Inter", "system-ui", "Avenir", "Helvetica", "Arial", sans-serif;
+}
+
+@layer base {
+  body {
+    @apply bg-background text-text-main font-sans antialiased;
+  }
+}
+
+@layer components {
+  .selected-state {
+    @apply bg-primary border-primary z-40;
+    box-shadow: 0 2px 4px color-mix(in srgb, var(--color-primary) 30%, transparent);
+  }
+}
