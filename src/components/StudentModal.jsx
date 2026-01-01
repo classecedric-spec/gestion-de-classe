@@ -23,6 +23,7 @@ const StudentModal = ({ showModal, onClose, onSaved, isEditing = false, editId =
         parent2_nom: '',
         parent2_prenom: '',
         parent2_email: '',
+        nom_parents: '',
         photo_base64: ''
     };
 
@@ -99,6 +100,7 @@ const StudentModal = ({ showModal, onClose, onSaved, isEditing = false, editId =
                     parent2_nom: data.parent2_nom || '',
                     parent2_prenom: data.parent2_prenom || '',
                     parent2_email: data.parent2_email || '',
+                    nom_parents: data.nom_parents || '',
                     photo_base64: data.photo_base64 || ''
                 });
             }
@@ -195,6 +197,7 @@ const StudentModal = ({ showModal, onClose, onSaved, isEditing = false, editId =
                 parent2_nom: newStudent.parent2_nom,
                 parent2_prenom: newStudent.parent2_prenom,
                 parent2_email: newStudent.parent2_email,
+                nom_parents: newStudent.nom_parents,
                 photo_base64: newStudent.photo_base64
             };
 
@@ -447,6 +450,17 @@ const StudentModal = ({ showModal, onClose, onSaved, isEditing = false, editId =
                                         <UserIcon size={16} className="text-primary" />
                                         Parent 1 (Principal)
                                     </h3>
+                                    <div className="space-y-1">
+                                        <label className="text-xs font-semibold text-gray-400 uppercase">Nom Global des Parents (ex: M. & Mme Dupont)</label>
+                                        <input
+                                            type="text"
+                                            name="nom_parents"
+                                            value={newStudent.nom_parents}
+                                            onChange={handleInputChange}
+                                            className="w-full bg-black/20 border border-white/10 rounded-xl p-3 text-white focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all placeholder:text-gray-600"
+                                            placeholder="Laissez vide pour utiliser les prénoms/noms ci-dessous"
+                                        />
+                                    </div>
                                     <div className="grid grid-cols-2 gap-4">
                                         <div className="space-y-1">
                                             <label className="text-xs font-semibold text-gray-400 uppercase">Prénom</label>

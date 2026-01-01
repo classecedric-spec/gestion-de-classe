@@ -1,6 +1,6 @@
 import React from 'react';
 import { Outlet, NavLink, useLocation } from 'react-router-dom';
-import { Folder, FileText, Settings, Layers, GitBranch, Globe } from 'lucide-react';
+import { Folder, FileText, Settings, Layers, GitBranch, Globe, Package } from 'lucide-react';
 import clsx from 'clsx';
 
 const ActivitiesLayout = () => {
@@ -13,6 +13,7 @@ const ActivitiesLayout = () => {
         { id: 'activities', label: 'Activités', path: '/dashboard/activities/list', icon: FileText },
         { id: 'branches', label: 'Branches', path: '/dashboard/activities/branches', icon: GitBranch },
         { id: 'sub-branches', label: 'Sous-branches', path: '/dashboard/activities/sub-branches', icon: Layers },
+        { id: 'materiels', label: 'Matériel', path: '/dashboard/activities/materiels', icon: Package },
     ];
 
     return (

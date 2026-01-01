@@ -16,8 +16,10 @@ import SubBranches from './pages/SubBranches';
 import Modules from './pages/Modules';
 import Activities from './pages/Activities';
 import Niveaux from './pages/Niveaux';
+import Materiels from './pages/Materiels';
 import Settings from './pages/Settings';
 import SuiviPedagogique from './pages/SuiviPedagogique';
+import Adults from './pages/Adults';
 import { Navigate } from 'react-router-dom';
 
 function App() {
@@ -35,6 +37,7 @@ function App() {
             <Route path="groups" element={<Groups />} />
             <Route path="classes" element={<Classes />} />
             <Route path="niveaux" element={<Niveaux />} />
+            <Route path="adults" element={<Adults />} />
             <Route path="profile" element={<Profile />} />
           </Route>
           <Route path="activities" element={<ActivitiesLayout />}>
@@ -42,6 +45,7 @@ function App() {
             <Route path="branches" element={<Branches />} />
             <Route path="sub-branches" element={<SubBranches />} />
             <Route path="modules" element={<Modules />} />
+            <Route path="materiels" element={<Materiels />} />
             <Route path="list" element={<Activities />} />
           </Route>
           <Route path="settings" element={<Settings />} />

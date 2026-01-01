@@ -61,11 +61,6 @@ const SortableActivityItem = ({ activity, index, sortableId, onEdit }) => {
                 <GripVertical size={20} />
             </div>
 
-            {/* Fixed Index Number */}
-            <div className="w-7 h-7 rounded-md bg-primary/10 text-primary flex items-center justify-center font-bold text-xs shrink-0 select-none">
-                {index + 1}
-            </div>
-
             <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-3">
                     <h3 className="font-bold text-white text-lg select-none truncate">{activity.titre}</h3>
@@ -129,23 +124,18 @@ const ProgressionCard = ({ progression }) => {
             style={style}
             {...attributes}
             {...listeners}
-            className="flex items-center gap-3 p-3 bg-background/50 rounded-xl border border-white/5 hover:border-primary/30 transition-all cursor-grab active:cursor-grabbing group shadow-sm mb-2"
+            className="flex items-center gap-2 p-2 bg-background/50 rounded-lg border border-white/5 hover:border-primary/30 transition-all cursor-grab active:cursor-grabbing group shadow-sm mb-2"
         >
-            <div className="w-8 h-8 rounded-lg bg-surface flex items-center justify-center text-primary font-bold overflow-hidden border border-white/10 shrink-0">
+            <div className="w-6 h-6 rounded bg-surface flex items-center justify-center text-primary font-bold overflow-hidden border border-white/10 shrink-0">
                 {progression.Eleve?.photo_base64 ? (
                     <img src={progression.Eleve.photo_base64} alt="" className="w-full h-full object-cover" />
                 ) : (
-                    <span className="text-[10px]">{progression.Eleve?.prenom?.[0]}{progression.Eleve?.nom?.[0]}</span>
+                    <span className="text-[9px]">{progression.Eleve?.prenom?.[0]}{progression.Eleve?.nom?.[0]}</span>
                 )}
             </div>
             <div className="min-w-0 flex-1">
-                <p className="text-[11px] font-bold text-text-main truncate group-hover:text-primary transition-colors">
+                <p className="text-[10px] font-bold text-text-main truncate group-hover:text-primary transition-colors">
                     {progression.Eleve?.prenom} {progression.Eleve?.nom}
-                </p>
-                <p className="text-[9px] text-grey-medium uppercase tracking-wider truncate">
-                    {progression.Eleve?.EleveGroupe?.length > 0
-                        ? progression.Eleve.EleveGroupe.map(eg => eg.Groupe?.nom).filter(Boolean).join(', ')
-                        : 'Sans groupe'}
                 </p>
             </div>
         </div>
@@ -183,7 +173,7 @@ const ProgressionColumn = ({ id, label, icon: Icon, color, bg, children, count }
                 </span>
             </div>
 
-            <div className="flex-1 p-3 overflow-y-auto custom-scrollbar min-h-[200px]">
+            <div className="flex-1 p-3 overflow-y-auto custom-scrollbar min-h-[200px] grid grid-cols-2 gap-2 content-start">
                 {children}
             </div>
         </div>
@@ -276,25 +266,33 @@ const Modules = () => {
                 .from('Module')
                 .select(`
                     *,
-                    SousBranche:sous_branche_id (
-                        id,
-                        nom,
-                        branche_id,
-                        Branche:branche_id (
+                        SousBranche:sous_branche_id (
                             id,
-                            nom
-                        )
-                    ),
+                            nom,
+                            branche_id,
+                            ordre,
+                            Branche:branche_id (
+                                id,
+                                nom,
+                                ordre
+                            )
+                        ),
                     Activite (
                         *,
                         ActiviteNiveau (
                             *,
                             Niveau (*)
                         ),
+                        ActiviteMateriel (
+                            TypeMateriel (
+                                acronyme
+                            )
+                        ),
                         Progression (etat)
                     )
                 `)
-                .order('nom');
+                .order('nom')
+                .order('ordre', { foreignTable: 'Activite', ascending: true });
 
             if (error) throw error;
 
@@ -654,36 +652,55 @@ const Modules = () => {
         const { active, over } = event;
 
         if (active.id !== over.id) {
-            setModuleActivities((items) => {
-                const oldIndex = items.findIndex((item) => item.id === active.id);
-                const newIndex = items.findIndex((item) => item.id === over.id);
+            const oldIndex = moduleActivities.findIndex((item) => item.id === active.id);
+            const newIndex = moduleActivities.findIndex((item) => item.id === over.id);
+            const newItems = arrayMove(moduleActivities, oldIndex, newIndex);
 
-                const newItems = arrayMove(items, oldIndex, newIndex);
+            // Update local activity state
+            setModuleActivities(newItems);
 
-                // Update database with new order
-                const updates = newItems.map((item, index) => ({
-                    id: item.id,
-                    ordre: index + 1
-                }));
+            // Update database payload
+            const updates = newItems.map((item, index) => ({
+                id: item.id,
+                ordre: index + 1,
+                titre: item.titre,
+                module_id: item.module_id,
+                user_id: item.user_id
+            }));
 
-                // Fire and forget update (or handle error ideally)
-                updateActivitiesOrder(updates);
+            // Sync with global modules state
+            setModules(prev => prev.map(m => {
+                if (m.id === selectedModule.id) {
+                    const updatedActivities = m.Activite.map(act => {
+                        const update = updates.find(u => u.id === act.id);
+                        return update ? { ...act, ordre: update.ordre } : act;
+                    }).sort((a, b) => (a.ordre || 0) - (b.ordre || 0));
 
-                return newItems;
-            });
+                    const updatedModule = { ...m, Activite: updatedActivities };
+                    // Also update selectedModule to maintain consistency
+                    if (selectedModule.id === m.id) {
+                        setSelectedModule(updatedModule);
+                    }
+                    return updatedModule;
+                }
+                return m;
+            }));
+
+            updateActivitiesOrder(updates);
         }
     };
 
     const updateActivitiesOrder = async (updates) => {
         try {
-            // Supabase upsert
             const { error } = await supabase
                 .from('Activite')
-                .upsert(updates, { onConflict: 'id' }); // Assuming id is PK
+                .upsert(updates, { onConflict: 'id' });
 
             if (error) throw error;
         } catch (err) {
             console.error("Error updating activity order:", err);
+            // Optionally fetch modules again if update failed to revert UI
+            fetchModules();
         }
     };
 
@@ -704,7 +721,37 @@ const Modules = () => {
                 String(m.sous_branche_id) === String(subBranchFilter) ||
                 String(m.SousBranche?.id) === String(subBranchFilter);
 
-            return matchesSearch && matchesStatus && matchesBranch && matchesSubBranch;
+            const isFullyCompleted = m.totalProgressions > 0 && m.completedProgressions === m.totalProgressions;
+
+            return matchesSearch && matchesStatus && matchesBranch && matchesSubBranch && !isFullyCompleted;
+        }).sort((a, b) => {
+            // 1. Date de fin (D'abord les plus proches, nulls à la fin)
+            if (a.date_fin && b.date_fin) {
+                if (a.date_fin !== b.date_fin) {
+                    return new Date(a.date_fin) - new Date(b.date_fin);
+                }
+            } else if (a.date_fin) {
+                return -1; // a a une date, b non -> a d'abord
+            } else if (b.date_fin) {
+                return 1; // b a une date, a non -> b d'abord
+            }
+
+            // 2. Ordre de la Branche
+            const aBranchOrder = a.SousBranche?.Branche?.ordre || 0;
+            const bBranchOrder = b.SousBranche?.Branche?.ordre || 0;
+            if (aBranchOrder !== bBranchOrder) {
+                return aBranchOrder - bBranchOrder;
+            }
+
+            // 3. Ordre de la Sous-Branche
+            const aSBOrder = a.SousBranche?.ordre || 0;
+            const bSBOrder = b.SousBranche?.ordre || 0;
+            if (aSBOrder !== bSBOrder) {
+                return aSBOrder - bSBOrder;
+            }
+
+            // 4. Ordre Alphabétique (Nom)
+            return a.nom.localeCompare(b.nom);
         });
     }, [modules, searchTerm, statusFilter, branchFilter, subBranchFilter]);
 
@@ -720,7 +767,7 @@ const Modules = () => {
                             Liste des Modules
                         </h2>
                         <span className="px-2 py-1 bg-primary/10 text-primary text-[10px] font-bold rounded-md uppercase tracking-wider">
-                            {modules.length} Total
+                            {filteredModules.length} {filteredModules.length > 1 ? 'Modules' : 'Module'}
                         </span>
                     </div>
 
@@ -805,77 +852,107 @@ const Modules = () => {
                     ) : filteredModules.length === 0 ? (
                         <div className="text-center p-8 text-grey-medium italic">Aucun module trouvé.</div>
                     ) : (
-                        filteredModules.map((module) => (
-                            <div
-                                key={module.id}
-                                onClick={() => setSelectedModule(module)}
-                                className={clsx(
-                                    "w-full flex items-center gap-4 p-3 rounded-xl transition-all border text-left group relative hover:z-50 cursor-pointer",
-                                    selectedModule?.id === module.id
-                                        ? "selected-state"
-                                        : "bg-surface/50 border-transparent hover:border-white/10 hover:bg-surface"
-                                )}
-                                role="button"
-                                tabIndex={0}
-                                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setSelectedModule(module); }}
-                            >
-                                <div className={clsx(
-                                    "w-10 h-10 rounded-lg flex items-center justify-center text-lg font-bold shadow-inner overflow-hidden",
-                                    selectedModule?.id === module.id ? "bg-white/20 text-text-dark" : "bg-background text-primary"
-                                )}>
-                                    <Folder size={20} />
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                    <h3 className={clsx(
-                                        "font-bold truncate text-[11px] mb-0.5",
-                                        selectedModule?.id === module.id ? "text-text-dark" : "text-text-main"
-                                    )}>
-                                        {module.nom}
-                                        <span className="opacity-60 font-normal ml-1">
-                                            ({module.Branche?.nom || module.SousBranche?.Branche?.nom} - {module.SousBranche?.nom})
-                                        </span>
-                                    </h3>
-                                    <div className="w-full h-1 rounded-full bg-black/20 overflow-hidden">
-                                        <div
-                                            className="h-full bg-success transition-all duration-500 ease-out"
-                                            style={{ width: `${module.percent || 0}%` }}
-                                        />
-                                    </div>
-                                </div>
-
-                                <div className={clsx(
-                                    "flex gap-1 transition-opacity",
-                                    selectedModule?.id === module.id ? "opacity-100" : "opacity-0 group-hover:opacity-100"
-                                )}>
-                                    <div
-                                        onClick={(e) => { e.stopPropagation(); handleEdit(module); }}
-                                        className={clsx(
-                                            "p-1.5 rounded-lg transition-colors cursor-pointer",
-                                            selectedModule?.id === module.id
-                                                ? "text-text-dark/70 hover:text-text-dark hover:bg-text-dark/10"
-                                                : "text-grey-medium hover:text-white hover:bg-white/10"
-                                        )}
-                                        title="Modifier"
-                                    >
-                                        <Edit size={14} />
-                                    </div>
-                                </div>
-
-                                {/* Absolute Delete Button */}
-                                <button
-                                    onClick={(e) => { e.stopPropagation(); setModuleToDelete(module); }}
-                                    className="absolute -top-2 -right-2 z-10 p-2 bg-danger/10 hover:bg-danger text-danger hover:text-white rounded-full border border-danger/20 opacity-0 group-hover:opacity-100 transition-all shadow-lg scale-90 hover:scale-100"
-                                    title="Supprimer le module"
+                        filteredModules.map((module) => {
+                            const isExpired = module.date_fin && new Date(module.date_fin) < new Date();
+                            return (
+                                <div
+                                    key={module.id}
+                                    onClick={() => setSelectedModule(module)}
+                                    className={clsx(
+                                        "w-full flex items-center gap-4 p-3 rounded-xl transition-all border text-left group relative hover:z-50 cursor-pointer overflow-hidden backdrop-blur-sm",
+                                        selectedModule?.id === module.id
+                                            ? clsx("selected-state", isExpired && "!border-danger")
+                                            : (isExpired ? "bg-surface/50 border-danger/40 hover:border-danger/60" : "bg-surface/50 border-transparent hover:border-white/10 hover:bg-surface")
+                                    )}
+                                    role="button"
+                                    tabIndex={0}
+                                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setSelectedModule(module); }}
                                 >
-                                    <X size={14} strokeWidth={3} />
-                                </button>
+                                    <div className={clsx(
+                                        "w-10 h-10 rounded-lg flex items-center justify-center text-lg font-bold shadow-inner overflow-hidden shrink-0",
+                                        selectedModule?.id === module.id
+                                            ? "bg-white/20 text-inherit"
+                                            : "bg-background text-primary"
+                                    )}>
+                                        <Folder size={20} />
+                                    </div>
+                                    <div className="flex-1 min-w-0 flex flex-col gap-1">
+                                        {/* Line 1: Module Name + Date */}
+                                        <div className="flex items-center justify-between gap-2 overflow-hidden">
+                                            <h3 className={clsx(
+                                                "font-bold truncate text-[13px] leading-tight flex-1",
+                                                selectedModule?.id === module.id ? "text-text-dark" : "text-text-main"
+                                            )}>
+                                                {module.nom}
+                                            </h3>
+                                            {module.date_fin && (
+                                                <span className={clsx(
+                                                    "font-bold text-[10px] shrink-0",
+                                                    isExpired
+                                                        ? (selectedModule?.id === module.id ? "text-white" : "text-danger")
+                                                        : (selectedModule?.id === module.id ? "text-text-dark/70" : "text-white/60")
+                                                )}>
+                                                    {new Date(module.date_fin).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' })}
+                                                </span>
+                                            )}
+                                        </div>
 
-                                <ChevronRight size={16} className={clsx(
-                                    "transition-transform",
-                                    selectedModule?.id === module.id ? "text-text-dark translate-x-1" : "text-grey-dark group-hover:translate-x-1"
-                                )} />
-                            </div>
-                        ))
+                                        {/* Line 2: Progress Bar + Branch Info */}
+                                        <div className="flex flex-col gap-1.5">
+                                            <div className="w-full h-1.5 rounded-full bg-black/20 overflow-hidden">
+                                                <div
+                                                    className={clsx(
+                                                        "h-full transition-all duration-500 ease-out",
+                                                        isExpired ? (selectedModule?.id === module.id ? "bg-white" : "bg-danger") : "bg-success"
+                                                    )}
+                                                    style={{ width: `${(module.totalProgressions > 0 ? (module.completedProgressions / module.totalProgressions) * 100 : 0)}%` }}
+                                                />
+                                            </div>
+                                            <div className={clsx(
+                                                "flex items-center gap-2 text-[10px] truncate",
+                                                selectedModule?.id === module.id ? "text-text-dark/70" : "text-grey-medium"
+                                            )}>
+                                                <span className="truncate opacity-80" title={`${module.Branche?.nom || module.SousBranche?.Branche?.nom} > ${module.SousBranche?.nom}`}>
+                                                    {module.Branche?.nom || module.SousBranche?.Branche?.nom} - {module.SousBranche?.nom}
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div className={clsx(
+                                        "flex gap-1 transition-opacity",
+                                        selectedModule?.id === module.id ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+                                    )}>
+                                        <div
+                                            onClick={(e) => { e.stopPropagation(); handleEdit(module); }}
+                                            className={clsx(
+                                                "p-1.5 rounded-lg transition-colors cursor-pointer",
+                                                selectedModule?.id === module.id
+                                                    ? "text-text-dark/70 hover:text-text-dark hover:bg-text-dark/10"
+                                                    : "text-grey-medium hover:text-white hover:bg-white/10"
+                                            )}
+                                            title="Modifier"
+                                        >
+                                            <Edit size={14} />
+                                        </div>
+                                    </div>
+
+                                    {/* Absolute Delete Button */}
+                                    <button
+                                        onClick={(e) => { e.stopPropagation(); setModuleToDelete(module); }}
+                                        className="absolute -top-2 -right-2 z-10 p-2 bg-danger/10 hover:bg-danger text-danger hover:text-white rounded-full border border-danger/20 opacity-0 group-hover:opacity-100 transition-all shadow-lg scale-90 hover:scale-100"
+                                        title="Supprimer le module"
+                                    >
+                                        <X size={14} strokeWidth={3} />
+                                    </button>
+
+                                    <ChevronRight size={16} className={clsx(
+                                        "transition-transform",
+                                        selectedModule?.id === module.id ? "text-text-dark translate-x-1" : "text-grey-dark group-hover:translate-x-1"
+                                    )} />
+                                </div>
+                            );
+                        })
                     )}
                 </div>
 
@@ -1018,26 +1095,6 @@ const Modules = () => {
                                 </div>
                             ) : detailTab === 'groups' ? (
                                 <div className="space-y-6 animate-in slide-in-from-bottom-2 duration-300">
-                                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-surface/20 p-6 rounded-2xl border border-white/5">
-                                        <div className="space-y-1">
-                                            <h4 className="text-sm font-bold text-text-main flex items-center gap-2 uppercase tracking-wider">
-                                                <GitBranch size={16} className="text-primary" />
-                                                Démarrer le module
-                                            </h4>
-                                            <p className="text-xs text-grey-medium leading-relaxed">
-                                                Cochez les groupes d'élèves concernés. Le système créera une ligne de progression <span className="text-white font-medium">"À commencer"</span> pour chaque enfant dont le niveau correspond aux activités du module.
-                                            </p>
-                                        </div>
-                                        <button
-                                            onClick={generateProgressions}
-                                            disabled={selectedGroups.length === 0 || generatingProgressions}
-                                            className="whitespace-nowrap px-6 py-3 bg-success text-text-dark rounded-xl font-bold text-[11px] uppercase tracking-wider hover:bg-success/90 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-3 transition-all shadow-lg shadow-success/20 active:scale-95"
-                                        >
-                                            {generatingProgressions ? <Loader2 className="animate-spin" size={16} /> : <CheckSquare size={16} />}
-                                            Générer le suivi
-                                        </button>
-                                    </div>
-
                                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                                         {groups.length === 0 ? (
                                             <div className="col-span-full text-center p-12 bg-surface/10 rounded-2xl border border-dashed border-white/10 italic text-grey-medium">
@@ -1081,6 +1138,18 @@ const Modules = () => {
                                             ))
                                         )}
                                     </div>
+
+                                    <div className="flex justify-end pt-4 border-t border-white/5">
+                                        <button
+                                            onClick={generateProgressions}
+                                            disabled={selectedGroups.length === 0 || generatingProgressions}
+                                            title="Cochez les groupes d'élèves concernés. Le système créera une ligne de progression 'À commencer' pour chaque enfant dont le niveau correspond aux activités du module."
+                                            className="whitespace-nowrap px-6 py-3 bg-success text-text-dark rounded-xl font-bold text-[11px] uppercase tracking-wider hover:bg-success/90 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-3 transition-all shadow-lg shadow-success/20 active:scale-95"
+                                        >
+                                            {generatingProgressions ? <Loader2 className="animate-spin" size={16} /> : <CheckSquare size={16} />}
+                                            Générer le suivi
+                                        </button>
+                                    </div>
                                 </div>
                             ) : (
                                 <div className="flex gap-8 h-full min-h-[500px] animate-in slide-in-from-right-2 duration-300">
@@ -1099,9 +1168,16 @@ const Modules = () => {
                                                             : "bg-surface/30 border-white/5 hover:border-white/10"
                                                     )}
                                                 >
-                                                    <span className={clsx("text-[11px] font-bold truncate leading-tight", selectedProgressionActivity?.id === act.id ? "text-text-dark" : "text-text-main")}>
-                                                        {act.titre}
-                                                    </span>
+                                                    <div className="flex items-center gap-1 w-full">
+                                                        <span className={clsx("text-[11px] font-bold truncate leading-tight", selectedProgressionActivity?.id === act.id ? "text-text-dark" : "text-text-main")}>
+                                                            {act.titre}
+                                                        </span>
+                                                        {act.ActiviteMateriel && act.ActiviteMateriel.length > 0 && (
+                                                            <span className={clsx("shrink-0 text-[10px] font-normal opacity-80", selectedProgressionActivity?.id === act.id ? "text-text-dark" : "text-grey-medium")}>
+                                                                [{act.ActiviteMateriel.map(am => am.TypeMateriel?.acronyme).filter(Boolean).join(', ')}]
+                                                            </span>
+                                                        )}
+                                                    </div>
                                                     <div className="flex items-center gap-2">
                                                         <div className={clsx("w-full h-1 rounded-full bg-black/20 overflow-hidden")}>
                                                             <div

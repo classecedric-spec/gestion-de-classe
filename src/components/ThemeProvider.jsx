@@ -5,9 +5,9 @@ const ThemeContext = createContext();
 export const ThemeProvider = ({ children }) => {
     const [theme, setTheme] = useState(() => {
         if (typeof window !== 'undefined') {
-            return localStorage.getItem('theme') || 'dark';
+            return localStorage.getItem('theme') || 'default';
         }
-        return 'dark';
+        return 'default';
     });
 
     useEffect(() => {
@@ -17,10 +17,10 @@ export const ThemeProvider = ({ children }) => {
             const systemTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
             const effectiveTheme = t === 'system' ? systemTheme : t;
 
-            if (effectiveTheme === 'light') {
-                root.setAttribute('data-theme', 'light');
-            } else {
+            if (effectiveTheme === 'dark') {
                 root.removeAttribute('data-theme');
+            } else {
+                root.setAttribute('data-theme', effectiveTheme);
             }
         };
 

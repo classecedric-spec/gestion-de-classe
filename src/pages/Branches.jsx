@@ -1,8 +1,168 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../lib/supabaseClient';
-import { GitBranch, Search, Plus, Edit, Trash2, Loader2, Image as ImageIcon, X } from 'lucide-react';
+import { GitBranch, Search, Plus, Edit, Trash2, Loader2, Image as ImageIcon, X, GripVertical } from 'lucide-react';
 import clsx from 'clsx';
+import {
+    DndContext,
+    closestCenter,
+    KeyboardSensor,
+    PointerSensor,
+    useSensor,
+    useSensors,
+} from '@dnd-kit/core';
+import {
+    arrayMove,
+    SortableContext,
+    sortableKeyboardCoordinates,
+    verticalListSortingStrategy,
+    useSortable,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import AddBranchModal from '../components/AddBranchModal';
+
+const SortableBranchItem = ({ branch, isSelected, onClick, onEdit, onDelete }) => {
+    const {
+        attributes,
+        listeners,
+        setNodeRef,
+        transform,
+        transition,
+        isDragging,
+    } = useSortable({ id: branch.id });
+
+    const style = {
+        transform: CSS.Transform.toString(transform),
+        transition,
+        zIndex: isDragging ? 10 : 1,
+        position: 'relative',
+    };
+
+    return (
+        <div
+            ref={setNodeRef}
+            style={style}
+            onClick={() => onClick(branch)}
+            className={clsx(
+                "w-full flex items-center gap-4 p-3 rounded-xl transition-all border text-left group relative hover:z-50 cursor-pointer overflow-visible",
+                isSelected
+                    ? "selected-state"
+                    : "bg-surface/50 border-transparent hover:border-white/10 hover:bg-surface",
+                isDragging ? "opacity-50 border-primary dashed" : ""
+            )}
+        >
+            {/* Drag Handle */}
+            <div
+                {...attributes}
+                {...listeners}
+                className={clsx(
+                    "cursor-grab active:cursor-grabbing p-1.5 rounded-lg transition-colors outline-none",
+                    isSelected
+                        ? "text-text-dark/50 hover:text-text-dark hover:bg-text-dark/10"
+                        : "text-grey-medium hover:text-white hover:bg-white/5"
+                )}
+                onClick={(e) => e.stopPropagation()}
+            >
+                <GripVertical size={16} />
+            </div>
+
+            <div className={clsx(
+                "w-10 h-10 rounded-lg flex items-center justify-center text-lg font-bold shadow-inner overflow-hidden shrink-0",
+                isSelected ? "bg-white/20 text-text-dark" : "bg-background text-primary"
+            )}>
+                {branch.photo_base64 ? (
+                    <img src={branch.photo_base64} alt={branch.nom} className="w-full h-full object-cover" />
+                ) : (
+                    <GitBranch size={20} />
+                )}
+            </div>
+            <div className="flex-1 min-w-0">
+                <h3 className={clsx(
+                    "font-semibold truncate",
+                    isSelected ? "text-text-dark" : "text-text-main"
+                )}>
+                    {branch.nom}
+                </h3>
+            </div>
+
+            <div className={clsx(
+                "flex gap-1 transition-opacity",
+                isSelected ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+            )}>
+                <div
+                    onClick={(e) => { e.stopPropagation(); onEdit(branch); }}
+                    className={clsx(
+                        "p-1.5 rounded-lg transition-colors cursor-pointer",
+                        isSelected
+                            ? "text-text-dark/70 hover:text-text-dark hover:bg-text-dark/10"
+                            : "text-grey-medium hover:text-white hover:bg-white/10"
+                    )}
+                    title="Modifier"
+                >
+                    <Edit size={14} />
+                </div>
+            </div>
+
+            {/* Absolute Delete Button */}
+            <button
+                onClick={(e) => { e.stopPropagation(); onDelete(branch); }}
+                className="absolute -top-2 -right-2 z-10 p-2 bg-danger/10 hover:bg-danger text-danger hover:text-white rounded-full border border-danger/20 opacity-0 group-hover:opacity-100 transition-all shadow-lg scale-90 hover:scale-100"
+                title="Supprimer la branche"
+            >
+                <X size={14} strokeWidth={3} />
+            </button>
+
+            <ChevronRight size={16} className={clsx(
+                "transition-transform",
+                isSelected ? "text-text-dark translate-x-1" : "text-grey-dark group-hover:translate-x-1"
+            )} />
+        </div>
+    );
+};
+
+const SortableSubBranchItem = ({ sub }) => {
+    const {
+        attributes,
+        listeners,
+        setNodeRef,
+        transform,
+        transition,
+        isDragging,
+    } = useSortable({ id: sub.id });
+
+    const style = {
+        transform: CSS.Transform.toString(transform),
+        transition,
+        zIndex: isDragging ? 10 : 1,
+    };
+
+    return (
+        <div
+            ref={setNodeRef}
+            style={style}
+            className={clsx(
+                "flex items-center gap-3 p-4 bg-surface/50 rounded-xl border transition-colors",
+                isDragging ? "opacity-50 border-primary dashed" : "border-white/5 hover:border-white/10"
+            )}
+        >
+            <div
+                {...attributes}
+                {...listeners}
+                className="cursor-grab active:cursor-grabbing p-1.5 rounded-lg text-grey-medium hover:text-white hover:bg-white/5 outline-none"
+            >
+                <GripVertical size={16} />
+            </div>
+
+            <div className="w-10 h-10 rounded-lg bg-background flex items-center justify-center text-primary shrink-0 overflow-hidden shadow-inner">
+                {sub.photo_base64 ? (
+                    <img src={sub.photo_base64} alt={sub.nom} className="w-full h-full object-cover" />
+                ) : (
+                    <GitBranch size={18} />
+                )}
+            </div>
+            <span className="font-semibold text-text-main truncate">{sub.nom}</span>
+        </div>
+    );
+};
 
 const Branches = () => {
     const [branches, setBranches] = useState([]);
@@ -23,7 +183,7 @@ const Branches = () => {
             const { data, error } = await supabase
                 .from('Branche')
                 .select('*')
-                .order('nom');
+                .order('ordre', { ascending: true });
 
             if (error) throw error;
             setBranches(data || []);
@@ -108,7 +268,7 @@ const Branches = () => {
             .from('SousBranche')
             .select('*')
             .eq('branche_id', branchId)
-            .order('nom');
+            .order('ordre', { ascending: true });
 
         if (error) {
             console.error('Error fetching sub-branches:', error);
@@ -124,6 +284,91 @@ const Branches = () => {
         }
         if (branchToEdit) {
             setBranchToEdit(null);
+        }
+    };
+
+    // Drag and Drop Logic
+    const sensors = useSensors(
+        useSensor(PointerSensor, {
+            activationConstraint: {
+                distance: 8,
+            },
+        }),
+        useSensor(KeyboardSensor, {
+            coordinateGetter: sortableKeyboardCoordinates,
+        })
+    );
+
+    const handleDragEnd = async (event) => {
+        const { active, over } = event;
+
+        if (active.id !== over.id) {
+            setBranches((items) => {
+                const oldIndex = items.findIndex((item) => item.id === active.id);
+                const newIndex = items.findIndex((item) => item.id === over.id);
+                const newItems = arrayMove(items, oldIndex, newIndex);
+
+                // Update orders in DB
+                const updates = newItems.map((item, index) => ({
+                    id: item.id,
+                    nom: item.nom,
+                    user_id: item.user_id,
+                    photo_base64: item.photo_base64,
+                    ordre: index + 1
+                }));
+
+                updateOrder(updates);
+
+                return newItems;
+            });
+        }
+    };
+
+    const updateOrder = async (updates) => {
+        try {
+            const { error } = await supabase
+                .from('Branche')
+                .upsert(updates, { onConflict: 'id' });
+            if (error) throw error;
+        } catch (err) {
+            console.error("Error updating branch order:", err);
+        }
+    };
+
+    const handleSubBranchDragEnd = async (event) => {
+        const { active, over } = event;
+
+        if (active.id !== over.id) {
+            setSubBranches((items) => {
+                const oldIndex = items.findIndex((item) => item.id === active.id);
+                const newIndex = items.findIndex((item) => item.id === over.id);
+                const newItems = arrayMove(items, oldIndex, newIndex);
+
+                // Update orders in DB
+                const updates = newItems.map((item, index) => ({
+                    id: item.id,
+                    nom: item.nom,
+                    branche_id: item.branche_id,
+                    user_id: item.user_id,
+                    photo_base64: item.photo_base64,
+                    ordre: index + 1
+                }));
+
+                updateSubBranchOrder(updates);
+
+                return newItems;
+            });
+        }
+    };
+
+    const updateSubBranchOrder = async (updates) => {
+        try {
+            const { error } = await supabase
+                .from('SousBranche')
+                .upsert(updates, { onConflict: 'id' });
+            if (error) throw error;
+        } catch (err) {
+            console.error("Error updating sub-branch order:", err);
         }
     };
 
@@ -164,72 +409,27 @@ const Branches = () => {
                     ) : filteredBranches.length === 0 ? (
                         <div className="text-center p-8 text-grey-medium italic">Aucune branche trouvée.</div>
                     ) : (
-                        filteredBranches.map((branch) => (
-                            <div
-                                key={branch.id}
-                                onClick={() => setSelectedBranch(branch)}
-                                className={clsx(
-                                    "w-full flex items-center gap-4 p-3 rounded-xl transition-all border text-left group relative hover:z-50 cursor-pointer",
-                                    selectedBranch?.id === branch.id
-                                        ? "selected-state"
-                                        : "bg-surface/50 border-transparent hover:border-white/10 hover:bg-surface"
-                                )}
-                                role="button"
-                                tabIndex={0}
-                                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setSelectedBranch(branch); }}
+                        <DndContext
+                            sensors={sensors}
+                            collisionDetection={closestCenter}
+                            onDragEnd={handleDragEnd}
+                        >
+                            <SortableContext
+                                items={filteredBranches.map(b => b.id)}
+                                strategy={verticalListSortingStrategy}
                             >
-                                <div className={clsx(
-                                    "w-10 h-10 rounded-lg flex items-center justify-center text-lg font-bold shadow-inner overflow-hidden shrink-0",
-                                    selectedBranch?.id === branch.id ? "bg-white/20 text-text-dark" : "bg-background text-primary"
-                                )}>
-                                    {branch.photo_base64 ? (
-                                        <img src={branch.photo_base64} alt={branch.nom} className="w-full h-full object-cover" />
-                                    ) : (
-                                        <GitBranch size={20} />
-                                    )}
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                    <h3 className={clsx(
-                                        "font-semibold truncate",
-                                        selectedBranch?.id === branch.id ? "text-text-dark" : "text-text-main"
-                                    )}>
-                                        {branch.nom}
-                                    </h3>
-                                </div>
-
-                                <div className={clsx(
-                                    "flex gap-1 transition-opacity",
-                                    selectedBranch?.id === branch.id ? "opacity-100" : "opacity-0 group-hover:opacity-100"
-                                )}>
-                                    <div
-                                        onClick={(e) => { e.stopPropagation(); handleEdit(branch); }}
-                                        className={clsx(
-                                            "p-1.5 rounded-lg transition-colors cursor-pointer",
-                                            selectedBranch?.id === branch.id
-                                                ? "text-text-dark/70 hover:text-text-dark hover:bg-text-dark/10"
-                                                : "text-grey-medium hover:text-white hover:bg-white/10"
-                                        )}
-                                        title="Modifier"
-                                    >
-                                        <Edit size={14} />
-                                    </div>
-                                </div>
-
-                                {/* Absolute Delete Button */}
-                                <button
-                                    onClick={(e) => { e.stopPropagation(); setBranchToDelete(branch); }}
-                                    className="absolute -top-2 -right-2 z-10 p-2 bg-danger/10 hover:bg-danger text-danger hover:text-white rounded-full border border-danger/20 opacity-0 group-hover:opacity-100 transition-all shadow-lg scale-90 hover:scale-100"
-                                    title="Supprimer la branche"
-                                >
-                                    <X size={14} strokeWidth={3} />
-                                </button>
-
-                                <ChevronRight size={16} className={clsx(
-                                    "transition-transform",
-                                    selectedBranch?.id === branch.id ? "text-text-dark translate-x-1" : "text-grey-dark group-hover:translate-x-1"
-                                )} />
-                            </div>
-                        ))
+                                {filteredBranches.map((branch) => (
+                                    <SortableBranchItem
+                                        key={branch.id}
+                                        branch={branch}
+                                        isSelected={selectedBranch?.id === branch.id}
+                                        onClick={setSelectedBranch}
+                                        onEdit={handleEdit}
+                                        onDelete={setBranchToDelete}
+                                    />
+                                ))}
+                            </SortableContext>
+                        </DndContext>
                     )}
                 </div>
 
@@ -277,26 +477,28 @@ const Branches = () => {
                                 </span>
                             </h3>
 
-                            <div className="space-y-2">
-                                {subBranches.length === 0 ? (
-                                    <div className="text-center p-12 border-2 border-dashed border-white/5 rounded-xl">
-                                        <p className="text-grey-medium italic">Aucune sous-branche liée.</p>
-                                    </div>
-                                ) : (
-                                    subBranches.map(sub => (
-                                        <div key={sub.id} className="flex items-center gap-3 p-4 bg-surface/50 rounded-xl border border-white/5 hover:border-white/10 transition-colors">
-                                            <div className="w-10 h-10 rounded-lg bg-background flex items-center justify-center text-primary shrink-0 overflow-hidden shadow-inner">
-                                                {sub.photo_base64 ? (
-                                                    <img src={sub.photo_base64} alt={sub.nom} className="w-full h-full object-cover" />
-                                                ) : (
-                                                    <GitBranch size={18} />
-                                                )}
-                                            </div>
-                                            <span className="font-semibold text-text-main truncate">{sub.nom}</span>
+                            {subBranches.length === 0 ? (
+                                <div className="text-center p-12 border-2 border-dashed border-white/5 rounded-xl">
+                                    <p className="text-grey-medium italic">Aucune sous-branche liée.</p>
+                                </div>
+                            ) : (
+                                <DndContext
+                                    sensors={sensors}
+                                    collisionDetection={closestCenter}
+                                    onDragEnd={handleSubBranchDragEnd}
+                                >
+                                    <SortableContext
+                                        items={subBranches.map(s => s.id)}
+                                        strategy={verticalListSortingStrategy}
+                                    >
+                                        <div className="space-y-2">
+                                            {subBranches.map((sub) => (
+                                                <SortableSubBranchItem key={sub.id} sub={sub} />
+                                            ))}
                                         </div>
-                                    ))
-                                )}
-                            </div>
+                                    </SortableContext>
+                                </DndContext>
+                            )}
                         </div>
                     </div>
                 ) : (

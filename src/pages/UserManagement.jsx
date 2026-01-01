@@ -11,6 +11,7 @@ const UserManagement = () => {
         { id: 'classes', label: 'Classes', path: '/dashboard/user/classes', icon: BookOpen },
         { id: 'students', label: 'Élèves', path: '/dashboard/user/students', icon: GraduationCap },
         { id: 'niveaux', label: 'Niveaux', path: '/dashboard/user/niveaux', icon: Layers },
+        { id: 'adults', label: 'Adultes', path: '/dashboard/user/adults', icon: User },
         { id: 'profile', label: 'Mon Profil', path: '/dashboard/user/profile', icon: User },
     ];
 

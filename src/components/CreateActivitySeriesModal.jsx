@@ -13,9 +13,12 @@ const CreateActivitySeriesModal = ({ isOpen, onClose, onAdded, moduleId }) => {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
 
+    const [materialTypeId, setMaterialTypeId] = useState(null); // ID for "Fichier papier"
+
     useEffect(() => {
         if (isOpen) {
             fetchLevels();
+            ensurePaperMaterial(); // Check/Create "Fichier papier"
             resetForm();
         }
     }, [isOpen]);
@@ -34,6 +37,37 @@ const CreateActivitySeriesModal = ({ isOpen, onClose, onAdded, moduleId }) => {
             setLevels(data || []);
         } catch (err) {
             console.error('Error fetching levels:', err);
+        }
+    };
+
+    const ensurePaperMaterial = async () => {
+        try {
+            // Check if exists
+            const { data: existing } = await supabase
+                .from('TypeMateriel')
+                .select('id')
+                .ilike('nom', 'Fichier papier')
+                .maybeSingle();
+
+            if (existing) {
+                setMaterialTypeId(existing.id);
+            } else {
+                // Create it
+                const { data: { user } } = await supabase.auth.getUser();
+                if (user) {
+                    const { data: created, error } = await supabase
+                        .from('TypeMateriel')
+                        .insert([{ nom: 'Fichier papier', user_id: user.id }])
+                        .select()
+                        .single();
+
+                    if (!error && created) {
+                        setMaterialTypeId(created.id);
+                    }
+                }
+            }
+        } catch (err) {
+            console.error("Error ensuring paper material:", err);
         }
     };
 
@@ -64,8 +98,13 @@ const CreateActivitySeriesModal = ({ isOpen, onClose, onAdded, moduleId }) => {
             const activitiesToInsert = [];
             for (let i = 0; i < count; i++) {
                 const num = parseInt(startNumber) + i;
+                let titre = `${baseName.trim()}.${num}`;
+                if (materialAcronym) {
+                    titre += ` [${materialAcronym}]`;
+                }
+
                 activitiesToInsert.push({
-                    titre: `${baseName.trim()}.${num}`,
+                    titre,
                     module_id: moduleId,
                     user_id: user.id,
                     ordre: lastOrder + i + 1,
@@ -95,6 +134,20 @@ const CreateActivitySeriesModal = ({ isOpen, onClose, onAdded, moduleId }) => {
                     .insert(linksToInsert);
 
                 if (linkError) throw linkError;
+
+                // 4. Link "Fichier papier" Material if available
+                if (materialTypeId) {
+                    const materialLinks = insertedActivities.map(act => ({
+                        activite_id: act.id,
+                        type_materiel_id: materialTypeId
+                    }));
+
+                    const { error: matError } = await supabase
+                        .from('ActiviteMateriel')
+                        .insert(materialLinks);
+
+                    if (matError) console.error("Error linking material:", matError);
+                }
             }
 
             onAdded();

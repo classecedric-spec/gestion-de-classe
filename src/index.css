@@ -3,79 +3,66 @@
 @layer base {
   :root {
     /* DEFAULT (DARK) THEME */
-    /* Format: R G B (for Tailwind opacity support) */
-    --color-primary: 217 185 129;
-    /* #D9B981 */
-    --color-background: 10 10 10;
-    /* #0a0a0a */
-    --color-surface: 30 30 30;
-    /* #1e1e1e */
-    --color-text-main: 255 255 255;
-    /* #FFFFFF */
-    --color-text-dark: 0 0 0;
-    /* #000000 */
-    --color-success: 0 123 102;
-    /* #007B66 */
-    --color-danger: 229 75 75;
-    /* #E54B4B */
-    --color-grey-dark: 46 46 46;
-    /* #2e2e2e */
-    --color-grey-medium: 136 136 136;
-    /* #888888 */
-    --color-grey-light: 204 204 204;
-    /* #cccccc */
-
-    --color-input: 20 20 20;
-    /* Dark Grey for inputs */
-
-    /* Semantic Colors */
-    --color-border: 255 255 255;
-    /* White for Dark Mode borders */
+    --primary: #D9B981;
+    --background: #0a0a0a;
+    --surface: #1e1e1e;
+    --text-main: #ffffff;
+    --text-dark: #000000;
+    --success: #007B66;
+    --danger: #E54B4B;
+    --grey-dark: #2e2e2e;
+    --grey-medium: #888888;
+    --grey-light: #cccccc;
+    --input: #141414;
+    --border: rgba(255, 255, 255, 0.1);
 
     --font-sans: "Inter", "system-ui", "Avenir", "Helvetica", "Arial", sans-serif;
   }
 
   [data-theme="light"] {
-    --color-primary: 217 185 129;
-    /* #D9B981 (Keep Gold) */
-    --color-background: 240 242 245;
-    /* #F0F2F5 (Light Grey) */
-    --color-surface: 255 255 255;
-    /* #FFFFFF (White) */
-    --color-text-main: 26 26 26;
-    /* #1A1A1A (Near Black) */
-    --color-text-dark: 0 0 0;
-    /* #000000 (Keep Black on Gold) */
-    --color-success: 0 123 102;
-    /* #007B66 */
-    --color-danger: 220 53 69;
-    /* Red slightly darker for light bg? Keep same for now */
-    --color-grey-dark: 200 200 200;
-    --color-grey-medium: 100 100 100;
-    --color-grey-light: 46 46 46;
-    --color-input: 242 242 242;
-    /* Light Grey for inputs */
+    --primary: #D9B981;
+    --background: #f8fafc;
+    --surface: rgba(255, 255, 255, 0.6);
+    --text-main: #1e293b;
+    --text-dark: #000000;
+    --success: #10b981;
+    --danger: #ef4444;
+    --grey-dark: #cbd5e1;
+    --grey-medium: #64748b;
+    --grey-light: #f1f5f9;
+    --input: rgba(255, 255, 255, 0.5);
+    --border: rgba(255, 255, 255, 0.5);
+  }
 
-    /* Semantic Colors */
-    --color-border: 220 220 220;
-    /* Lighter border for Light Mode */
+  [data-theme="default"] {
+    --primary: #D2AE6D;
+    --background: #19303D;
+    --surface: #254154;
+    --text-main: #F2F2F2;
+    --text-dark: #00131E;
+    --success: #007B66;
+    --danger: #E54B4B;
+    --grey-dark: #49555C;
+    --grey-medium: #A0A8AD;
+    --grey-light: #D7DADB;
+    --input: #19303D;
+    --border: rgba(210, 174, 109, 0.2);
   }
 }
 
 @theme {
-  --color-primary: rgb(var(--color-primary) / <alpha-value>);
-  --color-background: rgb(var(--color-background) / <alpha-value>);
-  --color-surface: rgb(var(--color-surface) / <alpha-value>);
-  --color-input: rgb(var(--color-input) / <alpha-value>);
-  --color-text-main: rgb(var(--color-text-main) / <alpha-value>);
-  --color-text-dark: rgb(var(--color-text-dark) / <alpha-value>);
-  --color-success: rgb(var(--color-success) / <alpha-value>);
-  --color-danger: rgb(var(--color-danger) / <alpha-value>);
-  --color-grey-dark: rgb(var(--color-grey-dark) / <alpha-value>);
-  --color-grey-medium: rgb(var(--color-grey-medium) / <alpha-value>);
-  --color-grey-light: rgb(var(--color-grey-light) / <alpha-value>);
-
-  --color-border: rgb(var(--color-border) / <alpha-value>);
+  --color-primary: var(--primary);
+  --color-background: var(--background);
+  --color-surface: var(--surface);
+  --color-input: var(--input);
+  --color-text-main: var(--text-main);
+  --color-text-dark: var(--text-dark);
+  --color-success: var(--success);
+  --color-danger: var(--danger);
+  --color-grey-dark: var(--grey-dark);
+  --color-grey-medium: var(--grey-medium);
+  --color-grey-light: var(--grey-light);
+  --color-border: var(--border);
 
   --font-sans: "Inter", "system-ui", "Avenir", "Helvetica", "Arial", sans-serif;
 }
@@ -84,11 +71,36 @@
   body {
     @apply bg-background text-text-main font-sans antialiased;
   }
+
+  /* Specific background for Light Theme based on provided image */
+  [data-theme="light"] body {
+    background: linear-gradient(135deg, #f5f3ff 0%, #fff1f2 100%) fixed;
+  }
+
+  /* Transition for all elements using theme colors */
+  body,
+  aside,
+  main,
+  header,
+  section,
+  div,
+  button,
+  input {
+    transition: background 0.3s ease, background-color 0.3s ease, border-color 0.3s ease, color 0.2s ease, box-shadow 0.3s ease;
+  }
+
+  /* Glassmorphism effect for surfaces in light theme */
+  [data-theme="light"] aside,
+  [data-theme="light"] section,
+  [data-theme="light"] .bg-surface {
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+  }
 }
 
 @layer components {
   .selected-state {
     @apply bg-primary border-primary z-40;
-    box-shadow: 0 2px 4px color-mix(in srgb, var(--color-primary) 30%, transparent);
+    box-shadow: 0 2px 4px rgba(217, 185, 129, 0.3);
   }
 }

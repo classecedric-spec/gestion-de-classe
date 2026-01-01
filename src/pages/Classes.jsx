@@ -40,7 +40,13 @@ const Classes = () => {
         try {
             const { data, error } = await supabase
                 .from('Classe')
-                .select('*')
+                .select(`
+                    *,
+                    ClasseAdulte (
+                        role,
+                        Adulte (id, nom, prenom)
+                    )
+                `)
                 .order('nom');
             if (error) throw error;
             setClasses(data || []);
@@ -218,12 +224,25 @@ const Classes = () => {
                                 </div>
                                 <div className="flex-1 min-w-0">
                                     <p className="font-semibold truncate text-sm">{classe.nom}</p>
-                                    <p className={clsx(
-                                        "text-[10px] uppercase font-bold tracking-wider",
-                                        selectedClass?.id === classe.id ? "text-text-dark/60" : "text-grey-dark"
-                                    )}>
-                                        {classe.acronyme || 'No ACR'}
-                                    </p>
+                                    <div className="flex flex-wrap gap-1 mt-0.5">
+                                        {classe.acronyme && (
+                                            <span className={clsx(
+                                                "text-[9px] uppercase font-black px-1 rounded flex items-center",
+                                                selectedClass?.id === classe.id ? "bg-black/20 text-text-dark" : "bg-primary/20 text-primary"
+                                            )}>
+                                                {classe.acronyme}
+                                            </span>
+                                        )}
+                                        {classe.ClasseAdulte && classe.ClasseAdulte.length > 0 && (
+                                            <span className={clsx(
+                                                "text-[9px] font-bold px-1 rounded",
+                                                selectedClass?.id === classe.id ? "bg-black/10 text-text-dark/70" : "bg-white/5 text-grey-medium"
+                                            )}>
+                                                {classe.ClasseAdulte.filter(ca => ca.role === 'principal').map(ca => ca.Adulte.nom).join(', ')}
+                                                {classe.ClasseAdulte.length > classe.ClasseAdulte.filter(ca => ca.role === 'principal').length && '+'}
+                                            </span>
+                                        )}
+                                    </div>
                                 </div>
 
                                 <div className={clsx(

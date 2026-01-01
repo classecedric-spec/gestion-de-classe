@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
-import { Home, Users, Settings, BookOpen, Layers, User, GraduationCap, Puzzle, Loader2, Clock } from 'lucide-react';
+import { Home, Users, Settings, BookOpen, Layers, User, GraduationCap, Puzzle, Loader2, Clock, Menu, ChevronLeft } from 'lucide-react';
 import { supabase } from '../lib/supabaseClient';
 import clsx from 'clsx';
 import TimerModal from './TimerModal';
@@ -11,6 +11,22 @@ const Layout = () => {
     const [session, setSession] = useState(null);
     const [loading, setLoading] = useState(true);
     const [profileIncomplete, setProfileIncomplete] = useState(false);
+    const [isSidebarOpen, setIsSidebarOpen] = useState(() => {
+        // Initial state: closed on suivi, open elsewhere unless previously saved (optional)
+        return location.pathname === '/dashboard/suivi' ? false : true;
+    });
+
+    // We only force-collapse it when first entering Suivi page from a non-suivi page
+    // but we don't force-open it when leaving.
+    const prevPathRef = useRef(location.pathname);
+    useEffect(() => {
+        if (location.pathname === '/dashboard/suivi' && prevPathRef.current !== '/dashboard/suivi') {
+            setIsSidebarOpen(false);
+        }
+        prevPathRef.current = location.pathname;
+    }, [location.pathname]);
+
+    const isSuiviPage = location.pathname === '/dashboard/suivi';
 
     // --- TIMER STATE ---
     const [showTimerModal, setShowTimerModal] = useState(false);
@@ -140,11 +156,34 @@ const Layout = () => {
     }
 
     return (
-        <div className="flex h-screen bg-background text-text-main font-sans">
+        <div className="flex h-screen bg-background text-text-main font-sans overflow-hidden">
+            {/* Toggle Button */}
+            {!isSidebarOpen && (
+                <button
+                    onClick={() => setIsSidebarOpen(true)}
+                    className={clsx(
+                        "fixed z-[100] h-[46px] w-[46px] bg-surface text-primary border border-white/10 rounded-xl shadow-xl flex items-center justify-center animate-in fade-in slide-in-from-left-2 transition-all hover:bg-white/5 hover:scale-105 active:scale-95",
+                        isSuiviPage ? "top-[7px] left-4" : "top-[33px] left-6"
+                    )}
+                    title="Afficher le menu"
+                >
+                    <Menu size={22} strokeWidth={2.5} />
+                </button>
+            )}
+
             {/* Sidebar */}
-            <aside className="w-64 bg-surface flex flex-col border-r border-border/10 shadow-lg">
-                <div className="p-6">
-                    <h1 className="text-2xl font-bold text-primary">Gestion Classe</h1>
+            <aside className={clsx(
+                "bg-surface flex flex-col border-r border-border/10 shadow-lg transition-all duration-300 relative z-50",
+                isSidebarOpen ? "w-64" : "w-0 border-none opacity-0"
+            )}>
+                <div className="p-6 flex items-center justify-between">
+                    <h1 className="text-xl font-bold text-primary truncate">Gestion Classe</h1>
+                    <button
+                        onClick={() => setIsSidebarOpen(false)}
+                        className="p-1.5 hover:bg-white/5 rounded-lg text-grey-medium hover:text-white transition-colors"
+                    >
+                        <ChevronLeft size={20} />
+                    </button>
                 </div>
 
                 <nav className="flex-1 px-4 py-4 space-y-2">
@@ -219,7 +258,11 @@ const Layout = () => {
             </aside>
 
             {/* Main Content */}
-            <main className="flex-1 overflow-y-auto p-8 relative">
+            <main className={clsx(
+                "flex-1 overflow-y-auto relative transition-all duration-300",
+                !isSidebarOpen && "pl-20",
+                isSuiviPage ? "p-0" : "p-8"
+            )}>
                 {profileIncomplete && (
                     <div className="absolute top-0 left-0 w-full bg-primary text-text-dark px-4 py-2 text-center font-bold z-50 shadow-md">
                         ⚠️ Merci de compléter votre profil (Nom, Prénom) pour continuer.

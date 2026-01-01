@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabaseClient';
-import { Users, BookOpen, Activity, Check, AlertCircle, Clock, Loader2, Play, RotateCcw } from 'lucide-react';
+import { Users, BookOpen, Activity, Check, AlertCircle, Clock, Loader2, Play, RotateCcw, Filter } from 'lucide-react';
 import clsx from 'clsx';
 import { toast } from 'sonner';
 
@@ -9,6 +9,7 @@ const SuiviPedagogique = () => {
     const [groups, setGroups] = useState([]);
     const [selectedGroupId, setSelectedGroupId] = useState(null);
     const [showGroupSelector, setShowGroupSelector] = useState(true);
+    const [showPendingOnly, setShowPendingOnly] = useState(true);
 
     const [students, setStudents] = useState([]);
     const [selectedStudent, setSelectedStudent] = useState(null);
@@ -51,13 +52,13 @@ const SuiviPedagogique = () => {
 
     useEffect(() => {
         if (selectedStudent) {
-            fetchModules();
+            fetchModules(selectedStudent.id);
             // Reset downstream
             setSelectedModule(null);
             setActivities([]);
             fetchStudentProgressions(selectedStudent.id);
         }
-    }, [selectedStudent]);
+    }, [selectedStudent, showPendingOnly]);
 
     useEffect(() => {
         if (selectedModule) {
@@ -72,7 +73,21 @@ const SuiviPedagogique = () => {
             // We use !inner to filter Eleves that have an entry in EleveGroupe for this groupId
             const { data, error } = await supabase
                 .from('Eleve')
-                .select('*, EleveGroupe!inner(groupe_id)') // Select Eleve columns + inner join
+                .select(`
+                  *,
+                  Classe (
+                    nom,
+                    ClasseAdulte (
+                      role,
+                      Adulte (id, nom, prenom)
+                    )
+                  ),
+                  Niveau (nom),
+                  EleveGroupe!inner(
+                    groupe_id,
+                    Groupe(id, nom)
+                  )
+                `)
                 .eq('EleveGroupe.groupe_id', groupId)
                 .order('prenom');
 
@@ -86,18 +101,74 @@ const SuiviPedagogique = () => {
         }
     };
 
-    const fetchModules = async () => {
+    const fetchModules = async (studentId) => {
+        if (!studentId) return;
         setLoadingModules(true);
         try {
-            // "Modules 'en cours' liés à cet élève".
-            // Simpler implementation: All modules with statut 'en_cours'.
             const { data, error } = await supabase
                 .from('Module')
-                .select('*')
-                .eq('statut', 'en_cours')
-                .order('nom');
+                .select(`
+                    *,
+                    SousBranche:sous_branche_id (
+                        ordre,
+                        Branche:branche_id (ordre)
+                    ),
+                    Activite (
+                        id,
+                        Progression (etat, eleve_id)
+                    )
+                `)
+                .eq('statut', 'en_cours');
+
             if (error) throw error;
-            setModules(data || []);
+
+            const modulesWithStats = (data || []).map(m => {
+                const totalActivities = m.Activite?.length || 0;
+                const completedActivities = m.Activite?.filter(act =>
+                    act.Progression?.some(p => p.eleve_id === studentId && p.etat === 'termine')
+                ).length || 0;
+
+                return {
+                    ...m,
+                    totalActivities,
+                    completedActivities,
+                    percent: totalActivities > 0 ? Math.round((completedActivities / totalActivities) * 100) : 0
+                };
+            });
+
+            const filteredByCompletion = modulesWithStats.filter(m => {
+                // Si aucune activité, on le garde
+                if (m.totalActivities === 0) return true;
+
+                // Filter based on toggle
+                if (showPendingOnly) {
+                    return m.completedActivities < m.totalActivities;
+                }
+                return true;
+            });
+
+            const sortedModules = filteredByCompletion.sort((a, b) => {
+                // 1. Date de fin (nulls à la fin)
+                if (a.date_fin && b.date_fin) {
+                    if (a.date_fin !== b.date_fin) return new Date(a.date_fin) - new Date(b.date_fin);
+                } else if (a.date_fin) return -1;
+                else if (b.date_fin) return 1;
+
+                // 2. Ordre Branche
+                const aBOrder = a.SousBranche?.Branche?.ordre || 0;
+                const bBOrder = b.SousBranche?.Branche?.ordre || 0;
+                if (aBOrder !== bBOrder) return aBOrder - bBOrder;
+
+                // 3. Ordre Sous-Branche
+                const aSBOrder = a.SousBranche?.ordre || 0;
+                const bSBOrder = b.SousBranche?.ordre || 0;
+                if (aSBOrder !== bSBOrder) return aSBOrder - bSBOrder;
+
+                // 4. Alphabétique
+                return a.nom.localeCompare(b.nom);
+            });
+
+            setModules(sortedModules);
         } catch (err) {
             console.error(err);
         } finally {
@@ -110,7 +181,14 @@ const SuiviPedagogique = () => {
         try {
             const { data, error } = await supabase
                 .from('Activite')
-                .select('*')
+                .select(`
+                    *,
+                    ActiviteMateriel (
+                        TypeMateriel (
+                            acronyme
+                        )
+                    )
+                `)
                 .eq('module_id', moduleId)
                 .order('ordre', { ascending: true }); // Assuming 'ordre' or just created_at
             if (error) throw error;
@@ -139,17 +217,49 @@ const SuiviPedagogique = () => {
         }
     };
 
+    // --- POLLING SYNC (Backup for Realtime) ---
+    useEffect(() => {
+        const interval = setInterval(() => {
+            if (students.length > 0) {
+                fetchHelpRequests();
+            }
+            if (selectedStudentRef.current) {
+                fetchStudentProgressions(selectedStudentRef.current.id);
+            }
+        }, 3000); // Poll every 3 seconds
+
+        return () => clearInterval(interval);
+    }, [students]);
+
     // --- HELP REQUESTS LOGIC ---
+    // --- REALTIME SYNC ---
+    const selectedStudentRef = useRef(selectedStudent);
+    useEffect(() => {
+        selectedStudentRef.current = selectedStudent;
+    }, [selectedStudent]);
+
     useEffect(() => {
         if (students.length > 0) {
             fetchHelpRequests();
 
             const channel = supabase
-                .channel('help_requests_updates')
+                .channel('suivi_pedagogique_global')
                 .on(
                     'postgres_changes',
                     { event: '*', schema: 'public', table: 'Progression' },
-                    () => fetchHelpRequests()
+                    (payload) => {
+                        // 1. Update Help Requests List (Always)
+                        fetchHelpRequests();
+
+                        // 2. Update Specific Student View if active (optimizes refreshes)
+                        const currentSelected = selectedStudentRef.current;
+                        const impactedId = payload.new?.eleve_id || payload.old?.eleve_id;
+
+                        // If the update concerns the currently viewed student, refresh their flow
+                        if (currentSelected && impactedId === currentSelected.id) {
+                            fetchStudentProgressions(currentSelected.id);
+                        }
+                    }
                 )
                 .subscribe();
 
@@ -170,10 +280,21 @@ const SuiviPedagogique = () => {
                     id,
                     etat,
                     eleve:Eleve(id, prenom, nom, photo_base64),
-                    activite:Activite(id, titre)
+                    activite:Activite!inner(
+                        id,
+                        titre,
+                        Module!inner(
+                            statut
+                        ),
+                        ActiviteMateriel (
+                            TypeMateriel (
+                                acronyme
+                            )
+                        )
+                    )
                 `)
                 .eq('etat', 'besoin_d_aide')
-                .eq('etat', 'besoin_d_aide')
+                .eq('activite.Module.statut', 'en_cours')
                 .in('eleve_id', studentIds)
                 .order('updated_at', { ascending: true });
 
@@ -269,6 +390,18 @@ const SuiviPedagogique = () => {
         return (student.prenom?.[0] || '') + (student.nom?.[0] || '');
     };
 
+    const calculateAge = (dateString) => {
+        if (!dateString) return 'N/A';
+        const today = new Date();
+        const birthDate = new Date(dateString);
+        let age = today.getFullYear() - birthDate.getFullYear();
+        const m = today.getMonth() - birthDate.getMonth();
+        if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
+            age--;
+        }
+        return `${age} ans`;
+    };
+
     // --- VIEW LOGIC ---
     const currentView = selectedModule ? 'activities' : selectedStudent ? 'modules' : 'students';
 
@@ -321,44 +454,60 @@ const SuiviPedagogique = () => {
                     ) : (
                         <div className="flex flex-col w-full animate-in slide-in-from-left-2 duration-300">
                             {/* Context Info Area */}
-                            <div className="p-4 pb-2 space-y-2">
+                            <div className="p-4 flex flex-col gap-4">
                                 {selectedStudent && (
-                                    <div className="flex items-center gap-3">
-                                        <div className="w-10 h-10 rounded-full overflow-hidden border border-white/10 shadow-sm shrink-0">
-                                            {selectedStudent.photo_base64 ? (
-                                                <img src={selectedStudent.photo_base64} alt="" className="w-full h-full object-cover" />
-                                            ) : (
-                                                <div className="w-full h-full bg-surface flex items-center justify-center text-xs font-bold text-primary">
-                                                    {getInitials(selectedStudent)}
-                                                </div>
-                                            )}
+                                    <div className="flex flex-col gap-3 animate-in fade-in duration-500">
+                                        {/* Avatar & Identité */}
+                                        <div className="flex items-center gap-4">
+                                            <div className="w-16 h-16 rounded-2xl overflow-hidden border-2 border-primary/20 shadow-lg shrink-0 bg-surface">
+                                                {selectedStudent.photo_base64 ? (
+                                                    <img src={selectedStudent.photo_base64} alt="" className="w-full h-full object-cover" />
+                                                ) : (
+                                                    <div className="w-full h-full flex items-center justify-center text-xl font-bold text-primary">
+                                                        {getInitials(selectedStudent)}
+                                                    </div>
+                                                )}
+                                            </div>
+                                            <div className="min-w-0">
+                                                <h3 className="text-xl font-bold text-white leading-tight truncate">
+                                                    {selectedStudent.prenom}
+                                                </h3>
+                                            </div>
                                         </div>
-                                        <div className="min-w-0">
-                                            <h3 className="text-base font-bold text-white leading-tight truncate">
-                                                {selectedStudent.prenom} {selectedStudent.nom}
-                                            </h3>
-                                            {!selectedModule && <p className="text-[10px] text-grey-medium uppercase tracking-wide">Sélectionnez un module</p>}
-                                        </div>
-                                    </div>
-                                )}
 
-                                {selectedModule && (
-                                    <div className="pl-[52px] animate-in fade-in slide-in-from-top-1">
-                                        <div className="text-sm font-bold text-primary truncate">
-                                            {selectedModule.nom}
-                                        </div>
+                                        {selectedModule && (
+                                            <div className="p-3 bg-primary/10 rounded-xl border border-primary/20 animate-in slide-in-from-top-1">
+                                                <span className="text-[10px] uppercase tracking-widest font-black text-primary opacity-70 block mb-1">Module en cours</span>
+                                                <div className="text-sm font-bold text-white truncate leading-tight">
+                                                    {selectedModule.nom}
+                                                </div>
+                                            </div>
+                                        )}
                                     </div>
                                 )}
                             </div>
 
                             {/* Navigation Area */}
-                            <div className="px-4 pb-3 pt-1">
+                            <div className="px-4 pb-3 pt-1 flex items-center justify-between">
                                 <button
                                     onClick={handleBack}
                                     className="text-xs text-grey-medium hover:text-white flex items-center gap-1.5 transition-colors py-1 px-2 rounded-lg hover:bg-white/5 -ml-2"
                                 >
                                     <span className="text-primary text-base">‹</span>
                                     <span className="font-medium">Retour</span>
+                                </button>
+
+                                <button
+                                    onClick={() => setShowPendingOnly(!showPendingOnly)}
+                                    className={clsx(
+                                        "text-[10px] font-bold uppercase tracking-wider flex items-center gap-1.5 px-2 py-1 rounded-lg border transition-all",
+                                        showPendingOnly
+                                            ? "bg-primary/10 border-primary text-primary"
+                                            : "bg-surface/30 border-white/5 text-grey-medium hover:text-white"
+                                    )}
+                                >
+                                    <Filter size={10} />
+                                    {showPendingOnly ? "En cours" : "Tous"}
                                 </button>
                             </div>
                         </div>
@@ -399,18 +548,61 @@ const SuiviPedagogique = () => {
                             <div className="flex justify-center p-4"><Loader2 className="animate-spin text-primary" /></div>
                         ) : (
                             <div className="space-y-2 animate-in fade-in slide-in-from-right-4 duration-300">
-                                {modules.map(module => (
-                                    <button
-                                        key={module.id}
-                                        onClick={() => setSelectedModule(module)}
-                                        className="w-full text-left px-4 py-3 rounded-xl border border-white/5 bg-surface/30 hover:bg-surface/50 hover:border-primary/30 transition-all flex items-center gap-3 group"
-                                    >
-                                        <div className="p-2 bg-white/5 rounded-lg text-primary group-hover:scale-110 transition-transform">
-                                            <BookOpen size={16} />
-                                        </div>
-                                        <span className="text-sm font-medium text-gray-200 group-hover:text-white truncate">{module.nom}</span>
-                                    </button>
-                                ))}
+                                {modules.map(module => {
+                                    const isExpired = module.date_fin && new Date(module.date_fin) < new Date();
+                                    return (
+                                        <button
+                                            key={module.id}
+                                            onClick={() => setSelectedModule(module)}
+                                            className={clsx(
+                                                "w-full text-left px-4 py-3 rounded-xl border flex items-center gap-3 group transition-all",
+                                                isExpired
+                                                    ? "bg-surface/30 border-danger/40 hover:border-danger/60"
+                                                    : "bg-surface/30 border-white/5 hover:bg-surface/50 hover:border-primary/30"
+                                            )}
+                                        >
+                                            <div className="p-2 rounded-lg transition-transform group-hover:scale-110 bg-white/5 text-primary">
+                                                <BookOpen size={16} />
+                                            </div>
+                                            <div className="flex-1 min-w-0">
+                                                <div className="flex items-center justify-between gap-2">
+                                                    <div className="text-sm font-medium text-gray-200 group-hover:text-white transition-colors truncate">
+                                                        {module.nom}
+                                                    </div>
+                                                    {module.date_fin && (
+                                                        <div className={clsx(
+                                                            "text-[10px] font-bold transition-colors shrink-0",
+                                                            isExpired ? "text-danger" : "text-white/60"
+                                                        )}>
+                                                            {new Date(module.date_fin).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' })}
+                                                        </div>
+                                                    )}
+                                                </div>
+
+                                                <div className="mt-2 flex flex-col gap-1.5">
+                                                    <div className="w-full h-1.5 rounded-full bg-black/20 overflow-hidden">
+                                                        <div
+                                                            className={clsx(
+                                                                "h-full transition-all duration-500 ease-out",
+                                                                isExpired ? "bg-danger" : "bg-success"
+                                                            )}
+                                                            style={{
+                                                                width: `${(module.Activite?.length > 0
+                                                                    ? (module.Activite.filter(act => progressions[act.id] === 'termine').length / module.Activite.length) * 100
+                                                                    : 0)}%`
+                                                            }}
+                                                        />
+                                                    </div>
+                                                    {module.SousBranche && (
+                                                        <div className="flex items-center gap-2 text-[10px] text-gray-400 truncate opacity-60">
+                                                            <span>{module.SousBranche.nom}</span>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </button>
+                                    );
+                                })}
                                 {modules.length === 0 && !loadingModules && (
                                     <p className="text-center text-grey-medium text-sm py-4">Aucun module en cours.</p>
                                 )}
@@ -429,10 +621,19 @@ const SuiviPedagogique = () => {
                                     return (
                                         <div key={activity.id} className="p-3 bg-surface/20 rounded-xl border border-white/5 flex flex-col gap-3">
                                             <div className="flex items-center gap-3">
-                                                <div className="w-6 h-6 rounded-md bg-white/5 flex items-center justify-center text-xs text-grey-medium font-bold shrink-0">
-                                                    {activity.ordre || '-'}
-                                                </div>
-                                                <span className="text-sm text-gray-200 font-medium leading-tight">{activity.titre}</span>
+                                                <span className={clsx(
+                                                    "text-sm font-medium leading-tight transition-colors",
+                                                    currentStatus === 'termine' && "text-success font-bold",
+                                                    currentStatus === 'besoin_d_aide' && "text-danger font-bold",
+                                                    currentStatus !== 'termine' && currentStatus !== 'besoin_d_aide' && "text-gray-200"
+                                                )}>
+                                                    {activity.titre}
+                                                    {activity.ActiviteMateriel && activity.ActiviteMateriel.length > 0 && (
+                                                        <span className="ml-1 opacity-70 font-normal">
+                                                            [{activity.ActiviteMateriel.map(am => am.TypeMateriel?.acronyme).filter(Boolean).join(', ')}]
+                                                        </span>
+                                                    )}
+                                                </span>
                                             </div>
 
                                             {/* ACTION BUTTONS */}
@@ -549,6 +750,11 @@ const SuiviPedagogique = () => {
                                         </h4>
                                         <p className="text-[10px] text-grey-medium truncate uppercase tracking-wide">
                                             {req.activite?.titre || 'Activité inconnue'}
+                                            {req.activite?.ActiviteMateriel && req.activite.ActiviteMateriel.length > 0 && (
+                                                <span className="ml-1 opacity-70">
+                                                    [{req.activite.ActiviteMateriel.map(am => am.TypeMateriel?.acronyme).filter(Boolean).join(', ')}]
+                                                </span>
+                                            )}
                                         </p>
                                     </div>
                                     {/* INDICATOR (Hidden when expanded) */}
