@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import { supabase } from '../lib/supabaseClient';
 import { Search, User as UserIcon, Calendar, GraduationCap, ShieldCheck, Loader2, ChevronRight, ChevronDown, Filter, Plus, X, BookOpen, Layers, Trash2, Edit, Users, CheckCircle2, Clock, AlertCircle, LayoutList, GitGraph, FileText } from 'lucide-react';
 import clsx from 'clsx';
@@ -9,6 +10,7 @@ import StudentTrackingPDFModern from '../components/StudentTrackingPDFModern';
 import { saveAs } from 'file-saver';
 
 const Students = () => {
+    const location = useLocation();
     const [students, setStudents] = useState([]);
     const [selectedStudent, setSelectedStudent] = useState(null);
     const [loading, setLoading] = useState(true);
@@ -81,8 +83,22 @@ const Students = () => {
             }
 
             setStudents(data || []);
-            if (data && data.length > 0 && !selectedStudent) {
-                setSelectedStudent(data[0]);
+
+            // Selection Logic with Navigation State Support
+            if (data && data.length > 0) {
+                // 1. Check for incoming navigation state
+                if (location.state?.selectedStudentId) {
+                    const target = data.find(s => s.id === location.state.selectedStudentId);
+                    if (target) {
+                        setSelectedStudent(target);
+                        return;
+                    }
+                }
+
+                // 2. Default to first student if not already selected
+                if (!selectedStudent) {
+                    setSelectedStudent(data[0]);
+                }
             }
         } catch (err) {
             console.error('Error fetching students:', err.message);

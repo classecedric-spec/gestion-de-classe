@@ -20,6 +20,7 @@ import Materiels from './pages/Materiels';
 import Settings from './pages/Settings';
 import SuiviPedagogique from './pages/SuiviPedagogique';
 import Adults from './pages/Adults';
+import AvancementAteliers from './pages/AvancementAteliers';
 import { Navigate } from 'react-router-dom';
 
 function App() {
@@ -31,6 +32,7 @@ function App() {
         <Route path="/dashboard" element={<Layout />}>
           <Route index element={<Home />} />
           <Route path="suivi" element={<SuiviPedagogique />} />
+          <Route path="avancement" element={<AvancementAteliers />} />
           <Route path="user" element={<UserManagement />}>
             <Route index element={<Navigate to="groups" replace />} />
             <Route path="students" element={<Students />} />

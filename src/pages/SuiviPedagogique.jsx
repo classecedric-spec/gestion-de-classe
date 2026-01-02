@@ -624,7 +624,7 @@ const SuiviPedagogique = () => {
                                                 <span className={clsx(
                                                     "text-sm font-medium leading-tight transition-colors",
                                                     currentStatus === 'termine' && "text-success font-bold",
-                                                    currentStatus === 'besoin_d_aide' && "text-danger font-bold",
+                                                    currentStatus === 'besoin_d_aide' && "text-[#A0A8AD] font-bold",
                                                     currentStatus !== 'termine' && currentStatus !== 'besoin_d_aide' && "text-gray-200"
                                                 )}>
                                                     {activity.titre}
@@ -657,8 +657,8 @@ const SuiviPedagogique = () => {
                                                     className={clsx(
                                                         "flex-1 py-2 rounded-lg text-[10px] font-bold uppercase tracking-wide transition-all border",
                                                         currentStatus === 'besoin_d_aide'
-                                                            ? "bg-danger text-white border-danger shadow-sm"
-                                                            : "bg-black/20 border-white/10 text-grey-medium hover:text-danger hover:border-danger/50"
+                                                            ? "bg-[#A0A8AD] text-white border-[#A0A8AD] shadow-sm"
+                                                            : "bg-black/20 border-white/10 text-grey-medium hover:text-[#A0A8AD] hover:border-[#A0A8AD]/50"
                                                     )}
                                                 >
                                                     Aide
@@ -711,9 +711,9 @@ const SuiviPedagogique = () => {
             {/* MIDDLE COLUMN: HELP REQUESTS (25% WIDTH) */}
             <div className="w-1/4 min-w-[300px] h-full border-r border-white/10 bg-surface/5 flex flex-col">
                 <div className="p-4 border-b border-white/5 h-[60px] flex items-center gap-2">
-                    <div className="w-2 h-2 rounded-full bg-danger animate-pulse"></div>
+                    <div className="w-2 h-2 rounded-full bg-[#A0A8AD] animate-pulse"></div>
                     <span className="text-xs font-bold uppercase tracking-wider text-grey-medium">Demandes d'Aide</span>
-                    <span className="ml-auto bg-danger/10 text-danger text-[10px] font-bold px-2 py-0.5 rounded-full">
+                    <span className="ml-auto bg-[#A0A8AD]/10 text-[#A0A8AD] text-[10px] font-bold px-2 py-0.5 rounded-full">
                         {helpRequests.length}
                     </span>
                 </div>
@@ -731,7 +731,7 @@ const SuiviPedagogique = () => {
                                 onClick={() => handleExpandHelp(req.id, req.activite?.id)}
                                 className={clsx(
                                     "p-3 bg-surface rounded-xl border border-white/5 shadow-sm transition-all animate-in slide-in-from-bottom-2 cursor-pointer group hover:border-white/20 select-none",
-                                    expandedRequestId === req.id ? "bg-surface-light border-primary/20 ring-1 ring-primary/10" : "hover:border-danger/30"
+                                    expandedRequestId === req.id ? "bg-surface-light border-primary/20 ring-1 ring-primary/10" : "hover:border-[#A0A8AD]/30"
                                 )}
                             >
                                 <div className="flex items-center gap-3">
@@ -761,7 +761,7 @@ const SuiviPedagogique = () => {
                                     {expandedRequestId !== req.id && (
                                         <div className={clsx(
                                             "px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider transition-colors shadow-sm",
-                                            "bg-danger text-white border border-red-500"
+                                            "bg-[#A0A8AD] text-white border border-[#A0A8AD]"
                                         )}>
                                             Aide
                                         </div>

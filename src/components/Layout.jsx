@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
-import { Home, Users, Settings, BookOpen, Layers, User, GraduationCap, Puzzle, Loader2, Clock, Menu, ChevronLeft } from 'lucide-react';
+import { Home, Users, Settings, BookOpen, Layers, User, GraduationCap, Puzzle, Loader2, Clock, Menu, ChevronLeft, Table } from 'lucide-react';
 import { supabase } from '../lib/supabaseClient';
 import clsx from 'clsx';
 import TimerModal from './TimerModal';
@@ -138,6 +138,7 @@ const Layout = () => {
         { icon: Home, label: 'Accueil', path: '/dashboard' },
         { icon: Users, label: 'Utilisateurs', path: '/dashboard/user' },
         { icon: GraduationCap, label: 'Suivi Pédago.', path: '/dashboard/suivi' },
+        { icon: Table, label: 'Avancement', path: '/dashboard/avancement' },
         { icon: Puzzle, label: 'Activités', path: '/dashboard/activities' },
         { icon: Settings, label: 'Paramètres', path: '/dashboard/settings' },
     ];

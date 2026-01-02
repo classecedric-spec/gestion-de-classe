@@ -1,12 +1,18 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabaseClient';
-import { Layers, Plus, X, Loader2, Trash2, BookOpen, Search, ChevronRight, GraduationCap, Edit, Camera } from 'lucide-react';
+import { Layers, Plus, X, Loader2, Trash2, BookOpen, Search, ChevronRight, GraduationCap, Edit, Camera, LayoutList, FileText } from 'lucide-react';
 import clsx from 'clsx';
 import StudentModal from '../components/StudentModal';
 import AddStudentToGroupModal from '../components/AddStudentToGroupModal';
 import AddGroupModal from '../components/AddGroupModal';
+import { pdf } from '@react-pdf/renderer';
+import { saveAs } from 'file-saver';
+import { PDFDocument, rgb } from 'pdf-lib';
+import StudentTrackingPDFModern from '../components/StudentTrackingPDFModern';
 
 const Groups = () => {
+    const navigate = useNavigate();
     const [groups, setGroups] = useState([]);
     const [selectedGroup, setSelectedGroup] = useState(null);
     const [studentsInGroup, setStudentsInGroup] = useState([]);
@@ -17,6 +23,7 @@ const Groups = () => {
     const [isEditingGroup, setIsEditingGroup] = useState(false);
     const [groupToEdit, setGroupToEdit] = useState(null);
     const [searchQuery, setSearchQuery] = useState('');
+    const [activeTab, setActiveTab] = useState('students');
 
     // Student Modal State
     const [showStudentModal, setShowStudentModal] = useState(false);
@@ -184,6 +191,192 @@ const Groups = () => {
         }
     };
 
+    const handleGenerateGroupTodoList = async (ecoMode = false) => {
+        if (!selectedGroup || studentsInGroup.length === 0) return;
+
+        const filename = `Listes_Travail_${selectedGroup.nom.replace(/\s+/g, '_')}${ecoMode ? '_ECO' : ''}.pdf`;
+        let fileHandle = null;
+
+        // 1. Try to open Save Dialog immediately (User Gesture context)
+        if (window.showSaveFilePicker) {
+            try {
+                fileHandle = await window.showSaveFilePicker({
+                    suggestedName: filename,
+                    types: [{
+                        description: 'PDF Document',
+                        accept: { 'application/pdf': ['.pdf'] },
+                    }],
+                });
+            } catch (err) {
+                // If user cancelled, stop everything
+                if (err.name === 'AbortError') return;
+                // Otherwise continue and try fallback later
+                console.warn('File picker failed, falling back to download', err);
+            }
+        }
+
+        setLoading(true);
+
+        try {
+            // 2. Fetch data needed for PDF generation
+            // Fetch all modules with activities
+            const { data: modulesData, error: modulesError } = await supabase
+                .from('Module')
+                .select(`
+                    id,
+                    nom,
+                    date_fin,
+                    Activite (
+                        id,
+                        titre
+                    )
+                `)
+                .order('date_fin', { ascending: true });
+
+            if (modulesError) throw modulesError;
+
+            // Fetch all progressions for students in this group
+            const { data: progressions, error: progError } = await supabase
+                .from('Progression')
+                .select('*')
+                .in('eleve_id', studentsInGroup.map(s => s.id));
+
+            if (progError) throw progError;
+
+            // 3. Build bulk data for PDF
+            const bulkData = studentsInGroup.map(student => {
+                const studentProgress = progressions.filter(p => p.eleve_id === student.id);
+
+                const activeModules = modulesData.filter(module => {
+                    if (!module.date_fin) return false;
+
+                    // Check completion
+                    const moduleActivities = module.Activite || [];
+                    if (moduleActivities.length === 0) return false;
+
+                    const allValidated = moduleActivities.every(act => {
+                        const prog = studentProgress.find(p => p.activite_id === act.id);
+                        return prog && prog.statut === 'valide';
+                    });
+
+                    if (allValidated) return false; // Hide completed modules
+
+                    return true;
+                }).map(m => ({
+                    title: m.nom,
+                    dueDate: m.date_fin,
+                    activities: m.Activite.map(a => ({
+                        name: a.titre
+                    }))
+                }));
+
+                if (activeModules.length === 0) return null;
+
+                return {
+                    studentName: `${student.prenom} ${student.nom}`,
+                    modules: activeModules,
+                    printDate: new Date().toLocaleDateString('fr-FR')
+                };
+            }).filter(Boolean);
+
+            if (bulkData.length === 0) {
+                alert("Aucun travail à faire trouvé pour ce groupe.");
+                setLoading(false);
+                return;
+            }
+
+            // 4. Generate & Merge PDFs
+            // We create a new PDF Document to merge individual student PDFs
+            // This ensures page numbering (1/N) is reset for each student
+            const mergedPdf = await PDFDocument.create();
+
+            for (const studentData of bulkData) {
+                // Generate individual PDF blob for this student
+                // We use the 'data' prop to generate a single-student document
+                const blob = await pdf(<StudentTrackingPDFModern data={studentData} />).toBlob();
+                const arrayBuffer = await blob.arrayBuffer();
+
+                // Load into pdf-lib
+                const studentDoc = await PDFDocument.load(arrayBuffer);
+
+                // Copy pages
+                const copiedPages = await mergedPdf.copyPages(studentDoc, studentDoc.getPageIndices());
+                copiedPages.forEach((page) => mergedPdf.addPage(page));
+            }
+
+            let finalPdfBlob;
+
+            // 6. Eco Mode (2 pages per sheet)
+            if (ecoMode) {
+                const bookletPdf = await PDFDocument.create();
+
+                // We need to save and reload to be able to embed the merged pages
+                const mergedPdfBytes = await mergedPdf.save();
+                const srcDoc = await PDFDocument.load(mergedPdfBytes);
+
+                // Embed all pages
+                const embeddedPages = await bookletPdf.embedPdf(srcDoc, srcDoc.getPageIndices());
+
+                const pageCount = embeddedPages.length;
+
+                for (let i = 0; i < pageCount; i += 2) {
+                    // Create A4 Landscape page (approx [841.89, 595.28])
+                    const page = bookletPdf.addPage([841.89, 595.28]);
+
+                    // Left Page (i)
+                    const leftPage = embeddedPages[i];
+
+                    page.drawPage(leftPage, {
+                        x: 0,
+                        y: 0,
+                        width: 420.945, // Half width
+                        height: 595.28 // Full height
+                    });
+
+                    // Right Page (i+1)
+                    if (i + 1 < pageCount) {
+                        const rightPage = embeddedPages[i + 1];
+                        page.drawPage(rightPage, {
+                            x: 420.945,
+                            y: 0,
+                            width: 420.945,
+                            height: 595.28
+                        });
+                    }
+
+                    // Divider Line
+                    page.drawLine({
+                        start: { x: 420.945, y: 0 },
+                        end: { x: 420.945, y: 595.28 },
+                        thickness: 1,
+                        color: rgb(0, 0, 0),
+                    });
+                }
+
+                const bookletBytes = await bookletPdf.save();
+                finalPdfBlob = new Blob([bookletBytes], { type: 'application/pdf' });
+            } else {
+                // 5. Standard Save
+                const mergedPdfBytes = await mergedPdf.save();
+                finalPdfBlob = new Blob([mergedPdfBytes], { type: 'application/pdf' });
+            }
+
+            if (fileHandle) {
+                const writable = await fileHandle.createWritable();
+                await writable.write(finalPdfBlob);
+                await writable.close();
+            } else {
+                saveAs(finalPdfBlob, filename);
+            }
+
+        } catch (error) {
+            console.error("Error generating PDF:", error);
+            alert("Erreur lors de la génération du PDF.");
+        } finally {
+            setLoading(false);
+        }
+    };
+
     const filteredGroups = groups.filter(g =>
         g.nom.toLowerCase().includes(searchQuery.toLowerCase()) ||
         g.acronyme?.toLowerCase().includes(searchQuery.toLowerCase())
@@ -348,78 +541,152 @@ const Groups = () => {
 
                         </div>
 
-
-                        {/* Students List */}
-                        <div className="flex-1 overflow-y-auto p-8 custom-scrollbar bg-background/20">
-                            <h3 className="text-sm font-bold uppercase tracking-widest text-grey-dark border-b border-white/5 pb-4 mb-6 flex items-center gap-2">
-                                <GraduationCap size={18} className="text-primary" />
-                                Les enfants de ce groupe
-                            </h3>
-
-                            {loadingStudents ? (
-                                <div className="flex flex-col items-center justify-center py-12 gap-3">
-                                    <Loader2 className="animate-spin text-primary" size={32} />
-                                    <p className="text-grey-medium animate-pulse text-sm">Chargement des élèves...</p>
-                                </div>
-                            ) : studentsInGroup.length === 0 ? (
-                                <div className="text-center py-12 p-8 bg-white/5 rounded-2xl border border-dashed border-white/10 flex flex-col items-center gap-4">
-                                    <GraduationCap size={48} className="mx-auto text-grey-dark opacity-20" />
-                                    <div>
-                                        <p className="text-grey-medium italic">Aucun enfant dans ce groupe pour le moment.</p>
-                                        <p className="text-xs text-grey-dark mt-1">Cliquez sur le bouton ci-dessous pour ajouter des élèves.</p>
-                                    </div>
-                                </div>
-                            ) : (
-                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                                    {studentsInGroup.map(student => (
-                                        <div key={student.id} className="relative group/card">
-                                            <button
-                                                onClick={(e) => handleRemoveStudentFromGroup(e, student.id)}
-                                                className="absolute -top-2 -right-2 z-10 p-2 bg-danger/10 hover:bg-danger text-danger hover:text-white rounded-full border border-danger/20 opacity-0 group-hover/card:opacity-100 transition-all shadow-lg scale-90 hover:scale-100"
-                                                title="Retirer du groupe"
-                                            >
-                                                <X size={14} strokeWidth={3} />
-                                            </button>
-                                            <button
-                                                onClick={() => handleEditStudent(student)}
-                                                className="w-full flex items-center gap-4 p-4 rounded-xl bg-white/5 border border-white/5 hover:border-primary/30 hover:bg-white/10 transition-all text-left group"
-                                            >
-                                                <div className={clsx(
-                                                    "w-12 h-12 rounded-lg flex items-center justify-center text-lg font-bold text-primary group-hover:scale-110 transition-transform overflow-hidden shadow-inner",
-                                                    student.photo_base64 ? "bg-[#D9B981]" : "bg-background"
-                                                )}>
-                                                    {student.photo_base64 ? (
-                                                        <img src={student.photo_base64} alt="Student" className="w-[90%] h-[90%] object-contain" />
-                                                    ) : (
-                                                        <>{student.prenom[0]}{student.nom[0]}</>
-                                                    )}
-                                                </div>
-                                                <div className="flex-1 min-w-0">
-                                                    <p className="font-semibold text-text-main group-hover:text-primary transition-colors">
-                                                        {student.prenom} {student.nom}
-                                                    </p>
-                                                    <p className="text-xs text-grey-medium">
-                                                        {student.Classe?.nom || 'Sans classe'}
-                                                    </p>
-                                                </div>
-                                                <ChevronRight size={16} className="text-grey-dark group-hover:text-primary group-hover:translate-x-1 transition-all" />
-                                            </button>
-                                        </div>
-                                    ))}
-
-                                </div>
-                            )}
-                        </div>
-
-                        <div className="p-4 border-t border-white/5 bg-surface/30">
+                        {/* Tabs */}
+                        <div className="flex items-center gap-1 px-8 border-b border-white/5 bg-surface/20">
                             <button
-                                onClick={() => setShowAddToGroupModal(true)}
-                                className="w-full py-3 bg-white/5 hover:bg-primary/20 hover:text-primary text-grey-light rounded-xl border border-dashed border-white/20 hover:border-primary/50 transition-all flex items-center justify-center gap-2 group"
+                                onClick={() => setActiveTab('students')}
+                                className={clsx(
+                                    "px-4 py-3 text-sm font-bold border-b-2 transition-colors flex items-center gap-2",
+                                    activeTab === 'students' ? "border-primary text-primary" : "border-transparent text-grey-medium hover:text-white"
+                                )}
                             >
-                                <Plus size={18} className="group-hover:scale-110 transition-transform" />
-                                <span className="font-medium">Ajouter un enfant</span>
+                                <GraduationCap size={16} />
+                                Liste des élèves
+                            </button>
+                            <button
+                                onClick={() => setActiveTab('actions')}
+                                className={clsx(
+                                    "px-4 py-3 text-sm font-bold border-b-2 transition-colors flex items-center gap-2",
+                                    activeTab === 'actions' ? "border-primary text-primary" : "border-transparent text-grey-medium hover:text-white"
+                                )}
+                            >
+                                <LayoutList size={16} />
+                                Boutons d'action
                             </button>
                         </div>
+
+                        {/* Students List Tab */}
+                        {activeTab === 'students' && (
+                            <>
+                                <div className="flex-1 overflow-y-auto p-8 custom-scrollbar bg-background/20">
+                                    <h3 className="text-sm font-bold uppercase tracking-widest text-grey-dark border-b border-white/5 pb-4 mb-6 flex items-center gap-2">
+                                        <GraduationCap size={18} className="text-primary" />
+                                        Les enfants de ce groupe
+                                    </h3>
+
+                                    {loadingStudents ? (
+                                        <div className="flex flex-col items-center justify-center py-12 gap-3">
+                                            <Loader2 className="animate-spin text-primary" size={32} />
+                                            <p className="text-grey-medium animate-pulse text-sm">Chargement des élèves...</p>
+                                        </div>
+                                    ) : studentsInGroup.length === 0 ? (
+                                        <div className="text-center py-12 p-8 bg-white/5 rounded-2xl border border-dashed border-white/10 flex flex-col items-center gap-4">
+                                            <GraduationCap size={48} className="mx-auto text-grey-dark opacity-20" />
+                                            <div>
+                                                <p className="text-grey-medium italic">Aucun enfant dans ce groupe pour le moment.</p>
+                                                <p className="text-xs text-grey-dark mt-1">Cliquez sur le bouton ci-dessous pour ajouter des élèves.</p>
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                                            {studentsInGroup.map(student => (
+                                                <div key={student.id} className="relative group/card">
+                                                    <button
+                                                        onClick={(e) => handleRemoveStudentFromGroup(e, student.id)}
+                                                        className="absolute -top-2 -right-2 z-10 p-2 bg-danger/10 hover:bg-danger text-danger hover:text-white rounded-full border border-danger/20 opacity-0 group-hover/card:opacity-100 transition-all shadow-lg scale-90 hover:scale-100"
+                                                        title="Retirer du groupe"
+                                                    >
+                                                        <X size={14} strokeWidth={3} />
+                                                    </button>
+                                                    <div
+                                                        onClick={() => navigate('/dashboard/user/students', { state: { selectedStudentId: student.id } })}
+                                                        className="w-full flex items-center gap-4 p-4 rounded-xl bg-white/5 border border-white/5 hover:border-primary/30 hover:bg-white/10 transition-all text-left group cursor-pointer"
+                                                    >
+                                                        <div className={clsx(
+                                                            "w-12 h-12 rounded-lg flex items-center justify-center text-lg font-bold text-primary group-hover:scale-110 transition-transform overflow-hidden shadow-inner",
+                                                            student.photo_base64 ? "bg-[#D9B981]" : "bg-background"
+                                                        )}>
+                                                            {student.photo_base64 ? (
+                                                                <img src={student.photo_base64} alt="Student" className="w-[90%] h-[90%] object-contain" />
+                                                            ) : (
+                                                                <>{student.prenom[0]}{student.nom[0]}</>
+                                                            )}
+                                                        </div>
+                                                        <div className="flex-1 min-w-0">
+                                                            <p className="font-semibold text-text-main group-hover:text-primary transition-colors">
+                                                                {student.prenom} {student.nom}
+                                                            </p>
+                                                            <p className="text-xs text-grey-medium">
+                                                                {student.Classe?.nom || 'Sans classe'}
+                                                            </p>
+                                                        </div>
+
+                                                        {/* Edit Button */}
+                                                        <button
+                                                            onClick={(e) => { e.stopPropagation(); handleEditStudent(student); }}
+                                                            className="p-1.5 text-grey-medium hover:text-white hover:bg-white/10 rounded-full transition-colors opacity-0 group-hover:opacity-100 mr-2"
+                                                            title="Modifier"
+                                                        >
+                                                            <Edit size={14} />
+                                                        </button>
+
+                                                        <ChevronRight size={16} className="text-grey-dark group-hover:text-primary group-hover:translate-x-1 transition-all" />
+                                                    </div>
+                                                </div>
+                                            ))}
+
+                                        </div>
+                                    )}
+                                </div>
+
+
+                                <div className="p-4 border-t border-white/5 bg-surface/30">
+                                    <button
+                                        onClick={() => setShowAddToGroupModal(true)}
+                                        className="w-full py-3 bg-white/5 hover:bg-primary/20 hover:text-primary text-grey-light rounded-xl border border-dashed border-white/20 hover:border-primary/50 transition-all flex items-center justify-center gap-2 group"
+                                    >
+                                        <Plus size={18} className="group-hover:scale-110 transition-transform" />
+                                        <span className="font-medium">Nouveau Groupe</span>
+                                    </button>
+                                </div>
+                            </>
+                        )}
+
+                        {/* Actions Tab */}
+                        {activeTab === 'actions' && (
+                            <div className="flex-1 flex flex-col items-center justify-center text-grey-dark p-12 text-center bg-background/20">
+                                <div className="w-full max-w-md space-y-4">
+                                    <div className="bg-surface/50 p-6 rounded-2xl border border-white/10 shadow-lg">
+                                        <div className="w-16 h-16 bg-primary/20 text-primary rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-inner">
+                                            <FileText size={32} />
+                                        </div>
+                                        <h3 className="text-lg font-bold text-text-main mb-2">Générer les listes de travail</h3>
+                                        <p className="text-sm text-grey-medium mb-6">
+                                            Téléchargez un fichier PDF unique contenant les listes de travail (To-Do Lists) pour tous les élèves de ce groupe.
+                                        </p>
+                                        <div className="grid grid-cols-2 gap-3">
+                                            <button
+                                                onClick={() => handleGenerateGroupTodoList(false)}
+                                                disabled={loading}
+                                                className="w-full py-3 bg-primary hover:bg-primary/90 text-white rounded-xl font-bold shadow-lg shadow-primary/20 flex flex-col items-center justify-center gap-1 transition-all hover:scale-[1.02] active:scale-[0.98]"
+                                            >
+                                                {loading ? <Loader2 className="animate-spin" size={20} /> : <FileText size={20} />}
+                                                <span className="text-sm">Standard (A4)</span>
+                                            </button>
+                                            <button
+                                                onClick={() => handleGenerateGroupTodoList(true)}
+                                                disabled={loading}
+                                                className="w-full py-3 bg-secondary hover:bg-secondary/90 text-white rounded-xl font-bold shadow-lg shadow-secondary/20 flex flex-col items-center justify-center gap-1 transition-all hover:scale-[1.02] active:scale-[0.98]"
+                                                title="2 pages par feuille, mode paysage"
+                                            >
+                                                {loading ? <Loader2 className="animate-spin" size={20} /> : <div className="flex gap-0.5"><FileText size={16} /><FileText size={16} /></div>}
+                                                <span className="text-sm">Éco (A5)</span>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
                     </>
                 )}
             </div>
