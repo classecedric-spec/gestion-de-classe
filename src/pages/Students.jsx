@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import { supabase } from '../lib/supabaseClient';
+import { calculateAge } from '../lib/utils';
 import { Search, User as UserIcon, Calendar, GraduationCap, ShieldCheck, Loader2, ChevronRight, ChevronDown, Filter, Plus, X, BookOpen, Layers, Trash2, Edit, Users, CheckCircle2, Clock, AlertCircle, LayoutList, GitGraph, FileText } from 'lucide-react';
 import clsx from 'clsx';
 import StudentModal from '../components/StudentModal';
@@ -133,19 +134,6 @@ const Students = () => {
                 .single();
             if (updatedStudent) setSelectedStudent(updatedStudent);
         }
-    };
-
-    const calculateAge = (dateString) => {
-        if (!dateString) return 'N/A';
-        const today = new Date();
-        const birthDate = new Date(dateString);
-        let age = today.getFullYear() - birthDate.getFullYear();
-        const m = today.getMonth() - birthDate.getMonth();
-        if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
-            age--;
-        }
-        return `${age} ans`;
-        return `${age} ans`;
     };
 
     const fetchStudentProgress = async (studentId) => {

@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
-import { Home, Users, Settings, BookOpen, Layers, User, GraduationCap, Puzzle, Loader2, Clock, Menu, ChevronLeft, Table } from 'lucide-react';
+import { Home, Users, Settings, BookOpen, Layers, User, GraduationCap, Puzzle, Loader2, Clock, Menu, ChevronLeft } from 'lucide-react';
 import { supabase } from '../lib/supabaseClient';
 import clsx from 'clsx';
 import TimerModal from './TimerModal';
@@ -137,8 +137,7 @@ const Layout = () => {
     const navItems = [
         { icon: Home, label: 'Accueil', path: '/dashboard' },
         { icon: Users, label: 'Utilisateurs', path: '/dashboard/user' },
-        { icon: GraduationCap, label: 'Suivi Pédago.', path: '/dashboard/suivi' },
-        { icon: Table, label: 'Avancement', path: '/dashboard/avancement' },
+        { icon: GraduationCap, label: 'Suivi Global', path: '/dashboard/suivi' },
         { icon: Puzzle, label: 'Activités', path: '/dashboard/activities' },
         { icon: Settings, label: 'Paramètres', path: '/dashboard/settings' },
     ];
@@ -175,7 +174,7 @@ const Layout = () => {
             {/* Sidebar */}
             <aside className={clsx(
                 "bg-surface flex flex-col border-r border-border/10 shadow-lg transition-all duration-300 relative z-50",
-                isSidebarOpen ? "w-64" : "w-0 border-none opacity-0"
+                isSidebarOpen ? "w-64" : "w-0 border-none opacity-0 pointer-events-none overflow-hidden"
             )}>
                 <div className="p-6 flex items-center justify-between">
                     <h1 className="text-xl font-bold text-primary truncate">Gestion Classe</h1>

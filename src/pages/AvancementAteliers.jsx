@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabaseClient';
+import { getInitials, getStatusColorClasses } from '../lib/utils';
 import { Users, BookOpen, Calendar, Check, AlertCircle, Clock, Search, ChevronDown, Filter } from 'lucide-react';
 import clsx from 'clsx';
 
@@ -166,20 +167,6 @@ const AvancementAteliers = () => {
         }
     };
 
-    // --- HELPERS ---
-    const getInitials = (student) => {
-        return (student.prenom?.[0] || '') + (student.nom?.[0] || '');
-    };
-
-    const getStatusColor = (status) => {
-        switch (status) {
-            case 'termine': return 'bg-success text-white border-success';
-            case 'besoin_d_aide': return 'bg-[#A0A8AD] text-white border-[#A0A8AD]';
-            case 'en_cours': return 'bg-primary/20 text-primary border-primary'; // Assuming 'en_cours' exists or similar
-            default: return 'bg-surface/50 text-grey-medium border-white/5';
-        }
-    };
-
     const getStatusIcon = (status) => {
         switch (status) {
             case 'termine': return <Check size={14} />;
@@ -188,6 +175,7 @@ const AvancementAteliers = () => {
             default: return null;
         }
     };
+
 
     return (
         <div className="flex flex-col h-full bg-background p-6 space-y-6 overflow-hidden">
@@ -376,7 +364,7 @@ const AvancementAteliers = () => {
                                                 <td key={act.id} className="p-2 border-b border-white/5 text-center bg-transparent relative">
                                                     <div className={clsx(
                                                         "w-full h-10 rounded-lg flex items-center justify-center border transition-all",
-                                                        getStatusColor(status)
+                                                        getStatusColorClasses(status)
                                                     )}>
                                                         {getStatusIcon(status) || <span className="w-1.5 h-1.5 rounded-full bg-white/10" />}
                                                     </div>

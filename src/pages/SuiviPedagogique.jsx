@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabaseClient';
+import { getInitials, calculateAge } from '../lib/utils';
 import { Users, BookOpen, Activity, Check, AlertCircle, Clock, Loader2, Play, RotateCcw, Filter } from 'lucide-react';
 import clsx from 'clsx';
 import { toast } from 'sonner';
@@ -28,6 +29,42 @@ const SuiviPedagogique = () => {
     const [helpRequests, setHelpRequests] = useState([]);
     const [expandedRequestId, setExpandedRequestId] = useState(null);
     const [helpersCache, setHelpersCache] = useState({});
+
+    // --- RESIZABLE COLUMN STATE ---
+    const [leftColumnWidth, setLeftColumnWidth] = useState(240);
+    const isResizing = useRef(false);
+    const containerRef = useRef(null);
+
+    // --- RESIZE HANDLERS ---
+    const handleMouseDown = (e) => {
+        isResizing.current = true;
+        document.body.style.cursor = 'col-resize';
+        document.body.style.userSelect = 'none';
+    };
+
+    useEffect(() => {
+        const handleMouseMove = (e) => {
+            if (!isResizing.current || !containerRef.current) return;
+            const containerRect = containerRef.current.getBoundingClientRect();
+            const newWidth = e.clientX - containerRect.left;
+            // Clamp between 180px and 400px
+            setLeftColumnWidth(Math.max(180, Math.min(400, newWidth)));
+        };
+
+        const handleMouseUp = () => {
+            isResizing.current = false;
+            document.body.style.cursor = '';
+            document.body.style.userSelect = '';
+        };
+
+        document.addEventListener('mousemove', handleMouseMove);
+        document.addEventListener('mouseup', handleMouseUp);
+
+        return () => {
+            document.removeEventListener('mousemove', handleMouseMove);
+            document.removeEventListener('mouseup', handleMouseUp);
+        };
+    }, []);
 
     // --- INITIAL LOAD ---
     useEffect(() => {
@@ -385,23 +422,6 @@ const SuiviPedagogique = () => {
         setShowGroupSelector(false);
     };
 
-    // --- RENDER HELPERS ---
-    const getInitials = (student) => {
-        return (student.prenom?.[0] || '') + (student.nom?.[0] || '');
-    };
-
-    const calculateAge = (dateString) => {
-        if (!dateString) return 'N/A';
-        const today = new Date();
-        const birthDate = new Date(dateString);
-        let age = today.getFullYear() - birthDate.getFullYear();
-        const m = today.getMonth() - birthDate.getMonth();
-        if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
-            age--;
-        }
-        return `${age} ans`;
-    };
-
     // --- VIEW LOGIC ---
     const currentView = selectedModule ? 'activities' : selectedStudent ? 'modules' : 'students';
 
@@ -416,7 +436,7 @@ const SuiviPedagogique = () => {
     };
 
     return (
-        <div className="w-full h-full flex bg-background relative overflow-hidden">
+        <div ref={containerRef} className="w-full h-full flex bg-background relative overflow-hidden">
 
             {/* STEP 0: SELECTOR MODAL */}
             {showGroupSelector && (
@@ -442,8 +462,11 @@ const SuiviPedagogique = () => {
                 </div>
             )}
 
-            {/* LEFT COLUMN: DRILL DOWN INTERFACE (25% WIDTH) */}
-            <div className="w-1/4 min-w-[300px] h-full border-r border-white/10 bg-surface/10 flex flex-col transition-all duration-300">
+            {/* LEFT COLUMN: DRILL DOWN INTERFACE */}
+            <div
+                className="h-full bg-surface/10 flex flex-col transition-colors duration-300 shrink-0 relative"
+                style={{ width: leftColumnWidth }}
+            >
 
                 {/* HEADER / BREADCRUMBS */}
                 <div className="flex flex-col border-b border-white/5 bg-surface/5">
@@ -522,12 +545,19 @@ const SuiviPedagogique = () => {
                         loadingStudents ? (
                             <div className="flex justify-center p-4"><Loader2 className="animate-spin text-primary" /></div>
                         ) : (
-                            <div className="grid grid-cols-4 gap-3 p-2 animate-in fade-in slide-in-from-left-4 duration-300">
-                                {students.map(student => (
+                            <div
+                                className="grid gap-2 p-2 pt-4 animate-in fade-in slide-in-from-left-4 duration-300 overflow-y-auto"
+                                style={{
+                                    maxHeight: '50vh',
+                                    gridTemplateColumns: `repeat(4, 1fr)`,
+                                    gridAutoRows: 'min-content'
+                                }}
+                            >
+                                {students.slice(0, 80).map(student => (
                                     <button
                                         key={student.id}
                                         onClick={() => setSelectedStudent(student)}
-                                        className="aspect-square rounded-full flex items-center justify-center border-2 border-white/10 hover:border-primary/50 hover:scale-105 transition-all relative group overflow-hidden bg-surface"
+                                        className="aspect-square rounded-full flex items-center justify-center border border-white/10 hover:border-primary/50 hover:scale-110 transition-all relative group overflow-hidden bg-surface"
                                         title={`${student.prenom} ${student.nom}`}
                                     >
                                         {student.photo_base64 ? (
@@ -535,7 +565,6 @@ const SuiviPedagogique = () => {
                                         ) : (
                                             <span className="text-[10px] font-bold text-primary">{getInitials(student)}</span>
                                         )}
-                                        {/* Hover overlay name? Optional, user asked for "just photos" */}
                                     </button>
                                 ))}
                             </div>
@@ -555,50 +584,37 @@ const SuiviPedagogique = () => {
                                             key={module.id}
                                             onClick={() => setSelectedModule(module)}
                                             className={clsx(
-                                                "w-full text-left px-4 py-3 rounded-xl border flex items-center gap-3 group transition-all",
+                                                "w-full text-left px-3 py-2.5 rounded-xl border group transition-all",
                                                 isExpired
                                                     ? "bg-surface/30 border-danger/40 hover:border-danger/60"
                                                     : "bg-surface/30 border-white/5 hover:bg-surface/50 hover:border-primary/30"
                                             )}
                                         >
-                                            <div className="p-2 rounded-lg transition-transform group-hover:scale-110 bg-white/5 text-primary">
-                                                <BookOpen size={16} />
+                                            <div className="text-sm font-medium text-gray-200 group-hover:text-white transition-colors truncate mb-1.5">
+                                                {module.nom}
                                             </div>
-                                            <div className="flex-1 min-w-0">
-                                                <div className="flex items-center justify-between gap-2">
-                                                    <div className="text-sm font-medium text-gray-200 group-hover:text-white transition-colors truncate">
-                                                        {module.nom}
-                                                    </div>
-                                                    {module.date_fin && (
-                                                        <div className={clsx(
-                                                            "text-[10px] font-bold transition-colors shrink-0",
-                                                            isExpired ? "text-danger" : "text-white/60"
-                                                        )}>
-                                                            {new Date(module.date_fin).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' })}
-                                                        </div>
-                                                    )}
+                                            <div className="flex items-center gap-2">
+                                                <div className="flex-1 h-1.5 rounded-full bg-black/20 overflow-hidden">
+                                                    <div
+                                                        className={clsx(
+                                                            "h-full transition-all duration-500 ease-out",
+                                                            isExpired ? "bg-danger" : "bg-success"
+                                                        )}
+                                                        style={{
+                                                            width: `${(module.Activite?.length > 0
+                                                                ? (module.Activite.filter(act => progressions[act.id] === 'termine').length / module.Activite.length) * 100
+                                                                : 0)}%`
+                                                        }}
+                                                    />
                                                 </div>
-
-                                                <div className="mt-2 flex flex-col gap-1.5">
-                                                    <div className="w-full h-1.5 rounded-full bg-black/20 overflow-hidden">
-                                                        <div
-                                                            className={clsx(
-                                                                "h-full transition-all duration-500 ease-out",
-                                                                isExpired ? "bg-danger" : "bg-success"
-                                                            )}
-                                                            style={{
-                                                                width: `${(module.Activite?.length > 0
-                                                                    ? (module.Activite.filter(act => progressions[act.id] === 'termine').length / module.Activite.length) * 100
-                                                                    : 0)}%`
-                                                            }}
-                                                        />
+                                                {module.date_fin && (
+                                                    <div className={clsx(
+                                                        "text-[10px] font-bold shrink-0",
+                                                        isExpired ? "text-danger" : "text-white/50"
+                                                    )}>
+                                                        {new Date(module.date_fin).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' })}
                                                     </div>
-                                                    {module.SousBranche && (
-                                                        <div className="flex items-center gap-2 text-[10px] text-gray-400 truncate opacity-60">
-                                                            <span>{module.SousBranche.nom}</span>
-                                                        </div>
-                                                    )}
-                                                </div>
+                                                )}
                                             </div>
                                         </button>
                                     );
@@ -648,7 +664,7 @@ const SuiviPedagogique = () => {
                                                             : "bg-black/20 border-white/10 text-grey-medium hover:text-primary hover:border-primary/50"
                                                     )}
                                                 >
-                                                    A commencer
+                                                    A.C.
                                                 </button>
 
                                                 {/* Aide */}
@@ -675,7 +691,7 @@ const SuiviPedagogique = () => {
                                                     )}
                                                 >
                                                     <Check size={12} className={currentStatus === 'termine' ? "inline" : "hidden"} />
-                                                    Fini
+                                                    Validé
                                                 </button>
                                             </div>
                                         </div>
@@ -708,8 +724,20 @@ const SuiviPedagogique = () => {
                 )}
             </div>
 
-            {/* MIDDLE COLUMN: HELP REQUESTS (25% WIDTH) */}
-            <div className="w-1/4 min-w-[300px] h-full border-r border-white/10 bg-surface/5 flex flex-col">
+            {/* RESIZABLE DIVIDER */}
+            <div
+                onMouseDown={handleMouseDown}
+                className="w-1 h-full bg-white/10 hover:bg-primary/50 cursor-col-resize transition-colors duration-200 shrink-0 group flex items-center justify-center"
+                title="Glisser pour redimensionner"
+            >
+                <div className="w-0.5 h-8 bg-white/20 group-hover:bg-primary rounded-full transition-colors" />
+            </div>
+
+            {/* MIDDLE COLUMN: HELP REQUESTS */}
+            <div
+                className="h-full border-r border-white/10 bg-surface/5 flex flex-col shrink-0"
+                style={{ width: leftColumnWidth }}
+            >
                 <div className="p-4 border-b border-white/5 h-[60px] flex items-center gap-2">
                     <div className="w-2 h-2 rounded-full bg-[#A0A8AD] animate-pulse"></div>
                     <span className="text-xs font-bold uppercase tracking-wider text-grey-medium">Demandes d'Aide</span>
