@@ -1,114 +1,113 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
-import { Home, Users, Settings, BookOpen, Layers, User, GraduationCap, Puzzle, Loader2, Clock, Menu, ChevronLeft } from 'lucide-react';
 import { supabase } from '../lib/supabaseClient';
+import { checkOverdueActivities } from '../lib/overdueLogic';
+import {
+    LayoutDashboard,
+    Users,
+    GraduationCap,
+    Puzzle,
+    Settings,
+    LogOut,
+    ChevronLeft,
+    Menu,
+    Loader2,
+    Calendar as CalendarIcon,
+    Home,
+    User,
+    Clock,
+    Flame
+} from 'lucide-react';
 import clsx from 'clsx';
 import TimerModal from './TimerModal';
 
 const Layout = () => {
-    const location = useLocation();
-    const navigate = useNavigate();
+    const [isSidebarOpen, setIsSidebarOpen] = useState(true);
     const [session, setSession] = useState(null);
     const [loading, setLoading] = useState(true);
     const [profileIncomplete, setProfileIncomplete] = useState(false);
-    const [isSidebarOpen, setIsSidebarOpen] = useState(() => {
-        // Initial state: closed on suivi, open elsewhere unless previously saved (optional)
-        return location.pathname === '/dashboard/suivi' ? false : true;
-    });
+    const location = useLocation();
+    const navigate = useNavigate();
 
-    // We only force-collapse it when first entering Suivi page from a non-suivi page
-    // but we don't force-open it when leaving.
-    const prevPathRef = useRef(location.pathname);
-    useEffect(() => {
-        if (location.pathname === '/dashboard/suivi' && prevPathRef.current !== '/dashboard/suivi') {
-            setIsSidebarOpen(false);
-        }
-        prevPathRef.current = location.pathname;
-    }, [location.pathname]);
+    // Timer State
+    const [showTimerModal, setShowTimerModal] = useState(false);
+    const [timerFinished, setTimerFinished] = useState(false);
+    const [timer, setTimer] = useState({
+        active: false,
+        duration: 0,
+        timeLeft: 0,
+        message: ''
+    });
 
     const isSuiviPage = location.pathname === '/dashboard/suivi';
 
-    // --- TIMER STATE ---
-    const [showTimerModal, setShowTimerModal] = useState(false);
-    const [timer, setTimer] = useState({ active: false, timeLeft: 0, duration: 0, message: '' });
-    const [timerFinished, setTimerFinished] = useState(false);
-    const timerInterval = useRef(null);
+    // Format current date
+    const formattedDate = new Intl.DateTimeFormat('fr-FR', {
+        weekday: 'long',
+        day: 'numeric',
+        month: 'long'
+    }).format(new Date());
 
-    // --- DATE ---
-    const today = new Date();
-    const dateStr = today.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' });
-    const formattedDate = dateStr.charAt(0).toUpperCase() + dateStr.slice(1);
-
-    // --- TIMER LOGIC ---
+    // Timer Logic
     useEffect(() => {
+        let interval;
         if (timer.active && timer.timeLeft > 0) {
-            timerInterval.current = setInterval(() => {
-                setTimer((prev) => {
-                    if (prev.timeLeft <= 1) {
-                        clearInterval(timerInterval.current);
-                        setTimerFinished(true);
-                        return { ...prev, active: false, timeLeft: 0 };
-                    }
-                    return { ...prev, timeLeft: prev.timeLeft - 1 };
-                });
+            interval = setInterval(() => {
+                setTimer(prev => ({
+                    ...prev,
+                    timeLeft: prev.timeLeft - 1
+                }));
             }, 1000);
-        } else {
-            clearInterval(timerInterval.current);
+        } else if (timer.active && timer.timeLeft === 0) {
+            setTimer(prev => ({ ...prev, active: false }));
+            setTimerFinished(true);
+            // Alert sound or notification could go here
+            if ('vibrate' in navigator) {
+                navigator.vibrate([200, 100, 200]);
+            }
         }
-        return () => clearInterval(timerInterval.current);
-    }, [timer.active]);
+        return () => clearInterval(interval);
+    }, [timer.active, timer.timeLeft]);
 
-    const startTimer = (durationSeconds, message = '') => {
-        setTimer({ active: true, timeLeft: durationSeconds, duration: durationSeconds, message });
+    const startTimer = (duration, message) => {
+        setTimer({
+            active: true,
+            duration,
+            timeLeft: duration,
+            message
+        });
+        setShowTimerModal(false);
     };
 
     const formatTime = (seconds) => {
-        const m = Math.floor(seconds / 60);
-        const s = seconds % 60;
-        return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+        const mins = Math.floor(seconds / 60);
+        const secs = seconds % 60;
+        return `${mins}:${secs.toString().padStart(2, '0')}`;
     };
 
     useEffect(() => {
         supabase.auth.getSession().then(({ data: { session } }) => {
             setSession(session);
             setLoading(false);
+            if (session) {
+                checkProfile(session.user.id);
+                checkOverdueActivities(session.user.id);
+            }
         });
 
-        const {
-            data: { subscription },
-        } = supabase.auth.onAuthStateChange((_event, session) => {
+        const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
             setSession(session);
             setLoading(false);
+            if (session) {
+                checkProfile(session.user.id);
+                checkOverdueActivities(session.user.id);
+            }
         });
 
         return () => subscription.unsubscribe();
     }, []);
 
-    useEffect(() => {
-        if (!session) return;
 
-        checkProfile(session.user.id);
-
-        const channel = supabase
-            .channel('profile_changes')
-            .on(
-                'postgres_changes',
-                {
-                    event: '*',
-                    schema: 'public',
-                    table: 'CompteUtilisateur',
-                    filter: `id=eq.${session.user.id}`,
-                },
-                () => {
-                    checkProfile(session.user.id);
-                }
-            )
-            .subscribe();
-
-        return () => {
-            supabase.removeChannel(channel);
-        };
-    }, [session]);
 
     // Effect to enforce profile completion on route change
     useEffect(() => {
@@ -135,7 +134,7 @@ const Layout = () => {
     };
 
     const navItems = [
-        { icon: Home, label: 'Accueil', path: '/dashboard' },
+        { icon: LayoutDashboard, label: 'Accueil', path: '/dashboard' },
         { icon: Users, label: 'Utilisateurs', path: '/dashboard/user' },
         { icon: GraduationCap, label: 'Suivi Global', path: '/dashboard/suivi' },
         { icon: Puzzle, label: 'Activités', path: '/dashboard/activities' },
@@ -236,8 +235,6 @@ const Layout = () => {
                             </>
                         )}
                     </button>
-
-
 
                     <div className="text-xs font-bold text-grey-medium/50 uppercase tracking-wider">
                         {formattedDate}

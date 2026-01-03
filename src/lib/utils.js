@@ -63,6 +63,8 @@ export const getStatusColorClasses = (status) => {
             return 'bg-[#A0A8AD] text-white border-[#A0A8AD]';
         case 'en_cours':
             return 'bg-primary/20 text-primary border-primary';
+        case 'a_domicile':
+            return 'bg-danger text-white border-danger';
         default:
             return 'bg-surface/50 text-grey-medium border-white/5';
     }

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../lib/supabaseClient';
-import { Folder, Search, Plus, Edit, Trash2, Loader2, GitBranch, Layers, Puzzle, GripVertical, X, ChevronDown, Sparkles, Users, CheckSquare, Check, TrendingUp, Trophy, AlertCircle, Clock } from 'lucide-react';
+import { Folder, Search, Plus, Edit, Trash2, Loader2, GitBranch, Layers, Puzzle, GripVertical, X, ChevronDown, Sparkles, Users, CheckSquare, Check, TrendingUp, Trophy, AlertCircle, Clock, Home } from 'lucide-react';
 import clsx from 'clsx';
 import AddModuleModal from '../components/AddModuleModal';
 import AddActivityModal from '../components/AddActivityModal';
@@ -477,7 +477,7 @@ const Modules = () => {
 
         // Only update if dropping on a different status
         const currentProgression = progressions.find(p => p.id === progressionId);
-        if (currentProgression && currentProgression.etat !== newStatus && ['a_commencer', 'en_cours', 'besoin_d_aide', 'termine'].includes(newStatus)) {
+        if (currentProgression && currentProgression.etat !== newStatus && ['a_commencer', 'en_cours', 'besoin_d_aide', 'termine', 'a_domicile'].includes(newStatus)) {
             // Optimistically update module progress
             if (selectedModule) {
                 setModules(prev => prev.map(m => {
@@ -1230,6 +1230,7 @@ const Modules = () => {
                                                                     { id: 'a_commencer', label: 'À commencer', icon: Clock, color: 'text-grey-medium', bg: 'bg-white/5' },
                                                                     { id: 'besoin_d_aide', label: 'Besoin d\'aide', icon: AlertCircle, color: 'text-danger', bg: 'bg-danger/10' },
                                                                     { id: 'en_cours', label: 'En cours', icon: TrendingUp, color: 'text-primary', bg: 'bg-primary/10' },
+                                                                    { id: 'a_domicile', label: 'À domicile', icon: Home, color: 'text-danger', bg: 'bg-danger/10' },
                                                                     { id: 'termine', label: 'Terminé', icon: Trophy, color: 'text-success', bg: 'bg-success/10' }
                                                                 ].map(column => {
                                                                     const columnProgressions = progressions.filter(p => p.etat === column.id);
