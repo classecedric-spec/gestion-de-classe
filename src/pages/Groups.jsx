@@ -30,6 +30,7 @@ const Groups = () => {
     const [isEditingStudent, setIsEditingStudent] = useState(false);
     const [editStudentId, setEditStudentId] = useState(null);
     const [showAddToGroupModal, setShowAddToGroupModal] = useState(false);
+    const [groupToDelete, setGroupToDelete] = useState(null);
     const [progress, setProgress] = useState(0);
     const [progressText, setProgressText] = useState('');
     const abortRef = useRef(false);
@@ -308,8 +309,8 @@ const Groups = () => {
                 return;
             }
 
-            setProgress(30);
-            setProgressText('Génération des fiches individuelles...');
+            setProgress(10);
+            setProgressText('Préparation de la fusion...');
 
             // 4. Generate & Merge PDFs
             // We create a new PDF Document to merge individual student PDFs
@@ -320,7 +321,8 @@ const Groups = () => {
             for (const studentData of bulkData) {
                 if (abortRef.current) throw new Error('ABORTED');
                 processed++;
-                const percentage = 30 + Math.round((processed / bulkData.length) * 30); // 30% to 60%
+                // Shifting to 10-80% as per user feedback
+                const percentage = 10 + Math.round((processed / bulkData.length) * 70);
                 setProgress(percentage);
                 setProgressText(`Génération : ${studentData.studentName}...`);
 
@@ -341,7 +343,7 @@ const Groups = () => {
 
             // 6. Eco Mode (2 pages per sheet)
             if (ecoMode) {
-                setProgress(65);
+                setProgress(82);
                 setProgressText('Mise en page LIVRET A5...');
 
                 const bookletPdf = await PDFDocument.create();
@@ -357,8 +359,9 @@ const Groups = () => {
 
                 for (let i = 0; i < pageCount; i += 2) {
                     if (abortRef.current) throw new Error('ABORTED');
-                    const progressStep = 65 + Math.round((i / pageCount) * 20); // 65% to 85%
-                    setProgress(progressStep);
+
+                    const assemblyPercentage = 82 + Math.round((i / pageCount) * 13);
+                    setProgress(assemblyPercentage);
                     setProgressText(`Assemblage page ${Math.floor(i / 2) + 1}...`);
 
                     // Create A4 Landscape page (approx [841.89, 595.28])

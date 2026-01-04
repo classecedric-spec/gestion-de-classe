@@ -197,6 +197,8 @@ const Modules = () => {
     const [groups, setGroups] = useState([]);
     const [selectedGroups, setSelectedGroups] = useState([]);
     const [generatingProgressions, setGeneratingProgressions] = useState(false);
+    const [progress, setProgress] = useState(0);
+    const [progressText, setProgressText] = useState('');
     const [selectedProgressionActivity, setSelectedProgressionActivity] = useState(null);
     const [progressions, setProgressions] = useState([]);
     const [loadingProgressions, setLoadingProgressions] = useState(false);
@@ -378,34 +380,38 @@ const Modules = () => {
         if (selectedGroups.length === 0 || !selectedModule) return;
 
         setGeneratingProgressions(true);
+        setProgress(5);
+        setProgressText('Recherche des élèves...');
         try {
             // 1. Fetch all students from selected groups using Join Table
             const { data: students, error: studentsError } = await supabase
                 .from('Eleve')
-                .select('id, niveau_id, EleveGroupe!inner(groupe_id)')
+                .select('id, prenom, nom, niveau_id, EleveGroupe!inner(groupe_id)')
                 .in('EleveGroupe.groupe_id', selectedGroups);
 
             if (studentsError) throw studentsError;
 
-            // 2. Fetch all levels per activity for this module
-            // Already available in selectedModule.Activite if we fetched it correctly
-            // Let's make sure selectedModule has ActiviteNiveau
-            const activities = selectedModule.Activite || [];
+            setProgress(15);
+            setProgressText(`${students.length} élèves trouvés...`);
 
+            // 2. Fetch all activities for this module
+            const activities = selectedModule.Activite || [];
             const progressionsToInsert = [];
 
-            for (const activity of activities) {
-                // Get levels associated with this activity
-                const activityLevels = activity.ActiviteNiveau?.map(an => an.niveau_id) || [];
+            let studentIndex = 0;
+            for (const student of students) {
+                studentIndex++;
+                const currentPercentage = 15 + Math.round((studentIndex / students.length) * 75);
+                setProgress(currentPercentage);
+                setProgressText(`Analyse : ${student.prenom} ${student.nom}...`);
 
-                // STRICT MATCHING RULE:
-                // 1. If activity has no levels defined -> Add to NOBODY.
-                // 2. If activity has levels -> Add ONLY to students with matching level.
+                for (const activity of activities) {
+                    // Get levels associated with this activity
+                    const activityLevels = activity.ActiviteNiveau?.map(an => an.niveau_id) || [];
 
-                if (activityLevels.length === 0) continue;
+                    // STRICT MATCHING RULE
+                    if (activityLevels.length === 0) continue;
 
-                for (const student of students) {
-                    // Only assign if student's level matches one of the activity's target levels
                     if (activityLevels.includes(student.niveau_id)) {
                         progressionsToInsert.push({
                             eleve_id: student.id,
@@ -418,15 +424,18 @@ const Modules = () => {
             }
 
             if (progressionsToInsert.length > 0) {
-                // Insert with upsert behavior (on conflict do nothing) is tricky with JS client
-                // We'll just try to insert and ignore errors OR check existing first
-                // For simplicity and per user requirement "create a line", we'll do as is
+                setProgress(95);
+                setProgressText('Enregistrement en base de données...');
                 const { error: insertError } = await supabase
                     .from('Progression')
-                    .upsert(progressionsToInsert, { onConflict: 'eleve_id, activite_id' });
+                    .upsert(progressionsToInsert, {
+                        onConflict: 'eleve_id, activite_id',
+                        ignoreDuplicates: true
+                    });
 
                 if (insertError) throw insertError;
 
+                setProgress(100);
                 showNotification(`${progressionsToInsert.length} lignes de progression générées !`);
                 setSelectedGroups([]);
                 setDetailTab('activities');
@@ -438,6 +447,8 @@ const Modules = () => {
             showNotification("Erreur lors de la génération des progressions.", 'error');
         } finally {
             setGeneratingProgressions(false);
+            setProgress(0);
+            setProgressText('');
         }
     };
 
@@ -555,12 +566,12 @@ const Modules = () => {
         }
     }, [detailTab, selectedProgressionActivity]);
 
-    // Set first activity as default when switching to progression tab
+    // Set first activity as default when switching modules OR to progression tab
     useEffect(() => {
-        if (detailTab === 'progression' && !selectedProgressionActivity && moduleActivities.length > 0) {
+        if (detailTab === 'progression' && moduleActivities.length > 0) {
             setSelectedProgressionActivity(moduleActivities[0]);
         }
-    }, [detailTab, moduleActivities]);
+    }, [detailTab, selectedModule?.id, moduleActivities.length > 0]);
 
     const handleDelete = async () => {
         const targetModule = moduleToDelete;
@@ -1176,16 +1187,34 @@ const Modules = () => {
                                         <button
                                             onClick={generateProgressions}
                                             disabled={selectedGroups.length === 0 || generatingProgressions}
-                                            className="w-full py-5 bg-success text-text-dark rounded-[2rem] font-black text-xs uppercase tracking-[0.2em] hover:bg-success/90 disabled:opacity-30 disabled:grayscale disabled:cursor-not-allowed flex items-center justify-center gap-4 transition-all shadow-xl shadow-success/20 active:scale-[0.98] hover:scale-[1.02]"
+                                            className={clsx(
+                                                "w-full py-5 rounded-[2rem] font-black text-xs uppercase tracking-[0.2em] disabled:opacity-30 disabled:grayscale disabled:cursor-not-allowed flex items-center justify-center gap-4 transition-all active:scale-[0.98] hover:scale-[1.02]",
+                                                generatingProgressions
+                                                    ? "bg-primary text-text-dark shadow-xl shadow-primary/20"
+                                                    : "bg-success text-text-dark shadow-xl shadow-success/20 hover:bg-success/90"
+                                            )}
                                         >
                                             {generatingProgressions ? (
-                                                <Loader2 className="animate-spin" size={24} />
-                                            ) : (
-                                                <div className="w-8 h-8 rounded-full bg-text-dark/10 flex items-center justify-center">
-                                                    <CheckSquare size={20} strokeWidth={3} />
+                                                <div className="w-full px-8 flex flex-col gap-2">
+                                                    <div className="flex justify-between items-center text-[10px] font-black uppercase tracking-widest text-text-dark">
+                                                        <span className="truncate pr-4">{progressText}</span>
+                                                        <span>{progress}%</span>
+                                                    </div>
+                                                    <div className="w-full h-1.5 bg-text-dark/20 rounded-full overflow-hidden">
+                                                        <div
+                                                            className="h-full bg-text-dark transition-all duration-300 ease-out"
+                                                            style={{ width: `${progress}%` }}
+                                                        />
+                                                    </div>
                                                 </div>
+                                            ) : (
+                                                <>
+                                                    <div className="w-8 h-8 rounded-full bg-text-dark/10 flex items-center justify-center">
+                                                        <CheckSquare size={20} strokeWidth={3} />
+                                                    </div>
+                                                    Générer le suivi complet
+                                                </>
                                             )}
-                                            Générer le suivi complet
                                         </button>
                                     </div>
                                 </div>

@@ -49,8 +49,8 @@ const styles = StyleSheet.create({
         borderColor: '#CCC',
     },
     moduleHeader: {
-        paddingVertical: 4,
-        paddingHorizontal: 8,
+        paddingVertical: 6,
+        paddingHorizontal: 10,
         borderTopLeftRadius: 6,
         borderTopRightRadius: 6,
         flexDirection: 'row',
@@ -58,11 +58,11 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     moduleTitle: {
-        fontSize: 10,
+        fontSize: 14,
         fontWeight: 'bold',
     },
     moduleDate: {
-        fontSize: 9,
+        fontSize: 10,
     },
 
     // Status Colors
@@ -105,7 +105,7 @@ const styles = StyleSheet.create({
     },
     activityName: {
         fontSize: 14,
-        fontWeight: 'bold',
+        fontWeight: 'normal',
         color: '#000',
     },
     activityMeta: {
