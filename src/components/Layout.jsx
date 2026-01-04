@@ -240,12 +240,14 @@ const Layout = () => {
             </aside >
 
             {/* Main Content */}
-            <main className={
-                clsx(
-                    "flex-1 overflow-y-auto relative transition-all duration-300",
-                    !isSidebarOpen && (isFullPage ? "pl-0" : "pl-20"),
-                    isFullPage ? "p-0" : "p-8"
-                )}>
+            <main
+                onClick={() => isSidebarOpen && setIsSidebarOpen(false)}
+                className={
+                    clsx(
+                        "flex-1 overflow-y-auto relative transition-all duration-300",
+                        !isSidebarOpen && (isFullPage ? "pl-0" : "pl-20"),
+                        isFullPage ? "p-0" : "p-8"
+                    )}>
 
                 {/* 1. BLOCKED: Pending Validation */}
                 {pendingValidation && (location.pathname !== '/dashboard/settings' || !location.search.includes('tab=profil')) && (

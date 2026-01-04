@@ -8,10 +8,12 @@ import {
 } from 'lucide-react';
 import clsx from 'clsx';
 import { toast } from 'sonner';
+import { useLocation } from 'react-router-dom';
 import TimerModal from '../components/TimerModal';
 
 const SuiviPedagogique = ({ timer, setTimer, timerFinished, setTimerFinished }) => {
     // --- STATE ---
+    const location = useLocation();
     const [currentAdultSelection, setCurrentAdultSelection] = useState(null);
     const [currentActivityTypeSelection, setCurrentActivityTypeSelection] = useState(null);
     const [groups, setGroups] = useState([]);
@@ -26,6 +28,70 @@ const SuiviPedagogique = ({ timer, setTimer, timerFinished, setTimerFinished }) 
 
     const [students, setStudents] = useState([]);
     const [selectedStudent, setSelectedStudent] = useState(null);
+
+    // ... (rest of state)
+
+    // HANDLE NAVIGATION FROM HOME
+    useEffect(() => {
+        if (location.state?.eleve_id && groups.length > 0 && !selectedStudent) {
+            const targetStudentId = location.state.eleve_id;
+
+            // We need to find which group this student belongs to.
+            // Since we only have 'groups' (list of groups), we can't easily know without fetching.
+            // OPTIMIZATION: We can fetch the student's group first if needed, or rely on fetching detailed student info.
+
+            // Let's try to find the student in the currently loaded students if a group is already selected
+            if (students.length > 0) {
+                const found = students.find(s => s.id === targetStudentId);
+                if (found) {
+                    setSelectedStudent(found);
+                    // Clear state to avoid re-selecting on future renders if we change manually
+                    window.history.replaceState({}, document.title);
+                    return;
+                }
+            }
+
+            // If not found or no group selected, we might need to find the group for this student.
+            // This requires a separate fetch or smarter logic. 
+            // For now, let's assume the user has the correct group selected or we trigger a search.
+
+            // Actually, we can fetch the student's group ID:
+            const findStudentGroup = async () => {
+                const { data } = await supabase
+                    .from('EleveGroupe')
+                    .select('groupe_id')
+                    .eq('eleve_id', targetStudentId)
+                    .single();
+
+                if (data && data.groupe_id) {
+                    const grp = groups.find(g => g.id === data.groupe_id);
+                    if (grp) {
+                        setSelectedGroupId(grp.id);
+                        // We set a flag to select the student once students are loaded
+                        // We can store the target ID in a ref to check in the students useEffect
+                        pendingStudentSelection.current = targetStudentId;
+                    }
+                }
+            };
+            findStudentGroup();
+        }
+    }, [location.state, groups]);
+
+    const pendingStudentSelection = useRef(null);
+
+    useEffect(() => {
+        if (pendingStudentSelection.current && students.length > 0) {
+            const found = students.find(s => s.id === pendingStudentSelection.current);
+            if (found) {
+                setSelectedStudent(found);
+                pendingStudentSelection.current = null;
+                // clear location state
+                window.history.replaceState({}, document.title);
+            }
+        }
+    }, [students]);
+
+
 
     const [isSaving, setIsSaving] = useState(false);
     const [lastSaved, setLastSaved] = useState(null);

@@ -67,9 +67,9 @@ const SuiviGlobal = () => {
     };
 
     return (
-        <div className="flex flex-col h-full w-full overflow-hidden">
+        <div className="flex flex-col h-full w-full overflow-hidden bg-background">
             {/* View Toggle Header */}
-            <div className="bg-surface/50 border-b border-white/5 px-6 py-3 flex items-center justify-between sticky top-0 z-40 backdrop-blur-md shrink-0 pl-16">
+            <div className="bg-surface/50 border-b border-white/5 px-6 py-3 flex items-center justify-between sticky top-0 z-40 backdrop-blur-md shrink-0 pl-16 rounded-b-2xl">
 
                 {/* SPACE FOR SIDEBAR TOGGLE (LEFT) */}
                 <div className="min-w-[200px]" />

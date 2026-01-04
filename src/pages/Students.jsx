@@ -48,13 +48,20 @@ const Students = () => {
     useEffect(() => {
         if (selectedStudent) {
             fetchStudentProgress(selectedStudent.id);
-            setCurrentTab('infos');
+
+            // Check for initial tab from navigation state
+            if (location.state?.initialTab && location.state?.selectedStudentId === selectedStudent.id) {
+                setCurrentTab(location.state.initialTab);
+            } else {
+                setCurrentTab('infos');
+            }
+
             setExpandedModules({});
         } else {
             setStudentProgress([]);
             setExpandedModules({});
         }
-    }, [selectedStudent]);
+    }, [selectedStudent, location.state]);
 
     const fetchStudents = async () => {
         setLoading(true);
@@ -224,6 +231,7 @@ const Students = () => {
                         id,
                         titre,
                         ordre,
+                        ActiviteNiveau ( niveau_id ),
                         Module (
                             id,
                             nom,
@@ -244,7 +252,25 @@ const Students = () => {
                 .eq('eleve_id', studentId);
 
             if (error) throw error;
-            setStudentProgress(data || []);
+
+            // Filter logic: Only keep activities matching student's level
+            const student = students.find(s => s.id === studentId) || selectedStudent;
+            const filteredData = (data || []).filter(p => {
+                if (!p.Activite) return false;
+
+                // If student has a level and activity has level constraints (ActiviteNiveau)
+                if (student?.niveau_id && p.Activite.ActiviteNiveau && p.Activite.ActiviteNiveau.length > 0) {
+                    // Check if any of the activity's levels match the student's level
+                    const hasMatchingLevel = p.Activite.ActiviteNiveau.some(an => an.niveau_id === student.niveau_id);
+                    return hasMatchingLevel;
+                }
+
+                // If activity has NO level constraints (empty ActiviteNiveau), typically implies available for all?
+                // Assuming empty means available for now.
+                return true;
+            });
+
+            setStudentProgress(filteredData);
         } catch (error) {
             console.error('Error fetching progress:', error);
         } finally {
