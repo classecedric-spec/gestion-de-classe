@@ -1,20 +1,24 @@
 import { Link } from 'react-router-dom';
-import { LogIn, Layers, Users, BookOpen, ChevronRight, CheckCircle2, Star, ShieldCheck, Zap } from 'lucide-react';
+import { LogIn, Layers, Users, BookOpen, ChevronRight, CheckCircle2, Star, ShieldCheck, Zap, Sparkles } from 'lucide-react';
+import clsx from 'clsx';
+import Footer from '../components/Footer';
 
 const Landing = () => {
     return (
-        <div className="min-h-screen bg-[#0a0a0a] text-text-main font-sans overflow-x-hidden flex flex-col selection:bg-primary/30 selection:text-white">
+        <div className="min-h-screen bg-background text-text-main font-sans overflow-x-hidden flex flex-col selection:bg-primary/30 selection:text-white transition-colors duration-500">
             {/* Header */}
-            <header className="fixed top-0 left-0 w-full h-20 flex items-center justify-between px-6 md:px-12 z-50 bg-[#0a0a0a]/80 backdrop-blur-xl border-b border-white/5">
-                <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary to-[#b8955c] flex items-center justify-center text-[#1e1e1e] font-bold text-xl">
+            <header className="fixed top-0 left-0 w-full h-20 flex items-center justify-between px-6 md:px-12 z-50 bg-background/80 backdrop-blur-xl border-b border-border">
+                <div className="flex items-center gap-3 group cursor-pointer">
+                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-[#b8955c] flex items-center justify-center text-text-dark font-black text-xl shadow-lg shadow-primary/20 group-hover:scale-110 transition-transform duration-300">
                         G
                     </div>
-                    <span className="text-lg font-bold text-white tracking-tight">Gestion<span className="text-primary">Classe</span></span>
+                    <span className="text-xl font-black text-white tracking-tighter uppercase italic">
+                        Gestion<span className="text-primary not-italic">Classe</span>
+                    </span>
                 </div>
                 <Link
                     to="/login"
-                    className="flex items-center gap-2 bg-white/5 hover:bg-white/10 text-white border border-white/10 py-2.5 px-6 rounded-full transition-all font-medium text-sm hover:scale-105 active:scale-95"
+                    className="flex items-center gap-2 bg-white/5 hover:bg-primary text-white hover:text-text-dark border border-white/10 hover:border-primary py-2.5 px-6 rounded-xl transition-all font-bold text-xs uppercase tracking-widest hover:scale-105 active:scale-95 shadow-xl shadow-black/20"
                 >
                     <LogIn size={16} />
                     Espace Enseignant
@@ -24,151 +28,133 @@ const Landing = () => {
             <main className="w-full pt-32 pb-20">
 
                 {/* Hero Section */}
-                <section className="max-w-7xl mx-auto px-6 md:px-12 text-center mb-32 relative">
+                <section className="max-w-7xl mx-auto px-6 md:px-12 text-center mb-40 relative">
                     {/* Background Effects */}
                     <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-primary/10 rounded-full blur-[120px] -z-10 animate-pulse-slow"></div>
-                    <div className="absolute top-0 right-1/4 w-[400px] h-[400px] bg-blue-500/10 rounded-full blur-[100px] -z-10"></div>
+                    <div className="absolute top-0 right-1/4 w-[400px] h-[400px] bg-primary/20 rounded-full blur-[100px] -z-10"></div>
 
                     {/* Badge */}
-                    <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/5 border border-white/10 text-xs font-semibold text-grey-light mb-8 animate-in fade-in slide-in-from-bottom-4 duration-700 shadow-xl shadow-black/20 hover:bg-white/10 transition-colors cursor-default">
-                        <span className="relative flex h-2 w-2">
-                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-                            <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
-                        </span>
-                        Version 1.0 disponible maintenant
+                    <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-surface/50 border border-border text-[10px] font-black uppercase tracking-widest text-primary mb-8 animate-in fade-in slide-in-from-bottom-4 duration-700 shadow-xl shadow-black/40 hover:bg-surface transition-colors cursor-default">
+                        <Sparkles size={12} />
+                        Version 1.2 est arrivée
                     </div>
 
                     {/* Title */}
-                    <h1 className="text-6xl md:text-8xl font-black text-white mb-8 tracking-tighter leading-[1.1] animate-in fade-in slide-in-from-bottom-8 duration-1000">
-                        L'Excellence <br />
-                        <span className="bg-gradient-to-r from-primary via-[#ead2a8] to-primary bg-clip-text text-transparent bg-[length:200%_auto] animate-gradient">Pédagogique</span>
+                    <h1 className="text-5xl md:text-8xl lg:text-9xl font-black text-white mb-8 tracking-tighter leading-[0.9] animate-in fade-in slide-in-from-bottom-8 duration-1000">
+                        LA GESTION DE CLASSE <br />
+                        <span className="bg-gradient-to-r from-primary via-[#ead2a8] to-primary bg-clip-text text-transparent bg-[length:200%_auto] animate-gradient uppercase">FACILITÉE</span>
                     </h1>
 
                     {/* Description */}
-                    <p className="text-xl md:text-2xl text-grey-medium mb-12 max-w-2xl mx-auto leading-relaxed animate-in fade-in slide-in-from-bottom-10 duration-1000 delay-100 font-light">
-                        Une suite complète pour gérer vos élèves, suivre leur progression et organiser votre enseignement. <span className="text-white font-medium">Simple. Puissant. Élégant.</span>
+                    <p className="text-lg md:text-2xl text-grey-medium mb-12 max-w-3xl mx-auto leading-relaxed animate-in fade-in slide-in-from-bottom-10 duration-1000 delay-100 font-medium">
+                        Une suite intuitive pour orchestrer vos classes, suivre chaque progression et <span className="text-white underline decoration-primary/40 decoration-4 underline-offset-4">sublimer</span> votre enseignement quotidien.
                     </p>
 
                     {/* CTA Buttons */}
-                    <div className="flex flex-col md:flex-row items-center justify-center gap-4 animate-in fade-in slide-in-from-bottom-12 duration-1000 delay-200">
+                    <div className="flex flex-col md:flex-row items-center justify-center gap-6 animate-in fade-in slide-in-from-bottom-12 duration-1000 delay-200">
                         <Link
                             to="/login"
-                            className="w-full md:w-auto flex items-center justify-center gap-3 bg-primary text-[#1e1e1e] font-bold py-4 px-10 rounded-full hover:bg-[#c4a46d] transition-all shadow-xl shadow-primary/20 hover:shadow-primary/40 hover:-translate-y-1"
+                            className="w-full md:w-auto flex items-center justify-center gap-4 bg-primary text-text-dark font-black py-5 px-12 rounded-2xl hover:bg-primary/90 transition-all shadow-2xl shadow-primary/30 hover:shadow-primary/50 hover:-translate-y-1 text-xs uppercase tracking-widest"
                         >
-                            Commencer maintenant
-                            <ChevronRight size={20} />
+                            Démarrer l'aventure
+                            <ChevronRight size={18} />
                         </Link>
-                        <a href="#features" className="w-full md:w-auto flex items-center justify-center gap-3 bg-white/5 border border-white/10 text-white font-semibold py-4 px-10 rounded-full hover:bg-white/10 transition-all backdrop-blur-sm">
-                            En savoir plus
-                        </a>
+                        <Link to="/features" className="w-full md:w-auto flex items-center justify-center gap-4 bg-surface/50 border border-border text-white font-black py-5 px-12 rounded-2xl hover:bg-surface transition-all backdrop-blur-sm shadow-xl text-xs uppercase tracking-widest">
+                            Découvrir les outils
+                        </Link>
                     </div>
                 </section>
 
                 {/* Features Grid */}
                 <section id="features" className="max-w-7xl mx-auto px-6 md:px-12 mb-40">
-                    <div className="text-center mb-16">
-                        <h2 className="text-3xl font-bold text-white mb-4">Tout ce dont vous avez besoin</h2>
-                        <p className="text-grey-medium max-w-xl mx-auto">Une interface pensée pour les enseignants exigeants, alliant esthétique et fonctionnalité.</p>
+                    <div className="text-center mb-20 relative">
+                        <div className="absolute -top-10 left-1/2 -translate-x-1/2 w-40 h-1 bg-primary/20 rounded-full"></div>
+                        <h2 className="text-4xl md:text-5xl font-black text-white mb-4 tracking-tight uppercase">Écosystème Intelligent</h2>
+                        <p className="text-grey-medium max-w-xl mx-auto font-medium">L'alliance parfaite entre design épuré et puissance fonctionnelle.</p>
                     </div>
 
-                    <div className="grid md:grid-cols-3 gap-8">
-                        {/* Feature 1 */}
-                        <div className="bg-[#121212] p-8 rounded-3xl border border-white/5 hover:border-primary/30 transition-all group hover:-translate-y-2 relative overflow-hidden">
-                            <div className="absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-full blur-3xl group-hover:bg-primary/10 transition-colors"></div>
-                            <div className="w-14 h-14 bg-gradient-to-br from-primary/20 to-transparent rounded-2xl flex items-center justify-center text-primary mb-6 group-hover:scale-110 transition-transform border border-primary/10">
-                                <Users size={28} />
+                    <div className="grid md:grid-cols-3 gap-10">
+                        {[
+                            {
+                                icon: Users,
+                                title: "Structure Avancée",
+                                desc: "Gérez une hiérarchie complexe : Niveaux, Classes et Groupes. Une organisation sans faille.",
+                                color: "primary"
+                            },
+                            {
+                                icon: BookOpen,
+                                title: "Suivi Précis",
+                                desc: "Parcours détaillés avec Activités et Modules. Visualisez la réussite en temps réel.",
+                                color: "primary"
+                            },
+                            {
+                                icon: Zap,
+                                title: "Ultra Fluidité",
+                                desc: "Une interface réactive et des animations soignées pour une expérience utilisateur premium.",
+                                color: "primary"
+                            }
+                        ].map((feature, idx) => (
+                            <div key={idx} className="bg-surface/40 p-10 rounded-[2rem] border border-border hover:border-primary/50 transition-all group hover:-translate-y-3 relative overflow-hidden shadow-2xl backdrop-blur-sm">
+                                <div className="absolute -top-10 -right-10 w-40 h-40 bg-primary/5 rounded-full blur-3xl group-hover:bg-primary/10 transition-colors"></div>
+                                <div className="w-16 h-16 bg-gradient-to-br from-primary/20 to-transparent rounded-2xl flex items-center justify-center text-primary mb-8 group-hover:scale-110 group-hover:rotate-3 transition-all duration-500 border border-primary/10 shadow-lg">
+                                    <feature.icon size={32} strokeWidth={2.5} />
+                                </div>
+                                <h3 className="text-2xl font-black text-white mb-4 tracking-tight uppercase">{feature.title}</h3>
+                                <p className="text-grey-medium leading-relaxed font-medium">
+                                    {feature.desc}
+                                </p>
                             </div>
-                            <h3 className="text-xl font-bold text-white mb-3">Structure Avancée</h3>
-                            <p className="text-grey-light leading-relaxed text-sm">
-                                Gérez une hiérarchie complexe : <span className="text-primary">Niveaux</span>, <span className="text-primary">Classes</span> et <span className="text-primary">Groupes</span>. Une organisation sans faille pour votre établissement.
-                            </p>
-                        </div>
-
-                        {/* Feature 2 */}
-                        <div className="bg-[#121212] p-8 rounded-3xl border border-white/5 hover:border-blue-500/30 transition-all group hover:-translate-y-2 relative overflow-hidden">
-                            <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/5 rounded-full blur-3xl group-hover:bg-blue-500/10 transition-colors"></div>
-                            <div className="w-14 h-14 bg-gradient-to-br from-blue-500/20 to-transparent rounded-2xl flex items-center justify-center text-blue-500 mb-6 group-hover:scale-110 transition-transform border border-blue-500/10">
-                                <BookOpen size={28} />
-                            </div>
-                            <h3 className="text-xl font-bold text-white mb-3">Suivi Pédagogique</h3>
-                            <p className="text-grey-light leading-relaxed text-sm">
-                                Créez des parcours d'apprentissage détaillés avec <span className="text-blue-400">Activités</span> et <span className="text-blue-400">Modules</span>. Visualisez la progression en temps réel.
-                            </p>
-                        </div>
-
-                        {/* Feature 3 */}
-                        <div className="bg-[#121212] p-8 rounded-3xl border border-white/5 hover:border-purple-500/30 transition-all group hover:-translate-y-2 relative overflow-hidden">
-                            <div className="absolute top-0 right-0 w-32 h-32 bg-purple-500/5 rounded-full blur-3xl group-hover:bg-purple-500/10 transition-colors"></div>
-                            <div className="w-14 h-14 bg-gradient-to-br from-purple-500/20 to-transparent rounded-2xl flex items-center justify-center text-purple-500 mb-6 group-hover:scale-110 transition-transform border border-purple-500/10">
-                                <Zap size={28} />
-                            </div>
-                            <h3 className="text-xl font-bold text-white mb-3">Performance & Fluidité</h3>
-                            <p className="text-grey-light leading-relaxed text-sm">
-                                Une interface réactive, des animations soignées et une expérience utilisateur optimisée pour le gain de temps.
-                            </p>
-                        </div>
+                        ))}
                     </div>
                 </section>
 
-                {/* Trust / Stats Section (Optional Decoration) */}
-                <section className="mb-40 border-y border-white/5 bg-white/[0.02] backdrop-blur-sm py-20">
-                    <div className="max-w-7xl mx-auto px-6 grid grid-cols-2 md:grid-cols-4 gap-12 text-center">
-                        <div>
-                            <div className="text-4xl font-black text-white mb-2">100%</div>
-                            <div className="text-sm text-grey-medium uppercase tracking-wider font-bold">Sécurisé</div>
-                        </div>
-                        <div>
-                            <div className="text-4xl font-black text-white mb-2">24/7</div>
-                            <div className="text-sm text-grey-medium uppercase tracking-wider font-bold">Disponibilité</div>
-                        </div>
-                        <div>
-                            <div className="text-4xl font-black text-white mb-2">Clean</div>
-                            <div className="text-sm text-grey-medium uppercase tracking-wider font-bold">Design</div>
-                        </div>
-                        <div>
-                            <div className="text-4xl font-black text-white mb-2">Fast</div>
-                            <div className="text-sm text-grey-medium uppercase tracking-wider font-bold">Performance</div>
-                        </div>
+                {/* Trust / Stats Section */}
+                <section className="mb-40 border-y border-border bg-surface/20 backdrop-blur-md py-24">
+                    <div className="max-w-7xl mx-auto px-6 grid grid-cols-2 lg:grid-cols-4 gap-16 text-center">
+                        {[
+                            { val: "100%", label: "Sécurisé" },
+                            { val: "24/7", label: "Accessible" },
+                            { val: "OUI", label: "Responsif" },
+                            { val: "TOP", label: "Performant" }
+                        ].map((stat, i) => (
+                            <div key={i} className="group cursor-default">
+                                <div className="text-6xl font-black text-white mb-2 group-hover:text-primary transition-colors duration-300 tracking-tighter italic">{stat.val}</div>
+                                <div className="text-[10px] text-grey-medium uppercase tracking-[0.2em] font-black">{stat.label}</div>
+                            </div>
+                        ))}
                     </div>
                 </section>
 
                 {/* CTA Section */}
-                <section className="max-w-5xl mx-auto px-6 mb-20">
-                    <div className="bg-gradient-to-b from-[#1a1a1a] to-[#0a0a0a] p-12 md:p-20 rounded-[2.5rem] border border-white/10 text-center relative overflow-hidden group">
+                <section className="max-w-6xl mx-auto px-6 mb-20">
+                    <div className="bg-gradient-to-br from-surface to-background p-16 md:p-28 rounded-[4rem] border border-border text-center relative overflow-hidden group shadow-[0_0_100px_rgba(0,0,0,0.5)]">
 
-                        {/* Interactive blur blobs */}
-                        <div className="absolute top-0 left-0 w-full h-full opacity-30 group-hover:opacity-50 transition-opacity duration-700">
-                            <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-primary/20 rounded-full blur-[100px] animate-pulse-slow"></div>
-                            <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-blue-500/10 rounded-full blur-[100px] animate-pulse-slow delay-1000"></div>
+                        {/* Interactive blobs */}
+                        <div className="absolute top-0 left-0 w-full h-full opacity-30 group-hover:opacity-60 transition-opacity duration-1000">
+                            <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-primary/20 rounded-full blur-[120px] animate-pulse-slow"></div>
+                            <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-primary/30 rounded-full blur-[120px] animate-pulse-slow delay-1000"></div>
                         </div>
 
                         <div className="relative z-10">
-                            <h2 className="text-4xl md:text-6xl font-black text-white mb-8 tracking-tight">
-                                Prêt à transformer <br /> votre classe ?
+                            <h2 className="text-5xl md:text-7xl font-black text-white mb-10 tracking-tighter uppercase italic leading-[0.8]">
+                                Prêt à <br /> <span className="text-primary not-italic">Révolutionner</span> <br /> votre classe ?
                             </h2>
-                            <p className="text-xl text-grey-medium mb-10 max-w-2xl mx-auto font-light">
-                                Rejoignez une nouvelle ère de gestion pédagogique. Configurez votre espace en quelques minutes.
+                            <p className="text-lg md:text-xl text-grey-medium mb-12 max-w-2xl mx-auto font-medium leading-relaxed">
+                                Rejoignez l'élite des enseignants modernes. Configurez votre espace de travail en moins de 2 minutes.
                             </p>
 
                             <Link
                                 to="/login"
-                                className="inline-flex items-center gap-3 bg-white text-black font-bold py-4 px-12 rounded-full hover:bg-gray-200 transition-all shadow-2xl shadow-white/10 hover:shadow-white/20 hover:-translate-y-1"
+                                className="inline-flex items-center gap-4 bg-primary text-text-dark font-black py-5 px-16 rounded-2xl hover:bg-white hover:scale-105 transition-all shadow-2xl shadow-primary/20 hover:shadow-white/20 hover:-translate-y-1 text-xs uppercase tracking-[0.15em]"
                             >
-                                Créer un compte
+                                Créer mon compte
                                 <ChevronRight size={20} />
                             </Link>
                         </div>
                     </div>
                 </section>
 
-                <footer className="text-center text-grey-dark text-sm border-t border-white/5 pt-12 pb-12">
-                    <div className="flex items-center justify-center gap-6 mb-8">
-                        <Link to="#" className="hover:text-white transition-colors">À propos</Link>
-                        <Link to="#" className="hover:text-white transition-colors">Fonctionnalités</Link>
-                        <Link to="#" className="hover:text-white transition-colors">Contact</Link>
-                    </div>
-                    <p>&copy; 2025 Gestion de Classe — Fait avec passion.</p>
-                </footer>
+                <Footer />
             </main>
         </div>
     );

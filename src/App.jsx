@@ -5,7 +5,6 @@ import Home from './pages/Home';
 import Landing from './pages/Landing';
 import Auth from './pages/Auth';
 import Students from './pages/Students';
-import Profile from './pages/Profile';
 import Classes from './pages/Classes';
 import Groups from './pages/Groups';
 import UserManagement from './pages/UserManagement';
@@ -21,6 +20,8 @@ import Settings from './pages/Settings';
 import SuiviGlobal from './pages/SuiviGlobal';
 import Adults from './pages/Adults';
 import MobileSuivi from './pages/MobileSuivi';
+import Features from './pages/Features';
+import Privacy from './pages/Privacy';
 import { Navigate } from 'react-router-dom';
 
 function App() {
@@ -28,6 +29,8 @@ function App() {
     <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
       <Routes>
         <Route path="/" element={<Landing />} />
+        <Route path="/features" element={<Features />} />
+        <Route path="/privacy" element={<Privacy />} />
         <Route path="/login" element={<Auth />} />
         <Route path="/dashboard" element={<Layout />}>
           <Route index element={<Home />} />
