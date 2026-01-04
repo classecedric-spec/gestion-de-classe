@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import { supabase } from '../lib/supabaseClient';
 import { calculateAge } from '../lib/utils';
-import { Search, User as UserIcon, Calendar, GraduationCap, ShieldCheck, Loader2, ChevronRight, ChevronDown, Filter, Plus, X, BookOpen, Layers, Trash2, Edit, Users, CheckCircle2, Clock, AlertCircle, LayoutList, GitGraph, FileText, Activity, GitBranch } from 'lucide-react';
+import { Search, User as UserIcon, Calendar, GraduationCap, ShieldCheck, Loader2, ChevronRight, ChevronDown, Filter, Plus, X, BookOpen, Layers, Trash2, Edit, Users, CheckCircle2, Clock, AlertCircle, LayoutList, GitGraph, FileText, Activity, GitBranch, Camera } from 'lucide-react';
+import { resizeAndConvertToBase64 } from '../lib/imageUtils';
 import clsx from 'clsx';
 import StudentModal from '../components/StudentModal';
 import { pdf } from '@react-pdf/renderer';
@@ -33,6 +34,9 @@ const Students = () => {
     const [expandedBranches, setExpandedBranches] = useState({});
     const [expandedSubBranches, setExpandedSubBranches] = useState({});
     const [expandedTreeModules, setExpandedTreeModules] = useState({});
+    const [isDraggingPhoto, setIsDraggingPhoto] = useState(false); // For detail view
+    const [draggingPhotoId, setDraggingPhotoId] = useState(null); // For list view
+    const [updatingPhotoId, setUpdatingPhotoId] = useState(null); // ID of student being updated
 
     useEffect(() => {
         fetchStudents();
@@ -245,6 +249,67 @@ const Students = () => {
             console.error('Error fetching progress:', error);
         } finally {
             setLoadingProgress(false);
+        }
+    };
+
+    // --- PHOTO DROP LOGIC ---
+    const handlePhotoDrop = async (e, student = null) => {
+        e.preventDefault();
+        setIsDraggingPhoto(false);
+        setDraggingPhotoId(null);
+        const file = e.dataTransfer.files[0];
+        if (file) await processAndSavePhoto(file, student || selectedStudent);
+    };
+
+    const handlePhotoDragOver = (e, studentId = null) => {
+        e.preventDefault();
+        if (studentId) {
+            setDraggingPhotoId(studentId);
+        } else {
+            setIsDraggingPhoto(true);
+        }
+    };
+
+    const handlePhotoDragLeave = (e) => {
+        e.preventDefault();
+        setIsDraggingPhoto(false);
+        setDraggingPhotoId(null);
+    };
+
+    const handlePhotoChange = async (e, student = null) => {
+        const file = e.target.files[0];
+        if (file) await processAndSavePhoto(file, student || selectedStudent);
+    };
+
+    const processAndSavePhoto = async (file, student) => {
+        if (!student) return;
+        if (!file.type.match('image.*')) {
+            alert("Veuillez déposer une image (JPG ou PNG).");
+            return;
+        }
+
+        setUpdatingPhotoId(student.id);
+        try {
+            const base64 = await resizeAndConvertToBase64(file, 200, 200);
+
+            const { error } = await supabase
+                .from('Eleve')
+                .update({ photo_base64: base64 })
+                .eq('id', student.id);
+
+            if (error) throw error;
+
+            // Update local state
+            const updated = { ...student, photo_base64: base64 };
+            if (selectedStudent?.id === student.id) {
+                setSelectedStudent(updated);
+            }
+            setStudents(prev => prev.map(s => s.id === updated.id ? updated : s));
+        } catch (err) {
+            console.error("Error saving photo:", err);
+            alert("Erreur lors de l'enregistrement de la photo.");
+        } finally {
+            setUpdatingPhotoId(null);
         }
     };
 
@@ -487,16 +552,42 @@ const Students = () => {
                                 tabIndex={0}
                                 onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setSelectedStudent(student); }}
                             >
-                                <div className={clsx(
-                                    "w-10 h-10 rounded-lg flex items-center justify-center text-lg font-bold shadow-inner overflow-hidden",
-                                    selectedStudent?.id === student.id ? "bg-white/20 text-text-dark" : "bg-background text-primary",
-                                    student.photo_base64 && "bg-[#D9B981]"
-                                )}>
-                                    {student.photo_base64 ? (
+                                <div
+                                    className={clsx(
+                                        "w-10 h-10 rounded-lg flex items-center justify-center text-lg font-bold shadow-inner overflow-hidden relative group/photo cursor-pointer transition-all",
+                                        selectedStudent?.id === student.id ? "bg-white/20 text-text-dark" : "bg-background text-primary",
+                                        student.photo_base64 && "bg-[#D9B981]",
+                                        draggingPhotoId === student.id && "ring-2 ring-primary scale-110 bg-primary/20"
+                                    )}
+                                    onClick={(e) => e.stopPropagation()}
+                                    onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); setDraggingPhotoId(student.id); }}
+                                    onDragLeave={(e) => { e.preventDefault(); e.stopPropagation(); setDraggingPhotoId(null); }}
+                                    onDrop={async (e) => {
+                                        e.preventDefault();
+                                        e.stopPropagation();
+                                        setDraggingPhotoId(null);
+                                        const file = e.dataTransfer.files[0];
+                                        if (file) await processAndSavePhoto(file, student);
+                                    }}
+                                >
+                                    {updatingPhotoId === student.id ? (
+                                        <Loader2 className="animate-spin text-primary" size={16} />
+                                    ) : student.photo_base64 ? (
                                         <img src={student.photo_base64} alt="Student" className="w-[90%] h-[90%] object-contain" />
                                     ) : (
                                         <>{student.prenom[0]}{student.nom[0]}</>
                                     )}
+
+                                    {/* Small hover overlay for list */}
+                                    <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover/photo:opacity-100 transition-opacity">
+                                        <Camera className="text-white" size={14} />
+                                        <input
+                                            type="file"
+                                            accept="image/*"
+                                            className="absolute inset-0 opacity-0 cursor-pointer"
+                                            onChange={(e) => handlePhotoChange(e, student)}
+                                        />
+                                    </div>
                                 </div>
                                 <div className="flex-1 min-w-0">
                                     <p className={clsx(
@@ -582,14 +673,40 @@ const Students = () => {
                         {/* Header Section */}
                         <div className="p-8 border-b border-white/5 bg-surface/20 flex flex-col justify-between items-start gap-6">
                             <div className="flex gap-6 items-center w-full">
-                                <div className={clsx(
-                                    "w-24 h-24 rounded-2xl border-4 border-background flex items-center justify-center text-3xl font-bold text-primary shadow-2xl shrink-0 overflow-hidden",
-                                    selectedStudent.photo_base64 ? "bg-[#D9B981]" : "bg-surface"
-                                )}>
-                                    {selectedStudent.photo_base64 ? (
+                                <div
+                                    className={clsx(
+                                        "w-24 h-24 rounded-2xl border-4 flex items-center justify-center text-3xl font-bold transition-all duration-300 shadow-2xl shrink-0 overflow-hidden relative group cursor-pointer",
+                                        isDraggingPhoto ? "border-primary bg-primary/20 scale-105" : "border-background",
+                                        selectedStudent.photo_base64 ? "bg-[#D9B981]" : "bg-surface"
+                                    )}
+                                    onDragOver={handlePhotoDragOver}
+                                    onDragLeave={handlePhotoDragLeave}
+                                    onDrop={handlePhotoDrop}
+                                >
+                                    {updatingPhotoId === selectedStudent.id ? (
+                                        <Loader2 className="animate-spin text-primary" size={32} />
+                                    ) : selectedStudent.photo_base64 ? (
                                         <img src={selectedStudent.photo_base64} alt="Student" className="w-[90%] h-[90%] object-contain" />
                                     ) : (
                                         <>{selectedStudent.prenom[0]}{selectedStudent.nom[0]}</>
+                                    )}
+
+                                    {/* Hover Overlay */}
+                                    <div className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                                        <Camera className="text-white mb-1" size={24} />
+                                        <span className="text-[10px] text-white font-black uppercase tracking-tighter">Changer</span>
+                                        <input
+                                            type="file"
+                                            accept="image/*"
+                                            className="absolute inset-0 opacity-0 cursor-pointer"
+                                            onChange={handlePhotoChange}
+                                        />
+                                    </div>
+
+                                    {isDraggingPhoto && (
+                                        <div className="absolute inset-0 bg-primary/20 backdrop-blur-sm flex items-center justify-center pointer-events-none">
+                                            <Plus className="text-primary animate-bounce" size={40} />
+                                        </div>
                                     )}
                                 </div>
                                 <div>

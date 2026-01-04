@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabaseClient';
-import { Check, User as UserIcon, Search, Filter, Layers, GraduationCap, ChevronDown, ChevronUp, Plus } from 'lucide-react';
+import { Check, User as UserIcon, Search, Filter, Layers, GraduationCap, ChevronDown, ChevronUp, Plus, Loader2 } from 'lucide-react';
 import clsx from 'clsx';
 import Modal from './ui/Modal';
 import Button from './ui/Button';
@@ -9,6 +9,7 @@ const AddStudentToGroupModal = ({ showModal, handleCloseModal, groupId, groupNam
     const [students, setStudents] = useState([]);
     const [classes, setClasses] = useState([]);
     const [groups, setGroups] = useState([]);
+    const [niveaux, setNiveaux] = useState([]);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
 
@@ -16,6 +17,7 @@ const AddStudentToGroupModal = ({ showModal, handleCloseModal, groupId, groupNam
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedClasses, setSelectedClasses] = useState([]);
     const [selectedGroups, setSelectedGroups] = useState([]);
+    const [selectedNiveaux, setSelectedNiveaux] = useState([]);
     const [sortBy, setSortBy] = useState('nom'); // 'nom' or 'prenom'
 
     // UI state
@@ -29,6 +31,7 @@ const AddStudentToGroupModal = ({ showModal, handleCloseModal, groupId, groupNam
             setSearchQuery('');
             setSelectedClasses([]);
             setSelectedGroups([]);
+            setSelectedNiveaux([]);
         }
     }, [showModal]);
 
@@ -46,6 +49,7 @@ const AddStudentToGroupModal = ({ showModal, handleCloseModal, groupId, groupNam
                     nom,
                     prenom,
                     classe_id,
+                    niveau_id,
                     Classe (nom),
                     EleveGroupe (
                         groupe_id,
@@ -72,9 +76,18 @@ const AddStudentToGroupModal = ({ showModal, handleCloseModal, groupId, groupNam
 
             if (groupsError) throw groupsError;
 
+            // Fetch all levels
+            const { data: niveauxData, error: niveauxError } = await supabase
+                .from('Niveau')
+                .select('id, nom')
+                .order('ordre', { ascending: true });
+
+            if (niveauxError) throw niveauxError;
+
             setStudents(studentsData || []);
             setClasses(classesData || []);
             setGroups(groupsData || []);
+            setNiveaux(niveauxData || []);
         } catch (error) {
             console.error('Error fetching data for modal:', error);
         } finally {
@@ -142,14 +155,17 @@ const AddStudentToGroupModal = ({ showModal, handleCloseModal, groupId, groupNam
 
         const matchesClass = selectedClasses.length === 0 || selectedClasses.includes(student.classe_id);
 
+        const matchesNiveau = selectedNiveaux.length === 0 || selectedNiveaux.includes(student.niveau_id);
+
         const studentGroupIds = student.EleveGroupe?.map(eg => eg.groupe_id) || [];
         const matchesGroup = selectedGroups.length === 0 || selectedGroups.some(gId => studentGroupIds.includes(gId));
 
         // Don't show students already in THIS group
         // Note: The original code logic checked if the student is ALREADY in the group and excluded them.
         // We replicate this:
+        // Don't show students already in THIS group
         const inCurrentGroup = studentGroupIds.includes(groupId);
-        return matchesSearch && matchesClass && matchesGroup && !inCurrentGroup;
+        return matchesSearch && matchesClass && matchesNiveau && matchesGroup && !inCurrentGroup;
     }).sort((a, b) => {
         if (sortBy === 'nom') return a.nom.localeCompare(b.nom);
         return a.prenom.localeCompare(b.prenom);
@@ -205,9 +221,9 @@ const AddStudentToGroupModal = ({ showModal, handleCloseModal, groupId, groupNam
                     >
                         <Filter size={18} />
                         <span className="hidden sm:inline">Filtres</span>
-                        {(selectedClasses.length > 0 || selectedGroups.length > 0) && (
+                        {(selectedClasses.length > 0 || selectedGroups.length > 0 || selectedNiveaux.length > 0) && (
                             <span className="bg-primary text-text-dark text-xs font-bold px-1.5 py-0.5 rounded-full">
-                                {selectedClasses.length + selectedGroups.length}
+                                {selectedClasses.length + selectedGroups.length + selectedNiveaux.length}
                             </span>
                         )}
                     </button>
@@ -222,7 +238,33 @@ const AddStudentToGroupModal = ({ showModal, handleCloseModal, groupId, groupNam
 
                 {/* Expanded Filters */}
                 {showFilters && (
-                    <div className="pt-2 animate-in slide-in-from-top-2 space-y-4 border-t border-white/5 mt-2">
+                    <div className="pt-2 animate-in slide-in-from-top-2 space-y-4 border-t border-white/5 mt-2 overflow-y-auto max-h-[40vh]">
+                        {/* Levels Filter */}
+                        <div>
+                            <p className="text-xs font-bold text-gray-500 uppercase mb-2 flex items-center gap-1">
+                                <Layers size={12} /> Niveaux
+                            </p>
+                            <div className="flex flex-wrap gap-2">
+                                {niveaux.map(niv => (
+                                    <button
+                                        key={niv.id}
+                                        onClick={() => setSelectedNiveaux(prev =>
+                                            prev.includes(niv.id) ? prev.filter(id => id !== niv.id) : [...prev, niv.id]
+                                        )}
+                                        className={clsx(
+                                            "px-2 py-1 rounded-lg text-xs font-medium border transition-colors",
+                                            selectedNiveaux.includes(niv.id)
+                                                ? "bg-primary/20 border-primary text-primary"
+                                                : "bg-white/5 border-transparent text-gray-400 hover:border-white/10"
+                                        )}
+                                    >
+                                        {niv.nom}
+                                    </button>
+                                ))}
+                                {niveaux.length === 0 && <span className="text-xs text-gray-600 italic">Aucun niveau</span>}
+                            </div>
+                        </div>
+
                         {/* Classes Filter */}
                         <div>
                             <p className="text-xs font-bold text-gray-500 uppercase mb-2 flex items-center gap-1">

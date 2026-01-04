@@ -1,15 +1,11 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabaseClient';
-import { User, Users, GraduationCap, LogOut } from 'lucide-react';
+import { User, Users, GraduationCap } from 'lucide-react';
 
 const Home = () => {
     const [user, setUser] = useState(null);
     const [students, setStudents] = useState([]);
     const [loading, setLoading] = useState(true);
-
-    const handleLogout = async () => {
-        await supabase.auth.signOut();
-    };
 
     useEffect(() => {
         const getProfile = async () => {
@@ -64,13 +60,6 @@ const Home = () => {
                         {user ? `Bienvenue, ${user.email}` : 'Bienvenue dans votre espace de gestion.'}
                     </p>
                 </div>
-                <button
-                    onClick={handleLogout}
-                    className="p-2 bg-surface hover:bg-white/5 text-grey-light hover:text-danger rounded-lg transition-colors border border-white/5 hover:border-danger/20"
-                    title="Se déconnecter"
-                >
-                    <LogOut size={20} />
-                </button>
             </header>
 
             <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">

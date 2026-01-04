@@ -60,9 +60,10 @@ const Adults = () => {
                 if (error) throw error;
                 toast.success("Profil mis à jour");
             } else {
+                const { data: { user } } = await supabase.auth.getUser();
                 const { error } = await supabase
                     .from('Adulte')
-                    .insert([currentAdult]);
+                    .insert([{ ...currentAdult, user_id: user.id }]);
                 if (error) throw error;
                 toast.success("Adulte ajouté");
             }

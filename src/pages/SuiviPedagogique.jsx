@@ -555,8 +555,8 @@ const SuiviPedagogique = ({ timer, setTimer, timerFinished, setTimerFinished }) 
             });
 
             const filteredByCompletion = modulesWithStats.filter(m => {
-                // Si aucune activité, on le garde
-                if (m.totalActivities === 0) return true;
+                // Si aucune activité, on ne l'affiche pas
+                if (m.totalActivities === 0) return false;
 
                 // Filter based on toggle
                 if (showPendingOnly) {
@@ -1437,22 +1437,20 @@ const SuiviPedagogique = ({ timer, setTimer, timerFinished, setTimerFinished }) 
                     </div>
 
                     {/* BOTTOM ZONE 1B */}
-                    <div className="flex-1 overflow-y-auto p-2">
+                    <div className="flex-1 overflow-y-auto p-4 flex flex-col items-center justify-center gap-4">
                         {selectedStudent && (
-                            <div className="p-4 border-t border-white/5 bg-surface/5">
-                                <button
-                                    onClick={() => {
-                                        setSelectedStudent(null);
-                                        setSelectedModule(null);
-                                        setModules([]);
-                                        setActivities([]);
-                                    }}
-                                    className="w-full py-3 bg-white/5 hover:bg-primary/20 hover:text-primary text-grey-light rounded-xl border border-dashed border-white/20 hover:border-primary/50 transition-all flex items-center justify-center gap-2 group"
-                                >
-                                    <Check size={18} className="group-hover:scale-110 transition-transform" />
-                                    <span className="font-medium uppercase tracking-wider text-xs">Fin pour cet utilisateur</span>
-                                </button>
-                            </div>
+                            <button
+                                onClick={() => {
+                                    setSelectedStudent(null);
+                                    setSelectedModule(null);
+                                    setModules([]);
+                                    setActivities([]);
+                                }}
+                                className="w-full py-4 bg-primary/10 hover:bg-primary/20 text-primary text-xs font-black uppercase tracking-widest rounded-xl border border-primary/30 transition-all flex items-center justify-center gap-2 shadow-xl shadow-primary/5 active:scale-95 group"
+                            >
+                                <Check size={16} className="group-hover:scale-110 transition-transform" />
+                                <span>Fin pour cet utilisateur</span>
+                            </button>
                         )}
                         {!selectedStudent && (
                             <div className="flex items-center justify-center h-full opacity-30">

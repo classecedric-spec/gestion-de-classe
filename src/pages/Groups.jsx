@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabaseClient';
 import { Layers, Plus, X, Loader2, Trash2, BookOpen, Search, ChevronRight, GraduationCap, Edit, Camera, LayoutList, FileText } from 'lucide-react';
@@ -30,7 +30,26 @@ const Groups = () => {
     const [isEditingStudent, setIsEditingStudent] = useState(false);
     const [editStudentId, setEditStudentId] = useState(null);
     const [showAddToGroupModal, setShowAddToGroupModal] = useState(false);
-    const [groupToDelete, setGroupToDelete] = useState(null);
+    const [progress, setProgress] = useState(0);
+    const [progressText, setProgressText] = useState('');
+    const abortRef = useRef(false);
+
+    useEffect(() => {
+        const handleEsc = (e) => {
+            if (loading && e.key === 'Escape') {
+                handleCancelGeneration();
+            }
+        };
+        window.addEventListener('keydown', handleEsc);
+        return () => window.removeEventListener('keydown', handleEsc);
+    }, [loading]);
+
+    const handleCancelGeneration = () => {
+        if (loading) {
+            abortRef.current = true;
+            setProgressText('Annulation en cours...');
+        }
+    };
 
     useEffect(() => {
         fetchGroups();
@@ -208,16 +227,21 @@ const Groups = () => {
                     }],
                 });
             } catch (err) {
-                // If user cancelled, stop everything
                 if (err.name === 'AbortError') return;
-                // Otherwise continue and try fallback later
                 console.warn('File picker failed, falling back to download', err);
             }
         }
 
+
+
         setLoading(true);
+        abortRef.current = false; // Reset abort flag
+        setProgress(10);
+        setProgressText('Récupération des données...');
 
         try {
+            if (abortRef.current) throw new Error('ABORTED');
+
             // 2. Fetch data needed for PDF generation
             // Fetch all modules with activities
             const { data: modulesData, error: modulesError } = await supabase
@@ -247,28 +271,27 @@ const Groups = () => {
             const bulkData = studentsInGroup.map(student => {
                 const studentProgress = progressions.filter(p => p.eleve_id === student.id);
 
-                const activeModules = modulesData.filter(module => {
-                    if (!module.date_fin) return false;
+                const activeModules = modulesData.map(module => {
+                    if (!module.date_fin) return null;
 
-                    // Check completion
                     const moduleActivities = module.Activite || [];
-                    if (moduleActivities.length === 0) return false;
 
-                    const allValidated = moduleActivities.every(act => {
+                    // Filter activities: Must have a progression AND not be validated
+                    const relevantActivities = moduleActivities.filter(act => {
                         const prog = studentProgress.find(p => p.activite_id === act.id);
-                        return prog && prog.statut === 'valide';
+                        return prog && prog.statut !== 'valide';
                     });
 
-                    if (allValidated) return false; // Hide completed modules
+                    if (relevantActivities.length === 0) return null;
 
-                    return true;
-                }).map(m => ({
-                    title: m.nom,
-                    dueDate: m.date_fin,
-                    activities: m.Activite.map(a => ({
-                        name: a.titre
-                    }))
-                }));
+                    return {
+                        title: module.nom,
+                        dueDate: module.date_fin,
+                        activities: relevantActivities.map(a => ({
+                            name: a.titre
+                        }))
+                    };
+                }).filter(Boolean);
 
                 if (activeModules.length === 0) return null;
 
@@ -285,12 +308,22 @@ const Groups = () => {
                 return;
             }
 
+            setProgress(30);
+            setProgressText('Génération des fiches individuelles...');
+
             // 4. Generate & Merge PDFs
             // We create a new PDF Document to merge individual student PDFs
             // This ensures page numbering (1/N) is reset for each student
             const mergedPdf = await PDFDocument.create();
 
+            let processed = 0;
             for (const studentData of bulkData) {
+                if (abortRef.current) throw new Error('ABORTED');
+                processed++;
+                const percentage = 30 + Math.round((processed / bulkData.length) * 30); // 30% to 60%
+                setProgress(percentage);
+                setProgressText(`Génération : ${studentData.studentName}...`);
+
                 // Generate individual PDF blob for this student
                 // We use the 'data' prop to generate a single-student document
                 const blob = await pdf(<StudentTrackingPDFModern data={studentData} />).toBlob();
@@ -308,6 +341,9 @@ const Groups = () => {
 
             // 6. Eco Mode (2 pages per sheet)
             if (ecoMode) {
+                setProgress(65);
+                setProgressText('Mise en page LIVRET A5...');
+
                 const bookletPdf = await PDFDocument.create();
 
                 // We need to save and reload to be able to embed the merged pages
@@ -320,6 +356,11 @@ const Groups = () => {
                 const pageCount = embeddedPages.length;
 
                 for (let i = 0; i < pageCount; i += 2) {
+                    if (abortRef.current) throw new Error('ABORTED');
+                    const progressStep = 65 + Math.round((i / pageCount) * 20); // 65% to 85%
+                    setProgress(progressStep);
+                    setProgressText(`Assemblage page ${Math.floor(i / 2) + 1}...`);
+
                     // Create A4 Landscape page (approx [841.89, 595.28])
                     const page = bookletPdf.addPage([841.89, 595.28]);
 
@@ -361,6 +402,9 @@ const Groups = () => {
                 finalPdfBlob = new Blob([mergedPdfBytes], { type: 'application/pdf' });
             }
 
+            setProgress(90);
+            setProgressText('Finalisation du fichier...');
+
             if (fileHandle) {
                 const writable = await fileHandle.createWritable();
                 await writable.write(finalPdfBlob);
@@ -369,11 +413,24 @@ const Groups = () => {
                 saveAs(finalPdfBlob, filename);
             }
 
+            setProgress(100);
+            setProgressText('Téléchargement terminé !');
+            setTimeout(() => {
+                setProgress(0);
+                setProgressText('');
+            }, 2000);
+
         } catch (error) {
-            console.error("Error generating PDF:", error);
-            alert("Erreur lors de la génération du PDF.");
+            if (error.message === 'ABORTED') {
+                console.log('Génération annulée par l\'utilisateur');
+                // No alert, just clean state returns
+            } else {
+                console.error("Error generating PDF:", error);
+                alert("Erreur lors de la génération du PDF.");
+            }
         } finally {
             setLoading(false);
+            setProgress(0);
         }
     };
 
@@ -646,7 +703,7 @@ const Groups = () => {
                                         className="w-full py-3 bg-white/5 hover:bg-primary/20 hover:text-primary text-grey-light rounded-xl border border-dashed border-white/20 hover:border-primary/50 transition-all flex items-center justify-center gap-2 group"
                                     >
                                         <Plus size={18} className="group-hover:scale-110 transition-transform" />
-                                        <span className="font-medium">Nouveau Groupe</span>
+                                        <span className="font-medium">Ajouter des enfants</span>
                                     </button>
                                 </div>
                             </>
@@ -664,24 +721,45 @@ const Groups = () => {
                                         <p className="text-sm text-grey-medium mb-6">
                                             Téléchargez un fichier PDF unique contenant les listes de travail (To-Do Lists) pour tous les élèves de ce groupe.
                                         </p>
-                                        <div className="grid grid-cols-2 gap-3">
-                                            <button
-                                                onClick={() => handleGenerateGroupTodoList(false)}
-                                                disabled={loading}
-                                                className="w-full py-3 bg-primary hover:bg-primary/90 text-white rounded-xl font-bold shadow-lg shadow-primary/20 flex flex-col items-center justify-center gap-1 transition-all hover:scale-[1.02] active:scale-[0.98]"
-                                            >
-                                                {loading ? <Loader2 className="animate-spin" size={20} /> : <FileText size={20} />}
-                                                <span className="text-sm">Standard (A4)</span>
-                                            </button>
-                                            <button
-                                                onClick={() => handleGenerateGroupTodoList(true)}
-                                                disabled={loading}
-                                                className="w-full py-3 bg-secondary hover:bg-secondary/90 text-white rounded-xl font-bold shadow-lg shadow-secondary/20 flex flex-col items-center justify-center gap-1 transition-all hover:scale-[1.02] active:scale-[0.98]"
-                                                title="2 pages par feuille, mode paysage"
-                                            >
-                                                {loading ? <Loader2 className="animate-spin" size={20} /> : <div className="flex gap-0.5"><FileText size={16} /><FileText size={16} /></div>}
-                                                <span className="text-sm">Éco (A5)</span>
-                                            </button>
+                                        <div className="w-full">
+                                            {loading && progress > 0 ? (
+                                                <div className="w-full bg-surface border border-white/10 rounded-xl p-4 flex flex-col gap-3">
+                                                    <div className="flex justify-between items-center text-sm font-medium text-text-main">
+                                                        <span className="truncate pr-4">{progressText}</span>
+                                                        <span className="text-primary">{progress}%</span>
+                                                    </div>
+
+                                                    {/* Progress Track */}
+                                                    <div className="w-full h-3 bg-background/50 rounded-full overflow-hidden border border-white/5">
+                                                        {/* Solid Bar instead of Gradient to reduce 'jumping' visual perception */}
+                                                        <div
+                                                            className="h-full bg-primary transition-all duration-200 ease-linear shadow-[0_0_10px_rgba(217,185,129,0.3)]"
+                                                            style={{ width: `${progress}%` }}
+                                                        />
+                                                    </div>
+
+                                                    <button
+                                                        onClick={handleCancelGeneration}
+                                                        className="self-end text-xs text-danger hover:text-danger/80 hover:underline flex items-center gap-1 mt-1 transition-colors"
+                                                    >
+                                                        <X size={12} />
+                                                        Annuler (ESC)
+                                                    </button>
+                                                </div>
+                                            ) : (
+                                                <button
+                                                    onClick={() => handleGenerateGroupTodoList(true)}
+                                                    disabled={loading}
+                                                    className="w-full py-4 bg-primary hover:bg-primary/90 text-white rounded-xl font-bold shadow-lg shadow-primary/20 flex flex-col items-center justify-center gap-2 transition-all hover:scale-[1.01] active:scale-[0.99]"
+                                                    title="Générer le PDF (Mode Éco A5)"
+                                                >
+                                                    <div className="flex items-center gap-2">
+                                                        <FileText size={20} />
+                                                        <span className="text-lg">Générer les livrets (Mode Éco A5)</span>
+                                                    </div>
+                                                    <span className="text-xs opacity-70 font-normal">2 pages par feuille • Économie de papier</span>
+                                                </button>
+                                            )}
                                         </div>
                                     </div>
                                 </div>

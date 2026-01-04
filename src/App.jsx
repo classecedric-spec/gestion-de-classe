@@ -16,6 +16,7 @@ import Modules from './pages/Modules';
 import Activities from './pages/Activities';
 import Niveaux from './pages/Niveaux';
 import Materiels from './pages/Materiels';
+import Presence from './pages/Presence';
 import Settings from './pages/Settings';
 import SuiviGlobal from './pages/SuiviGlobal';
 import Adults from './pages/Adults';
@@ -53,6 +54,7 @@ function App() {
             <Route path="list" element={<Activities />} />
           </Route>
           <Route path="settings" element={<Settings />} />
+          <Route path="presence" element={<Presence />} />
         </Route>
         <Route path="/mobile-suivi/:groupId" element={<MobileSuivi />} />
       </Routes>

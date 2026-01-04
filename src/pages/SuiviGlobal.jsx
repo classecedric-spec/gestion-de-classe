@@ -5,12 +5,18 @@ import SuiviPedagogique from './SuiviPedagogique';
 import AvancementAteliers from './AvancementAteliers';
 import TimerModal from '../components/TimerModal';
 
+import { cleanupOrphanProgressions } from '../lib/cleanupUtils';
+
 const SuiviGlobal = () => {
     const [activeView, setActiveView] = useState('suivi'); // 'suivi' or 'avancement'
     const [currentTime, setCurrentTime] = useState(new Date());
 
     useEffect(() => {
         const timer = setInterval(() => setCurrentTime(new Date()), 30000);
+
+        // Run cleanup on mount
+        cleanupOrphanProgressions();
+
         return () => clearInterval(timer);
     }, []);
 
@@ -63,65 +69,72 @@ const SuiviGlobal = () => {
     return (
         <div className="flex flex-col h-full w-full overflow-hidden">
             {/* View Toggle Header */}
-            <div className="bg-surface/50 border-b border-white/5 px-6 py-3 flex items-center gap-4 shrink-0">
-                {/* Toggle Buttons (LEFT) */}
-                <div className="flex bg-background/50 p-1 rounded-xl border border-white/10">
-                    <button
-                        onClick={() => setActiveView('suivi')}
-                        className={clsx(
-                            "flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold uppercase tracking-wider transition-all",
-                            activeView === 'suivi'
-                                ? "bg-primary text-text-dark shadow-lg"
-                                : "text-grey-medium hover:text-white hover:bg-white/5"
-                        )}
-                    >
-                        <Users size={16} />
-                        Encodage
-                    </button>
-                    <button
-                        onClick={() => setActiveView('avancement')}
-                        className={clsx(
-                            "flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold uppercase tracking-wider transition-all",
-                            activeView === 'avancement'
-                                ? "bg-primary text-text-dark shadow-lg"
-                                : "text-grey-medium hover:text-white hover:bg-white/5"
-                        )}
-                    >
-                        <Table size={16} />
-                        Suivi des groupes
-                    </button>
+            <div className="bg-surface/50 border-b border-white/5 px-6 py-3 flex items-center justify-between sticky top-0 z-40 backdrop-blur-md shrink-0 pl-16">
+
+                {/* SPACE FOR SIDEBAR TOGGLE (LEFT) */}
+                <div className="min-w-[200px]" />
+
+                {/* Toggle Buttons (CENTER) */}
+                <div className="flex-1 flex justify-center">
+                    <div className="flex bg-background/50 p-1 rounded-xl border border-white/10 shadow-inner">
+                        <button
+                            onClick={() => setActiveView('suivi')}
+                            className={clsx(
+                                "flex items-center gap-2 px-6 py-2 rounded-lg text-sm font-bold uppercase tracking-wider transition-all",
+                                activeView === 'suivi'
+                                    ? "bg-primary text-text-dark shadow-lg"
+                                    : "text-grey-medium hover:text-white hover:bg-white/5"
+                            )}
+                        >
+                            <Users size={16} />
+                            Encodage
+                        </button>
+                        <button
+                            onClick={() => setActiveView('avancement')}
+                            className={clsx(
+                                "flex items-center gap-2 px-6 py-2 rounded-lg text-sm font-bold uppercase tracking-wider transition-all",
+                                activeView === 'avancement'
+                                    ? "bg-primary text-text-dark shadow-lg"
+                                    : "text-grey-medium hover:text-white hover:bg-white/5"
+                            )}
+                        >
+                            <Table size={16} />
+                            Suivi des groupes
+                        </button>
+                    </div>
                 </div>
 
-                {/* DATE (NEXT TO SELECTOR) */}
-                <div className="ml-6 opacity-90 pointer-events-none">
-                    <span className="text-xl font-black text-white uppercase tracking-widest">
-                        {currentTime.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' })}
-                    </span>
-                </div>
+                {/* DATE & TIME (RIGHT) */}
+                <div className="min-w-[420px] flex justify-end items-center gap-6">
+                    <div className="opacity-90 pointer-events-none">
+                        <span className="text-xl font-black text-white uppercase tracking-widest leading-none">
+                            {currentTime.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' })}
+                        </span>
+                    </div>
 
-                {/* TIME (RIGHT) */}
-                <div className="ml-auto flex items-center gap-4">
-                    {/* Live Timer Countdown (if active) */}
-                    {timer.active && (
+                    <div className="flex items-center gap-4">
+                        {/* Live Timer Countdown (if active) */}
+                        {timer.active && (
+                            <div
+                                onClick={() => setShowTimerModal(true)}
+                                className="flex items-center gap-2 px-3 py-1.5 bg-primary/20 border border-primary/30 rounded-xl cursor-pointer hover:bg-primary/30 transition-all animate-pulse"
+                            >
+                                <span className="text-xl font-black text-primary font-mono leading-none">
+                                    {formatTime(timer.timeLeft)}
+                                </span>
+                            </div>
+                        )}
+
                         <div
                             onClick={() => setShowTimerModal(true)}
-                            className="flex items-center gap-2 px-3 py-1.5 bg-primary/20 border border-primary/30 rounded-xl cursor-pointer hover:bg-primary/30 transition-all animate-pulse"
+                            className="flex items-center gap-3 bg-white/5 px-4 py-1.5 rounded-xl border border-white/5 shadow-inner cursor-pointer hover:bg-white/10 transition-all group"
+                            title="Configurer le minuteur"
                         >
-                            <span className="text-xl font-black text-primary font-mono leading-none">
-                                {formatTime(timer.timeLeft)}
+                            <Clock size={16} className="text-primary group-hover:scale-110 transition-transform" />
+                            <span className="text-2xl font-black text-white font-mono tracking-[0.1em] leading-none">
+                                {currentTime.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
                             </span>
                         </div>
-                    )}
-
-                    <div
-                        onClick={() => setShowTimerModal(true)}
-                        className="flex items-center gap-3 bg-white/5 px-4 py-1.5 rounded-xl border border-white/5 shadow-inner cursor-pointer hover:bg-white/10 transition-all group"
-                        title="Configurer le minuteur"
-                    >
-                        <Clock size={16} className="text-primary group-hover:scale-110 transition-transform" />
-                        <span className="text-2xl font-black text-white font-mono tracking-[0.1em] leading-none">
-                            {currentTime.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
-                        </span>
                     </div>
                 </div>
             </div>

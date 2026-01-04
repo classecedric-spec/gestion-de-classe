@@ -116,10 +116,23 @@ const AvancementAteliers = () => {
             if (eleveIds.length > 0) {
                 const { data } = await supabase
                     .from('Eleve')
-                    .select('*')
-                    .in('id', eleveIds)
-                    .order('nom');
-                setStudents(data || []);
+                    .select('*, Niveau(ordre, nom)')
+                    .in('id', eleveIds);
+
+                // Sort: Niveau order -> Prenom -> Nom
+                const sortedStudents = (data || []).sort((a, b) => {
+                    const levelA = a.Niveau?.ordre || 0;
+                    const levelB = b.Niveau?.ordre || 0;
+                    if (levelA !== levelB) return levelA - levelB;
+
+                    const prenomA = (a.prenom || '').toLowerCase();
+                    const prenomB = (b.prenom || '').toLowerCase();
+                    if (prenomA !== prenomB) return prenomA.localeCompare(prenomB);
+
+                    return (a.nom || '').localeCompare(b.nom || '');
+                });
+
+                setStudents(sortedStudents);
             } else {
                 setStudents([]);
             }
@@ -256,9 +269,16 @@ const AvancementAteliers = () => {
                     .in('eleve_id', studentIds)
                     .in('activite_id', actIds);
 
-                // Filter Logic: Only keep activities that appear in progs
-                const activeActivityIds = new Set(progs?.map(p => p.activite_id));
-                const filteredActs = sortedActs.filter(a => activeActivityIds.has(a.id));
+                // Filter Logic: Keep activities relevant to ANY student in the group
+                // If activity has NO levels defined, we assume it's strict (hidden).
+                // We check if the activity's levels intersect with the group's student levels.
+                const groupLevelIds = new Set(students.map(s => s.niveau_id).filter(Boolean));
+
+                const filteredActs = sortedActs.filter(a => {
+                    const actLevels = a.ActiviteNiveau?.map(an => an.niveau_id) || [];
+                    if (actLevels.length === 0) return false; // Strict: if no levels, hide
+                    return actLevels.some(id => groupLevelIds.has(id));
+                });
 
                 setActivities(filteredActs);
 
@@ -718,19 +738,23 @@ const AvancementAteliers = () => {
                                                     onClick={() => handleStatusClick(student, act)}
                                                     className={clsx(
                                                         "p-0 border-t border-white/10 relative group/cell transition-colors min-w-[52px]",
-                                                        isAllowed ? "cursor-pointer" : "cursor-not-allowed opacity-20",
-                                                        isAllowed && (status ? "hover:bg-white/5" : "hover:bg-white/5"),
+                                                        isAllowed ? "cursor-pointer hover:bg-white/5" : "cursor-default",
                                                         lastActivityIds.has(act.id) && "border-r border-white/10"
                                                     )}
                                                 >
                                                     <div className="w-full h-[52px] flex items-center justify-center">
-                                                        <div className={clsx(
-                                                            "w-10 h-10 flex items-center justify-center transition-all rounded-lg",
-                                                            getStatusColorClasses(displayStatus),
-                                                            !displayStatus && "opacity-0"
-                                                        )}>
-                                                            {getStatusIcon(displayStatus)}
-                                                        </div>
+                                                        {isAllowed ? (
+                                                            <div className={clsx(
+                                                                "w-10 h-10 flex items-center justify-center transition-all rounded-lg",
+                                                                getStatusColorClasses(displayStatus),
+                                                                !displayStatus && "opacity-0"
+                                                            )}>
+                                                                {getStatusIcon(displayStatus)}
+                                                            </div>
+                                                        ) : (
+                                                            // Not Applicable: Grey Square
+                                                            <div className="w-full h-full bg-white/5"></div>
+                                                        )}
                                                     </div>
                                                 </td>
                                             );

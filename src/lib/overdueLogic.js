@@ -11,7 +11,6 @@ export const checkOverdueActivities = async (userId) => {
         // Get local date in YYYY-MM-DD
         const d = new Date();
         const todayStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-        console.log(`[Overdue Check] Starting check for ${todayStr} (User: ${userId})...`);
 
         // 1. Get all modules for this user
         const { data: allModules, error: modAllErr } = await supabase
@@ -24,25 +23,23 @@ export const checkOverdueActivities = async (userId) => {
             return;
         }
 
-        console.log(`[Overdue Check] Total modules found: ${allModules?.length || 0}`);
+
 
         const overdueModules = (allModules || []).filter(m =>
             m.statut === 'en_cours' && m.date_fin && m.date_fin <= todayStr
         );
 
         if (overdueModules.length === 0) {
-            console.log('[Overdue Check] No overdue modules found (date_fin <= today).');
             return;
         }
 
-        console.log(`[Overdue Check] Found ${overdueModules.length} overdue modules:`, overdueModules.map(m => `${m.nom} (${m.date_fin})`));
+
 
         const moduleIds = overdueModules.map(m => m.id);
 
-        // 2. Get all activities from these modules
         const { data: activities, error: actError } = await supabase
             .from('Activite')
-            .select('id, titre')
+            .select('id, titre, ActiviteNiveau(niveau_id)')
             .in('module_id', moduleIds);
 
         if (actError) {
@@ -51,17 +48,16 @@ export const checkOverdueActivities = async (userId) => {
         }
 
         if (!activities || activities.length === 0) {
-            console.log('[Overdue Check] No activities found in these modules.');
             return;
         }
 
-        console.log(`[Overdue Check] Found ${activities.length} activities to check.`);
+
         const activityIds = activities.map(a => a.id);
 
         // 3. Get all students belonging to the user
         const { data: students, error: stuError } = await supabase
             .from('Eleve')
-            .select('id, prenom, nom')
+            .select('id, prenom, nom, niveau_id')
             .eq('titulaire_id', userId);
 
         if (stuError) {
@@ -70,11 +66,10 @@ export const checkOverdueActivities = async (userId) => {
         }
 
         if (!students || students.length === 0) {
-            console.log('[Overdue Check] No students found for this user (titulaire_id).');
             return;
         }
 
-        console.log(`[Overdue Check] Found ${students.length} students to check.`);
+
         const studentIds = students.map(s => s.id);
 
         // 4. Get all existing progressions for these students/activities
@@ -89,7 +84,7 @@ export const checkOverdueActivities = async (userId) => {
             return;
         }
 
-        console.log(`[Overdue Check] Found ${existingProgressions?.length || 0} existing progression records.`);
+
 
         // 5. Update existing progressions to 'a_domicile' if they are NOT 'termine' and NOT already 'a_domicile'
         const progressionsToUpdate = (existingProgressions || []).filter(p =>
@@ -110,10 +105,8 @@ export const checkOverdueActivities = async (userId) => {
                     console.error('[Overdue Check] Error updating progressions:', updateError);
                 }
             } else {
-                console.log(`[Overdue Check] Updated ${idsToUpdate.length} existing records to 'a_domicile'`);
+                // Success updating
             }
-        } else {
-            console.log('[Overdue Check] No existing records to update.');
         }
 
         // 6. Create missing progressions as 'a_domicile'
@@ -124,6 +117,15 @@ export const checkOverdueActivities = async (userId) => {
         const missingProgs = [];
         for (const student of students) {
             for (const activity of activities) {
+                // Strict Level Check
+                const allowedLevels = activity.ActiviteNiveau?.map(an => an.niveau_id) || [];
+                // If activity has no levels -> It's hidden/strict -> No homework
+                // If student has no level -> Can't verify -> No homework
+                // If student's level is not in allowed -> No homework
+                if (!student.niveau_id || allowedLevels.length === 0 || !allowedLevels.includes(student.niveau_id)) {
+                    continue;
+                }
+
                 const key = `${student.id}-${activity.id}`;
                 if (!existingPairs.has(key)) {
                     missingProgs.push({
@@ -138,16 +140,13 @@ export const checkOverdueActivities = async (userId) => {
         }
 
         if (missingProgs.length > 0) {
-            console.log(`[Overdue Check] Creating ${missingProgs.length} new 'a_domicile' records...`);
-            const { error: insertError } = await supabase.from('Progression').insert(missingProgs);
+            const { error: insertError } = await supabase.from('Progression').upsert(missingProgs, { onConflict: 'eleve_id, activite_id', ignoreDuplicates: true });
             if (insertError) {
                 if (insertError.code === '23514') {
                     console.error('[Overdue Check] DB CONSTRAINT ERROR: La valeur "a_domicile" n\'est pas autorisée dans la base de données. Veuillez mettre à jour la contrainte Progression_etat_check.');
                 } else {
                     console.error('[Overdue Check] Error inserting progressions:', insertError);
                 }
-            } else {
-                console.log(`[Overdue Check] Created ${missingProgs.length} new 'a_domicile' records.`);
             }
         }
     } catch (err) {

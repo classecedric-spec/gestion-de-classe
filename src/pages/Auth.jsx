@@ -14,6 +14,7 @@ const Auth = () => {
     const [fullName, setFullName] = useState('');
     const [error, setError] = useState(null);
     const [message, setMessage] = useState(null);
+    const [isForgotPassword, setIsForgotPassword] = useState(false);
     const [dbStatus, setDbStatus] = useState({ checked: false, exists: true, errorType: null, rawError: null });
     const [copied, setCopied] = useState(false);
     const navigate = useNavigate();
@@ -49,7 +50,13 @@ const Auth = () => {
         setMessage(null);
 
         try {
-            if (isSignUp) {
+            if (isForgotPassword) {
+                const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, {
+                    redirectTo: `${window.location.origin}/dashboard/settings?tab=profil`,
+                });
+                if (resetError) throw resetError;
+                setMessage('Un lien de réinitialisation a été envoyé à votre adresse email.');
+            } else if (isSignUp) {
                 const { data, error: signUpError } = await supabase.auth.signUp({
                     email,
                     password,
@@ -93,7 +100,9 @@ const Auth = () => {
                             Gestion de <span className="text-primary text-4xl leading-none">Classe</span>
                         </h1>
                         <p className="text-grey-medium">
-                            {isSignUp ? 'Créez votre compte pour commencer' : 'Bon retour parmi nous !'}
+                            {isForgotPassword
+                                ? 'Entrez votre email pour réinitialiser votre mot de passe'
+                                : (isSignUp ? 'Créez votre compte pour commencer' : 'Bon retour parmi nous !')}
                         </p>
                     </div>
 
@@ -222,24 +231,36 @@ const Auth = () => {
                                     onClick={() => setShowPassword(!showPassword)}
                                     className="absolute right-3 top-1/2 -translate-y-1/2 text-grey-medium hover:text-text-main transition-colors p-1"
                                 >
-                                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                                 </button>
                             </div>
                         </div>
 
-                        {!isSignUp && (
-                            <div className="flex items-center space-x-2 ml-1">
-                                <input
-                                    type="checkbox"
-                                    id="rememberMe"
-                                    checked={rememberMe}
-                                    onChange={(e) => setRememberMe(e.target.checked)}
-                                    className="w-4 h-4 rounded border-border/10 bg-background text-primary focus:ring-primary/50 transition-all cursor-pointer"
-                                    name="rememberMe"
-                                />
-                                <label htmlFor="rememberMe" className="text-sm text-grey-medium cursor-pointer hover:text-grey-light transition-colors">
-                                    Connexion automatique
-                                </label>
+                        {!isSignUp && !isForgotPassword && (
+                            <div className="flex items-center justify-between ml-1">
+                                <div className="flex items-center space-x-2">
+                                    <input
+                                        type="checkbox"
+                                        id="rememberMe"
+                                        checked={rememberMe}
+                                        onChange={(e) => setRememberMe(e.target.checked)}
+                                        className="w-4 h-4 rounded border-border/10 bg-background text-primary focus:ring-primary/50 transition-all cursor-pointer"
+                                        name="rememberMe"
+                                    />
+                                    <label htmlFor="rememberMe" className="text-sm text-grey-medium cursor-pointer hover:text-grey-light transition-colors">
+                                        Connexion auto.
+                                    </label>
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setIsForgotPassword(true);
+                                        setError(null);
+                                        setMessage(null);
+                                    }}
+                                    className="text-xs text-primary hover:text-white transition-colors"
+                                >
+                                    Mot de passe oublié ?
+                                </button>
                             </div>
                         )}
 
@@ -264,7 +285,7 @@ const Auth = () => {
                                 <Loader2 className="animate-spin" size={20} />
                             ) : (
                                 <>
-                                    {isSignUp ? "S'inscrire" : 'Se connecter'}
+                                    {isForgotPassword ? "Réinitialiser" : (isSignUp ? "S'inscrire" : 'Se connecter')}
                                     <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />
                                 </>
                             )}
@@ -273,13 +294,32 @@ const Auth = () => {
 
                     <div className="mt-8 pt-6 border-t border-border/5 text-center">
                         <p className="text-grey-medium">
-                            {isSignUp ? 'Vous avez déjà un compte ?' : "Vous n'avez pas de compte ?"}
-                            <button
-                                onClick={() => setIsSignUp(!isSignUp)}
-                                className="ml-2 text-primary hover:text-primary/80 font-semibold transition-colors focus:outline-none underline decoration-primary/30 underline-offset-4"
-                            >
-                                {isSignUp ? 'Connectez-vous' : 'Inscrivez-vous'}
-                            </button>
+                            {isForgotPassword ? (
+                                <button
+                                    onClick={() => {
+                                        setIsForgotPassword(false);
+                                        setError(null);
+                                        setMessage(null);
+                                    }}
+                                    className="text-primary hover:text-primary/80 font-semibold transition-colors focus:outline-none underline decoration-primary/30 underline-offset-4"
+                                >
+                                    Retour à la connexion
+                                </button>
+                            ) : (
+                                <>
+                                    {isSignUp ? 'Vous avez déjà un compte ?' : "Vous n'avez pas de compte ?"}
+                                    <button
+                                        onClick={() => {
+                                            setIsSignUp(!isSignUp);
+                                            setError(null);
+                                            setMessage(null);
+                                        }}
+                                        className="ml-2 text-primary hover:text-primary/80 font-semibold transition-colors focus:outline-none underline decoration-primary/30 underline-offset-4"
+                                    >
+                                        {isSignUp ? 'Connectez-vous' : 'Inscrivez-vous'}
+                                    </button>
+                                </>
+                            )}
                         </p>
                     </div>
                 </div>

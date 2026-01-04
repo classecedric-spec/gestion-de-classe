@@ -332,14 +332,11 @@ const Classes = () => {
                                     </div>
                                 </div>
                             </div>
-
-                            <div className="flex gap-2">
-                            </div>
                         </div>
 
                         {/* Students List */}
                         <div className="flex-1 overflow-y-auto p-8 custom-scrollbar bg-background/20">
-                            <h3 className="text-sm font-bold uppercase tracking-widest text-grey-dark border-b border-border/5 pb-4 mb-6 flex items-center gap-2">
+                            <h3 className="text-sm font-bold uppercase tracking-widest text-grey-dark border-b border-border/5 pb-4 mb-10 flex items-center gap-2">
                                 <GraduationCap size={18} className="text-primary" />
                                 Les enfants de cette classe
                             </h3>
@@ -358,41 +355,59 @@ const Classes = () => {
                                     </div>
                                 </div>
                             ) : (
-                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                                <div
+                                    className="grid gap-10 auto-rows-fr"
+                                    style={{
+                                        gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
+                                        '--card-font-size': studentsInClass.length > 0
+                                            ? `${Math.max(14, Math.min(24, 300 / Math.max(...studentsInClass.map(s => Math.max(s.prenom.length, s.nom.length) + 1))))}px`
+                                            : '20px'
+                                    }}
+                                >
                                     {studentsInClass.map(student => (
-                                        <div key={student.id} className="relative group/card">
+                                        <div key={student.id} className="relative group/card h-full">
                                             <button
                                                 onClick={(e) => handleRemoveStudentFromClass(e, student.id)}
-                                                className="absolute -top-2 -right-2 z-10 p-2 bg-danger/10 hover:bg-danger text-danger hover:text-white rounded-full border border-danger/20 opacity-0 group-hover/card:opacity-100 transition-all shadow-lg scale-90 hover:scale-100"
+                                                className="absolute top-4 right-4 z-10 p-3 bg-danger/10 hover:bg-danger text-danger hover:text-white rounded-full border border-danger/20 opacity-0 group-hover/card:opacity-100 transition-all shadow-lg scale-90 hover:scale-100 focus:outline-none"
                                                 title="Retirer de la classe"
                                             >
-                                                <X size={14} strokeWidth={3} />
+                                                <X size={16} strokeWidth={3} />
                                             </button>
                                             <button
                                                 onClick={() => handleEditStudent(student)}
-                                                className="w-full flex items-center gap-4 p-4 rounded-xl bg-input border border-border/5 hover:border-primary/30 hover:bg-input/80 transition-all text-left group"
+                                                className="w-full h-full flex flex-col items-center justify-center text-center p-12 rounded-[3.5rem] bg-surface/40 backdrop-blur-sm border border-white/5 hover:border-primary/40 hover:bg-surface/60 transition-all duration-500 group shadow-xl hover:shadow-primary/20 relative overflow-hidden"
+                                                style={{ fontSize: 'var(--card-font-size)' }}
                                             >
+                                                {/* Decorative background circle */}
+                                                <div className="absolute -bottom-16 -right-16 w-48 h-48 bg-primary/5 rounded-full blur-[100px] group-hover:bg-primary/10 transition-colors" />
+
                                                 <div className={clsx(
-                                                    "w-12 h-12 rounded-lg flex items-center justify-center text-lg font-bold text-primary group-hover:scale-110 transition-transform overflow-hidden shadow-inner",
-                                                    student.photo_base64 ? "bg-[#D9B981]" : "bg-background"
+                                                    "w-40 h-40 rounded-[3rem] flex items-center justify-center font-bold text-primary group-hover:scale-110 transition-transform duration-500 overflow-hidden shadow-2xl mb-10 shrink-0 relative",
+                                                    student.photo_base64 ? "bg-[#D9B981] p-3" : "bg-background"
                                                 )}>
                                                     {student.photo_base64 ? (
-                                                        <img src={student.photo_base64} alt="Student" className="w-[90%] h-[90%] object-contain" />
+                                                        <img src={student.photo_base64} alt="Student" className="w-full h-full object-contain rounded-[2.2rem]" />
                                                     ) : (
-                                                        <>{student.prenom[0]}{student.nom[0]}</>
+                                                        <span className="text-[2.5em] tracking-tighter">{student.prenom[0]}{student.nom[0]}</span>
                                                     )}
                                                 </div>
-                                                <div className="flex-1 min-w-0">
-                                                    <p className="font-semibold text-text-main group-hover:text-primary transition-colors">
-                                                        {student.prenom} {student.nom}
+
+                                                <div className="flex flex-col items-center min-w-0 w-full">
+                                                    <p className="font-black text-text-main group-hover:text-primary transition-colors leading-[1.2] tracking-tight mb-4 uppercase break-words px-4">
+                                                        {student.prenom} <br />
+                                                        <span className="opacity-80 font-extrabold">{student.nom}</span>
                                                     </p>
-                                                    <p className="text-[10px] uppercase font-bold tracking-wider text-grey-dark">
+                                                    <div className="h-2 w-16 bg-primary/20 rounded-full mb-6 group-hover:w-24 group-hover:bg-primary/50 transition-all duration-500" />
+                                                    <p className="text-[0.55em] uppercase font-black tracking-[0.35em] text-grey-medium opacity-60 truncate w-full px-6">
                                                         {student.EleveGroupe?.length > 0
-                                                            ? student.EleveGroupe.map(eg => eg.Groupe?.nom).filter(Boolean).join(', ')
+                                                            ? student.EleveGroupe[0].Groupe?.nom
                                                             : 'Sans groupe'}
                                                     </p>
                                                 </div>
-                                                <ChevronRight size={16} className="text-grey-dark group-hover:text-primary group-hover:translate-x-1 transition-all" />
+
+                                                <div className="mt-12 opacity-0 group-hover:opacity-100 transition-all duration-500 transform translate-y-4 group-hover:translate-y-0">
+                                                    <ChevronRight size={32} className="text-primary" />
+                                                </div>
                                             </button>
                                         </div>
                                     ))}
@@ -400,13 +415,13 @@ const Classes = () => {
                             )}
                         </div>
 
-                        <div className="p-4 border-t border-border/5 bg-surface/30">
+                        <div className="p-8 border-t border-border/5 bg-surface/30">
                             <button
                                 onClick={() => setShowAddToClassModal(true)}
-                                className="w-full py-3 bg-input hover:bg-primary/20 hover:text-primary text-grey-light rounded-xl border border-dashed border-border/20 hover:border-primary/50 transition-all flex items-center justify-center gap-2 group"
+                                className="w-full py-5 bg-input hover:bg-primary/20 hover:text-primary text-grey-light rounded-2xl border border-dashed border-border/20 hover:border-primary/50 transition-all flex items-center justify-center gap-4 group"
                             >
-                                <Plus size={18} className="group-hover:scale-110 transition-transform" />
-                                <span className="font-medium">Ajouter un enfant</span>
+                                <Plus size={24} className="group-hover:scale-110 transition-transform" />
+                                <span className="font-black uppercase tracking-widest text-sm">Ajouter un enfant</span>
                             </button>
                         </div>
                     </>

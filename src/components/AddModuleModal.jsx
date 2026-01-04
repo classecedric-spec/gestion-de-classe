@@ -170,23 +170,38 @@ const AddModuleModal = ({ isOpen, onClose, onAdded, moduleToEdit }) => {
                 date_fin: endDate || null
             };
 
+            let savedModule;
+            const selectQuery = `
+                *,
+                SousBranche (
+                    id, nom, branche_id,
+                    Branche (id, nom)
+                )
+            `;
+
             if (moduleToEdit) {
-                const { error: updateError } = await supabase
+                const { data, error: updateError } = await supabase
                     .from('Module')
                     .update(moduleData)
-                    .eq('id', moduleToEdit.id);
+                    .eq('id', moduleToEdit.id)
+                    .select(selectQuery)
+                    .single();
                 if (updateError) throw updateError;
+                savedModule = data;
             } else {
-                const { error: insertError } = await supabase
+                const { data, error: insertError } = await supabase
                     .from('Module')
                     .insert([{
                         ...moduleData,
                         user_id: user.id
-                    }]);
+                    }])
+                    .select(selectQuery)
+                    .single();
                 if (insertError) throw insertError;
+                savedModule = data;
             }
 
-            onAdded();
+            onAdded(savedModule);
             onClose();
         } catch (err) {
             console.error('Error saving module:', err);

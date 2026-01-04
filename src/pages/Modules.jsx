@@ -67,21 +67,15 @@ const SortableActivityItem = ({ activity, index, sortableId, onEdit }) => {
 
                     {/* Requirements Badges */}
                     <div className="flex flex-wrap gap-1.5">
-                        {/* Base Requirement */}
-                        <div className="flex items-center gap-1 px-1.5 py-0.5 bg-white/5 rounded text-[10px] font-medium text-grey-medium border border-white/5 whitespace-nowrap">
-                            <span className="opacity-70 uppercase tracking-tighter">Base</span>
-                            <span className="text-primary/70">{activity.nb_exercices || 0}</span>
-                            <span className="opacity-30">/</span>
-                            <span className="text-danger/70">{activity.max_erreurs || 0}</span>
-                        </div>
+
 
                         {/* Level-specific Requirements */}
                         {activity.ActiviteNiveau?.map(req => (
                             <div key={req.id} className="flex items-center gap-1 px-1.5 py-0.5 bg-primary/5 rounded text-[10px] font-bold text-primary border border-primary/10 whitespace-nowrap">
                                 <span className="opacity-70 uppercase tracking-tighter">{req.Niveau?.nom}</span>
-                                <span>{req.nb_exercices || 0}</span>
+                                <span>{req.nombre_exercices || 0}</span>
                                 <span className="opacity-30">/</span>
-                                <span className="text-danger/70">{req.max_erreurs || 0}</span>
+                                <span className="text-danger/70">{req.nombre_erreurs || 0}</span>
                             </div>
                         ))}
                     </div>
@@ -206,6 +200,13 @@ const Modules = () => {
     const [selectedProgressionActivity, setSelectedProgressionActivity] = useState(null);
     const [progressions, setProgressions] = useState([]);
     const [loadingProgressions, setLoadingProgressions] = useState(false);
+
+    // Notifications
+    const [notification, setNotification] = useState(null);
+    const showNotification = (message, type = 'success') => {
+        setNotification({ message, type });
+        setTimeout(() => setNotification(null), 5000);
+    };
 
     // Local state for sortable activities
     const [moduleActivities, setModuleActivities] = useState([]);
@@ -338,8 +339,11 @@ const Modules = () => {
         }
     };
 
-    const handleCreated = () => {
-        fetchModules();
+    const handleCreated = async (newModule) => {
+        await fetchModules();
+        if (newModule) {
+            setSelectedModule(newModule);
+        }
         setModuleToEdit(null);
     };
 
@@ -423,15 +427,15 @@ const Modules = () => {
 
                 if (insertError) throw insertError;
 
-                alert(`${progressionsToInsert.length} lignes de progression générées !`);
+                showNotification(`${progressionsToInsert.length} lignes de progression générées !`);
                 setSelectedGroups([]);
                 setDetailTab('activities');
             } else {
-                alert("Aucun élève correspondant aux niveaux des activités n'a été trouvé dans ces groupes.");
+                showNotification("Aucun élève correspondant aux niveaux des activités n'a été trouvé dans ces groupes.", 'error');
             }
         } catch (err) {
             console.error('Error generating progressions:', err);
-            alert("Erreur lors de la génération des progressions.");
+            showNotification("Erreur lors de la génération des progressions.", 'error');
         } finally {
             setGeneratingProgressions(false);
         }
@@ -574,7 +578,7 @@ const Modules = () => {
             fetchModules();
         } catch (err) {
             console.error('Error deleting module:', err);
-            alert("Erreur lors de la suppression du module.");
+            showNotification("Erreur lors de la suppression du module.", 'error');
         } finally {
             setLoading(false);
         }
@@ -970,7 +974,7 @@ const Modules = () => {
                 <div className="p-4 border-t border-white/5 bg-surface/30">
                     <button
                         onClick={() => setIsAddModalOpen(true)}
-                        className="w-full py-3 bg-white/5 hover:bg-primary/20 hover:text-primary text-grey-light rounded-xl border border-dashed border-white/20 hover:border-primary/50 transition-all flex items-center justify-center gap-2 group"
+                        className="w-full h-12 bg-white/5 hover:bg-primary/20 hover:text-primary text-grey-light rounded-xl border border-dashed border-white/20 hover:border-primary/50 transition-all flex items-center justify-center gap-2 group"
                     >
                         <Plus size={18} className="group-hover:scale-110 transition-transform" />
                         <span className="font-medium">Ajouter un module</span>
@@ -993,8 +997,6 @@ const Modules = () => {
                                     <div className="flex items-center gap-4 text-grey-medium">
                                         {selectedModule.SousBranche && (
                                             <span className="text-sm text-grey-medium font-medium flex items-center gap-2">
-                                                {/* REMOVED ICON HERE */}
-                                                {/* Branch - SubBranch */}
                                                 {selectedModule.SousBranche.Branche && `${selectedModule.SousBranche.Branche.nom} - `}
                                                 {selectedModule.SousBranche.nom}
                                             </span>
@@ -1077,8 +1079,17 @@ const Modules = () => {
                             {detailTab === 'activities' ? (
                                 <div className="space-y-1 animate-in fade-in duration-300">
                                     {!moduleActivities || moduleActivities.length === 0 ? (
-                                        <div className="text-center p-12 border-2 border-dashed border-white/5 rounded-xl">
-                                            <p className="text-grey-medium italic">Aucune activité liée à ce module.</p>
+                                        <div className="pt-4">
+                                            <button
+                                                onClick={() => {
+                                                    setActivityToEdit(null);
+                                                    setIsAddActivityModalOpen(true);
+                                                }}
+                                                className="w-full h-12 bg-white/5 hover:bg-primary/20 hover:text-primary text-grey-light rounded-xl border border-dashed border-white/20 hover:border-primary/50 transition-all flex items-center justify-center gap-2 group"
+                                            >
+                                                <Plus size={18} className="group-hover:scale-110 transition-transform" />
+                                                <span className="font-medium">Ajouter une activité</span>
+                                            </button>
                                         </div>
                                     ) : (
                                         <DndContext
@@ -1100,6 +1111,20 @@ const Modules = () => {
                                                     />
                                                 ))}
                                             </SortableContext>
+
+                                            {/* Bottom Add Activity Button */}
+                                            <div className="pt-4">
+                                                <button
+                                                    onClick={() => {
+                                                        setActivityToEdit(null);
+                                                        setIsAddActivityModalOpen(true);
+                                                    }}
+                                                    className="w-full h-12 bg-white/5 hover:bg-primary/20 hover:text-primary text-grey-light rounded-xl border border-dashed border-white/20 hover:border-primary/50 transition-all flex items-center justify-center gap-2 group"
+                                                >
+                                                    <Plus size={18} className="group-hover:scale-110 transition-transform" />
+                                                    <span className="font-medium">Ajouter une activité</span>
+                                                </button>
+                                            </div>
                                         </DndContext>
                                     )}
                                 </div>
@@ -1116,54 +1141,56 @@ const Modules = () => {
                                                     key={group.id}
                                                     onClick={() => handleToggleGroup(group.id)}
                                                     className={clsx(
-                                                        "p-4 rounded-xl border transition-all cursor-pointer flex items-center justify-between group",
+                                                        "p-6 rounded-2xl border transition-all cursor-pointer flex flex-col items-center text-center gap-4 group relative overflow-hidden",
                                                         selectedGroups.includes(group.id)
                                                             ? "bg-primary text-text-dark border-primary shadow-lg shadow-primary/10"
                                                             : "bg-surface/30 border-white/5 hover:border-white/10 hover:bg-surface/50"
                                                     )}
                                                 >
-                                                    <div className="flex items-center gap-3">
-                                                        <div className={clsx(
-                                                            "w-10 h-10 rounded-lg flex items-center justify-center transition-colors",
-                                                            selectedGroups.includes(group.id) ? "bg-text-dark/10" : "bg-background text-grey-medium"
-                                                        )}>
-                                                            <Users size={20} />
-                                                        </div>
-                                                        <div className="min-w-0">
-                                                            <h4 className={clsx("font-bold truncate text-sm", selectedGroups.includes(group.id) ? "text-text-dark" : "text-text-main")}>
-                                                                {group.nom}
-                                                            </h4>
-                                                            <p className={clsx("text-[10px] uppercase tracking-wider truncate", selectedGroups.includes(group.id) ? "text-text-dark/60" : "text-grey-medium")}>
-                                                                {group.Classe?.nom || 'Sans classe'}
-                                                            </p>
-                                                        </div>
+                                                    <div className={clsx(
+                                                        "w-14 h-14 rounded-xl flex items-center justify-center transition-all",
+                                                        selectedGroups.includes(group.id) ? "bg-text-dark/10" : "bg-background text-primary"
+                                                    )}>
+                                                        <Users size={28} />
+                                                    </div>
+                                                    <div className="min-w-0">
+                                                        <h4 className={clsx("font-black uppercase tracking-tight text-sm", selectedGroups.includes(group.id) ? "text-text-dark" : "text-text-main")}>
+                                                            {group.nom}
+                                                        </h4>
                                                     </div>
                                                     <div className={clsx(
-                                                        "w-6 h-6 rounded-md border flex items-center justify-center transition-all",
-                                                        selectedGroups.includes(group.id) ? "bg-text-dark/10 border-text-dark/20 text-text-dark" : "border-white/10 text-transparent"
+                                                        "absolute top-3 right-3 w-6 h-6 rounded-lg border flex items-center justify-center transition-all",
+                                                        selectedGroups.includes(group.id) ? "bg-text-dark/10 border-text-dark/20 text-text-dark" : "border-white/10 text-transparent opacity-0 group-hover:opacity-100"
                                                     )}>
                                                         <Check size={16} strokeWidth={3} />
                                                     </div>
+                                                    <div className={clsx(
+                                                        "absolute -bottom-4 -right-4 w-12 h-12 rounded-full blur-2xl transition-opacity",
+                                                        selectedGroups.includes(group.id) ? "bg-text-dark/20 opacity-100" : "bg-primary/5 opacity-0 group-hover:opacity-100"
+                                                    )} />
                                                 </div>
                                             ))
                                         )}
                                     </div>
-
-                                    <div className="flex justify-end pt-4 border-t border-white/5">
+                                    <div className="pt-4">
                                         <button
                                             onClick={generateProgressions}
                                             disabled={selectedGroups.length === 0 || generatingProgressions}
-                                            title="Cochez les groupes d'élèves concernés. Le système créera une ligne de progression 'À commencer' pour chaque enfant dont le niveau correspond aux activités du module."
-                                            className="whitespace-nowrap px-6 py-3 bg-success text-text-dark rounded-xl font-bold text-[11px] uppercase tracking-wider hover:bg-success/90 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-3 transition-all shadow-lg shadow-success/20 active:scale-95"
+                                            className="w-full py-5 bg-success text-text-dark rounded-[2rem] font-black text-xs uppercase tracking-[0.2em] hover:bg-success/90 disabled:opacity-30 disabled:grayscale disabled:cursor-not-allowed flex items-center justify-center gap-4 transition-all shadow-xl shadow-success/20 active:scale-[0.98] hover:scale-[1.02]"
                                         >
-                                            {generatingProgressions ? <Loader2 className="animate-spin" size={16} /> : <CheckSquare size={16} />}
-                                            Générer le suivi
+                                            {generatingProgressions ? (
+                                                <Loader2 className="animate-spin" size={24} />
+                                            ) : (
+                                                <div className="w-8 h-8 rounded-full bg-text-dark/10 flex items-center justify-center">
+                                                    <CheckSquare size={20} strokeWidth={3} />
+                                                </div>
+                                            )}
+                                            Générer le suivi complet
                                         </button>
                                     </div>
                                 </div>
                             ) : (
                                 <div className="flex gap-8 h-full min-h-[500px] animate-in slide-in-from-right-2 duration-300">
-                                    {/* Activities List Sidebar */}
                                     <div className="w-56 flex flex-col gap-2 border-r border-white/5 pr-6">
                                         <h4 className="text-[10px] uppercase font-bold text-grey-medium tracking-widest mb-2 px-2">Activités</h4>
                                         <div className="space-y-1 overflow-y-auto custom-scrollbar pr-2">
@@ -1189,7 +1216,7 @@ const Modules = () => {
                                                         )}
                                                     </div>
                                                     <div className="flex items-center gap-2">
-                                                        <div className={clsx("w-full h-1 rounded-full bg-black/20 overflow-hidden")}>
+                                                        <div className="w-full h-1 rounded-full bg-black/20 overflow-hidden">
                                                             <div
                                                                 className="h-full bg-success transition-all duration-500 ease-out"
                                                                 style={{ width: `${stats[act.id]?.percent || 0}%` }}
@@ -1200,8 +1227,6 @@ const Modules = () => {
                                             ))}
                                         </div>
                                     </div>
-
-                                    {/* Progression Tracking Detail */}
                                     <div className="flex-1 flex flex-col min-w-0">
                                         {!selectedProgressionActivity ? (
                                             <div className="flex-1 flex flex-col items-center justify-center text-grey-medium text-center">
@@ -1210,8 +1235,6 @@ const Modules = () => {
                                             </div>
                                         ) : (
                                             <div className="flex-1 flex flex-col gap-6">
-
-
                                                 <div className="space-y-8 overflow-y-auto custom-scrollbar pr-4 pb-12">
                                                     {loadingProgressions ? (
                                                         <div className="flex flex-col items-center justify-center py-20 gap-4">
@@ -1275,6 +1298,8 @@ const Modules = () => {
                                 </div>
                             )}
                         </div>
+
+
                     </>
                 ) : (
                     <div className="flex-1 flex flex-col items-center justify-center text-grey-medium">
@@ -1293,12 +1318,18 @@ const Modules = () => {
 
             <AddActivityModal
                 isOpen={isAddActivityModalOpen}
-                onClose={() => {
-                    setIsAddActivityModalOpen(false);
-                    setActivityToEdit(null);
+                onClose={() => setIsAddActivityModalOpen(false)}
+                onAdded={() => {
+                    fetchModules();
+                    if (selectedModule) {
+                        const updated = modules.find(m => m.id === selectedModule.id);
+                        if (updated) setSelectedModule(updated);
+                    }
                 }}
-                onAdded={fetchModules}
                 activityToEdit={activityToEdit}
+                defaultModuleId={selectedModule?.id}
+                defaultModuleName={selectedModule?.nom}
+                nextOrder={moduleActivities?.length > 0 ? Math.max(...moduleActivities.map(a => a.ordre || 0)) + 1 : 0}
             />
 
             <CreateActivitySeriesModal
@@ -1308,37 +1339,70 @@ const Modules = () => {
                 moduleId={selectedModule?.id}
             />
 
-            {/* Delete Confirmation Modal */}
-            {moduleToDelete && (
-                <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-                    <div className="w-full max-w-sm bg-surface border border-white/10 rounded-2xl shadow-2xl p-6 text-center animate-in zoom-in-95 duration-200">
-                        <div className="w-16 h-16 bg-danger/10 text-danger rounded-full flex items-center justify-center mx-auto mb-4">
-                            <Trash2 size={32} />
+            {/* Floating Notification Popup */}
+            {
+                notification && (
+                    <div className={clsx(
+                        "fixed bottom-8 right-8 z-[200] flex items-center gap-4 px-6 py-4 rounded-2xl shadow-2xl animate-in slide-in-from-right-10 duration-500 border backdrop-blur-md",
+                        notification.type === 'success'
+                            ? "bg-success/90 border-success/20 text-text-dark"
+                            : "bg-danger/90 border-danger/20 text-white"
+                    )}>
+                        <div className={clsx(
+                            "w-8 h-8 rounded-full flex items-center justify-center shadow-inner",
+                            notification.type === 'success' ? "bg-text-dark/10" : "bg-white/10"
+                        )}>
+                            {notification.type === 'success' ? <Check size={18} strokeWidth={3} /> : <AlertCircle size={18} strokeWidth={3} />}
                         </div>
-                        <h2 className="text-xl font-bold text-text-main mb-2">Supprimer le module ?</h2>
-                        <p className="text-sm text-grey-medium mb-6">
-                            Êtes-vous sûr de vouloir supprimer le module <span className="text-white font-bold">"{moduleToDelete.nom}"</span> ?
-                            <br />Cette action est irréversible.
-                        </p>
-                        <div className="flex gap-3">
-                            <button
-                                onClick={() => setModuleToDelete(null)}
-                                className="flex-1 py-3 bg-white/5 hover:bg-white/10 text-grey-light rounded-xl font-medium transition-colors"
-                            >
-                                Annuler
-                            </button>
-                            <button
-                                onClick={handleDelete}
-                                disabled={loading}
-                                className="flex-1 py-3 bg-danger hover:bg-danger/90 text-white rounded-xl font-bold shadow-lg shadow-danger/20 flex items-center justify-center gap-2"
-                            >
-                                {loading ? <Loader2 className="animate-spin" size={20} /> : "Supprimer"}
-                            </button>
+                        <div className="flex flex-col">
+                            <p className="font-black text-sm tracking-tight leading-tight uppercase">
+                                {notification.type === 'success' ? 'Succès' : 'Attention'}
+                            </p>
+                            <p className="text-xs font-medium opacity-90">{notification.message}</p>
+                        </div>
+                        <button
+                            onClick={() => setNotification(null)}
+                            className="ml-4 p-1.5 rounded-lg hover:bg-black/10 transition-colors opacity-50 hover:opacity-100"
+                        >
+                            <X size={16} />
+                        </button>
+                    </div>
+                )
+            }
+
+            {/* Delete Confirmation Modal */}
+            {
+                moduleToDelete && (
+                    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+                        <div className="w-full max-w-sm bg-surface border border-white/10 rounded-2xl shadow-2xl p-6 text-center animate-in zoom-in-95 duration-200">
+                            <div className="w-16 h-16 bg-danger/10 text-danger rounded-full flex items-center justify-center mx-auto mb-4">
+                                <Trash2 size={32} />
+                            </div>
+                            <h2 className="text-xl font-bold text-text-main mb-2">Supprimer le module ?</h2>
+                            <p className="text-sm text-grey-medium mb-6">
+                                Êtes-vous sûr de vouloir supprimer le module <span className="text-white font-bold">"{moduleToDelete.nom}"</span> ?
+                                <br />Cette action est irréversible.
+                            </p>
+                            <div className="flex gap-3">
+                                <button
+                                    onClick={() => setModuleToDelete(null)}
+                                    className="flex-1 py-3 bg-white/5 hover:bg-white/10 text-grey-light rounded-xl font-medium transition-colors"
+                                >
+                                    Annuler
+                                </button>
+                                <button
+                                    onClick={handleDelete}
+                                    disabled={loading}
+                                    className="flex-1 py-3 bg-danger hover:bg-danger/90 text-white rounded-xl font-bold shadow-lg shadow-danger/20 flex items-center justify-center gap-2"
+                                >
+                                    {loading ? <Loader2 className="animate-spin" size={20} /> : "Supprimer"}
+                                </button>
+                            </div>
                         </div>
                     </div>
-                </div>
-            )}
-        </div>
+                )
+            }
+        </div >
     );
 };
 

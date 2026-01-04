@@ -18,7 +18,7 @@ import {
     Clock,
     Flame,
     Smartphone,
-    ShieldCheck
+    ShieldCheck, UserCheck
 } from 'lucide-react';
 import clsx from 'clsx';
 
@@ -32,6 +32,11 @@ const Layout = () => {
     const navigate = useNavigate();
 
     const isSuiviPage = location.pathname === '/dashboard/suivi';
+    const isPresencePage = location.pathname === '/dashboard/presence';
+    const isUserPage = location.pathname.startsWith('/dashboard/user');
+    const isActivitiesPage = location.pathname.startsWith('/dashboard/activities');
+    const isSettingsPage = location.pathname.startsWith('/dashboard/settings');
+    const isFullPage = isSuiviPage || isPresencePage || isUserPage || isActivitiesPage || isSettingsPage;
 
 
     useEffect(() => {
@@ -95,13 +100,24 @@ const Layout = () => {
         }
     };
 
+    const handleLogout = async () => {
+        const { error } = await supabase.auth.signOut();
+        if (error) console.error('Error logging out:', error);
+        navigate('/login');
+    };
+
     const navItems = [
         { icon: Home, label: 'Accueil', path: '/dashboard' },
-        { icon: Users, label: 'Utilisateurs', path: '/dashboard/user' },
+        { type: 'separator' },
+        { icon: UserCheck, label: 'Présence', path: '/dashboard/presence' },
         { icon: GraduationCap, label: 'Suivi Global', path: '/dashboard/suivi' },
+        { type: 'separator' },
+        { icon: Users, label: 'Utilisateurs', path: '/dashboard/user' },
         { icon: Puzzle, label: 'Activités', path: '/dashboard/activities' },
-        { icon: Settings, label: 'Paramètres', path: '/dashboard/settings' },
+        { type: 'separator' },
         { icon: Smartphone, label: 'iPhone', path: '/mobile-suivi', isExternal: true },
+        { type: 'separator' },
+        { icon: Settings, label: 'Paramètres', path: '/dashboard/settings' },
     ];
 
     // Filter nav items if not logged in OR if pending admin validation
@@ -125,7 +141,7 @@ const Layout = () => {
                     onClick={() => setIsSidebarOpen(true)}
                     className={clsx(
                         "fixed z-[100] h-[46px] w-[46px] bg-surface text-primary border border-white/10 rounded-xl shadow-xl flex items-center justify-center animate-in fade-in slide-in-from-left-2 transition-all hover:bg-white/5 hover:scale-105 active:scale-95",
-                        isSuiviPage ? "top-[7px] left-4" : "top-[33px] left-6"
+                        isFullPage ? "top-[11px] left-4" : "top-[33px] left-6"
                     )}
                     title="Afficher le menu"
                 >
@@ -149,7 +165,16 @@ const Layout = () => {
                 </div>
 
                 <nav className="flex-1 px-4 py-4 space-y-2">
-                    {displayedNavItems.map((item) => {
+                    {displayedNavItems.map((item, index) => {
+                        if (item.type === 'separator') {
+                            return (
+                                <div
+                                    key={`sep-${index}`}
+                                    className="h-px bg-white/5 my-4 mx-2"
+                                />
+                            );
+                        }
+
                         const Icon = item.icon;
                         const isActive = location.pathname === item.path;
 
@@ -198,7 +223,16 @@ const Layout = () => {
                     })}
                 </nav>
 
-                <div className="pb-4 px-4">
+                <div className="pb-4 px-4 sticky bottom-0 bg-surface">
+                    <button
+                        onClick={handleLogout}
+                        className="flex items-center w-full px-4 py-3 rounded-lg transition-colors group text-text-main hover:bg-input hover:text-danger mt-2"
+                        title="Se déconnecter"
+                    >
+                        <LogOut className="w-5 h-5 mr-3 shrink-0 group-hover:text-danger text-grey-medium" />
+                        <span className="truncate group-hover:text-danger">Se déconnecter</span>
+                    </button>
+                    <div className="h-px bg-white/5 my-4 mx-2" />
                     <div className="text-[10px] text-grey-dark text-center">
                         v1.0.0
                     </div>
@@ -209,8 +243,8 @@ const Layout = () => {
             <main className={
                 clsx(
                     "flex-1 overflow-y-auto relative transition-all duration-300",
-                    !isSidebarOpen && "pl-20",
-                    isSuiviPage ? "p-0" : "p-8"
+                    !isSidebarOpen && (isFullPage ? "pl-0" : "pl-20"),
+                    isFullPage ? "p-0" : "p-8"
                 )}>
 
                 {/* 1. BLOCKED: Pending Validation */}

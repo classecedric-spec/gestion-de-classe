@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useOutletContext, useLocation, useNavigate } from 'react-router-dom';
 import {
     User, Mail, School, Camera, Save, Loader2,
-    Moon, Sun, Monitor, Palette, AlertTriangle, Trash2, Database, Sparkles, Settings as SettingsIcon
+    Moon, Sun, Monitor, Palette, AlertTriangle, Trash2, Database, Sparkles, Settings as SettingsIcon,
+    Key
 } from 'lucide-react';
 import { supabase } from '../lib/supabaseClient';
 import { resizeAndConvertToBase64 } from '../lib/imageUtils';
@@ -36,6 +37,9 @@ const Settings = () => {
     const [isResetting, setIsResetting] = useState(false);
     const [isGenerating, setIsGenerating] = useState(false);
     const [showResetModal, setShowResetModal] = useState(false);
+    const [showPasswordModal, setShowPasswordModal] = useState(false);
+    const [passwordData, setPasswordData] = useState({ oldPassword: '', newPassword: '', confirmPassword: '' });
+    const [updatingPassword, setUpdatingPassword] = useState(false);
 
     useEffect(() => {
         if (activeTab === 'profil') {
@@ -286,239 +290,302 @@ const Settings = () => {
             const { data: { user } } = await supabase.auth.getUser();
             if (!user) throw new Error("Utilisateur non trouvé");
 
-            await supabase.from('Progression').delete().eq('user_id', user.id);
-            await supabase.from('EleveGroupe').delete().eq('user_id', user.id);
-            await supabase.from('ActiviteNiveau').delete().eq('user_id', user.id);
-            await supabase.from('TypeMateriel').delete().eq('user_id', user.id);
-            await supabase.from('Eleve').delete().eq('titulaire_id', user.id);
-            await supabase.from('Activite').delete().eq('user_id', user.id);
-            await supabase.from('Module').delete().eq('user_id', user.id);
-            await supabase.from('SousBranche').delete().eq('user_id', user.id);
-            await supabase.from('Branche').delete().eq('user_id', user.id);
-            await supabase.from('Groupe').delete().eq('user_id', user.id);
-            await supabase.from('Classe').delete().eq('user_id', user.id);
-            await supabase.from('Niveau').delete().eq('user_id', user.id);
+            // 1. Logs and Linker tables (Foreign Key dependencies)
+            // We use .not('id', 'is', null) to delete EVERYTHING authorized by RLS, 
+            // even if user_id column is missing or null, provided the user has DELETE rights.
+            await supabase.from('SuiviAdulte').delete().not('id', 'is', null);
+            await supabase.from('Progression').delete().not('id', 'is', null);
+            await supabase.from('Attendance').delete().not('id', 'is', null);
+            await supabase.from('EleveGroupe').delete().not('id', 'is', null);
+            await supabase.from('ActiviteNiveau').delete().not('id', 'is', null);
+            await supabase.from('ActiviteMateriel').delete().not('id', 'is', null);
 
-            toast.success("Données supprimées.", { id: resetToastId });
+            // 2. Data tables
+            await supabase.from('Eleve').delete().not('id', 'is', null);
+            await supabase.from('ClasseAdulte').delete().not('id', 'is', null);
+            await supabase.from('Activite').delete().not('id', 'is', null);
+            await supabase.from('Module').delete().not('id', 'is', null);
+            await supabase.from('SousBranche').delete().not('id', 'is', null);
+            await supabase.from('Branche').delete().not('id', 'is', null);
+            await supabase.from('SousDomaine').delete().not('id', 'is', null);
+            await supabase.from('Groupe').delete().not('id', 'is', null);
+            await supabase.from('Classe').delete().not('id', 'is', null);
+            await supabase.from('Niveau').delete().not('id', 'is', null);
+
+            // 3. Setup tables
+            await supabase.from('TypeActiviteAdulte').delete().not('id', 'is', null);
+            await supabase.from('Adulte').delete().not('id', 'is', null);
+            await supabase.from('CategoriePresence').delete().not('id', 'is', null);
+            await supabase.from('SetupPresence').delete().not('id', 'is', null);
+            await supabase.from('TypeMateriel').delete().not('id', 'is', null);
+            await supabase.from('UserPreference').delete().not('id', 'is', null);
+
+            toast.success("Toutes les données autorisées ont été réinitialisées.", { id: resetToastId });
             setShowResetModal(false);
-            setTimeout(() => window.location.reload(), 1500);
+            setTimeout(() => window.location.reload(), 2000);
         } catch (error) {
-            toast.error("Erreur suppression.", { id: resetToastId });
+            console.error("Hard reset failed:", error);
+            toast.error("Erreur lors de la réinitialisation: " + error.message, { id: resetToastId });
         } finally {
             setIsResetting(false);
         }
     };
 
+    const handleChangePassword = async (e) => {
+        e.preventDefault();
+        if (passwordData.newPassword !== passwordData.confirmPassword) {
+            toast.error("Les nouveaux mots de passe ne correspondent pas.");
+            return;
+        }
+
+        setUpdatingPassword(true);
+        try {
+            // Note: Supabase doesn't strictly require old password for update,
+            // but we could implement a re-auth if needed. For now, we follow instructions.
+            const { error } = await supabase.auth.updateUser({
+                password: passwordData.newPassword
+            });
+
+            if (error) throw error;
+
+            toast.success("Mot de passe mis à jour avec succès");
+            setShowPasswordModal(false);
+            setPasswordData({ oldPassword: '', newPassword: '', confirmPassword: '' });
+        } catch (error) {
+            toast.error("Erreur: " + error.message);
+        } finally {
+            setUpdatingPassword(false);
+        }
+    };
+
     return (
-        <div className="max-w-4xl mx-auto space-y-6 animate-in fade-in duration-500 pb-20">
+        <div className="h-full flex flex-col overflow-hidden">
             {/* Header */}
-            <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
-                <div>
-                    <h1 className="text-3xl font-black text-text-main mb-2">Paramètres</h1>
-                    <p className="text-grey-medium">Gérez votre profil et les préférences de l'application.</p>
+            <div className="bg-surface/50 border-b border-white/5 px-6 py-3 flex items-center justify-between sticky top-0 z-40 backdrop-blur-md shrink-0 pl-16">
+                {/* Space for Sidebar Toggle (LEFT) */}
+                <div className="min-w-[200px]" />
+
+                {/* TAB SELECTORS (CENTER) */}
+                <div className="flex-1 flex justify-center">
+                    <div className="flex bg-background/50 p-1 rounded-xl border border-white/10 shadow-inner">
+                        <button
+                            onClick={() => handleTabChange('profil')}
+                            className={clsx(
+                                "px-8 py-2 rounded-lg text-sm font-bold transition-all flex items-center gap-2",
+                                activeTab === 'profil' ? "bg-primary text-text-dark shadow-lg shadow-primary/20 scale-100" : "text-grey-medium hover:text-white hover:bg-white/5"
+                            )}
+                        >
+                            <User size={16} /> Profil
+                        </button>
+                        <button
+                            onClick={() => handleTabChange('systeme')}
+                            className={clsx(
+                                "px-8 py-2 rounded-lg text-sm font-bold transition-all flex items-center gap-2",
+                                activeTab === 'systeme' ? "bg-primary text-text-dark shadow-lg shadow-primary/20 scale-100" : "text-grey-medium hover:text-white hover:bg-white/5"
+                            )}
+                        >
+                            <SettingsIcon size={16} /> Système
+                        </button>
+                    </div>
                 </div>
 
-                {/* Tab Selector */}
-                <div className="flex p-1 bg-surface/50 backdrop-blur-sm border border-white/5 rounded-xl shadow-inner">
-                    <button
-                        onClick={() => handleTabChange('profil')}
-                        className={clsx(
-                            "px-6 py-2 rounded-lg text-sm font-bold transition-all flex items-center gap-2",
-                            activeTab === 'profil' ? "bg-primary text-text-dark shadow-md" : "text-grey-medium hover:text-white"
-                        )}
-                    >
-                        <User size={16} /> Profil
-                    </button>
-                    <button
-                        onClick={() => handleTabChange('systeme')}
-                        className={clsx(
-                            "px-6 py-2 rounded-lg text-sm font-bold transition-all flex items-center gap-2",
-                            activeTab === 'systeme' ? "bg-primary text-text-dark shadow-md" : "text-grey-medium hover:text-white"
-                        )}
-                    >
-                        <SettingsIcon size={16} /> Système
-                    </button>
+                {/* EMPTY (RIGHT) - To balance the grid/flex layout if needed, or for future clock */}
+                <div className="min-w-[200px] flex justify-end">
+                    <p className="text-[10px] text-grey-dark uppercase tracking-widest font-black opacity-50">Configuration</p>
                 </div>
             </div>
 
-            <div className="relative">
-                {/* --- PROFIL TAB --- */}
-                {activeTab === 'profil' && (
-                    <div className="space-y-6 animate-in fade-in slide-in-from-left-4 duration-300">
-                        {loadingProfile ? (
-                            <div className="h-64 flex items-center justify-center bg-surface/30 rounded-2xl border border-white/5">
-                                <Loader2 className="animate-spin text-primary" size={32} />
+            <div className="flex-1 overflow-y-auto p-8 relative">
+                <div className="max-w-4xl mx-auto space-y-6 pb-20">
+                    <div className="animate-in fade-in duration-500">
+
+                        {/* --- PROFIL TAB --- */}
+                        {activeTab === 'profil' && (
+                            <div className="space-y-6 animate-in fade-in slide-in-from-left-4 duration-300">
+                                {loadingProfile ? (
+                                    <div className="h-64 flex items-center justify-center bg-surface/30 rounded-2xl border border-white/5">
+                                        <Loader2 className="animate-spin text-primary" size={32} />
+                                    </div>
+                                ) : (
+                                    <form onSubmit={updateProfile} className="bg-surface/30 backdrop-blur-sm border border-white/5 rounded-2xl p-8 shadow-xl space-y-8">
+                                        {/* Avatar Section */}
+                                        <div className="flex flex-col items-center gap-4">
+                                            <div
+                                                className={clsx(
+                                                    "w-32 h-32 rounded-full border-2 border-dashed flex items-center justify-center relative group overflow-hidden shadow-xl transition-all",
+                                                    isDragging ? "border-primary bg-primary/20 scale-105" : "bg-white/5 border-white/20",
+                                                    profile.photo_base64 && "bg-[#D9B981]"
+                                                )}
+                                                onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
+                                                onDragLeave={() => setIsDragging(false)}
+                                                onDrop={(e) => { e.preventDefault(); setIsDragging(false); processFile(e.dataTransfer.files[0]); }}
+                                            >
+                                                {profile.photo_base64 ? (
+                                                    <img src={profile.photo_base64} alt="Avatar" className="w-[90%] h-[90%] object-contain rounded-full shadow-inner" />
+                                                ) : (
+                                                    <User size={48} className={isDragging ? "text-primary animate-bounce" : "text-grey-medium"} />
+                                                )}
+                                                <label className="absolute inset-0 bg-black/50 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
+                                                    <Camera className="text-white mb-2" size={32} />
+                                                    <span className="text-[10px] text-white font-bold uppercase tracking-wider">Modifier</span>
+                                                    <input type="file" accept="image/*" className="hidden" onChange={handleFileChange} />
+                                                </label>
+                                            </div>
+                                            <p className="text-[10px] font-bold text-grey-medium uppercase tracking-wider">Photo de profil</p>
+                                        </div>
+
+                                        <div className="grid md:grid-cols-2 gap-6">
+                                            <div className="space-y-2">
+                                                <label className="text-xs font-bold text-grey-light uppercase tracking-wide">Prénom</label>
+                                                <input
+                                                    type="text"
+                                                    value={profile.prenom}
+                                                    onChange={(e) => setProfile({ ...profile, prenom: e.target.value })}
+                                                    className="w-full bg-background/50 border border-white/10 rounded-xl p-3 text-text-main focus:ring-2 focus:ring-primary/50 outline-none transition-all placeholder:text-grey-dark"
+                                                    placeholder="Votre prénom"
+                                                />
+                                            </div>
+                                            <div className="space-y-2">
+                                                <label className="text-xs font-bold text-grey-light uppercase tracking-wide">Nom</label>
+                                                <input
+                                                    type="text"
+                                                    value={profile.nom}
+                                                    onChange={(e) => setProfile({ ...profile, nom: e.target.value })}
+                                                    className="w-full bg-background/50 border border-white/10 rounded-xl p-3 text-text-main focus:ring-2 focus:ring-primary/50 outline-none transition-all placeholder:text-grey-dark"
+                                                    placeholder="Votre nom"
+                                                />
+                                            </div>
+                                        </div>
+
+                                        <div className="space-y-2">
+                                            <label className="text-xs font-bold text-grey-light uppercase tracking-wide flex items-center gap-2">
+                                                <Mail size={14} /> Email
+                                            </label>
+                                            <input type="email" value={profile.email} disabled className="w-full bg-white/5 border border-white/5 rounded-xl p-3 text-grey-dark cursor-not-allowed font-medium" />
+                                        </div>
+
+                                        <div className="space-y-2">
+                                            <label className="text-xs font-bold text-grey-light uppercase tracking-wide flex items-center gap-2">
+                                                <School size={14} /> Nom de l'école
+                                            </label>
+                                            <input
+                                                type="text"
+                                                value={profile.nom_ecole}
+                                                onChange={(e) => setProfile({ ...profile, nom_ecole: e.target.value })}
+                                                className="w-full bg-background/50 border border-white/10 rounded-xl p-3 text-text-main focus:ring-2 focus:ring-primary/50 outline-none transition-all placeholder:text-grey-dark"
+                                                placeholder="Ex: École Saint-Joseph"
+                                            />
+                                        </div>
+
+                                        <div className="pt-4 flex justify-between items-center border-t border-white/5 mt-8">
+                                            <button
+                                                type="button"
+                                                onClick={() => setShowPasswordModal(true)}
+                                                className="text-xs text-primary hover:text-white transition-colors flex items-center gap-2 font-bold"
+                                            >
+                                                <Key size={14} /> Modifier le mot de passe
+                                            </button>
+
+                                            <button
+                                                type="submit"
+                                                disabled={updatingProfile}
+                                                className="px-8 py-3 bg-primary text-text-dark font-black uppercase tracking-widest text-[10px] rounded-xl hover:bg-primary/90 transition-all flex items-center gap-2 shadow-lg shadow-primary/20 active:scale-95 disabled:opacity-50"
+                                            >
+                                                {updatingProfile ? <Loader2 className="animate-spin" size={16} /> : <Save size={16} />}
+                                                Enregistrer les modifications
+                                            </button>
+                                        </div>
+                                    </form>
+                                )}
+
+                                {pendingValidation && (
+                                    <div className="flex items-center justify-center gap-3 p-5 bg-primary/10 border border-primary/20 rounded-2xl shadow-inner scale-in-fade duration-500">
+                                        <div className="w-2.5 h-2.5 rounded-full bg-primary animate-pulse" />
+                                        <p className="text-xs text-grey-light font-medium">
+                                            <span className="font-black text-primary uppercase tracking-widest">En attente de validation : </span>
+                                            Votre accès complet sera débloqué après validation de l'administrateur.
+                                        </p>
+                                    </div>
+                                )}
                             </div>
-                        ) : (
-                            <form onSubmit={updateProfile} className="bg-surface/30 backdrop-blur-sm border border-white/5 rounded-2xl p-8 shadow-xl space-y-8">
-                                {/* Avatar Section */}
-                                <div className="flex flex-col items-center gap-4">
-                                    <div
-                                        className={clsx(
-                                            "w-32 h-32 rounded-full border-2 border-dashed flex items-center justify-center relative group overflow-hidden shadow-xl transition-all",
-                                            isDragging ? "border-primary bg-primary/20 scale-105" : "bg-white/5 border-white/20",
-                                            profile.photo_base64 && "bg-[#D9B981]"
-                                        )}
-                                        onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
-                                        onDragLeave={() => setIsDragging(false)}
-                                        onDrop={(e) => { e.preventDefault(); setIsDragging(false); processFile(e.dataTransfer.files[0]); }}
-                                    >
-                                        {profile.photo_base64 ? (
-                                            <img src={profile.photo_base64} alt="Avatar" className="w-[90%] h-[90%] object-contain rounded-full shadow-inner" />
-                                        ) : (
-                                            <User size={48} className={isDragging ? "text-primary animate-bounce" : "text-grey-medium"} />
-                                        )}
-                                        <label className="absolute inset-0 bg-black/50 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
-                                            <Camera className="text-white mb-2" size={32} />
-                                            <span className="text-[10px] text-white font-bold uppercase tracking-wider">Modifier</span>
-                                            <input type="file" accept="image/*" className="hidden" onChange={handleFileChange} />
-                                        </label>
-                                    </div>
-                                    <p className="text-[10px] font-bold text-grey-medium uppercase tracking-wider">Photo de profil</p>
-                                </div>
-
-                                <div className="grid md:grid-cols-2 gap-6">
-                                    <div className="space-y-2">
-                                        <label className="text-xs font-bold text-grey-light uppercase tracking-wide">Prénom</label>
-                                        <input
-                                            type="text"
-                                            value={profile.prenom}
-                                            onChange={(e) => setProfile({ ...profile, prenom: e.target.value })}
-                                            className="w-full bg-background/50 border border-white/10 rounded-xl p-3 text-text-main focus:ring-2 focus:ring-primary/50 outline-none transition-all placeholder:text-grey-dark"
-                                            placeholder="Votre prénom"
-                                        />
-                                    </div>
-                                    <div className="space-y-2">
-                                        <label className="text-xs font-bold text-grey-light uppercase tracking-wide">Nom</label>
-                                        <input
-                                            type="text"
-                                            value={profile.nom}
-                                            onChange={(e) => setProfile({ ...profile, nom: e.target.value })}
-                                            className="w-full bg-background/50 border border-white/10 rounded-xl p-3 text-text-main focus:ring-2 focus:ring-primary/50 outline-none transition-all placeholder:text-grey-dark"
-                                            placeholder="Votre nom"
-                                        />
-                                    </div>
-                                </div>
-
-                                <div className="space-y-2">
-                                    <label className="text-xs font-bold text-grey-light uppercase tracking-wide flex items-center gap-2">
-                                        <Mail size={14} /> Email
-                                    </label>
-                                    <input type="email" value={profile.email} disabled className="w-full bg-white/5 border border-white/5 rounded-xl p-3 text-grey-dark cursor-not-allowed font-medium" />
-                                </div>
-
-                                <div className="space-y-2">
-                                    <label className="text-xs font-bold text-grey-light uppercase tracking-wide flex items-center gap-2">
-                                        <School size={14} /> Nom de l'école
-                                    </label>
-                                    <input
-                                        type="text"
-                                        value={profile.nom_ecole}
-                                        onChange={(e) => setProfile({ ...profile, nom_ecole: e.target.value })}
-                                        className="w-full bg-background/50 border border-white/10 rounded-xl p-3 text-text-main focus:ring-2 focus:ring-primary/50 outline-none transition-all placeholder:text-grey-dark"
-                                        placeholder="Ex: École Saint-Joseph"
-                                    />
-                                </div>
-
-                                <div className="pt-4 flex justify-end">
-                                    <button
-                                        type="submit"
-                                        disabled={updatingProfile}
-                                        className="px-8 py-3 bg-primary text-text-dark font-black uppercase tracking-widest text-[10px] rounded-xl hover:bg-primary/90 transition-all flex items-center gap-2 shadow-lg shadow-primary/20 active:scale-95 disabled:opacity-50"
-                                    >
-                                        {updatingProfile ? <Loader2 className="animate-spin" size={16} /> : <Save size={16} />}
-                                        Enregistrer les modifications
-                                    </button>
-                                </div>
-                            </form>
                         )}
 
-                        {pendingValidation && (
-                            <div className="flex items-center justify-center gap-3 p-5 bg-primary/10 border border-primary/20 rounded-2xl shadow-inner scale-in-fade duration-500">
-                                <div className="w-2.5 h-2.5 rounded-full bg-primary animate-pulse" />
-                                <p className="text-xs text-grey-light font-medium">
-                                    <span className="font-black text-primary uppercase tracking-widest">En attente de validation : </span>
-                                    Votre accès complet sera débloqué après validation de l'administrateur.
-                                </p>
-                            </div>
-                        )}
-                    </div>
-                )}
+                        {/* --- SYSTEME TAB --- */}
+                        {activeTab === 'systeme' && (
+                            <div className="space-y-8 animate-in fade-in slide-in-from-right-4 duration-300">
+                                {/* Apparence */}
+                                <section className="bg-surface/30 backdrop-blur-md border border-white/5 rounded-2xl p-6 shadow-xl">
+                                    <h2 className="text-lg font-bold text-text-main mb-6 flex items-center gap-2">
+                                        <Palette size={20} className="text-primary" /> Apparence
+                                    </h2>
+                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                        {[
+                                            { id: 'default', label: 'Défaut', icon: Palette },
+                                            { id: 'light', label: 'Clair', icon: Sun },
+                                            { id: 'dark', label: 'Sombre', icon: Moon },
+                                            { id: 'system', label: 'Système', icon: Monitor },
+                                        ].map(t => {
+                                            const Icon = t.icon;
+                                            return (
+                                                <button
+                                                    key={t.id}
+                                                    onClick={() => setTheme(t.id)}
+                                                    className={clsx(
+                                                        "flex flex-col items-center justify-center p-6 rounded-xl border transition-all gap-4 group",
+                                                        theme === t.id ? "bg-primary/10 border-primary text-primary" : "bg-white/5 border-white/10 text-grey-medium hover:text-white"
+                                                    )}
+                                                >
+                                                    <Icon size={24} />
+                                                    <span className="text-[10px] font-black uppercase tracking-widest">{t.label}</span>
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+                                </section>
 
-                {/* --- SYSTEME TAB --- */}
-                {activeTab === 'systeme' && (
-                    <div className="space-y-8 animate-in fade-in slide-in-from-right-4 duration-300">
-                        {/* Apparence */}
-                        <section className="bg-surface/30 backdrop-blur-md border border-white/5 rounded-2xl p-6 shadow-xl">
-                            <h2 className="text-lg font-bold text-text-main mb-6 flex items-center gap-2">
-                                <Palette size={20} className="text-primary" /> Apparence
-                            </h2>
-                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                                {[
-                                    { id: 'default', label: 'Défaut', icon: Palette },
-                                    { id: 'light', label: 'Clair', icon: Sun },
-                                    { id: 'dark', label: 'Sombre', icon: Moon },
-                                    { id: 'system', label: 'Système', icon: Monitor },
-                                ].map(t => {
-                                    const Icon = t.icon;
-                                    return (
+                                {/* Données Demo */}
+                                <section className="bg-surface/30 backdrop-blur-md border border-white/5 rounded-2xl p-6 shadow-xl">
+                                    <h2 className="text-lg font-bold text-text-main mb-6 flex items-center gap-2">
+                                        <Database size={20} className="text-primary" /> Environnement
+                                    </h2>
+                                    <div className="p-6 bg-primary/5 rounded-xl border border-primary/10 flex flex-col md:flex-row items-center justify-between gap-6">
+                                        <div className="flex-1">
+                                            <h3 className="text-sm font-bold text-white mb-1 uppercase tracking-tight">Générer des données de test</h3>
+                                            <p className="text-xs text-grey-medium">Créez une classe fictive avec des élèves et des activités pour tester l'application.</p>
+                                        </div>
                                         <button
-                                            key={t.id}
-                                            onClick={() => setTheme(t.id)}
-                                            className={clsx(
-                                                "flex flex-col items-center justify-center p-6 rounded-xl border transition-all gap-4 group",
-                                                theme === t.id ? "bg-primary/10 border-primary text-primary" : "bg-white/5 border-white/10 text-grey-medium hover:text-white"
-                                            )}
+                                            onClick={handleGenerateDemoData}
+                                            disabled={isGenerating}
+                                            className="w-full md:w-auto px-6 py-3 bg-primary text-text-dark font-black text-[10px] uppercase tracking-widest rounded-xl hover:bg-primary/90 transition-all flex items-center justify-center gap-2 shadow-lg disabled:opacity-50"
                                         >
-                                            <Icon size={24} />
-                                            <span className="text-[10px] font-black uppercase tracking-widest">{t.label}</span>
+                                            {isGenerating ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} />}
+                                            Générer
                                         </button>
-                                    );
-                                })}
-                            </div>
-                        </section>
+                                    </div>
+                                </section>
 
-                        {/* Données Demo */}
-                        <section className="bg-surface/30 backdrop-blur-md border border-white/5 rounded-2xl p-6 shadow-xl">
-                            <h2 className="text-lg font-bold text-text-main mb-6 flex items-center gap-2">
-                                <Database size={20} className="text-primary" /> Environnement
-                            </h2>
-                            <div className="p-6 bg-primary/5 rounded-xl border border-primary/10 flex flex-col md:flex-row items-center justify-between gap-6">
-                                <div className="flex-1">
-                                    <h3 className="text-sm font-bold text-white mb-1 uppercase tracking-tight">Générer des données de test</h3>
-                                    <p className="text-xs text-grey-medium">Créez une classe fictive avec des élèves et des activités pour tester l'application.</p>
-                                </div>
-                                <button
-                                    onClick={handleGenerateDemoData}
-                                    disabled={isGenerating}
-                                    className="w-full md:w-auto px-6 py-3 bg-primary text-text-dark font-black text-[10px] uppercase tracking-widest rounded-xl hover:bg-primary/90 transition-all flex items-center justify-center gap-2 shadow-lg disabled:opacity-50"
-                                >
-                                    {isGenerating ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} />}
-                                    Générer
-                                </button>
+                                {/* Danger Zone */}
+                                <section className="bg-danger/5 backdrop-blur-md border border-danger/10 rounded-2xl p-6 shadow-xl">
+                                    <h2 className="text-lg font-bold text-danger mb-6 flex items-center gap-2">
+                                        <AlertTriangle size={20} /> Zone de Danger
+                                    </h2>
+                                    <div className="p-6 bg-danger/5 rounded-xl border border-danger/10 flex flex-col md:flex-row items-center justify-between gap-6">
+                                        <div className="flex-1">
+                                            <h3 className="text-sm font-bold text-white mb-1 uppercase tracking-tight">Vider toutes les données</h3>
+                                            <p className="text-xs text-grey-medium">Supprime définitivement vos élèves, classes et suivis. Cette action est irréversible.</p>
+                                        </div>
+                                        <button
+                                            onClick={() => setShowResetModal(true)}
+                                            className="w-full md:w-auto px-6 py-3 bg-danger text-white font-black text-[10px] uppercase tracking-widest rounded-xl hover:bg-danger/90 transition-all flex items-center justify-center gap-2 shadow-lg"
+                                        >
+                                            <Trash2 size={16} /> Réinitialiser
+                                        </button>
+                                    </div>
+                                </section>
                             </div>
-                        </section>
-
-                        {/* Danger Zone */}
-                        <section className="bg-danger/5 backdrop-blur-md border border-danger/10 rounded-2xl p-6 shadow-xl">
-                            <h2 className="text-lg font-bold text-danger mb-6 flex items-center gap-2">
-                                <AlertTriangle size={20} /> Zone de Danger
-                            </h2>
-                            <div className="p-6 bg-danger/5 rounded-xl border border-danger/10 flex flex-col md:flex-row items-center justify-between gap-6">
-                                <div className="flex-1">
-                                    <h3 className="text-sm font-bold text-white mb-1 uppercase tracking-tight">Vider toutes les données</h3>
-                                    <p className="text-xs text-grey-medium">Supprime définitivement vos élèves, classes et suivis. Cette action est irréversible.</p>
-                                </div>
-                                <button
-                                    onClick={() => setShowResetModal(true)}
-                                    className="w-full md:w-auto px-6 py-3 bg-danger text-white font-black text-[10px] uppercase tracking-widest rounded-xl hover:bg-danger/90 transition-all flex items-center justify-center gap-2 shadow-lg"
-                                >
-                                    <Trash2 size={16} /> Réinitialiser
-                                </button>
-                            </div>
-                        </section>
+                        )}
                     </div>
-                )}
+                </div>
             </div>
 
             {/* Reset Modal */}
@@ -538,6 +605,76 @@ const Settings = () => {
                                 {isResetting ? <Loader2 size={14} className="animate-spin" /> : "Tout effacer"}
                             </button>
                         </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Change Password Modal */}
+            {showPasswordModal && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-in fade-in duration-300">
+                    <div className="w-full max-w-md bg-surface border border-white/10 rounded-2xl shadow-2xl p-8 animate-in zoom-in-95">
+                        <div className="text-center mb-6">
+                            <div className="w-16 h-16 bg-primary/10 text-primary rounded-full flex items-center justify-center mx-auto mb-4">
+                                <Key size={32} />
+                            </div>
+                            <h2 className="text-xl font-bold text-white">Changer mon mot de passe</h2>
+                        </div>
+
+                        <form onSubmit={handleChangePassword} className="space-y-4">
+                            <div className="space-y-1">
+                                <label className="text-[10px] font-bold text-grey-light uppercase tracking-wider ml-1">Ancien mot de passe</label>
+                                <input
+                                    type="password"
+                                    required
+                                    value={passwordData.oldPassword}
+                                    onChange={e => setPasswordData({ ...passwordData, oldPassword: e.target.value })}
+                                    className="w-full bg-background/50 border border-white/10 rounded-xl p-3 text-text-main focus:ring-1 focus:ring-primary outline-none transition-all"
+                                    placeholder="••••••••"
+                                />
+                            </div>
+                            <div className="space-y-1">
+                                <label className="text-[10px] font-bold text-grey-light uppercase tracking-wider ml-1">Nouveau mot de passe</label>
+                                <input
+                                    type="password"
+                                    required
+                                    value={passwordData.newPassword}
+                                    onChange={e => setPasswordData({ ...passwordData, newPassword: e.target.value })}
+                                    className="w-full bg-background/50 border border-white/10 rounded-xl p-3 text-text-main focus:ring-1 focus:ring-primary outline-none transition-all"
+                                    placeholder="••••••••"
+                                />
+                            </div>
+                            <div className="space-y-1">
+                                <label className="text-[10px] font-bold text-grey-light uppercase tracking-wider ml-1">Confirmer le nouveau mot de passe</label>
+                                <input
+                                    type="password"
+                                    required
+                                    value={passwordData.confirmPassword}
+                                    onChange={e => setPasswordData({ ...passwordData, confirmPassword: e.target.value })}
+                                    className="w-full bg-background/50 border border-white/10 rounded-xl p-3 text-text-main focus:ring-1 focus:ring-primary outline-none transition-all"
+                                    placeholder="••••••••"
+                                />
+                            </div>
+
+                            <div className="flex gap-3 pt-4">
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setShowPasswordModal(false);
+                                        setPasswordData({ oldPassword: '', newPassword: '', confirmPassword: '' });
+                                    }}
+                                    className="flex-1 py-3 bg-white/5 hover:bg-white/10 text-grey-light rounded-xl font-bold transition-all text-sm"
+                                >
+                                    Annuler
+                                </button>
+                                <button
+                                    type="submit"
+                                    disabled={updatingPassword}
+                                    className="flex-1 py-3 bg-primary text-text-dark rounded-xl font-black text-[10px] uppercase tracking-widest shadow-lg flex items-center justify-center gap-2"
+                                >
+                                    {updatingPassword ? <Loader2 size={14} className="animate-spin" /> : "Mettre à jour"}
+                                </button>
+                            </div>
+                        </form>
                     </div>
                 </div>
             )}
