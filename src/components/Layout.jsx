@@ -16,74 +16,23 @@ import {
     Home,
     User,
     Clock,
-    Flame
+    Flame,
+    Smartphone,
+    ShieldCheck
 } from 'lucide-react';
 import clsx from 'clsx';
-import TimerModal from './TimerModal';
 
 const Layout = () => {
     const [isSidebarOpen, setIsSidebarOpen] = useState(true);
     const [session, setSession] = useState(null);
     const [loading, setLoading] = useState(true);
     const [profileIncomplete, setProfileIncomplete] = useState(false);
+    const [pendingValidation, setPendingValidation] = useState(false);
     const location = useLocation();
     const navigate = useNavigate();
 
-    // Timer State
-    const [showTimerModal, setShowTimerModal] = useState(false);
-    const [timerFinished, setTimerFinished] = useState(false);
-    const [timer, setTimer] = useState({
-        active: false,
-        duration: 0,
-        timeLeft: 0,
-        message: ''
-    });
-
     const isSuiviPage = location.pathname === '/dashboard/suivi';
 
-    // Format current date
-    const formattedDate = new Intl.DateTimeFormat('fr-FR', {
-        weekday: 'long',
-        day: 'numeric',
-        month: 'long'
-    }).format(new Date());
-
-    // Timer Logic
-    useEffect(() => {
-        let interval;
-        if (timer.active && timer.timeLeft > 0) {
-            interval = setInterval(() => {
-                setTimer(prev => ({
-                    ...prev,
-                    timeLeft: prev.timeLeft - 1
-                }));
-            }, 1000);
-        } else if (timer.active && timer.timeLeft === 0) {
-            setTimer(prev => ({ ...prev, active: false }));
-            setTimerFinished(true);
-            // Alert sound or notification could go here
-            if ('vibrate' in navigator) {
-                navigator.vibrate([200, 100, 200]);
-            }
-        }
-        return () => clearInterval(interval);
-    }, [timer.active, timer.timeLeft]);
-
-    const startTimer = (duration, message) => {
-        setTimer({
-            active: true,
-            duration,
-            timeLeft: duration,
-            message
-        });
-        setShowTimerModal(false);
-    };
-
-    const formatTime = (seconds) => {
-        const mins = Math.floor(seconds / 60);
-        const secs = seconds % 60;
-        return `${mins}:${secs.toString().padStart(2, '0')}`;
-    };
 
     useEffect(() => {
         supabase.auth.getSession().then(({ data: { session } }) => {
@@ -110,40 +59,54 @@ const Layout = () => {
 
 
     // Effect to enforce profile completion on route change
+    // Effect to enforce profile completion OR pending validation on route change
     useEffect(() => {
-        if (session && profileIncomplete && location.pathname !== '/dashboard/user/profile') {
-            navigate('/dashboard/user/profile');
+        const queryParams = new URLSearchParams(location.search);
+        const isProfileTab = location.pathname === '/dashboard/settings' && queryParams.get('tab') === 'profil';
+
+        if (session && (profileIncomplete || pendingValidation) && !isProfileTab) {
+            navigate('/dashboard/settings?tab=profil');
         }
-    }, [location.pathname, session, profileIncomplete, navigate]);
+    }, [location.pathname, location.search, session, profileIncomplete, pendingValidation, navigate]);
 
     const checkProfile = async (userId) => {
         // Use maybeSingle to handle case where row doesn't exist yet
+        // We also check for 'validation_admin' (Boolean). 
+        // If it's explicitly FALSE, we block. If undefined/null, we allow (backward compat).
         const { data: profile } = await supabase
             .from('CompteUtilisateur')
-            .select('prenom, nom')
+            .select('prenom, nom, validation_admin')
             .eq('id', userId)
             .maybeSingle();
 
         // If profile is missing OR any field is missing, it is incomplete
         const isIncomplete = !profile || !profile.prenom || !profile.nom;
 
+        // Check for admin validation
+        // CAREFUL: We only block if it is explicitly FALSE. 
+        // Ideally DB default should be FALSE for new users.
+        const isPending = profile && profile.validation_admin === false;
+
         setProfileIncomplete(isIncomplete);
-        if (isIncomplete && location.pathname !== '/dashboard/user/profile') {
-            navigate('/dashboard/user/profile');
+        setPendingValidation(isPending);
+
+        if ((isIncomplete || isPending) && (location.pathname !== '/dashboard/settings' || !location.search.includes('tab=profil'))) {
+            navigate('/dashboard/settings?tab=profil');
         }
     };
 
     const navItems = [
-        { icon: LayoutDashboard, label: 'Accueil', path: '/dashboard' },
+        { icon: Home, label: 'Accueil', path: '/dashboard' },
         { icon: Users, label: 'Utilisateurs', path: '/dashboard/user' },
         { icon: GraduationCap, label: 'Suivi Global', path: '/dashboard/suivi' },
         { icon: Puzzle, label: 'Activités', path: '/dashboard/activities' },
         { icon: Settings, label: 'Paramètres', path: '/dashboard/settings' },
+        { icon: Smartphone, label: 'iPhone', path: '/mobile-suivi', isExternal: true },
     ];
 
-    // Filter nav items if not logged in
+    // Filter nav items if not logged in OR if pending admin validation
     const displayedNavItems = session
-        ? navItems
+        ? (pendingValidation ? [] : navItems)
         : navItems.filter(item => item.label === 'Accueil');
 
     if (loading) {
@@ -190,6 +153,33 @@ const Layout = () => {
                         const Icon = item.icon;
                         const isActive = location.pathname === item.path;
 
+                        if (item.isExternal) {
+                            return (
+                                <button
+                                    key={item.label}
+                                    onClick={async () => {
+                                        const { data } = await supabase
+                                            .from('UserPreference')
+                                            .select('value')
+                                            .eq('user_id', session.user.id)
+                                            .eq('key', 'suivi_pedagogique_layout')
+                                            .maybeSingle();
+
+                                        const groupId = data?.value?.selectedGroupId;
+                                        if (groupId) {
+                                            window.open(`/mobile-suivi/${groupId}`, '_blank');
+                                        } else {
+                                            toast.error("Aucun groupe sélectionné dans le Suivi");
+                                        }
+                                    }}
+                                    className="flex items-center w-full px-4 py-3 rounded-lg transition-colors group text-text-main hover:bg-input"
+                                >
+                                    <Icon className="w-5 h-5 mr-3 text-primary shrink-0" />
+                                    <span className="truncate">{item.label}</span>
+                                </button>
+                            );
+                        }
+
                         return (
                             <Link
                                 key={item.path}
@@ -201,131 +191,88 @@ const Layout = () => {
                                         : "text-text-main hover:bg-input"
                                 )}
                             >
-                                <Icon className={clsx("w-5 h-5 mr-3", isActive ? "text-text-dark" : "text-primary")} />
-                                {item.label}
+                                <Icon className={clsx("w-5 h-5 mr-3 shrink-0", isActive ? "text-text-dark" : "text-primary")} />
+                                <span className="truncate">{item.label}</span>
                             </Link>
                         );
                     })}
                 </nav>
-
-                {/* DATE & TIMER */}
-                <div className="px-4 pb-2 flex flex-col items-center gap-3 border-t border-border/10 pt-4">
-                    <button
-                        onClick={() => setShowTimerModal(true)}
-                        className={clsx(
-                            "w-full py-2 rounded-lg font-bold transition-all border flex items-center justify-center gap-2",
-                            timer.active
-                                ? "bg-primary/20 text-primary border-primary"
-                                : "bg-input text-grey-medium border-transparent hover:bg-input/80 hover:text-text-main"
-                        )}
-                    >
-                        {timer.active ? (
-                            <div className="flex flex-col items-center justify-center w-full py-1">
-                                <span className="text-xl font-mono leading-none">{formatTime(timer.timeLeft)}</span>
-                                {timer.message && (
-                                    <span className="text-[10px] font-bold text-grey-medium/50 uppercase tracking-wider mt-1 truncate max-w-full animate-pulse">
-                                        {timer.message}
-                                    </span>
-                                )}
-                            </div>
-                        ) : (
-                            <>
-                                <Clock size={16} />
-                                <span className="text-sm">Minuteur</span>
-                            </>
-                        )}
-                    </button>
-
-                    <div className="text-xs font-bold text-grey-medium/50 uppercase tracking-wider">
-                        {formattedDate}
-                    </div>
-                </div>
 
                 <div className="pb-4 px-4">
                     <div className="text-[10px] text-grey-dark text-center">
                         v1.0.0
                     </div>
                 </div>
-
-                <TimerModal
-                    isOpen={showTimerModal}
-                    onClose={() => setShowTimerModal(false)}
-                    onStart={startTimer}
-                />
-            </aside>
+            </aside >
 
             {/* Main Content */}
-            <main className={clsx(
-                "flex-1 overflow-y-auto relative transition-all duration-300",
-                !isSidebarOpen && "pl-20",
-                isSuiviPage ? "p-0" : "p-8"
-            )}>
-                {profileIncomplete && (
+            <main className={
+                clsx(
+                    "flex-1 overflow-y-auto relative transition-all duration-300",
+                    !isSidebarOpen && "pl-20",
+                    isSuiviPage ? "p-0" : "p-8"
+                )}>
+
+                {/* 1. BLOCKED: Pending Validation */}
+                {pendingValidation && (location.pathname !== '/dashboard/settings' || !location.search.includes('tab=profil')) && (
+                    <div className="absolute inset-0 bg-surface z-[60] flex flex-col items-center justify-center p-8 text-center animate-in fade-in">
+                        <div className="w-24 h-24 bg-primary/10 rounded-full flex items-center justify-center mb-6 border border-primary/20 shadow-[0_0_30px_rgba(217,185,129,0.1)]">
+                            <ShieldCheck size={48} className="text-primary" />
+                        </div>
+                        <h2 className="text-3xl font-bold text-text-main mb-4">Compte en attente de validation</h2>
+                        <p className="text-grey-medium max-w-lg text-lg leading-relaxed">
+                            Votre compte a été créé avec succès, mais nécessite une
+                            <span className="text-primary font-bold"> validation manuelle</span> de l'administrateur avant de pouvoir accéder à l'application.
+                        </p>
+                        <div className="mt-8 flex flex-col items-center gap-4">
+                            <div className="px-6 py-3 bg-surface border border-white/5 rounded-xl text-sm text-grey-dark">
+                                <span className="opacity-70">En attente de : </span>
+                                <span className="font-mono text-primary font-bold">validation_admin = true</span>
+                            </div>
+
+                            <Link
+                                to="/dashboard/settings?tab=profil"
+                                className="text-primary hover:text-white underline underline-offset-4 text-sm transition-colors"
+                            >
+                                Accéder à mon profil
+                            </Link>
+                        </div>
+                    </div>
+                )}
+
+                {/* 2. BLOCKED: Profile Incomplete (Only if not pending validation) */}
+                {!pendingValidation && profileIncomplete && (
                     <div className="absolute top-0 left-0 w-full bg-primary text-text-dark px-4 py-2 text-center font-bold z-50 shadow-md">
                         ⚠️ Merci de compléter votre profil (Nom, Prénom) pour continuer.
                     </div>
                 )}
-                {session ? (
-                    <Outlet context={{ refreshProfile: () => checkProfile(session.user.id) }} />
-                ) : (
-                    <div className="flex flex-col items-center justify-center h-full text-center space-y-6 animate-in fade-in zoom-in-95 duration-300">
-                        <div className="w-20 h-20 bg-primary/10 rounded-full flex items-center justify-center mb-2">
-                            <User size={40} className="text-primary" />
-                        </div>
-                        <h2 className="text-3xl font-bold text-text-main">Vous n'êtes pas connecté</h2>
-                        <p className="text-grey-medium max-w-md">
-                            Veuillez vous authentifier pour accéder au tableau de bord et gérer vos classes.
-                        </p>
-                        <Link
-                            to="/login"
-                            className="px-8 py-3 bg-primary text-text-dark rounded-xl font-bold hover:bg-primary/90 transition-all shadow-lg shadow-primary/20 flex items-center gap-2 group"
-                        >
-                            <User size={20} />
-                            Se connecter
-                            <div className="w-px h-4 bg-text-dark/20 mx-1" />
-                            <span className="text-xs font-normal opacity-70 group-hover:translate-x-0.5 transition-transform">→</span>
-                        </Link>
-                    </div>
-                )}
-            </main>
 
-            {/* TIMER FINISHED MODAL */}
-            {timerFinished && (
-                <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm animate-in fade-in">
-                    <div className="bg-surface p-8 rounded-2xl border border-primary/30 shadow-2xl text-center max-w-sm w-full space-y-6 animate-in zoom-in-95 relative overflow-hidden">
-                        {/* Status Light Effect */}
-                        <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-primary via-white to-primary animate-pulse opacity-50" />
-
-                        <div className="w-20 h-20 bg-primary/10 rounded-full flex items-center justify-center mx-auto text-primary mb-2 border border-primary/20 shadow-[0_0_30px_rgba(217,185,129,0.2)]">
-                            <Clock size={40} className="animate-bounce" style={{ animationDuration: '3s' }} />
-                        </div>
-
-                        <div className="space-y-2">
-                            <h2 className="text-3xl font-bold text-text-main">Terminé !</h2>
-                            <p className="text-grey-medium">Le temps est écoulé.</p>
-                        </div>
-
-                        {timer.message && (
-                            <div className="bg-primary/10 px-6 py-4 rounded-xl border border-primary/20">
-                                <p className="text-xl text-primary font-bold uppercase tracking-wider break-words shadow-primary/10 drop-shadow-md">
-                                    {timer.message}
-                                </p>
+                {
+                    session ? (
+                        <Outlet context={{ refreshProfile: () => checkProfile(session.user.id), pendingValidation }} />
+                    ) : (
+                        <div className="flex flex-col items-center justify-center h-full text-center space-y-6 animate-in fade-in zoom-in-95 duration-300">
+                            <div className="w-20 h-20 bg-primary/10 rounded-full flex items-center justify-center mb-2">
+                                <User size={40} className="text-primary" />
                             </div>
-                        )}
-
-                        <button
-                            onClick={() => {
-                                setTimerFinished(false);
-                                setTimer(prev => ({ ...prev, message: '' }));
-                            }}
-                            className="w-full py-4 bg-primary hover:bg-primary/90 text-text-dark text-lg font-bold rounded-xl transition-all hover:scale-[1.02] active:scale-95 shadow-xl shadow-primary/20"
-                        >
-                            Je comprends
-                        </button>
-                    </div>
-                </div>
-            )}
-        </div>
+                            <h2 className="text-3xl font-bold text-text-main">Vous n'êtes pas connecté</h2>
+                            <p className="text-grey-medium max-w-md">
+                                Veuillez vous authentifier pour accéder au tableau de bord et gérer vos classes.
+                            </p>
+                            <Link
+                                to="/login"
+                                className="px-8 py-3 bg-primary text-text-dark rounded-xl font-bold hover:bg-primary/90 transition-all shadow-lg shadow-primary/20 flex items-center gap-2 group"
+                            >
+                                <User size={20} />
+                                Se connecter
+                                <div className="w-px h-4 bg-text-dark/20 mx-1" />
+                                <span className="text-xs font-normal opacity-70 group-hover:translate-x-0.5 transition-transform">→</span>
+                            </Link>
+                        </div>
+                    )
+                }
+            </main >
+        </div >
     );
 };
 

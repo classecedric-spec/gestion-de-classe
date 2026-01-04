@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../lib/supabaseClient';
-import { Folder, Search, Plus, Edit, Trash2, Loader2, GitBranch, Layers, Puzzle, GripVertical, X, ChevronDown, Sparkles, Users, CheckSquare, Check, TrendingUp, Trophy, AlertCircle, Clock, Home } from 'lucide-react';
+import { Folder, Search, Plus, Edit, Trash2, Loader2, GitBranch, Layers, Puzzle, GripVertical, X, ChevronDown, Sparkles, Users, CheckSquare, Check, TrendingUp, Trophy, AlertCircle, Clock, Home, ShieldCheck } from 'lucide-react';
 import clsx from 'clsx';
 import AddModuleModal from '../components/AddModuleModal';
 import AddActivityModal from '../components/AddActivityModal';
@@ -161,9 +161,11 @@ const ProgressionColumn = ({ id, label, icon: Icon, color, bg, children, count }
         >
             <div className="p-4 border-b border-white/5 flex items-center justify-between bg-surface/10 rounded-t-2xl">
                 <div className="flex items-center gap-2">
-                    <div className={clsx("p-1.5 rounded-lg shadow-inner", bg, color)}>
-                        <Icon size={14} />
-                    </div>
+                    {Icon && (
+                        <div className={clsx("p-1.5 rounded-lg shadow-inner", bg, color)}>
+                            <Icon size={14} />
+                        </div>
+                    )}
                     <h4 className={clsx("text-[10px] font-black uppercase tracking-[0.15em]", color)}>
                         {label}
                     </h4>
@@ -392,14 +394,22 @@ const Modules = () => {
                 // Get levels associated with this activity
                 const activityLevels = activity.ActiviteNiveau?.map(an => an.niveau_id) || [];
 
+                // STRICT MATCHING RULE:
+                // 1. If activity has no levels defined -> Add to NOBODY.
+                // 2. If activity has levels -> Add ONLY to students with matching level.
+
+                if (activityLevels.length === 0) continue;
+
                 for (const student of students) {
-                    // Create progression for student (Base requirements apply if no specific level override)
-                    progressionsToInsert.push({
-                        eleve_id: student.id,
-                        activite_id: activity.id,
-                        etat: 'a_commencer',
-                        user_id: (await supabase.auth.getUser()).data.user?.id
-                    });
+                    // Only assign if student's level matches one of the activity's target levels
+                    if (activityLevels.includes(student.niveau_id)) {
+                        progressionsToInsert.push({
+                            eleve_id: student.id,
+                            activite_id: activity.id,
+                            etat: 'a_commencer',
+                            user_id: (await supabase.auth.getUser()).data.user?.id
+                        });
+                    }
                 }
             }
 
@@ -477,7 +487,7 @@ const Modules = () => {
 
         // Only update if dropping on a different status
         const currentProgression = progressions.find(p => p.id === progressionId);
-        if (currentProgression && currentProgression.etat !== newStatus && ['a_commencer', 'en_cours', 'besoin_d_aide', 'termine', 'a_domicile'].includes(newStatus)) {
+        if (currentProgression && currentProgression.etat !== newStatus && ['a_commencer', 'besoin_d_aide', 'a_verifier', 'termine', 'a_domicile'].includes(newStatus)) {
             // Optimistically update module progress
             if (selectedModule) {
                 setModules(prev => prev.map(m => {
@@ -1227,9 +1237,9 @@ const Modules = () => {
                                                         >
                                                             <div className="grid grid-cols-2 gap-4 pb-4 custom-scrollbar flex-1 min-h-0">
                                                                 {[
-                                                                    { id: 'a_commencer', label: 'À commencer', icon: Clock, color: 'text-grey-medium', bg: 'bg-white/5' },
+                                                                    { id: 'a_commencer', label: 'À commencer', icon: null, color: 'text-grey-medium', bg: 'bg-white/5' },
                                                                     { id: 'besoin_d_aide', label: 'Besoin d\'aide', icon: AlertCircle, color: 'text-danger', bg: 'bg-danger/10' },
-                                                                    { id: 'en_cours', label: 'En cours', icon: TrendingUp, color: 'text-primary', bg: 'bg-primary/10' },
+                                                                    { id: 'a_verifier', label: 'À Vérifier', icon: ShieldCheck, color: 'text-[#8B5CF6]', bg: 'bg-[#8B5CF6]/10' },
                                                                     { id: 'a_domicile', label: 'À domicile', icon: Home, color: 'text-danger', bg: 'bg-danger/10' },
                                                                     { id: 'termine', label: 'Terminé', icon: Trophy, color: 'text-success', bg: 'bg-success/10' }
                                                                 ].map(column => {

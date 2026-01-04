@@ -155,8 +155,20 @@ const styles = StyleSheet.create({
     }
 });
 
-const AvancementPDF = ({ students, activities, progressions, groupName, moduleName, date }) => {
+const AvancementPDF = ({ students, activities, progressions, groupName, moduleName, branchName, date, dateOperator }) => {
     const printDate = new Date().toLocaleDateString('fr-FR');
+
+    const getDateLabel = () => {
+        if (!date) return '';
+        const d = new Date(date).toLocaleDateString('fr-FR');
+        switch (dateOperator) {
+            case 'lt': return ` avant le ${d}`;
+            case 'lte': return ` au ou avant le ${d}`;
+            case 'gt': return ` après le ${d}`;
+            case 'eq': return ` le ${d}`;
+            default: return ` le ${d}`;
+        }
+    };
 
     return (
         <Document>
@@ -164,11 +176,13 @@ const AvancementPDF = ({ students, activities, progressions, groupName, moduleNa
                 {/* Header */}
                 <View style={styles.header}>
                     <Text style={styles.title}>Avancement des Ateliers</Text>
-                    <Text style={styles.subtitle}>
-                        Groupe: {groupName || 'Non spécifié'} |
-                        {moduleName ? ` Module: ${moduleName} |` : ''}
-                        Généré le {printDate}
-                    </Text>
+                    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
+                        <Text style={styles.subtitle}>Groupe: {groupName || 'Tous'}</Text>
+                        {branchName && <Text style={styles.subtitle}>| Branche: {branchName}</Text>}
+                        {moduleName && <Text style={styles.subtitle}>| Module: {moduleName}</Text>}
+                        {date && <Text style={styles.subtitle}>| Date: {getDateLabel()}</Text>}
+                        <Text style={styles.subtitle}>| Généré le {printDate}</Text>
+                    </View>
                 </View>
 
                 {/* Table */}

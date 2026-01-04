@@ -20,6 +20,7 @@ import Materiels from './pages/Materiels';
 import Settings from './pages/Settings';
 import SuiviGlobal from './pages/SuiviGlobal';
 import Adults from './pages/Adults';
+import MobileSuivi from './pages/MobileSuivi';
 import { Navigate } from 'react-router-dom';
 
 function App() {
@@ -39,7 +40,6 @@ function App() {
             <Route path="classes" element={<Classes />} />
             <Route path="niveaux" element={<Niveaux />} />
             <Route path="adults" element={<Adults />} />
-            <Route path="profile" element={<Profile />} />
           </Route>
           <Route path="activities" element={<ActivitiesLayout />}>
             <Route index element={<Navigate to="modules" replace />} />
@@ -51,6 +51,7 @@ function App() {
           </Route>
           <Route path="settings" element={<Settings />} />
         </Route>
+        <Route path="/mobile-suivi/:groupId" element={<MobileSuivi />} />
       </Routes>
     </Router>
   );

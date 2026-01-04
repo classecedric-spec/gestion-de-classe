@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabaseClient';
 import { checkOverdueActivities } from '../lib/overdueLogic';
 import { getInitials, getStatusColorClasses } from '../lib/utils';
-import { Users, BookOpen, Calendar, Check, AlertCircle, Clock, Search, ChevronDown, Filter, FileText, Loader2, GitBranch, Home } from 'lucide-react';
+import { BookOpen, Calendar, ChevronDown, Clock, Search, FileText, Loader2, Users, Check, AlertCircle, Home, GitBranch, ShieldCheck } from 'lucide-react';
+import { toast } from 'sonner';
 import clsx from 'clsx';
 import { pdf } from '@react-pdf/renderer';
 import { saveAs } from 'file-saver';
@@ -26,10 +27,11 @@ const AvancementAteliers = () => {
 
     const [students, setStudents] = useState([]);
     const [activities, setActivities] = useState([]);
-    const [progressions, setProgressions] = useState({}); // Map: `${studentId}-${activityId}` -> status
+    const [progressions, setProgressions] = useState({}); // Map: `${ studentId } -${ activityId } ` -> status
 
     const [loading, setLoading] = useState(false);
     const [generatingPDF, setGeneratingPDF] = useState(false);
+    const [studentIndices, setStudentIndices] = useState({}); // { studentId: { branchId: value } }
 
     // --- INITIAL LOAD ---
     useEffect(() => {
@@ -188,23 +190,24 @@ const AvancementAteliers = () => {
             const { data: acts } = await supabase
                 .from('Activite')
                 .select(`
-                    *,
-                    Module (
-                        id,
-                        nom,
-                        date_fin,
-                        SousBranche (
-                            id,
-                            nom,
-                            ordre,
-                            Branche (
-                                id,
-                                nom,
-                                ordre
-                            )
-                        )
-                    )
-                `)
+    *,
+    Module(
+        id,
+        nom,
+        date_fin,
+        SousBranche(
+            id,
+            nom,
+            ordre,
+            Branche(
+                id,
+                nom,
+                ordre
+            )
+        )
+    ),
+    ActiviteNiveau(niveau_id)
+        `)
                 .in('module_id', moduleIds);
 
             // 2. Complex sort: Module criteria then Activity order
@@ -242,8 +245,6 @@ const AvancementAteliers = () => {
                 return (a.ordre || 0) - (b.ordre || 0);
             });
 
-            setActivities(sortedActs);
-
             // 2. Fetch Progressions if we have students and activities
             if (students.length > 0 && sortedActs.length > 0) {
                 const studentIds = students.map(s => s.id);
@@ -255,12 +256,19 @@ const AvancementAteliers = () => {
                     .in('eleve_id', studentIds)
                     .in('activite_id', actIds);
 
+                // Filter Logic: Only keep activities that appear in progs
+                const activeActivityIds = new Set(progs?.map(p => p.activite_id));
+                const filteredActs = sortedActs.filter(a => activeActivityIds.has(a.id));
+
+                setActivities(filteredActs);
+
                 const progMap = {};
                 progs?.forEach(p => {
                     progMap[`${p.eleve_id}-${p.activite_id}`] = p.etat;
                 });
                 setProgressions(progMap);
             } else {
+                setActivities([]);
                 setProgressions({});
             }
         } catch (error) {
@@ -270,13 +278,85 @@ const AvancementAteliers = () => {
         }
     };
 
+    const handleStatusClick = async (student, activity) => {
+        // Level Restriction Check
+        const activityLevels = activity.ActiviteNiveau?.map(an => an.niveau_id) || [];
+        // Strict matching: If activity has no levels or student doesn't match, block it.
+        // Assuming if activityLevels is empty = strictly restricted (as per Suivi logic).
+        // If your logic is "Empty = Open to all", change this condition.
+        // Based on SuiviPedagogique: "if (activityLevels.length === 0) return false;"
+        const isAllowed = activityLevels.length > 0 && student.niveau_id && activityLevels.includes(student.niveau_id);
+
+        if (!isAllowed) {
+            // Optional: toast.info("Activité non disponible pour ce niveau");
+            return;
+        }
+
+        const currentStatus = progressions[`${student.id}-${activity.id}`] || 'a_commencer';
+        let nextStatus = 'termine';
+
+        // Cycle: a_commencer -> besoin_d_aide -> termine -> a_commencer
+        if (currentStatus === 'a_commencer') nextStatus = 'besoin_d_aide';
+        else if (currentStatus === 'besoin_d_aide') nextStatus = 'termine';
+        else if (currentStatus === 'termine' || currentStatus === 'a_verifier') nextStatus = 'a_commencer';
+
+        // Auto-Verification Logic
+        if (nextStatus === 'termine') {
+            const branchId = activity.Module?.SousBranche?.Branche?.id;
+            const studentIndex = studentIndices[student.id]?.[branchId] ?? 50; // Default 50
+            const roll = Math.random() * 100;
+
+            // If roll is LESS than index, trigger verification
+            // High index = High chance of verif? User said: "Si ce nombre est inférieur a l'indice... ajouté d'office"
+            // So if Index is 80, Rolls 0-79 trigger it (80% chance).
+            // Logic: High Index = Need more monitoring. Correct.
+
+            if (roll < studentIndex) {
+                nextStatus = 'a_verifier';
+                toast("Verif. requise (Auto)", { description: "L'élève a été ajouté à la liste de vérification." });
+            }
+        }
+
+        // Optimistic Update
+        const key = `${student.id}-${activity.id}`;
+        setProgressions(prev => ({ ...prev, [key]: nextStatus }));
+
+        // DB Update
+        const { error } = await supabase
+            .from('Progression')
+            .upsert({
+                eleve_id: student.id,
+                activite_id: activity.id,
+                etat: nextStatus,
+                updated_at: new Date().toISOString()
+            }, { onConflict: 'eleve_id, activite_id' });
+
+        if (error) {
+            console.error("Error updating status:", error);
+            toast.error("Erreur de sauvegarde");
+            setProgressions(prev => ({ ...prev, [key]: currentStatus })); // Revert
+        }
+    };
+
     const getStatusIcon = (status) => {
         switch (status) {
             case 'termine': return <Check size={14} />;
             case 'besoin_d_aide': return <AlertCircle size={14} />;
-            case 'en_cours': return <Clock size={14} />;
+            case 'a_verifier': return <ShieldCheck size={14} />;
             case 'a_domicile': return <Home size={14} />;
+            case 'a_commencer': return <div className="w-1.5 h-1.5 rounded-full bg-white/30" />;
             default: return null;
+        }
+    };
+
+    const getStatusColorClasses = (status) => {
+        switch (status) {
+            case 'termine': return "bg-success border-success text-white";
+            case 'besoin_d_aide': return "bg-[#A0A8AD] border-[#A0A8AD] text-white";
+            case 'a_verifier': return "bg-[#8B5CF6] border-[#8B5CF6] text-white"; // Violet
+            case 'a_domicile': return "bg-danger border-danger text-white";
+            case 'a_commencer': return "bg-white/5 border-white/10 text-grey-medium hover:bg-white/10";
+            default: return "bg-transparent border-transparent text-transparent"; // Completely invisible for undefined/null
         }
     };
 
@@ -369,7 +449,9 @@ const AvancementAteliers = () => {
                     progressions={progressions}
                     groupName={selectedGroup?.nom}
                     moduleName={selectedModule?.nom}
+                    branchName={branches.find(b => b.id === selectedBrancheId)?.nom}
                     date={selectedDateFin}
+                    dateOperator={dateOperator}
                 />
             ).toBlob();
 
@@ -530,7 +612,7 @@ const AvancementAteliers = () => {
                         >
                             <option value="">
                                 {(selectedDateFin || selectedBrancheId)
-                                    ? `Tous les modules (${getFilteredModules().length})`
+                                    ? `Tous les modules(${getFilteredModules().length})`
                                     : "Sélectionner un module..."}
                             </option>
                             {getFilteredModules().map(m => (
@@ -559,38 +641,40 @@ const AvancementAteliers = () => {
                             <p>Aucun élève dans ce groupe.</p>
                         </div>
                     ) : (
-                        <table className="w-full border-separate border-spacing-0 min-w-max">
+                        <table className="w-max border-separate border-spacing-0">
                             <thead className="sticky top-0 z-20 bg-surface shadow-sm">
                                 {/* Row 1: Module Capsules (Only if we have multiple modules or not a single module selection) */}
-                                {moduleSpans.length > 0 && (
-                                    <tr>
-                                        <th className="sticky left-0 top-0 z-40 bg-surface border-b border-white/5 shadow-[4px_0_12px_-4px_rgba(0,0,0,0.5)] h-12"></th>
-                                        {moduleSpans.map((span, sIdx) => (
-                                            <th
-                                                key={`${span.id}-${sIdx}`}
-                                                colSpan={span.count}
-                                                className="sticky top-0 z-30 p-2 border-b border-white/5 bg-surface"
-                                            >
-                                                <div className="bg-white/5 border border-white/10 rounded-lg py-1.5 px-3 text-[10px] font-bold text-primary uppercase tracking-widest truncate mx-1 shadow-inner">
-                                                    {span.nom}
-                                                </div>
-                                            </th>
-                                        ))}
-                                    </tr>
-                                )}
-                                <tr>
+                                {
+                                    moduleSpans.length > 0 && (
+                                        <tr className="border-b border-white/10">
+                                            <th className="sticky left-0 top-0 z-40 bg-surface border-r border-white/10 h-12 min-w-[150px]"></th>
+                                            {moduleSpans.map((span, sIdx) => (
+                                                <th
+                                                    key={`${span.id}-${sIdx}`}
+                                                    colSpan={span.count}
+                                                    className="sticky top-0 z-30 p-2 bg-surface"
+                                                >
+                                                    <div className="bg-white/5 border border-white/10 rounded-lg py-1.5 px-3 text-[10px] font-bold text-primary uppercase tracking-widest whitespace-nowrap mx-1">
+                                                        {span.nom}
+                                                    </div>
+                                                </th>
+                                            ))}
+                                        </tr>
+                                    )
+                                }
+                                <tr className="border-b border-white/10">
                                     {/* Sticky First Column Header (Student Name) */}
-                                    <th className="sticky left-0 top-[48px] z-30 bg-surface p-4 text-left border-b border-border/10 w-[150px] min-w-[150px] max-w-[150px] shadow-[4px_0_12px_-4px_rgba(0,0,0,0.5)] h-full">
+                                    <th className="sticky left-0 top-[48px] z-30 bg-surface p-4 text-left min-w-[150px] border-r border-white/10 border-b border-white/10 h-full">
                                         <span className="text-xs font-bold uppercase tracking-wider text-primary">Élève</span>
                                     </th>
                                     {/* Activity Headers */}
                                     {activities.map((act) => (
                                         <th key={act.id} className={clsx(
-                                            "sticky top-[48px] z-20 p-1 border-b border-border/10 w-10 min-w-[40px] align-bottom pb-2 relative group/th bg-surface vertical-header",
-                                            lastActivityIds.has(act.id) && "border-r border-white/20"
+                                            "sticky top-[48px] z-20 p-0 min-w-[52px] align-bottom pb-2 relative group/th bg-surface vertical-header border-b border-white/10",
+                                            lastActivityIds.has(act.id) && "border-r border-white/10"
                                         )}>
                                             <div className="flex flex-col items-center justify-end h-[100px] w-full">
-                                                <span className="text-[10px] font-medium text-grey-light uppercase tracking-wide leading-tight [writing-mode:vertical-rl] rotate-180 line-clamp-2" title={act.titre}>
+                                                <span className="text-[10px] font-medium text-grey-light uppercase tracking-wide leading-tight [writing-mode:vertical-rl] rotate-180 whitespace-nowrap" title={act.titre}>
                                                     {act.titre}
                                                 </span>
                                             </div>
@@ -602,7 +686,7 @@ const AvancementAteliers = () => {
                                 {students.map((student) => (
                                     <tr key={student.id} className="group hover:bg-white/5 transition-colors">
                                         {/* Sticky Student Name Column */}
-                                        <td className="sticky left-0 z-10 bg-surface group-hover:bg-surface-light p-3 border-b border-white/5 shadow-[4px_0_12px_-4px_rgba(0,0,0,0.5)] transition-colors">
+                                        <td className="sticky left-0 z-10 bg-surface group-hover:bg-surface-light p-3 min-w-[150px] border-r border-white/10 border-t border-white/10 transition-colors">
                                             <div className="flex items-center gap-3">
                                                 <div className="w-8 h-8 rounded-full bg-primary/10 overflow-hidden flex items-center justify-center border border-white/10 shrink-0">
                                                     {student.photo_base64 ? (
@@ -612,28 +696,41 @@ const AvancementAteliers = () => {
                                                     )}
                                                 </div>
                                                 <div className="flex flex-col min-w-0">
-                                                    <span className="text-sm font-bold text-white truncate" title={`${student.prenom} ${student.nom}`}>
+                                                    <span className="text-sm font-bold text-white whitespace-nowrap" title={`${student.prenom} ${student.nom} `}>
                                                         {student.prenom} {student.nom?.[0]}.
                                                     </span>
                                                 </div>
                                             </div>
                                         </td>
 
-                                        {/* Status Cells */}
-                                        {activities.map(act => {
-                                            const status = progressions[`${student.id}-${act.id}`]; // undefined, 'a_commencer', 'en_cours', 'besoin_d_aide', 'termine'
-                                            // Provide visual feedback for status
-                                            // We could also make this clickable later
+                                        {/* Activity Cells */}
+                                        {activities.map((act) => {
+                                            const status = progressions[`${student.id}-${act.id}`];
+                                            const activityLevels = act.ActiviteNiveau?.map(an => an.niveau_id) || [];
+                                            const isAllowed = activityLevels.length > 0 && student.niveau_id && activityLevels.includes(student.niveau_id);
+
+                                            // Determine visual status: use actual status, or 'a_commencer' if allowed but empty
+                                            const displayStatus = status || (isAllowed ? 'a_commencer' : null);
+
                                             return (
-                                                <td key={act.id} className={clsx(
-                                                    "p-1 border-b border-white/5 text-center bg-transparent relative",
-                                                    lastActivityIds.has(act.id) && "border-r border-white/20"
-                                                )}>
-                                                    <div className={clsx(
-                                                        "w-8 h-8 mx-auto rounded-md flex items-center justify-center border transition-all",
-                                                        getStatusColorClasses(status)
-                                                    )}>
-                                                        {getStatusIcon(status) || <span className="w-1 h-1 rounded-full bg-white/10" />}
+                                                <td
+                                                    key={`${student.id}-${act.id}`}
+                                                    onClick={() => handleStatusClick(student, act)}
+                                                    className={clsx(
+                                                        "p-0 border-t border-white/10 relative group/cell transition-colors min-w-[52px]",
+                                                        isAllowed ? "cursor-pointer" : "cursor-not-allowed opacity-20",
+                                                        isAllowed && (status ? "hover:bg-white/5" : "hover:bg-white/5"),
+                                                        lastActivityIds.has(act.id) && "border-r border-white/10"
+                                                    )}
+                                                >
+                                                    <div className="w-full h-[52px] flex items-center justify-center">
+                                                        <div className={clsx(
+                                                            "w-10 h-10 flex items-center justify-center transition-all rounded-lg",
+                                                            getStatusColorClasses(displayStatus),
+                                                            !displayStatus && "opacity-0"
+                                                        )}>
+                                                            {getStatusIcon(displayStatus)}
+                                                        </div>
                                                     </div>
                                                 </td>
                                             );
@@ -646,18 +743,12 @@ const AvancementAteliers = () => {
                 </div>
 
                 {/* Legend */}
-                <div className="mt-6 flex flex-wrap gap-6 px-4 py-3 bg-white/5 rounded-xl border border-white/10 w-fit">
+                <div className="mt-6 flex flex-wrap gap-6 px-4 py-3 bg-white/5 rounded-xl border border-white/10 w-fit mb-4">
                     <div className="flex items-center gap-2">
                         <div className="w-4 h-4 rounded bg-success flex items-center justify-center text-white">
                             <Check size={10} />
                         </div>
                         <span className="text-xs font-medium text-grey-light">Terminé</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                        <div className="w-4 h-4 rounded bg-primary/20 border border-primary flex items-center justify-center text-primary">
-                            <Clock size={10} />
-                        </div>
-                        <span className="text-xs font-medium text-grey-light">En cours</span>
                     </div>
                     <div className="flex items-center gap-2">
                         <div className="w-4 h-4 rounded bg-[#A0A8AD] flex items-center justify-center text-white">
@@ -670,6 +761,12 @@ const AvancementAteliers = () => {
                             <Home size={10} />
                         </div>
                         <span className="text-xs font-medium text-grey-light">À domicile (Retard)</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <div className="w-4 h-4 rounded bg-[#8B5CF6] flex items-center justify-center text-white">
+                            <ShieldCheck size={10} />
+                        </div>
+                        <span className="text-xs font-medium text-grey-light">À Vérifier</span>
                     </div>
                 </div>
             </div>

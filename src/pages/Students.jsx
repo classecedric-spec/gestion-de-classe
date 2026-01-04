@@ -2,11 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import { supabase } from '../lib/supabaseClient';
 import { calculateAge } from '../lib/utils';
-import { Search, User as UserIcon, Calendar, GraduationCap, ShieldCheck, Loader2, ChevronRight, ChevronDown, Filter, Plus, X, BookOpen, Layers, Trash2, Edit, Users, CheckCircle2, Clock, AlertCircle, LayoutList, GitGraph, FileText } from 'lucide-react';
+import { Search, User as UserIcon, Calendar, GraduationCap, ShieldCheck, Loader2, ChevronRight, ChevronDown, Filter, Plus, X, BookOpen, Layers, Trash2, Edit, Users, CheckCircle2, Clock, AlertCircle, LayoutList, GitGraph, FileText, Activity, GitBranch } from 'lucide-react';
 import clsx from 'clsx';
 import StudentModal from '../components/StudentModal';
 import { pdf } from '@react-pdf/renderer';
-import StudentTrackingPDF from '../components/StudentTrackingPDF';
+
 import StudentTrackingPDFModern from '../components/StudentTrackingPDFModern';
 import { saveAs } from 'file-saver';
 
@@ -37,6 +37,8 @@ const Students = () => {
     useEffect(() => {
         fetchStudents();
         fetchClassesAndGroups();
+        fetchBranches();
+        loadUserPreferences();
     }, []);
 
     useEffect(() => {
@@ -134,6 +136,75 @@ const Students = () => {
                 .single();
             if (updatedStudent) setSelectedStudent(updatedStudent);
         }
+    };
+    const handleUpdateImportance = async (newVal) => {
+        const val = newVal === '' ? null : parseInt(newVal, 10);
+
+        // Optimistic UI Update
+        const updated = { ...selectedStudent, importance_suivi: val };
+        setSelectedStudent(updated);
+        setStudents(prev => prev.map(s => s.id === updated.id ? updated : s));
+
+        const { error } = await supabase
+            .from('Eleve')
+            .update({ importance_suivi: val })
+            .eq('id', updated.id);
+
+        if (error) {
+            console.error("Error updating importance:", error);
+            // Revert on error would be ideal here
+        }
+    };
+
+    // --- BRANCH & PREFS LOGIC ---
+    const [branches, setBranches] = useState([]);
+    const [studentIndices, setStudentIndices] = useState({}); // { studentId: { branchId: value } }
+
+    const fetchBranches = async () => {
+        const { data } = await supabase.from('Branche').select('id, nom').order('ordre');
+        setBranches(data || []);
+    };
+
+    const loadUserPreferences = async () => {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+
+        const { data } = await supabase
+            .from('UserPreference')
+            .select('value')
+            .eq('user_id', user.id)
+            .eq('key', 'eleve_profil_competences')
+            .maybeSingle();
+
+        if (data?.value) {
+            setStudentIndices(data.value);
+        }
+    };
+
+    const handleUpdateBranchIndex = async (studentId, branchId, newValue) => {
+        const val = newValue === '' ? null : parseInt(newValue, 10);
+
+        setStudentIndices(prev => {
+            const next = { ...prev };
+            if (!next[studentId]) next[studentId] = {};
+            next[studentId][branchId] = val;
+
+            // Save to DB (debounced ideal, but simple here)
+            saveUserPreferences(next);
+            return next;
+        });
+    };
+
+    const saveUserPreferences = async (newIndices) => {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+
+        await supabase.from('UserPreference').upsert({
+            user_id: user.id,
+            key: 'eleve_profil_competences',
+            value: newIndices,
+            updated_at: new Date().toISOString()
+        }, { onConflict: 'user_id, key' });
     };
 
     const fetchStudentProgress = async (studentId) => {
@@ -353,8 +424,7 @@ const Students = () => {
         }
     };
 
-    const handleGenerateTodoPDF = () => generatePDF(StudentTrackingPDF, 'Classique');
-    const handleGenerateTodoPDFModern = () => generatePDF(StudentTrackingPDFModern, 'Moderne');
+    const handleGeneratePDF = () => generatePDF(StudentTrackingPDFModern, 'Suivi');
 
     return (
         <div className="h-full flex gap-8 animate-in fade-in duration-500 relative">
@@ -589,6 +659,21 @@ const Students = () => {
                                                 <div className="p-2 rounded-lg bg-white/5 text-primary"><Calendar size={18} /></div>
                                                 <p className="text-text-main font-bold">{calculateAge(selectedStudent.date_naissance)}</p>
                                             </div>
+                                            <div className="flex items-center gap-3">
+                                                <div className="p-2 rounded-lg bg-white/5 text-primary"><Activity size={18} /></div>
+                                                <div className="flex flex-col">
+                                                    <span className="text-[10px] text-grey-medium uppercase tracking-wider">Importance Suivi (0-100)</span>
+                                                    <input
+                                                        type="number"
+                                                        min="0"
+                                                        max="100"
+                                                        value={selectedStudent.importance_suivi ?? ''}
+                                                        onChange={(e) => handleUpdateImportance(e.target.value)}
+                                                        placeholder="50"
+                                                        className="bg-transparent text-text-main font-bold border-b border-white/10 focus:border-primary focus:outline-none w-16"
+                                                    />
+                                                </div>
+                                            </div>
                                         </div>
                                     </div>
 
@@ -634,6 +719,40 @@ const Students = () => {
                                                 </div>
                                             </div>
                                         </div>
+                                    </div>
+
+                                    {/* Branch Indices Section */}
+                                    <div className="space-y-6">
+                                        <h3 className="text-sm font-bold uppercase tracking-widest text-grey-dark border-b border-white/5 pb-2">Indices de Branche (Performance)</h3>
+                                        {branches.length === 0 ? (
+                                            <p className="text-xs text-grey-medium italic">Aucune branche définie.</p>
+                                        ) : (
+                                            <div className="grid grid-cols-2 gap-3">
+                                                {branches.map(branch => {
+                                                    const val = studentIndices[selectedStudent.id]?.[branch.id];
+                                                    return (
+                                                        <div key={branch.id} className="bg-white/5 p-3 rounded-xl border border-white/5 flex items-center justify-between">
+                                                            <div className="flex items-center gap-2 overflow-hidden">
+                                                                <GitBranch size={14} className="text-primary shrink-0" />
+                                                                <span className="text-xs font-bold text-gray-300 truncate" title={branch.nom}>{branch.nom}</span>
+                                                            </div>
+                                                            <input
+                                                                type="number"
+                                                                min="0"
+                                                                max="100"
+                                                                placeholder="50"
+                                                                className="w-12 bg-black/20 text-right text-xs font-mono font-bold text-white rounded px-1 py-1 focus:outline-none focus:ring-1 focus:ring-primary/50"
+                                                                value={val ?? ''}
+                                                                onChange={(e) => handleUpdateBranchIndex(selectedStudent.id, branch.id, e.target.value)}
+                                                            />
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        )}
+                                        <p className="text-[10px] text-grey-medium italic mt-2">
+                                            Ces indices influencent la probabilité de sélection dans le générateur de suivi. (Base: 50)
+                                        </p>
                                     </div>
                                 </div>
                             )}
@@ -983,18 +1102,11 @@ const Students = () => {
                             {currentTab === 'todo' && (
                                 <div className="h-full flex flex-col items-center justify-center gap-4 text-grey-medium">
                                     <button
-                                        onClick={handleGenerateTodoPDF}
-                                        className="px-6 py-3 bg-primary text-text-dark font-bold rounded-xl shadow-lg hover:bg-primary-light transition-all flex items-center gap-2"
-                                    >
-                                        <FileText size={20} />
-                                        Créer le PDF (Classique)
-                                    </button>
-                                    <button
-                                        onClick={handleGenerateTodoPDFModern}
+                                        onClick={handleGeneratePDF}
                                         className="px-6 py-3 bg-white text-primary border-2 border-primary font-bold rounded-xl shadow-lg hover:bg-gray-50 transition-all flex items-center gap-2"
                                     >
                                         <FileText size={20} />
-                                        Créer le PDF (Moderne)
+                                        Créer le PDF
                                     </button>
                                     <p className="text-sm italic opacity-60">Le contenu de la liste sera généré automatiquement.</p>
                                 </div>
