@@ -121,7 +121,7 @@ const Layout = () => {
         { icon: Users, label: 'Utilisateurs', path: '/dashboard/user' },
         { icon: Puzzle, label: 'Activités', path: '/dashboard/activities' },
         { type: 'separator' },
-        { icon: Smartphone, label: 'iPhone', path: '/mobile-suivi', isExternal: true },
+        { icon: Smartphone, label: 'Suivi Mobile', path: '/mobile-suivi', isExternal: true },
         { type: 'separator' },
         { icon: Settings, label: 'Paramètres', path: '/dashboard/settings' },
     ];

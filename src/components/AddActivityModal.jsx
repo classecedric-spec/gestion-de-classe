@@ -240,7 +240,6 @@ const AddActivityModal = ({ isOpen, onClose, onAdded, activityToEdit, defaultMod
                 nombre_exercices: parseInt(nbExercises) || 1,
                 nombre_erreurs: parseInt(nbErrors) || 1,
                 statut_exigence: requirementStatus,
-                statut_exigence: requirementStatus,
                 user_id: user.id
             };
 
