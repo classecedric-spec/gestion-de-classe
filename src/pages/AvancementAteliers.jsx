@@ -137,7 +137,6 @@ const AvancementAteliers = () => {
                 setStudents([]);
             }
         } catch (error) {
-            console.error('Error fetching students:', error);
         } finally {
             setLoading(false);
         }
@@ -292,7 +291,6 @@ const AvancementAteliers = () => {
                 setProgressions({});
             }
         } catch (error) {
-            console.error('Error fetching activities/progress:', error);
         } finally {
             setLoading(false);
         }
@@ -352,7 +350,6 @@ const AvancementAteliers = () => {
             }, { onConflict: 'eleve_id, activite_id' });
 
         if (error) {
-            console.error("Error updating status:", error);
             toast.error("Erreur de sauvegarde");
             setProgressions(prev => ({ ...prev, [key]: currentStatus })); // Revert
         }
@@ -456,7 +453,6 @@ const AvancementAteliers = () => {
                 // If user cancelled, stop everything
                 if (err.name === 'AbortError') return;
                 // Otherwise continue and try fallback later
-                console.warn('File picker failed, falling back to download', err);
             }
         }
 
@@ -483,7 +479,6 @@ const AvancementAteliers = () => {
                 saveAs(blob, filename);
             }
         } catch (error) {
-            console.error('Error generating PDF:', error);
             alert('Erreur lors de la génération du PDF.');
         } finally {
             setGeneratingPDF(false);

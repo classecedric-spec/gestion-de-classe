@@ -84,7 +84,6 @@ const Presence = () => {
             }
             setIsSetupLocked(false);
         } catch (err) {
-            console.error("Error auto-selecting setup:", err);
             setIsSetupLocked(false);
         }
     };
@@ -109,7 +108,6 @@ const Presence = () => {
 
             await fetchSetups();
         } catch (err) {
-            console.error("Error initializing:", err);
             if (err.message && err.message.includes('relation') && err.message.includes('does not exist')) {
                 setError("Les tables de base de données nécessaires n'existent pas encore. Veuillez exécuter la migration SQL.");
             } else {
@@ -138,7 +136,7 @@ const Presence = () => {
 
             const { data } = await supabase.from('Eleve').select('*, Classe(nom)').in('id', studentIds).order('nom');
             setStudents(data || []);
-        } catch (err) { console.error("Error fetching students:", err); }
+        } catch (err) { }
     };
 
     const fetchCategories = async (setupId) => {
@@ -146,7 +144,7 @@ const Presence = () => {
             const { data, error } = await supabase.from('CategoriePresence').select('*').eq('setup_id', setupId).order('created_at');
             if (error) throw error;
             setCategories(data || []);
-        } catch (err) { console.error("Error fetching categories:", err); }
+        } catch (err) { }
     };
 
     const fetchAttendances = async () => {
@@ -155,7 +153,7 @@ const Presence = () => {
             const { data, error } = await supabase.from('Attendance').select('*').eq('date', currentDate).eq('setup_id', selectedSetup?.id).in('eleve_id', students.map(s => s.id));
             if (error) throw error;
             setAttendances(data || []);
-        } catch (err) { console.error("Error fetching attendances:", err); }
+        } catch (err) { }
     };
 
     const handleUnlockEditing = () => {
@@ -231,7 +229,6 @@ const Presence = () => {
                 setAttendances(prev => prev.map(a => a.id === optimisticAtt.id ? data : a));
             }
         } catch (err) {
-            console.error("Error saving:", err);
             fetchAttendances(); // Revert on error
         }
     };
@@ -247,14 +244,12 @@ const Presence = () => {
             const { error } = await supabase.from('Attendance').delete().eq('id', existingRecord.id);
             if (error) throw error;
         } catch (err) {
-            console.error("Error deleting:", err);
             fetchAttendances(); // Revert
         }
     };
 
     // Replaced Handler with Modal Logic
     const confirmMarkUnassignedAbsent = async () => {
-        console.log("Confirming mark unassigned as absent...");
         const unassignedStudents = students.filter(s => !attendances.find(a => a.eleve_id === s.id));
         if (unassignedStudents.length === 0) return;
 
@@ -275,7 +270,7 @@ const Presence = () => {
             const { data, error } = await supabase.from('Attendance').insert(updates).select();
             if (error) throw error;
             setAttendances(prev => [...prev, ...data]);
-        } catch (err) { console.error(err); alert(err.message); } finally { setLoading(false); }
+        } catch (err) { alert(err.message); } finally { setLoading(false); }
     };
 
     const handleMarkUnassignedAbsent = () => {

@@ -43,7 +43,6 @@ const Materiels = () => {
                 setSelectedMateriel(data[0]);
             }
         } catch (error) {
-            console.error('Error fetching materiels:', error);
         } finally {
             setLoading(false);
         }
@@ -79,7 +78,6 @@ const Materiels = () => {
 
             setLinkedActivities(activities);
         } catch (error) {
-            console.error('Error fetching linked activities:', error);
             setLinkedActivities([]);
         } finally {
             setLoadingActivities(false);
@@ -110,7 +108,6 @@ const Materiels = () => {
                 else setSelectedMateriel(null);
             }
         } catch (error) {
-            console.error('Error deleting materiel:', error);
             alert("Erreur lors de la suppression. Ce matériel est peut-être lié à des activités.");
         }
     };

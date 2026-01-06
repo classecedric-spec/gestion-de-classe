@@ -148,7 +148,7 @@ const SuiviPedagogique = ({ timer, setTimer, timerFinished, setTimerFinished }) 
                 return data || [];
             },
             setAdultActivities,
-            (err) => console.error('Error fetching adult tracking:', err)
+            (err) => { }
         );
     };
 
@@ -161,7 +161,7 @@ const SuiviPedagogique = ({ timer, setTimer, timerFinished, setTimerFinished }) 
                 return data || [];
             },
             setAllAdults,
-            (err) => console.error('Error fetching adults:', err)
+            (err) => { }
         );
     };
 
@@ -174,7 +174,7 @@ const SuiviPedagogique = ({ timer, setTimer, timerFinished, setTimerFinished }) 
                 return data || [];
             },
             setAvailableActivityTypes,
-            (err) => console.error('Error fetching activity types:', err)
+            (err) => { }
         );
     };
 
@@ -535,7 +535,6 @@ const SuiviPedagogique = ({ timer, setTimer, timerFinished, setTimerFinished }) 
                 },
                 setStudents,
                 (err) => {
-                    console.error(err);
                     setStudents([]);
                 }
             );
@@ -591,7 +590,7 @@ const SuiviPedagogique = ({ timer, setTimer, timerFinished, setTimerFinished }) 
                 });
                 setGroupedProgressions(map);
             },
-            (err) => console.error("Error fetching group stats", err)
+            (err) => { }
         );
     };
 
@@ -674,7 +673,6 @@ const SuiviPedagogique = ({ timer, setTimer, timerFinished, setTimerFinished }) 
                 setLoadingModules(false);
             },
             (err) => {
-                console.error(err);
                 setLoadingModules(false);
             }
         );
@@ -715,7 +713,6 @@ const SuiviPedagogique = ({ timer, setTimer, timerFinished, setTimerFinished }) 
                 setLoadingActivities(false);
             },
             (err) => {
-                console.error(err);
                 setLoadingActivities(false);
             }
         );
@@ -739,7 +736,7 @@ const SuiviPedagogique = ({ timer, setTimer, timerFinished, setTimerFinished }) 
                 });
                 setProgressions(progMap);
             },
-            (err) => console.error("Error fetching progressions", err)
+            (err) => { }
         );
     };
 
@@ -829,7 +826,7 @@ const SuiviPedagogique = ({ timer, setTimer, timerFinished, setTimerFinished }) 
                 .in('eleve_id', studentIds)
                 .order('updated_at', { ascending: true });
 
-            if (error) console.error("Error fetching help requests", error);
+            if (error) { }
 
             // Filter in JS: natural requests (is_suivi=false) must be in an 'en_cours' module.
             // Admin follow-ups (is_suivi=true) are always shown.

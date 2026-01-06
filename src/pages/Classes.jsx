@@ -59,7 +59,6 @@ const Classes = () => {
                 handleSelectClass(data[0]);
             }
         } catch (error) {
-            console.error('Error fetching classes:', error);
         } finally {
             setLoading(false);
         }
@@ -83,7 +82,6 @@ const Classes = () => {
             if (error) throw error;
             setStudentsInClass(data || []);
         } catch (error) {
-            console.error('Error fetching students in class:', error);
         } finally {
             setLoadingStudents(false);
         }

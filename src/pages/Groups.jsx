@@ -228,9 +228,7 @@ const Groups = () => {
                 } else if (fallbackData && fallbackData.length > 0) {
                     setSelectedGroup(fallbackData[0]);
                 }
-            } else {
-                console.error('Error fetching groups:', error);
-            }
+            } else { }
         } finally {
             setLoading(false);
         }
@@ -244,9 +242,7 @@ const Groups = () => {
                 .order('nom');
             if (error) throw error;
             setClasses(data || []);
-        } catch (error) {
-            console.error('Error fetching classes:', error);
-        }
+        } catch (error) { }
     };
 
     const fetchStudentsInGroup = async (groupId) => {
@@ -277,9 +273,7 @@ const Groups = () => {
             if (error) throw error;
 
             setStudentsInGroup(data || []);
-        } catch (error) {
-            console.error('Error fetching students in group:', error);
-        } finally {
+        } catch (error) { } finally {
             setLoadingStudents(false);
         }
     };
@@ -343,7 +337,6 @@ const Groups = () => {
                     .eq('id', g.id)
             ));
         } catch (error) {
-            console.error("Error updating group order:", error);
             // Revert on error
             fetchGroups();
         }
@@ -407,7 +400,6 @@ const Groups = () => {
                 });
             } catch (err) {
                 if (err.name === 'AbortError') return;
-                console.warn('File picker failed, falling back to download', err);
             }
         }
 
@@ -579,10 +571,7 @@ const Groups = () => {
             }, 2000);
 
         } catch (error) {
-            if (error.message === 'ABORTED') {
-                console.log('Génération annulée par l\'utilisateur');
-            } else {
-                console.error("Error generating PDF:", error);
+            if (error.message !== 'ABORTED') {
                 alert("Erreur lors de la génération du PDF.");
             }
         } finally {

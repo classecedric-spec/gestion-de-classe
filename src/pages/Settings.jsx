@@ -84,7 +84,6 @@ const Settings = () => {
                 setProfile(prev => ({ ...prev, email: user.email }));
             }
         } catch (error) {
-            console.error('Error loading profile:', error);
         } finally {
             setLoadingProfile(false);
         }
@@ -169,7 +168,6 @@ const Settings = () => {
             toast.success(`${invalidProgs.length} progression(s) corrigée(s) !`, { id: toastId });
 
         } catch (err) {
-            console.error(err);
             toast.error("Erreur lors de la vérification.", { id: toastId });
         }
     };
@@ -359,7 +357,6 @@ const Settings = () => {
             setShowResetModal(false);
             setTimeout(() => window.location.reload(), 2000);
         } catch (error) {
-            console.error("Hard reset failed:", error);
             toast.error("Erreur lors de la réinitialisation: " + error.message, { id: resetToastId });
         } finally {
             setIsResetting(false);

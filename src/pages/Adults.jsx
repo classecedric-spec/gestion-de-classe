@@ -38,7 +38,6 @@ const Adults = () => {
             if (error) throw error;
             setAdults(data || []);
         } catch (error) {
-            console.error('Error fetching adults:', error);
         } finally {
             setLoadingAdults(false);
         }
@@ -109,7 +108,6 @@ const Adults = () => {
                 setActivities(data || []);
             }
         } catch (error) {
-            console.error('Error fetching activities:', error);
         } finally {
             setLoadingActivities(false);
         }

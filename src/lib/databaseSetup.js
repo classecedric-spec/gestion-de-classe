@@ -31,7 +31,6 @@ export const checkDatabaseSetup = async () => {
       }
 
       if (error) {
-        console.log(`Check database error for ${table}:`, error);
 
         if (error.message?.includes('API key') || error.code === 'PGRST301' || error.status === 401) {
           return { exists: false, errorType: 'API_KEY', message: "Clé API Supabase invalide ou non autorisée", rawError: error };
@@ -49,7 +48,6 @@ export const checkDatabaseSetup = async () => {
 
     return { exists: true, errorType: null, message: null, rawError: null };
   } catch (err) {
-    console.error("Check database exception:", err);
     return { exists: false, errorType: 'UNKNOWN', message: err.message, rawError: err };
   }
 };

@@ -11,7 +11,6 @@ import { toast } from 'sonner';
  * after some students have already started it.
  */
 export const cleanupOrphanProgressions = async () => {
-    console.log('Running orphan progression cleanup...');
     try {
         // 1. Fetch all needed data
         // We need:
@@ -34,8 +33,6 @@ export const cleanupOrphanProgressions = async () => {
         const students = studentResponse.data || [];
         const activityLevels = actLevelResponse.data || [];
 
-        // DEBUG: Log counts
-        console.log(`📊 Cleanup Stats: ${progressions.length} progressions, ${students.length} students, ${activityLevels.length} activity-level links`);
 
         // 2. Build Lookup Maps
         const studentLevelMap = new Map(); // studentId -> niveauId
@@ -49,8 +46,6 @@ export const cleanupOrphanProgressions = async () => {
             activityAllowedLevelsMap.get(al.activite_id).add(al.niveau_id);
         });
 
-        // DEBUG: How many activities have level restrictions?
-        console.log(`📊 Activities with level restrictions: ${activityAllowedLevelsMap.size}`);
 
         // 3. Identify Orphans
         const idsToDelete = [];
@@ -83,12 +78,8 @@ export const cleanupOrphanProgressions = async () => {
             }
         }
 
-        // DEBUG: Log breakdown
-        console.log(`📊 Breakdown: ${noStudentLevelCount} no student level, ${noActivityLevelCount} no activity restrictions, ${mismatchCount} mismatches`);
 
-        // 4. Delete orphans
         if (idsToDelete.length > 0) {
-            console.log(`Found ${idsToDelete.length} orphan progressions. Deleting...`);
 
             const { error } = await supabase
                 .from('Progression')
@@ -97,16 +88,12 @@ export const cleanupOrphanProgressions = async () => {
 
             if (error) throw error;
 
-            console.log('Cleanup complete.');
             // Optional: Notify user if significant cleanup happened
             if (idsToDelete.length > 5) {
                 toast.info(`Nettoyage: ${idsToDelete.length} suivis obsolètes supprimés.`);
             }
-        } else {
-            console.log('No orphan progressions found.');
         }
 
-    } catch (error) {
-        console.error('Error in cleanupOrphanProgressions:', error);
-    }
+
+    } catch (error) { }
 };

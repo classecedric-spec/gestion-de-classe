@@ -35,7 +35,6 @@ const SubBranches = () => {
                 setSelectedSubBranch(data[0]);
             }
         } catch (error) {
-            console.error('Error fetching sub-branches:', error);
         } finally {
             setLoading(false);
         }
@@ -81,7 +80,6 @@ const SubBranches = () => {
             setSubBranchToDelete(null);
             fetchSubBranches();
         } catch (err) {
-            console.error('Error deleting sub-branch:', err);
             alert("Erreur lors de la suppression: " + (err.message || "Erreur inconnue"));
         } finally {
             setLoading(false);

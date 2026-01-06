@@ -93,13 +93,7 @@ const Students = () => {
                 .eq('titulaire_id', user.id)
                 .order('nom', { ascending: true });
 
-            if (error) {
-                if (error.code === '42P01') {
-                    console.warn("Table not found, trying lowercase fallback");
-                }
-                throw error;
-            }
-
+            if (error) throw error;
             setStudents(data || []);
 
             // Selection Logic with Navigation State Support
@@ -119,7 +113,7 @@ const Students = () => {
                 }
             }
         } catch (err) {
-            console.error('Error fetching students:', err.message);
+            // Error handled by try/catch
         } finally {
             setLoading(false);
         }
@@ -178,7 +172,6 @@ const Students = () => {
             .eq('id', updated.id);
 
         if (error) {
-            console.error("Error updating importance:", error);
             // Revert on error would be ideal here
         }
     };
@@ -305,7 +298,6 @@ const Students = () => {
 
             setStudentProgress(filteredData);
         } catch (error) {
-            console.error('Error fetching progress:', error);
         } finally {
             setLoadingProgress(false);
         }
@@ -365,7 +357,6 @@ const Students = () => {
             }
             setStudents(prev => prev.map(s => s.id === updated.id ? updated : s));
         } catch (err) {
-            console.error("Error saving photo:", err);
             alert("Erreur lors de l'enregistrement de la photo.");
         } finally {
             setUpdatingPhotoId(null);
@@ -406,7 +397,6 @@ const Students = () => {
             setStudentToDelete(null);
             fetchStudents();
         } catch (error) {
-            console.error("Error deleting student:", error);
             alert('Erreur lors de la suppression: ' + error.message);
         } finally {
             setLoading(false);
@@ -461,16 +451,12 @@ const Students = () => {
                     await writable.close();
                     return;
                 }
-            } catch (err) {
-                if (err.name === 'AbortError') return; // User cancelled
-                console.warn("File System Access API failed, falling back to download", err);
-            }
+            } catch (err) { }
 
             // Fallback
             saveAs(blob, fileName);
 
         } catch (error) {
-            console.error("PDF Generation Error:", error);
             alert("Erreur lors de la génération du PDF.");
         }
     };
