@@ -58,7 +58,6 @@ const AddMaterielModal = ({ isOpen, onClose, onAdded, materielToEdit }) => {
             }
             onClose();
         } catch (err) {
-            console.error("Error saving materiel:", err);
             setError("Une erreur est survenue lors de l'enregistrement.");
         } finally {
             setLoading(false);

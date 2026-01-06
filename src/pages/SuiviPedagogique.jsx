@@ -837,9 +837,6 @@ const SuiviPedagogique = ({ timer, setTimer, timerFinished, setTimerFinished }) 
 
             setHelpRequests(validRequests);
         } catch (err) {
-            console.error(err);
-
-
         }
     };
 
@@ -872,7 +869,6 @@ const SuiviPedagogique = ({ timer, setTimer, timerFinished, setTimerFinished }) 
 
             setHelpersCache(prev => ({ ...prev, [requestId]: randomHelpers }));
         } catch (err) {
-            console.error("Error fetching helpers", err);
         }
     };
 
@@ -950,7 +946,6 @@ const SuiviPedagogique = ({ timer, setTimer, timerFinished, setTimerFinished }) 
             if (error) throw error;
             fetchHelpRequests(); // Refresh help list immediately
         } catch (err) {
-            console.error("Error saving progression", err);
             toast.error("Erreur de sauvegarde");
         }
     };
@@ -1053,7 +1048,6 @@ const SuiviPedagogique = ({ timer, setTimer, timerFinished, setTimerFinished }) 
                 updated_at: new Date().toISOString()
             });
             if (error) {
-                console.error("Insert error:", error);
             }
         }
 
@@ -1076,7 +1070,6 @@ const SuiviPedagogique = ({ timer, setTimer, timerFinished, setTimerFinished }) 
             setItemToDelete(null);
             fetchHelpRequests();
         } catch (err) {
-            console.error("Delete error:", err);
             toast.error("Erreur lors de la suppression");
         }
     };

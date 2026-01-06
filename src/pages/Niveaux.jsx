@@ -156,7 +156,6 @@ const Niveaux = () => {
                 setSelectedNiveau(data[0]);
             }
         } catch (error) {
-            console.error('Error fetching niveaux:', error);
         } finally {
             setLoading(false);
         }
@@ -174,7 +173,6 @@ const Niveaux = () => {
             if (error) throw error;
             setStudents(data || []);
         } catch (err) {
-            console.error("Error fetching students for level:", err);
         } finally {
             setLoadingStudents(false);
         }
@@ -200,7 +198,6 @@ const Niveaux = () => {
             }
             setNiveauToDelete(null);
         } catch (error) {
-            console.error('Error deleting niveau:', error);
             alert("Erreur lors de la suppression.");
         } finally {
             setLoading(false);
@@ -282,7 +279,6 @@ const Niveaux = () => {
                 .upsert(updates, { onConflict: 'id' });
             if (error) throw error;
         } catch (err) {
-            console.error("Error updating niveau order:", err);
         }
     };
 

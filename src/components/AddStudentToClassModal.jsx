@@ -75,7 +75,6 @@ const AddStudentToClassModal = ({ showModal, handleCloseModal, classId, classNam
             setClasses(classesData || []);
             setGroups(groupsData || []);
         } catch (error) {
-            console.error('Error fetching data for modal:', error);
         } finally {
             setLoading(false);
         }
@@ -112,7 +111,6 @@ const AddStudentToClassModal = ({ showModal, handleCloseModal, classId, classNam
             onAdded();
             handleCloseModal();
         } catch (err) {
-            console.error('Error adding students to class:', err);
         } finally {
             setSaving(false);
         }

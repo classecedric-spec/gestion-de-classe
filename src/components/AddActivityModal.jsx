@@ -128,7 +128,6 @@ const AddActivityModal = ({ isOpen, onClose, onAdded, activityToEdit, defaultMod
             // Optionally auto-select it?
             setSelectedMaterialTypes(prev => [...prev, data.id]);
         } catch (err) {
-            console.error("Error creating material type:", err);
         }
     };
 
@@ -148,7 +147,6 @@ const AddActivityModal = ({ isOpen, onClose, onAdded, activityToEdit, defaultMod
             setEditingMaterialTypeId(null);
             setEditingMaterialName('');
         } catch (err) {
-            console.error("Error updating material type:", err);
         }
     };
 
@@ -169,7 +167,6 @@ const AddActivityModal = ({ isOpen, onClose, onAdded, activityToEdit, defaultMod
                 setEditingMaterialTypeId(null);
             }
         } catch (err) {
-            console.error("Error deleting material type:", err);
         } finally {
             setMaterialTypeIdToDelete(null);
         }
@@ -291,7 +288,6 @@ const AddActivityModal = ({ isOpen, onClose, onAdded, activityToEdit, defaultMod
             onAdded();
             onClose();
         } catch (err) {
-            console.error("Error saving activity:", err);
             setError(err.message);
         } finally {
             setLoading(false);

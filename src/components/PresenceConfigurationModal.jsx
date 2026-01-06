@@ -79,7 +79,6 @@ const PresenceConfigurationModal = ({
             }
 
         } catch (err) {
-            console.error("Error fetching available dates:", err);
         }
     };
 
@@ -235,7 +234,6 @@ const PresenceConfigurationModal = ({
             setExportData(data || []);
 
         } catch (err) {
-            console.error("Error fetching range data:", err);
         } finally {
             setLoading(false);
         }
@@ -251,7 +249,6 @@ const PresenceConfigurationModal = ({
             if (error) throw error;
             setSets(data || []);
         } catch (error) {
-            console.error('Error fetching sets:', error);
         } finally {
             setLoading(false);
         }
@@ -282,7 +279,6 @@ const PresenceConfigurationModal = ({
             setCategories(data || []);
             setView('edit');
         } catch (error) {
-            console.error('Error fetching categories:', error);
         } finally {
             setLoading(false);
         }

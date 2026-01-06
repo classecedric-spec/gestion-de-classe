@@ -72,7 +72,6 @@ const AddNiveauModal = ({ isOpen, onClose, onAdded, niveauToEdit }) => {
             setNom('');
             onClose();
         } catch (error) {
-            console.error('Error managing niveau:', error);
             alert("Erreur: " + error.message);
         } finally {
             setLoading(false);

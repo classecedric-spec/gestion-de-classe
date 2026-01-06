@@ -122,7 +122,6 @@ const MobileSuivi = () => {
                 setFullStudents(egData.map(d => d.Eleve).filter(Boolean));
             }
         } catch (err) {
-            console.error(err);
         }
     };
 
@@ -195,7 +194,6 @@ const MobileSuivi = () => {
             fetchHelpRequests();
         } catch (err) {
             toast.error("Erreur génération");
-            console.error(err);
         } finally {
             setIsAutoGenerating(false);
         }
@@ -235,7 +233,6 @@ const MobileSuivi = () => {
 
             setHelpRequests(validRequests);
         } catch (err) {
-            console.error(err);
         } finally {
             setLoading(false);
         }
@@ -266,7 +263,6 @@ const MobileSuivi = () => {
 
             setHelpersCache(prev => ({ ...prev, [requestId]: randomHelpers }));
         } catch (err) {
-            console.error("Error fetching helpers", err);
         }
     };
 

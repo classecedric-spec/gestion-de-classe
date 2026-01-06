@@ -74,7 +74,6 @@ const AddBranchModal = ({ isOpen, onClose, onAdded, branchToEdit = null }) => {
             onAdded(data);
             onClose();
         } catch (err) {
-            console.error('Error saving branch:', err);
             setError("Erreur lors de l'enregistrement. Vérifiez votre connexion.");
         } finally {
             setLoading(false);

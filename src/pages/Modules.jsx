@@ -228,7 +228,6 @@ const Modules = () => {
                 .in('activite_id', activityIds);
 
             if (error) {
-                console.error('Error fetching stats:', error);
                 return;
             }
 
@@ -335,7 +334,6 @@ const Modules = () => {
                 setSelectedModule(null);
             }
         } catch (error) {
-            console.error('Error fetching modules:', error);
         } finally {
             setLoading(false);
         }
@@ -358,7 +356,6 @@ const Modules = () => {
             if (error) throw error;
             setGroups(data || []);
         } catch (err) {
-            console.error('Error fetching groups:', err);
         }
     };
 
@@ -445,7 +442,6 @@ const Modules = () => {
                 showNotification("Aucun élève correspondant aux niveaux des activités n'a été trouvé dans ces groupes.", 'error');
             }
         } catch (err) {
-            console.error('Error generating progressions:', err);
             showNotification("Erreur lors de la génération des progressions.", 'error');
         } finally {
             setGeneratingProgressions(false);
@@ -467,7 +463,6 @@ const Modules = () => {
             if (error) throw error;
             setProgressions(data || []);
         } catch (err) {
-            console.error('Error fetching progressions:', err);
         } finally {
             setLoadingProgressions(false);
         }
@@ -488,7 +483,6 @@ const Modules = () => {
 
             if (error) throw error;
         } catch (err) {
-            console.error('Error updating progression status:', err);
             // Revert
             setProgressions(oldProgressions);
         }
@@ -590,7 +584,6 @@ const Modules = () => {
             setModuleToDelete(null);
             fetchModules();
         } catch (err) {
-            console.error('Error deleting module:', err);
             showNotification("Erreur lors de la suppression du module.", 'error');
         } finally {
             setLoading(false);
@@ -657,7 +650,6 @@ const Modules = () => {
             const { error } = await supabase.from('Module').update({ statut: newStatus }).eq('id', module.id);
             if (error) throw error;
         } catch (err) {
-            console.error("Error updating status:", err);
             // Revert or refresh on error
             fetchModules();
         }
@@ -725,7 +717,6 @@ const Modules = () => {
 
             if (error) throw error;
         } catch (err) {
-            console.error("Error updating activity order:", err);
             // Optionally fetch modules again if update failed to revert UI
             fetchModules();
         }

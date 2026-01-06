@@ -20,7 +20,6 @@ export const OfflineSyncProvider = ({ children }) => {
             try {
                 setQueue(JSON.parse(storedQueue));
             } catch (e) {
-                console.error("Failed to parse offline queue", e);
             }
         }
 
@@ -85,7 +84,6 @@ export const OfflineSyncProvider = ({ children }) => {
                     successCount++;
                 }
             } catch (error) {
-                console.error("Sync error for item:", item, error);
                 // Keep failed items to retry later? Or discard?
                 // For now, let's keep them if it's a network error, discard if logic error?
                 // Hard to distinguish perfectly. We'll keep them if we suspect network flicker.

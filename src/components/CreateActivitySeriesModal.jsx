@@ -38,7 +38,6 @@ const CreateActivitySeriesModal = ({ isOpen, onClose, onAdded, moduleId }) => {
             const { data } = await supabase.from('Niveau').select('*').order('ordre');
             setLevels(data || []);
         } catch (err) {
-            console.error('Error fetching levels:', err);
         }
     };
 
@@ -94,7 +93,6 @@ const CreateActivitySeriesModal = ({ isOpen, onClose, onAdded, moduleId }) => {
                 }
             }
         } catch (err) {
-            console.error("Error ensuring paper material:", err);
         }
     };
 
@@ -182,14 +180,14 @@ const CreateActivitySeriesModal = ({ isOpen, onClose, onAdded, moduleId }) => {
                         .from('ActiviteMateriel')
                         .insert(materialLinks);
 
-                    if (matError) console.error("Error linking material:", matError);
+                    if (matError) {
+                    }
                 }
             }
 
             onAdded();
             onClose();
         } catch (err) {
-            console.error('Error creating activity series:', err);
             setError(err.message || "Une erreur est survenue lors de la création.");
         } finally {
             setLoading(false);

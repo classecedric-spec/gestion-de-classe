@@ -18,7 +18,6 @@ const ImageUpload = ({
                 const base64 = await resizeAndConvertToBase64(file, 100, 100);
                 onChange(base64);
             } catch (err) {
-                console.error("Error processing image:", err);
                 alert("Erreur lors du traitement de l'image");
             }
         } else {

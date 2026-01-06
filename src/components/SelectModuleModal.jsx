@@ -26,7 +26,6 @@ const SelectModuleModal = ({ isOpen, onClose, onSelect }) => {
             if (error) throw error;
             setModules(data || []);
         } catch (err) {
-            console.error('Error fetching modules:', err);
         } finally {
             setLoading(false);
         }

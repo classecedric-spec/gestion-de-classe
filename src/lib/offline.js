@@ -10,7 +10,6 @@ export const saveToCache = (key, data) => {
         localStorage.setItem(STORAGE_PREFIX + key, JSON.stringify(data));
         localStorage.setItem(STORAGE_PREFIX + key + '_ts', Date.now().toString());
     } catch (error) {
-        console.error('Error saving to cache:', error);
     }
 };
 
@@ -20,7 +19,6 @@ export const getFromCache = (key) => {
         if (!data) return null;
         return JSON.parse(data);
     } catch (error) {
-        console.error('Error reading from cache:', error);
         return null;
     }
 };
@@ -43,8 +41,6 @@ export const fetchWithCache = async (key, fetchFn, setData, onError) => {
         setData(data);
         saveToCache(key, data);
     } catch (error) {
-        console.warn(`Network error for ${key}, falling back to cache.`, error);
-
         // Fallback to cache
         const cachedData = getFromCache(key);
         if (cachedData) {

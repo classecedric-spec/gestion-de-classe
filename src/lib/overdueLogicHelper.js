@@ -28,9 +28,8 @@ const fixMissingDueDates = async (userId) => {
                 .in('activite_id', activityIds)
                 .is('date_limite', null); // Only touch those who missed the boat
 
-            if (updateError) console.error('Error backfilling dates for module:', module.id, updateError);
+            if (updateError) { }
         }
     } catch (err) {
-        console.error('Error in fixMissingDueDates:', err);
     }
 };

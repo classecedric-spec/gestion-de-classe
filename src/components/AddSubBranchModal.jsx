@@ -46,7 +46,6 @@ const AddSubBranchModal = ({ isOpen, onClose, onAdded, subBranchToEdit = null })
                 setBranchId(data[0].id);
             }
         } catch (err) {
-            console.error('Error fetching branches:', err);
             setError("Impossible de charger les branches.");
         } finally {
             setFetchingBranches(false);
@@ -103,7 +102,6 @@ const AddSubBranchModal = ({ isOpen, onClose, onAdded, subBranchToEdit = null })
             onAdded(resultData);
             onClose();
         } catch (err) {
-            console.error('Error saving sub-branch:', err);
             setError("Erreur lors de l'enregistrement. Vérifiez votre connexion.");
         } finally {
             setLoading(false);

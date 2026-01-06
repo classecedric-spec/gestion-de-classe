@@ -153,7 +153,6 @@ const AddClassModal = ({ isOpen, onClose, onAdded, classToEdit }) => {
             } catch (err) {
                 // Ignore aborts
                 if (err.name === 'AbortError') return;
-                console.warn('File picker failed, fallback to saveAs', err);
             }
         }
 
@@ -236,7 +235,6 @@ const AddClassModal = ({ isOpen, onClose, onAdded, classToEdit }) => {
                     setImportedStudents(formatted);
                 }
             } catch (error) {
-                console.error("Erreur lecture Excel:", error);
                 alert("Erreur lors de la lecture du fichier.");
             }
         };
@@ -317,7 +315,6 @@ const AddClassModal = ({ isOpen, onClose, onAdded, classToEdit }) => {
 
                 const { error: studentError } = await supabase.from('Eleve').insert(studentsToInsert);
                 if (studentError) {
-                    console.error("Error inserting students:", studentError);
                     alert("Classe créée, mais erreur lors de l'import des élèves: " + studentError.message);
                 }
             }

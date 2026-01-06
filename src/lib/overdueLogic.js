@@ -29,18 +29,11 @@ export const checkOverdueActivities = async (userId) => {
             .lte('date_limite', todayStr); // Where Due Date is passed or today
 
         if (updateError) {
-            if (updateError.code === '23514') {
-                console.error('[Overdue Check] DB CONSTRAINT ERROR: "a_domicile" state missing in check constraint.');
-            } else {
-                console.error('[Overdue Check] Error updating overdue progressions:', updateError);
-            }
         } else {
             // Success (Supabase doesn't return count by default on update without select, 
             // but we don't strictly need it for this background task)
         }
-
     } catch (err) {
-        console.error('[Overdue Check] Unexpected error:', err);
     }
 };
 
@@ -71,9 +64,8 @@ const fixMissingDueDates = async (userId) => {
                 .in('activite_id', activityIds)
                 .is('date_limite', null);
 
-            if (updateError) console.error('Error backfilling dates for module:', module.id, updateError);
+            if (updateError) { }
         }
     } catch (err) {
-        console.error('Error in fixMissingDueDates:', err);
     }
 };

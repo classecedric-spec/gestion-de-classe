@@ -52,7 +52,6 @@ const AddModuleModal = ({ isOpen, onClose, onAdded, moduleToEdit }) => {
             if (error) throw error;
             setBranches(data || []);
         } catch (err) {
-            console.error('Error fetching branches:', err);
         }
     };
 
@@ -62,7 +61,6 @@ const AddModuleModal = ({ isOpen, onClose, onAdded, moduleToEdit }) => {
             if (error) throw error;
             setSubBranches(data || []);
         } catch (err) {
-            console.error('Error fetching sub-branches:', err);
         }
     };
 
@@ -148,7 +146,6 @@ const AddModuleModal = ({ isOpen, onClose, onAdded, moduleToEdit }) => {
                 setSubBranches(data || []);
                 setSubBranchId(newSubBranch.id);
             } catch (err) {
-                console.error("Error refreshing sub-branches:", err);
             }
         }
         setShowAddSubBranchModal(false);
@@ -204,7 +201,6 @@ const AddModuleModal = ({ isOpen, onClose, onAdded, moduleToEdit }) => {
             onAdded(savedModule);
             onClose();
         } catch (err) {
-            console.error('Error saving module:', err);
             setError(err.message || "Erreur lors de l'enregistrement.");
         } finally {
             setLoading(false);

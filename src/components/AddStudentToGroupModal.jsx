@@ -89,7 +89,6 @@ const AddStudentToGroupModal = ({ showModal, handleCloseModal, groupId, groupNam
             setGroups(groupsData || []);
             setNiveaux(niveauxData || []);
         } catch (error) {
-            console.error('Error fetching data for modal:', error);
         } finally {
             setLoading(false);
         }
@@ -141,7 +140,6 @@ const AddStudentToGroupModal = ({ showModal, handleCloseModal, groupId, groupNam
             onAdded && onAdded();
             handleCloseModal();
         } catch (error) {
-            console.error('Error adding students to group:', error);
             alert('Erreur: ' + error.message);
         } finally {
             setSaving(false);

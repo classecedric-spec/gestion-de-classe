@@ -52,7 +52,6 @@ const Activities = () => {
                 setSelectedActivity(data[0]);
             }
         } catch (error) {
-            console.error('Error fetching activities:', error);
         } finally {
             setLoading(false);
         }
@@ -78,7 +77,6 @@ const Activities = () => {
             setActivityToDelete(null);
             fetchActivities();
         } catch (err) {
-            console.error('Error deleting activity:', err);
             alert("Erreur lors de la suppression de l'activité.");
         } finally {
             setLoading(false);
@@ -207,7 +205,6 @@ const Activities = () => {
 
             if (error) throw error;
         } catch (err) {
-            console.error("Error updating requirement:", err);
             fetchActivities();
         }
     };

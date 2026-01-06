@@ -64,7 +64,6 @@ const StudentModal = ({ showModal, onClose, onSaved, isEditing = false, editId =
             const { data: niveaux } = await supabase.from('Niveau').select('*');
             if (niveaux) setNiveauxList(niveaux.sort((a, b) => (a.ordre || 0) - (b.ordre || 0)));
         } catch (error) {
-            console.error("Error fetching dependencies:", error);
         }
     };
 
@@ -105,7 +104,6 @@ const StudentModal = ({ showModal, onClose, onSaved, isEditing = false, editId =
                 });
             }
         } catch (err) {
-            console.error("Error fetching student details:", err);
         }
     };
 
@@ -261,7 +259,6 @@ const StudentModal = ({ showModal, onClose, onSaved, isEditing = false, editId =
             onSaved(studentId);
             handleCloseModal();
         } catch (err) {
-            console.error("Error creating/updating student:", err);
             alert("Erreur: " + err.message);
         } finally {
             setLoadingCreate(false);

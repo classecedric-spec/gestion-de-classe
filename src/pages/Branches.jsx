@@ -191,7 +191,6 @@ const Branches = () => {
                 setSelectedBranch(data[0]);
             }
         } catch (error) {
-            console.error('Error fetching branches:', error);
         } finally {
             setLoading(false);
         }
@@ -240,7 +239,6 @@ const Branches = () => {
             setBranchToDelete(null);
             fetchBranches();
         } catch (err) {
-            console.error('Error deleting branch:', err);
             alert(err.message || "Erreur lors de la suppression.");
         } finally {
             setLoading(false);
@@ -271,7 +269,6 @@ const Branches = () => {
             .order('ordre', { ascending: true });
 
         if (error) {
-            console.error('Error fetching sub-branches:', error);
         } else {
             setSubBranches(data || []);
         }
@@ -331,7 +328,6 @@ const Branches = () => {
                 .upsert(updates, { onConflict: 'id' });
             if (error) throw error;
         } catch (err) {
-            console.error("Error updating branch order:", err);
         }
     };
 
@@ -368,7 +364,6 @@ const Branches = () => {
                 .upsert(updates, { onConflict: 'id' });
             if (error) throw error;
         } catch (err) {
-            console.error("Error updating sub-branch order:", err);
         }
     };
 
