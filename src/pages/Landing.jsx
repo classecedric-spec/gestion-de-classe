@@ -21,7 +21,7 @@ const Landing = () => {
                     className="flex items-center gap-2 bg-white/5 hover:bg-primary text-white hover:text-text-dark border border-white/10 hover:border-primary py-2.5 px-6 rounded-xl transition-all font-bold text-xs uppercase tracking-widest hover:scale-105 active:scale-95 shadow-xl shadow-black/20"
                 >
                     <LogIn size={16} />
-                    Espace Enseignant
+                    Se connecter
                 </Link>
             </header>
 
