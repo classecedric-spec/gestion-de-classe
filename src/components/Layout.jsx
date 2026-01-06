@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabaseClient';
 import { checkOverdueActivities } from '../lib/overdueLogic';
+import { cleanupOrphanProgressions } from '../lib/cleanupUtils';
 import {
     LayoutDashboard,
     Users,
@@ -18,7 +19,9 @@ import {
     Clock,
     Flame,
     Smartphone,
-    ShieldCheck, UserCheck
+    ShieldCheck, UserCheck,
+    Tablet,
+    Monitor
 } from 'lucide-react';
 import clsx from 'clsx';
 
@@ -55,6 +58,7 @@ const Layout = () => {
             if (session) {
                 checkProfile(session.user.id);
                 checkOverdueActivities(session.user.id);
+                cleanupOrphanProgressions(); // Clean up mismatched level progressions
             }
         });
 
@@ -111,6 +115,8 @@ const Layout = () => {
         { type: 'separator' },
         { icon: UserCheck, label: 'Présence', path: '/dashboard/presence' },
         { icon: GraduationCap, label: 'Suivi Global', path: '/dashboard/suivi' },
+        { icon: Tablet, label: 'Suivi Tablette', path: '/suivi-tablet', isExternal: true },
+        { icon: Monitor, label: 'Suivi TBI', path: '/suivi-tbi', isExternal: true },
         { type: 'separator' },
         { icon: Users, label: 'Utilisateurs', path: '/dashboard/user' },
         { icon: Puzzle, label: 'Activités', path: '/dashboard/activities' },
@@ -183,6 +189,13 @@ const Layout = () => {
                                 <button
                                     key={item.label}
                                     onClick={async () => {
+                                        // Direct links for tablet and TBI
+                                        if (item.path === '/suivi-tablet' || item.path === '/suivi-tbi') {
+                                            window.open(item.path, '_blank');
+                                            return;
+                                        }
+
+                                        // iPhone - needs group ID from preferences
                                         const { data } = await supabase
                                             .from('UserPreference')
                                             .select('value')

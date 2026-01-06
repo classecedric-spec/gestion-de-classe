@@ -409,6 +409,7 @@ const Modules = () => {
                     // Get levels associated with this activity
                     const activityLevels = activity.ActiviteNiveau?.map(an => an.niveau_id) || [];
 
+
                     // STRICT MATCHING RULE
                     if (activityLevels.length === 0) continue;
 
@@ -417,7 +418,8 @@ const Modules = () => {
                             eleve_id: student.id,
                             activite_id: activity.id,
                             etat: 'a_commencer',
-                            user_id: (await supabase.auth.getUser()).data.user?.id
+                            user_id: (await supabase.auth.getUser()).data.user?.id,
+                            date_limite: selectedModule.date_fin || null // Add Due Date from Module
                         });
                     }
                 }
@@ -807,22 +809,21 @@ const Modules = () => {
                         />
                     </div>
 
-                    {/* Status Filters */}
-                    <div className="flex bg-background/50 p-1 rounded-xl border border-white/5 gap-1">
+                    {/* Status Filters - Capsule Style */}
+                    <div className="neu-selector-container flex p-1 rounded-xl gap-1">
                         {[
-                            { id: 'all', label: 'Tous', activeClass: 'bg-[#254154] text-white' },
-                            { id: 'en_preparation', label: 'Prép.', activeClass: 'bg-primary text-text-dark' },
-                            { id: 'en_cours', label: 'En cours', activeClass: 'bg-success text-text-dark' },
-                            { id: 'archive', label: 'Archive', activeClass: 'bg-danger text-text-dark' }
+                            { id: 'all', label: 'Tous' },
+                            { id: 'en_preparation', label: 'Prép.' },
+                            { id: 'en_cours', label: 'En cours' },
+                            { id: 'archive', label: 'Arch.' }
                         ].map(f => (
                             <button
                                 key={f.id}
                                 onClick={() => setStatusFilter(f.id)}
+                                data-active={statusFilter === f.id}
                                 className={clsx(
-                                    "flex-1 py-1.5 text-[10px] font-bold uppercase tracking-wider rounded-lg transition-all",
-                                    statusFilter === f.id
-                                        ? `${f.activeClass} shadow-sm`
-                                        : "text-grey-medium hover:text-white hover:bg-white/5"
+                                    "flex-1 flex items-center justify-center py-2 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all duration-300",
+                                    statusFilter !== f.id && "text-grey-medium hover:text-white"
                                 )}
                             >
                                 {f.label}
@@ -1050,41 +1051,49 @@ const Modules = () => {
 
                         {/* Content Section - Tabs */}
                         <div className="flex-1 overflow-y-auto p-8 custom-scrollbar bg-background/20">
-                            {/* Tabs Header */}
-                            <div className="flex gap-8 mb-8 border-b border-white/5 relative">
-                                <button
-                                    onClick={() => setDetailTab('activities')}
-                                    className={clsx(
-                                        "pb-4 text-xs font-bold uppercase tracking-widest transition-all relative flex items-center gap-2 px-1",
-                                        detailTab === 'activities' ? "text-primary" : "text-grey-medium hover:text-white"
-                                    )}
-                                >
-                                    <Puzzle size={16} />
-                                    Activités
-                                    {detailTab === 'activities' && <div className="absolute bottom-[-1px] left-0 w-full h-0.5 bg-primary shadow-[0_0_10px_rgba(217,185,129,0.5)] animate-in slide-in-from-left-full duration-300" />}
-                                </button>
-                                <button
-                                    onClick={() => setDetailTab('groups')}
-                                    className={clsx(
-                                        "pb-4 text-xs font-bold uppercase tracking-widest transition-all relative flex items-center gap-2 px-1",
-                                        detailTab === 'groups' ? "text-primary" : "text-grey-medium hover:text-white"
-                                    )}
-                                >
-                                    <Users size={16} />
-                                    Groupes
-                                    {detailTab === 'groups' && <div className="absolute bottom-[-1px] left-0 w-full h-0.5 bg-primary shadow-[0_0_10px_rgba(217,185,129,0.5)] animate-in slide-in-from-right-full duration-300" />}
-                                </button>
-                                <button
-                                    onClick={() => setDetailTab('progression')}
-                                    className={clsx(
-                                        "pb-4 text-xs font-bold uppercase tracking-widest transition-all relative flex items-center gap-2 px-1",
-                                        detailTab === 'progression' ? "text-primary" : "text-grey-medium hover:text-white"
-                                    )}
-                                >
-                                    <TrendingUp size={16} />
-                                    Suivi
-                                    {detailTab === 'progression' && <div className="absolute bottom-[-1px] left-0 w-full h-0.5 bg-primary shadow-[0_0_10px_rgba(217,185,129,0.5)] animate-in slide-in-from-right-full duration-300" />}
-                                </button>
+                            {/* Tabs Header - Modern Capsule Style */}
+                            <div className="flex justify-center mb-10">
+                                <div className="neu-selector-container flex p-1.5 rounded-2xl w-full max-w-md">
+                                    <button
+                                        onClick={() => setDetailTab('activities')}
+                                        data-active={detailTab === 'activities'}
+                                        className={clsx(
+                                            "flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-xs font-black uppercase tracking-[0.15em] transition-all duration-300",
+                                            detailTab === 'activities'
+                                                ? "bg-primary text-text-dark"
+                                                : "text-grey-medium hover:text-white"
+                                        )}
+                                    >
+                                        <Puzzle size={16} />
+                                        Activités
+                                    </button>
+                                    <button
+                                        onClick={() => setDetailTab('groups')}
+                                        data-active={detailTab === 'groups'}
+                                        className={clsx(
+                                            "flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-xs font-black uppercase tracking-[0.15em] transition-all duration-300",
+                                            detailTab === 'groups'
+                                                ? "bg-primary text-text-dark"
+                                                : "text-grey-medium hover:text-white"
+                                        )}
+                                    >
+                                        <Users size={16} />
+                                        Groupes
+                                    </button>
+                                    <button
+                                        onClick={() => setDetailTab('progression')}
+                                        data-active={detailTab === 'progression'}
+                                        className={clsx(
+                                            "flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-xs font-black uppercase tracking-[0.15em] transition-all duration-300",
+                                            detailTab === 'progression'
+                                                ? "bg-primary text-text-dark"
+                                                : "text-grey-medium hover:text-white"
+                                        )}
+                                    >
+                                        <TrendingUp size={16} />
+                                        Suivi
+                                    </button>
+                                </div>
                             </div>
 
                             {detailTab === 'activities' ? (

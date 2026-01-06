@@ -20,7 +20,7 @@ const ActivitiesLayout = () => {
         <div className="h-full flex flex-col overflow-hidden">
             {/* Tabs Header */}
             <div className="bg-surface/50 border-b border-white/5 px-6 py-3 flex items-center sticky top-0 z-40 backdrop-blur-md pl-16">
-                <div className="flex bg-background/50 p-1 rounded-xl border border-white/10 w-full max-w-5xl mx-auto">
+                <div className="neu-selector-container flex p-1.5 rounded-2xl w-full max-w-5xl mx-auto overflow-x-auto custom-scrollbar-hide">
                     {tabs.map((tab) => {
                         const Icon = tab.icon;
                         const isActive = location.pathname.includes(tab.path);
@@ -29,11 +29,12 @@ const ActivitiesLayout = () => {
                             <NavLink
                                 key={tab.id}
                                 to={tab.path}
-                                className={({ isActive }) => clsx(
-                                    "flex-1 flex items-center justify-center gap-2 px-6 py-2 rounded-lg text-sm font-bold transition-all duration-300",
+                                data-active={isActive}
+                                className={clsx(
+                                    "flex-1 flex items-center justify-center gap-2 px-6 py-3 rounded-xl text-xs font-black uppercase tracking-[0.12em] transition-all duration-300 min-w-fit",
                                     isActive
-                                        ? "bg-primary text-text-dark shadow-lg shadow-primary/20 scale-100"
-                                        : "text-grey-medium hover:text-white hover:bg-white/5"
+                                        ? "bg-primary text-text-dark"
+                                        : "text-grey-medium hover:text-white"
                                 )}
                             >
                                 <Icon size={16} />

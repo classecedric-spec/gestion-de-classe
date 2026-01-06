@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import { supabase } from '../lib/supabaseClient';
+import { fetchStudentPdfData } from '../lib/pdfUtils';
 import { calculateAge } from '../lib/utils';
 import { Search, User as UserIcon, Calendar, GraduationCap, ShieldCheck, Loader2, ChevronRight, ChevronDown, Filter, Plus, X, BookOpen, Layers, Trash2, Edit, Users, CheckCircle2, Clock, AlertCircle, LayoutList, GitGraph, FileText, Activity, GitBranch, Camera } from 'lucide-react';
 import { resizeAndConvertToBase64 } from '../lib/imageUtils';
@@ -10,14 +11,17 @@ import { pdf } from '@react-pdf/renderer';
 
 import StudentTrackingPDFModern from '../components/StudentTrackingPDFModern';
 import { saveAs } from 'file-saver';
+import { useOfflineSync } from '../context/OfflineSyncContext';
 
 const Students = () => {
     const location = useLocation();
+    const { isOnline, addToQueue } = useOfflineSync();
     const [students, setStudents] = useState([]);
     const [selectedStudent, setSelectedStudent] = useState(null);
     const [loading, setLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState('');
     const [filterClass, setFilterClass] = useState('all');
+    const [filterGroup, setFilterGroup] = useState('all');
 
     const [showModal, setShowModal] = useState(false);
     const [isEditing, setIsEditing] = useState(false);
@@ -156,6 +160,18 @@ const Students = () => {
         setSelectedStudent(updated);
         setStudents(prev => prev.map(s => s.id === updated.id ? updated : s));
 
+        if (!isOnline) {
+            addToQueue({
+                type: 'SUPABASE_CALL',
+                table: 'Eleve',
+                method: 'update',
+                payload: { importance_suivi: val },
+                match: { id: updated.id },
+                contextDescription: `Maj importance ${updated.prenom}`
+            });
+            return;
+        }
+
         const { error } = await supabase
             .from('Eleve')
             .update({ importance_suivi: val })
@@ -209,6 +225,23 @@ const Students = () => {
     const saveUserPreferences = async (newIndices) => {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) return;
+
+        if (!isOnline) {
+            addToQueue({
+                type: 'SUPABASE_CALL',
+                table: 'UserPreference',
+                method: 'upsert',
+                payload: {
+                    user_id: user.id,
+                    key: 'eleve_profil_competences',
+                    value: newIndices,
+                    updated_at: new Date().toISOString()
+                },
+                match: { user_id: user.id, key: 'eleve_profil_competences' },
+                contextDescription: "Sauvegarde préférences profils"
+            });
+            return;
+        }
 
         await supabase.from('UserPreference').upsert({
             user_id: user.id,
@@ -383,7 +416,8 @@ const Students = () => {
     const filteredStudents = students.filter(s =>
         (s.nom.toLowerCase().includes(searchQuery.toLowerCase()) ||
             s.prenom.toLowerCase().includes(searchQuery.toLowerCase())) &&
-        (filterClass === 'all' || s.Classe?.nom === filterClass)
+        (filterClass === 'all' || s.Classe?.nom === filterClass) &&
+        (filterGroup === 'all' || s.EleveGroupe?.some(eg => eg.Groupe?.nom === filterGroup))
     );
 
     const generatePDF = async (Component, filenameSuffix) => {
@@ -393,96 +427,22 @@ const Students = () => {
         }
 
         try {
-            // 1. Fetch ALL active curriculum (modules en_cours)
-            // This ensures we get things that fall in the "To Do" even if not started yet.
-            const { data: allModules, error: modError } = await supabase
-                .from('Module')
-                .select(`
-                    id,
-                    nom,
-                    date_fin,
-                    SousBranche (
-                        id,
-                        ordre,
-                        Branche ( id, ordre )
-                    ),
-                    Activite (
-                        id,
-                        titre,
-                        ordre
-                    )
-                `)
-                .eq('statut', 'en_cours');
+            // Use the shared function for data fetching (same as group PDF)
+            const pdfResult = await fetchStudentPdfData(selectedStudent.id, selectedStudent.niveau_id);
 
-            if (modError) throw modError;
-
-            // 2. Identification of completed activities
-            const completedActivityIds = new Set(
-                studentProgress
-                    .filter(p => p.etat === 'termine')
-                    .map(p => p.Activite?.id)
-                    .filter(Boolean)
-            );
-
-            // 3. Filter and Format Modules
-            const todoModuleList = [];
-
-            allModules.forEach(mod => {
-                // Filter activities: keep those NOT completed
-                const pendingActivities = (mod.Activite || []).filter(act => !completedActivityIds.has(act.id));
-
-                if (pendingActivities.length > 0) {
-                    todoModuleList.push({
-                        title: mod.nom,
-                        dueDate: mod.date_fin,
-                        // Store keys for sorting
-                        branchOrder: mod.SousBranche?.Branche?.ordre || 0,
-                        sbOrder: mod.SousBranche?.ordre || 0,
-                        activities: pendingActivities.map(act => ({
-                            name: act.titre,
-                            order: act.ordre || 0,
-                            material: "", // Placeholder
-                            level: "" // Placeholder
-                        }))
-                    });
-                }
-            });
-
-            // 4. Sort Modules
-            const sortedModules = todoModuleList.sort((a, b) => {
-                // 1. Date Fin
-                if (a.dueDate && b.dueDate) {
-                    if (a.dueDate !== b.dueDate) return new Date(a.dueDate) - new Date(b.dueDate);
-                } else if (a.dueDate) return -1;
-                else if (b.dueDate) return 1;
-
-                // 2. Branch
-                if (a.branchOrder !== b.branchOrder) return a.branchOrder - b.branchOrder;
-
-                // 3. SubBranch
-                if (a.sbOrder !== b.sbOrder) return a.sbOrder - b.sbOrder;
-
-                // 4. Alphabetical
-                return a.title.localeCompare(b.title);
-            });
-
-            // 5. Sort Activities within Module
-            sortedModules.forEach(m => {
-                m.activities.sort((a, b) => a.order - b.order);
-            });
-
-            if (sortedModules.length === 0) {
-                alert("Aucune activité à faire retrouvée.");
+            if (!pdfResult || pdfResult.modules.length === 0) {
+                alert("Aucune activité à faire trouvée.");
                 return;
             }
-            // 6. Prepare Data
+
+            // Prepare Data for PDF
             const pdfData = {
                 studentName: `${selectedStudent.prenom} ${selectedStudent.nom}`,
                 printDate: new Date().toLocaleDateString('fr-FR'),
-                modules: sortedModules
+                modules: pdfResult.modules
             };
 
-            // 5. Generate and Save
+            // 7. Generate and Save PDF
             const blob = await pdf(<Component data={pdfData} />).toBlob();
             const fileName = `ToDoList_${filenameSuffix}_${selectedStudent.prenom}_${selectedStudent.nom}.pdf`;
 
@@ -543,18 +503,41 @@ const Students = () => {
                         />
                     </div>
 
-                    <div className="flex items-center gap-2 text-xs">
-                        <Filter size={14} className="text-grey-medium" />
-                        <select
-                            value={filterClass}
-                            onChange={(e) => setFilterClass(e.target.value)}
-                            className="bg-transparent text-grey-light outline-none cursor-pointer hover:text-primary transition-colors"
-                        >
-                            <option value="all">Toutes les classes</option>
-                            {Array.from(new Set(students.map(s => s.Classe?.nom).filter(Boolean))).map(c => (
-                                <option key={c} value={c}>{c}</option>
-                            ))}
-                        </select>
+                    {/* Filters Row */}
+                    <div className="flex gap-2">
+                        {/* Group Filter */}
+                        <div className="relative group neu-selector-container rounded-xl flex-1">
+                            <select
+                                value={filterGroup}
+                                onChange={(e) => setFilterGroup(e.target.value)}
+                                className="w-full bg-transparent border-none py-2 pl-3 pr-6 text-[10px] font-bold text-white uppercase tracking-wider focus:ring-0 outline-none appearance-none cursor-pointer truncate"
+                            >
+                                <option value="all" className="bg-background text-grey-medium">Groupes: Tts</option>
+                                {Array.from(new Set(students.flatMap(s => s.EleveGroupe?.map(eg => eg.Groupe?.nom)).filter(Boolean))).sort().map(g => (
+                                    <option key={g} value={g} className="bg-background text-text-main">{g}</option>
+                                ))}
+                            </select>
+                            <div className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none text-grey-medium group-hover:text-primary transition-colors">
+                                <Users size={12} />
+                            </div>
+                        </div>
+
+                        {/* Class Filter */}
+                        <div className="relative group neu-selector-container rounded-xl flex-1">
+                            <select
+                                value={filterClass}
+                                onChange={(e) => setFilterClass(e.target.value)}
+                                className="w-full bg-transparent border-none py-2 pl-3 pr-6 text-[10px] font-bold text-white uppercase tracking-wider focus:ring-0 outline-none appearance-none cursor-pointer truncate"
+                            >
+                                <option value="all" className="bg-background text-grey-medium">Classes: Tts</option>
+                                {Array.from(new Set(students.map(s => s.Classe?.nom).filter(Boolean))).map(c => (
+                                    <option key={c} value={c} className="bg-background text-text-main">{c}</option>
+                                ))}
+                            </select>
+                            <div className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none text-grey-medium group-hover:text-primary transition-colors">
+                                <Filter size={12} />
+                            </div>
+                        </div>
                     </div>
                 </div>
 
@@ -751,35 +734,40 @@ const Students = () => {
                                 </div>
                             </div>
 
-                            {/* TABS */}
-                            <div className="flex gap-1 w-full border-b border-white/5">
-                                <button
-                                    onClick={() => setCurrentTab('infos')}
-                                    className={clsx(
-                                        "px-6 py-3 text-sm font-bold uppercase tracking-wider border-b-2 transition-all",
-                                        currentTab === 'infos' ? "border-primary text-primary" : "border-transparent text-grey-medium hover:text-white"
-                                    )}
-                                >
-                                    Informations
-                                </button>
-                                <button
-                                    onClick={() => setCurrentTab('suivi')}
-                                    className={clsx(
-                                        "px-6 py-3 text-sm font-bold uppercase tracking-wider border-b-2 transition-all",
-                                        currentTab === 'suivi' ? "border-primary text-primary" : "border-transparent text-grey-medium hover:text-white"
-                                    )}
-                                >
-                                    Suivi Pédagogique
-                                </button>
-                                <button
-                                    onClick={() => setCurrentTab('todo')}
-                                    className={clsx(
-                                        "px-6 py-3 text-sm font-bold uppercase tracking-wider border-b-2 transition-all",
-                                        currentTab === 'todo' ? "border-primary text-primary" : "border-transparent text-grey-medium hover:text-white"
-                                    )}
-                                >
-                                    To-Do List
-                                </button>
+                            {/* TABS - Modern Capsule Style */}
+                            <div className="flex justify-center w-full px-8 mb-4 mt-2">
+                                <div className="neu-selector-container flex p-1.5 rounded-2xl w-full max-w-2xl">
+                                    <button
+                                        onClick={() => setCurrentTab('infos')}
+                                        data-active={currentTab === 'infos'}
+                                        className={clsx(
+                                            "flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-xs font-black uppercase tracking-[0.12em] transition-all duration-300",
+                                            currentTab === 'infos' ? "bg-primary text-text-dark" : "text-grey-medium hover:text-white"
+                                        )}
+                                    >
+                                        Informations
+                                    </button>
+                                    <button
+                                        onClick={() => setCurrentTab('suivi')}
+                                        data-active={currentTab === 'suivi'}
+                                        className={clsx(
+                                            "flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-xs font-black uppercase tracking-[0.12em] transition-all duration-300",
+                                            currentTab === 'suivi' ? "bg-primary text-text-dark" : "text-grey-medium hover:text-white"
+                                        )}
+                                    >
+                                        Suivi Pédagogique
+                                    </button>
+                                    <button
+                                        onClick={() => setCurrentTab('todo')}
+                                        data-active={currentTab === 'todo'}
+                                        className={clsx(
+                                            "flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-xs font-black uppercase tracking-[0.12em] transition-all duration-300",
+                                            currentTab === 'todo' ? "bg-primary text-text-dark" : "text-grey-medium hover:text-white"
+                                        )}
+                                    >
+                                        To-Do List
+                                    </button>
+                                </div>
                             </div>
                         </div>
 
@@ -903,13 +891,14 @@ const Students = () => {
                             {currentTab === 'suivi' && (
                                 <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
                                     {/* Sub-Tabs Toggle */}
-                                    <div className="flex w-full">
-                                        <div className="w-full bg-surface/50 p-1 rounded-xl border border-white/10 flex gap-1">
+                                    <div className="flex w-full justify-center">
+                                        <div className="neu-selector-container flex p-1.5 rounded-2xl w-full max-w-md">
                                             <button
                                                 onClick={() => setSuiviMode('journal')}
+                                                data-active={suiviMode === 'journal'}
                                                 className={clsx(
-                                                    "flex-1 px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2 transition-all",
-                                                    suiviMode === 'journal' ? "bg-primary text-text-dark shadow-lg" : "text-grey-medium hover:text-white hover:bg-white/5"
+                                                    "flex-1 py-3 rounded-xl text-[10px] font-black uppercase tracking-[0.15em] flex items-center justify-center gap-2 transition-all duration-300",
+                                                    suiviMode === 'journal' ? "bg-primary text-text-dark" : "text-grey-medium hover:text-white hover:bg-white/5"
                                                 )}
                                             >
                                                 <LayoutList size={14} />
@@ -917,9 +906,10 @@ const Students = () => {
                                             </button>
                                             <button
                                                 onClick={() => setSuiviMode('progression')}
+                                                data-active={suiviMode === 'progression'}
                                                 className={clsx(
-                                                    "flex-1 px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2 transition-all",
-                                                    suiviMode === 'progression' ? "bg-primary text-text-dark shadow-lg" : "text-grey-medium hover:text-white hover:bg-white/5"
+                                                    "flex-1 py-3 rounded-xl text-[10px] font-black uppercase tracking-[0.15em] flex items-center justify-center gap-2 transition-all duration-300",
+                                                    suiviMode === 'progression' ? "bg-primary text-text-dark" : "text-grey-medium hover:text-white hover:bg-white/5"
                                                 )}
                                             >
                                                 <GitGraph size={14} />

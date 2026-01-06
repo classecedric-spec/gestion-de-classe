@@ -300,7 +300,7 @@ const Materiels = () => {
                         <div className="flex-1 overflow-y-auto p-8 custom-scrollbar bg-background/20 space-y-8">
 
                             {/* Information Section */}
-                            <section>
+                            <div>
                                 <h3 className="text-lg font-bold text-text-main mb-6 flex items-center gap-3 border-b border-white/5 pb-2 uppercase tracking-wide">
                                     <Package className="text-primary" size={24} />
                                     Informations
@@ -317,10 +317,10 @@ const Materiels = () => {
                                         </div>
                                     )}
                                 </div>
-                            </section>
+                            </div>
 
                             {/* Activities Section */}
-                            <section>
+                            <div>
                                 <h3 className="text-lg font-bold text-text-main mb-6 flex items-center gap-3 border-b border-white/5 pb-2 uppercase tracking-wide">
                                     <Sparkles className="text-accent" size={24} />
                                     Activités liées
@@ -378,7 +378,7 @@ const Materiels = () => {
                                         ))
                                     )}
                                 </div>
-                            </section>
+                            </div>
                         </div>
                     </div>
                 ) : (

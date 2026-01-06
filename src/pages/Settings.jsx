@@ -3,7 +3,7 @@ import { useOutletContext, useLocation, useNavigate } from 'react-router-dom';
 import {
     User, Mail, School, Camera, Save, Loader2,
     Moon, Sun, Monitor, Palette, AlertTriangle, Trash2, Database, Sparkles, Settings as SettingsIcon,
-    Key
+    Key, Feather, Smartphone, Cpu
 } from 'lucide-react';
 import { supabase } from '../lib/supabaseClient';
 import { resizeAndConvertToBase64 } from '../lib/imageUtils';
@@ -15,7 +15,7 @@ const Settings = () => {
     const location = useLocation();
     const navigate = useNavigate();
     const queryParams = new URLSearchParams(location.search);
-    const initialTab = queryParams.get('tab') || 'profil';
+    const initialTab = queryParams.get('tab') || 'systeme';
 
     const [activeTab, setActiveTab] = useState(initialTab);
     const { theme, setTheme } = useTheme();
@@ -139,6 +139,41 @@ const Settings = () => {
     };
 
     // --- SYSTEM LOGIC (Copied from Settings.jsx) ---
+    const handleCheckAndFixProgressions = async () => {
+        const toastId = toast.loading("Vérification des progressions...");
+        try {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) throw new Error("Utilisateur non trouvé");
+
+            // 1. Fetch null/invalid progressions
+            const { data: invalidProgs, error } = await supabase
+                .from('Progression')
+                .select('id, etat')
+                .or('etat.is.null,etat.eq.""');
+
+            if (error) throw error;
+
+            if (!invalidProgs || invalidProgs.length === 0) {
+                toast.success("Aucune progression invalide trouvée.", { id: toastId });
+                return;
+            }
+
+            // 2. Fix them
+            const { error: updateError } = await supabase
+                .from('Progression')
+                .update({ etat: 'a_commencer' })
+                .in('id', invalidProgs.map(p => p.id));
+
+            if (updateError) throw updateError;
+
+            toast.success(`${invalidProgs.length} progression(s) corrigée(s) !`, { id: toastId });
+
+        } catch (err) {
+            console.error(err);
+            toast.error("Erreur lors de la vérification.", { id: toastId });
+        }
+    };
+
     const handleGenerateDemoData = async () => {
         setIsGenerating(true);
         const toastId = toast.loading("Génération des données de test...");
@@ -367,24 +402,24 @@ const Settings = () => {
 
                 {/* TAB SELECTORS (CENTER) */}
                 <div className="flex-1 flex justify-center">
-                    <div className="flex bg-background/50 p-1 rounded-xl border border-white/10 shadow-inner">
-                        <button
-                            onClick={() => handleTabChange('profil')}
-                            className={clsx(
-                                "px-8 py-2 rounded-lg text-sm font-bold transition-all flex items-center gap-2",
-                                activeTab === 'profil' ? "bg-primary text-text-dark shadow-lg shadow-primary/20 scale-100" : "text-grey-medium hover:text-white hover:bg-white/5"
-                            )}
-                        >
-                            <User size={16} /> Profil
-                        </button>
+                    <div className="flex bg-background/50 p-1 rounded-xl border border-white/10 shadow-none">
                         <button
                             onClick={() => handleTabChange('systeme')}
                             className={clsx(
-                                "px-8 py-2 rounded-lg text-sm font-bold transition-all flex items-center gap-2",
-                                activeTab === 'systeme' ? "bg-primary text-text-dark shadow-lg shadow-primary/20 scale-100" : "text-grey-medium hover:text-white hover:bg-white/5"
+                                "px-8 py-2 rounded-lg text-sm font-bold transition-all duration-300 shadow-none border-0 flex items-center gap-2",
+                                activeTab === 'systeme' ? "bg-primary text-text-dark shadow-none" : "text-grey-medium hover:text-white hover:bg-white/5"
                             )}
                         >
                             <SettingsIcon size={16} /> Système
+                        </button>
+                        <button
+                            onClick={() => handleTabChange('profil')}
+                            className={clsx(
+                                "px-8 py-2 rounded-lg text-sm font-bold transition-all duration-300 shadow-none border-0 flex items-center gap-2",
+                                activeTab === 'profil' ? "bg-primary text-text-dark shadow-none" : "text-grey-medium hover:text-white hover:bg-white/5"
+                            )}
+                        >
+                            <User size={16} /> Profil
                         </button>
                     </div>
                 </div>
@@ -514,7 +549,7 @@ const Settings = () => {
                         {activeTab === 'systeme' && (
                             <div className="space-y-8 animate-in fade-in slide-in-from-right-4 duration-300">
                                 {/* Apparence */}
-                                <section className="bg-surface/30 backdrop-blur-md border border-white/5 rounded-2xl p-6 shadow-xl">
+                                <div className="bg-surface/30 backdrop-blur-md border border-white/5 rounded-2xl p-6 shadow-xl">
                                     <h2 className="text-lg font-bold text-text-main mb-6 flex items-center gap-2">
                                         <Palette size={20} className="text-primary" /> Apparence
                                     </h2>
@@ -523,6 +558,11 @@ const Settings = () => {
                                             { id: 'default', label: 'Défaut', icon: Palette },
                                             { id: 'light', label: 'Clair', icon: Sun },
                                             { id: 'dark', label: 'Sombre', icon: Moon },
+                                            { id: 'soft', label: 'Soft UI', icon: Feather },
+                                            { id: 'ios', label: 'iOS 18', icon: Smartphone },
+                                            { id: 'ios-26', label: 'Futur (iOS 26)', icon: Cpu },
+                                            { id: 'neumo-2', label: 'Neumorphisme', icon: Sparkles },
+                                            { id: 'glass', label: 'Vision', icon: Sparkles },
                                             { id: 'system', label: 'Système', icon: Monitor },
                                         ].map(t => {
                                             const Icon = t.icon;
@@ -541,31 +581,49 @@ const Settings = () => {
                                             );
                                         })}
                                     </div>
-                                </section>
+                                </div>
 
-                                {/* Données Demo */}
-                                <section className="bg-surface/30 backdrop-blur-md border border-white/5 rounded-2xl p-6 shadow-xl">
+                                <div className="bg-surface/30 backdrop-blur-md border border-white/5 rounded-2xl p-6 shadow-xl">
                                     <h2 className="text-lg font-bold text-text-main mb-6 flex items-center gap-2">
                                         <Database size={20} className="text-primary" /> Environnement
                                     </h2>
-                                    <div className="p-6 bg-primary/5 rounded-xl border border-primary/10 flex flex-col md:flex-row items-center justify-between gap-6">
-                                        <div className="flex-1">
-                                            <h3 className="text-sm font-bold text-white mb-1 uppercase tracking-tight">Générer des données de test</h3>
-                                            <p className="text-xs text-grey-medium">Créez une classe fictive avec des élèves et des activités pour tester l'application.</p>
+
+                                    <div className="space-y-4">
+                                        {/* Generation */}
+                                        <div className="p-6 bg-primary/5 rounded-xl border border-primary/10 flex flex-col md:flex-row items-center justify-between gap-6">
+                                            <div className="flex-1">
+                                                <h3 className="text-sm font-bold text-white mb-1 uppercase tracking-tight">Générer des données de test</h3>
+                                                <p className="text-xs text-grey-medium">Créez une classe fictive avec des élèves et des activités pour tester l'application.</p>
+                                            </div>
+                                            <button
+                                                onClick={handleGenerateDemoData}
+                                                disabled={isGenerating}
+                                                className="w-full md:w-auto px-6 py-3 bg-primary text-text-dark font-black text-[10px] uppercase tracking-widest rounded-xl hover:bg-primary/90 transition-all flex items-center justify-center gap-2 shadow-lg disabled:opacity-50"
+                                            >
+                                                {isGenerating ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} />}
+                                                Générer
+                                            </button>
                                         </div>
-                                        <button
-                                            onClick={handleGenerateDemoData}
-                                            disabled={isGenerating}
-                                            className="w-full md:w-auto px-6 py-3 bg-primary text-text-dark font-black text-[10px] uppercase tracking-widest rounded-xl hover:bg-primary/90 transition-all flex items-center justify-center gap-2 shadow-lg disabled:opacity-50"
-                                        >
-                                            {isGenerating ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} />}
-                                            Générer
-                                        </button>
+
+                                        {/* Repair */}
+                                        <div className="p-6 bg-white/5 rounded-xl border border-white/5 flex flex-col md:flex-row items-center justify-between gap-6">
+                                            <div className="flex-1">
+                                                <h3 className="text-sm font-bold text-white mb-1 uppercase tracking-tight">Maintenance des Données</h3>
+                                                <p className="text-xs text-grey-medium">Corrige les états de progression invalides ou manquants.</p>
+                                            </div>
+                                            <button
+                                                onClick={handleCheckAndFixProgressions}
+                                                className="w-full md:w-auto px-6 py-3 bg-white/10 hover:bg-white/20 text-white font-black text-[10px] uppercase tracking-widest rounded-xl transition-all flex items-center justify-center gap-2 shadow-lg"
+                                            >
+                                                <SettingsIcon size={16} />
+                                                Réparer
+                                            </button>
+                                        </div>
                                     </div>
-                                </section>
+                                </div>
 
                                 {/* Danger Zone */}
-                                <section className="bg-danger/5 backdrop-blur-md border border-danger/10 rounded-2xl p-6 shadow-xl">
+                                <div className="bg-danger/5 backdrop-blur-md border border-danger/10 rounded-2xl p-6 shadow-xl">
                                     <h2 className="text-lg font-bold text-danger mb-6 flex items-center gap-2">
                                         <AlertTriangle size={20} /> Zone de Danger
                                     </h2>
@@ -581,7 +639,7 @@ const Settings = () => {
                                             <Trash2 size={16} /> Réinitialiser
                                         </button>
                                     </div>
-                                </section>
+                                </div>
                             </div>
                         )}
                     </div>

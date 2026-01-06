@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabaseClient';
+import { fetchStudentPdfData } from '../lib/pdfUtils';
 import { User, Users, GraduationCap, LayoutList, FileText, CheckSquare, ChevronDown, Clock, Search, Loader2 } from 'lucide-react';
 import { pdf } from '@react-pdf/renderer';
 import { saveAs } from 'file-saver';
@@ -104,8 +105,7 @@ const Home = () => {
         try {
             if (abortRef.current) throw new Error('ABORTED');
 
-            // 2. Fetch data needed for PDF generation
-            // Fetch students in group
+            // 2. Fetch students in group
             const { data: links } = await supabase
                 .from('EleveGroupe')
                 .select('eleve_id')
@@ -118,55 +118,50 @@ const Home = () => {
                 return;
             }
 
+            // Fetch students with their level info
             const { data: studentsInGroup } = await supabase
                 .from('Eleve')
-                .select('*, Classe(nom)')
-                .in('id', studentIds)
-                .order('nom');
+                .select('id, prenom, nom, niveau_id, Niveau(nom, ordre)')
+                .in('id', studentIds);
 
-            // Fetch modules
-            const { data: modulesData } = await supabase
-                .from('Module')
-                .select(`
-                    id, nom, date_fin,
-                    Activite ( id, titre )
-                `)
-                .order('date_fin', { ascending: true });
+            // Sort students: Niveau (ordre) -> Prénom -> Nom
+            studentsInGroup.sort((a, b) => {
+                const levelA = a.Niveau?.ordre || 999;
+                const levelB = b.Niveau?.ordre || 999;
+                if (levelA !== levelB) return levelA - levelB;
 
-            // Fetch progressions
-            const { data: progressions } = await supabase
-                .from('Progression')
-                .select('*')
-                .in('eleve_id', studentIds);
+                const prenomCompare = (a.prenom || '').localeCompare(b.prenom || '');
+                if (prenomCompare !== 0) return prenomCompare;
 
-            // 3. Build bulk data
-            const bulkData = studentsInGroup.map(student => {
-                const studentProgress = progressions?.filter(p => p.eleve_id === student.id) || [];
+                return (a.nom || '').localeCompare(b.nom || '');
+            });
 
-                const activeModules = modulesData?.map(module => {
-                    if (!module.date_fin) return null;
-                    const relevantActivities = (module.Activite || []).filter(act => {
-                        const prog = studentProgress.find(p => p.activite_id === act.id);
-                        return prog && prog.statut !== 'valide';
+            setProgress(10);
+            setProgressText('Génération des données par élève...');
+
+            // 3. Fetch PDF data for each student using shared function (SAME as individual PDF)
+            const bulkData = [];
+            let studentIndex = 0;
+
+            for (const student of studentsInGroup) {
+                if (abortRef.current) throw new Error('ABORTED');
+
+                studentIndex++;
+                const percentage = 10 + Math.round((studentIndex / studentsInGroup.length) * 30);
+                setProgress(percentage);
+                setProgressText(`Récupération: ${student.prenom} ${student.nom}...`);
+
+                // Use the SAME function as individual PDF generation
+                const pdfData = await fetchStudentPdfData(student.id, student.niveau_id);
+
+                if (pdfData && pdfData.modules.length > 0) {
+                    bulkData.push({
+                        studentName: `${student.prenom} ${student.nom}`,
+                        modules: pdfData.modules,
+                        printDate: new Date().toLocaleDateString('fr-FR')
                     });
-
-                    if (relevantActivities.length === 0) return null;
-
-                    return {
-                        title: module.nom,
-                        dueDate: module.date_fin,
-                        activities: relevantActivities.map(a => ({ name: a.titre }))
-                    };
-                }).filter(Boolean) || [];
-
-                if (activeModules.length === 0) return null;
-
-                return {
-                    studentName: `${student.prenom} ${student.nom}`,
-                    modules: activeModules,
-                    printDate: new Date().toLocaleDateString('fr-FR')
-                };
-            }).filter(Boolean);
+                }
+            }
 
             if (bulkData.length === 0) {
                 alert("Aucun travail à faire trouvé pour ce groupe.");
@@ -374,7 +369,7 @@ const Home = () => {
             {/* Students Grid Section */}
             <div className="space-y-8">
                 {sortedLevels.map(([levelName, { students }]) => (
-                    <section key={levelName} className="space-y-4">
+                    <div key={levelName} className="space-y-4">
                         <div className="flex items-center gap-3 px-2">
                             <span className="px-3 py-1 rounded-full bg-white/5 text-xs font-bold text-text-secondary border border-white/5">
                                 {levelName}
@@ -417,7 +412,7 @@ const Home = () => {
                                 </div>
                             ))}
                         </div>
-                    </section>
+                    </div>
                 ))}
 
                 {sortedLevels.length === 0 && (

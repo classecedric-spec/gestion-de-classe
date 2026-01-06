@@ -12,144 +12,68 @@ export const checkOverdueActivities = async (userId) => {
         const d = new Date();
         const todayStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
-        // 1. Get all modules for this user
-        const { data: allModules, error: modAllErr } = await supabase
-            .from('Module')
-            .select('id, nom, date_fin, user_id, statut')
-            .eq('user_id', userId);
+        // 0. Safety Check: Backfill missing due dates
+        await fixMissingDueDates(userId);
 
-        if (modAllErr) {
-            console.error('[Overdue Check] Error fetching modules:', modAllErr);
-            return;
-        }
+        // Simplified Logic: 
+        // 1. Find all progressions that are 'a_commencer' AND have a date_limite <= today
+        // 2. Update them to 'a_domicile'
 
+        // We don't join Module anymore, relying on data redundancy (date_limite on Progression)
+        // This makes it performant and customisable.
 
-
-        const overdueModules = (allModules || []).filter(m =>
-            m.statut === 'en_cours' && m.date_fin && m.date_fin <= todayStr
-        );
-
-        if (overdueModules.length === 0) {
-            return;
-        }
-
-
-
-        const moduleIds = overdueModules.map(m => m.id);
-
-        const { data: activities, error: actError } = await supabase
-            .from('Activite')
-            .select('id, titre, ActiviteNiveau(niveau_id)')
-            .in('module_id', moduleIds);
-
-        if (actError) {
-            console.error('[Overdue Check] Error fetching activities:', actError);
-            return;
-        }
-
-        if (!activities || activities.length === 0) {
-            return;
-        }
-
-
-        const activityIds = activities.map(a => a.id);
-
-        // 3. Get all students belonging to the user
-        const { data: students, error: stuError } = await supabase
-            .from('Eleve')
-            .select('id, prenom, nom, niveau_id')
-            .eq('titulaire_id', userId);
-
-        if (stuError) {
-            console.error('[Overdue Check] Error fetching students:', stuError);
-            return;
-        }
-
-        if (!students || students.length === 0) {
-            return;
-        }
-
-
-        const studentIds = students.map(s => s.id);
-
-        // 4. Get all existing progressions for these students/activities
-        const { data: existingProgressions, error: progError } = await supabase
+        const { error: updateError } = await supabase
             .from('Progression')
-            .select('id, eleve_id, activite_id, etat')
-            .in('eleve_id', studentIds)
-            .in('activite_id', activityIds);
+            .update({ etat: 'a_domicile' })
+            .eq('etat', 'a_commencer') // Only target 'To Start'
+            .lte('date_limite', todayStr); // Where Due Date is passed or today
 
-        if (progError) {
-            console.error('[Overdue Check] Error fetching progressions:', progError);
-            return;
-        }
-
-
-
-        // 5. Update existing progressions to 'a_domicile' if they are NOT 'termine' and NOT already 'a_domicile'
-        const progressionsToUpdate = (existingProgressions || []).filter(p =>
-            p.etat !== 'termine' && p.etat !== 'a_domicile'
-        );
-
-        if (progressionsToUpdate.length > 0) {
-            const idsToUpdate = progressionsToUpdate.map(p => p.id);
-            const { error: updateError } = await supabase
-                .from('Progression')
-                .update({ etat: 'a_domicile' })
-                .in('id', idsToUpdate);
-
-            if (updateError) {
-                if (updateError.code === '23514') {
-                    console.error('[Overdue Check] DB CONSTRAINT ERROR: La valeur "a_domicile" n\'est pas autorisée dans la base de données. Veuillez mettre à jour la contrainte Progression_etat_check.');
-                } else {
-                    console.error('[Overdue Check] Error updating progressions:', updateError);
-                }
+        if (updateError) {
+            if (updateError.code === '23514') {
+                console.error('[Overdue Check] DB CONSTRAINT ERROR: "a_domicile" state missing in check constraint.');
             } else {
-                // Success updating
+                console.error('[Overdue Check] Error updating overdue progressions:', updateError);
             }
+        } else {
+            // Success (Supabase doesn't return count by default on update without select, 
+            // but we don't strictly need it for this background task)
         }
 
-        // 6. Create missing progressions as 'a_domicile'
-        const existingPairs = new Set(
-            (existingProgressions || []).map(p => `${p.eleve_id}-${p.activite_id}`)
-        );
-
-        const missingProgs = [];
-        for (const student of students) {
-            for (const activity of activities) {
-                // Strict Level Check
-                const allowedLevels = activity.ActiviteNiveau?.map(an => an.niveau_id) || [];
-                // If activity has no levels -> It's hidden/strict -> No homework
-                // If student has no level -> Can't verify -> No homework
-                // If student's level is not in allowed -> No homework
-                if (!student.niveau_id || allowedLevels.length === 0 || !allowedLevels.includes(student.niveau_id)) {
-                    continue;
-                }
-
-                const key = `${student.id}-${activity.id}`;
-                if (!existingPairs.has(key)) {
-                    missingProgs.push({
-                        eleve_id: student.id,
-                        activite_id: activity.id,
-                        etat: 'a_domicile',
-                        user_id: userId,
-                        is_suivi: false
-                    });
-                }
-            }
-        }
-
-        if (missingProgs.length > 0) {
-            const { error: insertError } = await supabase.from('Progression').upsert(missingProgs, { onConflict: 'eleve_id, activite_id', ignoreDuplicates: true });
-            if (insertError) {
-                if (insertError.code === '23514') {
-                    console.error('[Overdue Check] DB CONSTRAINT ERROR: La valeur "a_domicile" n\'est pas autorisée dans la base de données. Veuillez mettre à jour la contrainte Progression_etat_check.');
-                } else {
-                    console.error('[Overdue Check] Error inserting progressions:', insertError);
-                }
-            }
-        }
     } catch (err) {
         console.error('[Overdue Check] Unexpected error:', err);
+    }
+};
+
+/**
+ * Backfill missing 'date_limite' for existing progressions.
+ * It looks for progressions with NULL date_limite and updates them
+ * with the 'date_fin' of their corresponding module.
+ */
+const fixMissingDueDates = async (userId) => {
+    try {
+        // 1. Fetch all Modules that have a date_fin
+        const { data: modules, error: modError } = await supabase
+            .from('Module')
+            .select('id, date_fin, Activite(id)')
+            .eq('user_id', userId)
+            .not('date_fin', 'is', null);
+
+        if (modError || !modules) return;
+
+        // 2. Iterate and Update
+        for (const module of modules) {
+            const activityIds = module.Activite?.map(a => a.id) || [];
+            if (activityIds.length === 0) continue;
+
+            const { error: updateError } = await supabase
+                .from('Progression')
+                .update({ date_limite: module.date_fin })
+                .in('activite_id', activityIds)
+                .is('date_limite', null);
+
+            if (updateError) console.error('Error backfilling dates for module:', module.id, updateError);
+        }
+    } catch (err) {
+        console.error('Error in fixMissingDueDates:', err);
     }
 };

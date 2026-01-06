@@ -1,8 +1,25 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabaseClient';
-import { Layers, Plus, X, Loader2, Trash2, BookOpen, Search, ChevronRight, GraduationCap, Edit, Camera, LayoutList, FileText } from 'lucide-react';
+import { Layers, Plus, X, Loader2, Trash2, BookOpen, Search, ChevronRight, GraduationCap, Edit, Camera, LayoutList, FileText, GripVertical } from 'lucide-react';
 import clsx from 'clsx';
+import {
+    DndContext,
+    closestCenter,
+    KeyboardSensor,
+    PointerSensor,
+    useSensor,
+    useSensors,
+} from '@dnd-kit/core';
+import {
+    arrayMove,
+    SortableContext,
+    sortableKeyboardCoordinates,
+    verticalListSortingStrategy,
+    useSortable,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
+
 import StudentModal from '../components/StudentModal';
 import AddStudentToGroupModal from '../components/AddStudentToGroupModal';
 import AddGroupModal from '../components/AddGroupModal';
@@ -10,6 +27,103 @@ import { pdf } from '@react-pdf/renderer';
 import { saveAs } from 'file-saver';
 import { PDFDocument, rgb } from 'pdf-lib';
 import StudentTrackingPDFModern from '../components/StudentTrackingPDFModern';
+
+// --- SORTABLE ITEM COMPONENT ---
+function SortableGroupItem({ group, selectedGroup, onClick, onEdit, onDelete }) {
+    const {
+        attributes,
+        listeners,
+        setNodeRef,
+        transform,
+        transition,
+        isDragging,
+    } = useSortable({ id: group.id });
+
+    const style = {
+        transform: CSS.Transform.toString(transform),
+        transition,
+        zIndex: isDragging ? 50 : 'auto',
+        position: 'relative',
+    };
+
+    return (
+        <div
+            ref={setNodeRef}
+            style={style}
+            onClick={() => onClick(group)}
+            className={clsx(
+                "w-full flex items-center gap-4 p-4 rounded-xl transition-all border text-left group relative cursor-pointer",
+                isDragging ? "opacity-50 bg-background/50 border-primary/50 shadow-lg" : "",
+                selectedGroup?.id === group.id
+                    ? "selected-state"
+                    : "bg-surface/50 border-transparent hover:border-white/10 hover:bg-surface"
+            )}
+        >
+            {/* Drag Handle */}
+            <div
+                {...attributes}
+                {...listeners}
+                className="p-2 -ml-2 text-grey-dark hover:text-white cursor-grab active:cursor-grabbing touch-none flex items-center justify-center transition-colors"
+                onClick={(e) => e.stopPropagation()}
+                title="Déplacer"
+            >
+                <GripVertical size={16} />
+            </div>
+
+            <div className={clsx(
+                "w-10 h-10 rounded-lg flex items-center justify-center text-lg font-bold shadow-inner overflow-hidden shrink-0",
+                selectedGroup?.id === group.id ? "bg-white/20 text-text-dark" : "bg-background text-primary",
+                group.photo_base64 && "bg-[#D9B981]"
+            )}>
+                {group.photo_base64 ? (
+                    <img src={group.photo_base64} alt="Group" className="w-[90%] h-[90%] object-contain" />
+                ) : (
+                    <Layers size={20} />
+                )}
+            </div>
+            <div className="flex-1 min-w-0">
+                <p className={clsx(
+                    "font-semibold truncate",
+                    selectedGroup?.id === group.id ? "text-text-dark" : "text-text-main"
+                )}>
+                    {group.nom}
+                </p>
+            </div>
+
+            <div className={clsx(
+                "flex gap-1 transition-opacity",
+                selectedGroup?.id === group.id ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+            )}>
+                <div
+                    onClick={(e) => { e.stopPropagation(); onEdit(group); }}
+                    className={clsx(
+                        "p-1.5 rounded-lg transition-colors cursor-pointer",
+                        selectedGroup?.id === group.id
+                            ? "text-text-dark/70 hover:text-text-dark hover:bg-text-dark/10"
+                            : "text-grey-medium hover:text-white hover:bg-white/10"
+                    )}
+                    title="Modifier"
+                >
+                    <Edit size={14} />
+                </div>
+            </div>
+
+            {/* Absolute Delete Button */}
+            <button
+                onClick={(e) => { e.stopPropagation(); onDelete(group); }}
+                className="absolute -top-2 -right-2 z-10 p-2 bg-danger/10 hover:bg-danger text-danger hover:text-white rounded-full border border-danger/20 opacity-0 group-hover:opacity-100 transition-all shadow-lg scale-90 hover:scale-100"
+                title="Supprimer le groupe"
+            >
+                <X size={14} strokeWidth={3} />
+            </button>
+
+            <ChevronRight size={16} className={clsx(
+                "transition-transform",
+                selectedGroup?.id === group.id ? "text-text-dark translate-x-1" : "text-grey-dark group-hover:translate-x-1"
+            )} />
+        </div>
+    );
+}
 
 const Groups = () => {
     const navigate = useNavigate();
@@ -34,6 +148,22 @@ const Groups = () => {
     const [progress, setProgress] = useState(0);
     const [progressText, setProgressText] = useState('');
     const abortRef = useRef(false);
+
+    // --- REMOVE STUDENT MODAL LOGIC ---
+    const [studentToRemove, setStudentToRemove] = useState(null);
+    const [showRemoveModal, setShowRemoveModal] = useState(false);
+
+    // DnD Sensors
+    const sensors = useSensors(
+        useSensor(PointerSensor, {
+            activationConstraint: {
+                distance: 8,
+            },
+        }),
+        useSensor(KeyboardSensor, {
+            coordinateGetter: sortableKeyboardCoordinates,
+        })
+    );
 
     useEffect(() => {
         const handleEsc = (e) => {
@@ -68,10 +198,13 @@ const Groups = () => {
     const fetchGroups = async () => {
         setLoading(true);
         try {
+            // Try to order by 'ordre' then 'nom'
             const { data, error } = await supabase
                 .from('Groupe')
-                .select('*, Classe(nom)')
+                .select('*')
+                .order('ordre', { ascending: true })
                 .order('nom');
+
             if (error) throw error;
             setGroups(data || []);
 
@@ -83,7 +216,21 @@ const Groups = () => {
                 setSelectedGroup(data[0]);
             }
         } catch (error) {
-            console.error('Error fetching groups:', error);
+            // Fallback for missing 'ordre' column
+            if (error.code === '42703' || error.message?.includes('does not exist')) {
+                const { data: fallbackData } = await supabase.from('Groupe').select('*').order('nom');
+                setGroups(fallbackData || []);
+
+                // Re-sync selected group
+                if (selectedGroup) {
+                    const updated = fallbackData?.find(g => g.id === selectedGroup.id);
+                    if (updated) setSelectedGroup(updated);
+                } else if (fallbackData && fallbackData.length > 0) {
+                    setSelectedGroup(fallbackData[0]);
+                }
+            } else {
+                console.error('Error fetching groups:', error);
+            }
         } finally {
             setLoading(false);
         }
@@ -137,9 +284,6 @@ const Groups = () => {
         }
     };
 
-    // Derived classes for the selected group
-    const derivedClasses = Array.from(new Set(studentsInGroup.map(s => s.Classe?.nom).filter(Boolean)));
-
     const handleGroupAdded = () => {
         fetchGroups();
     };
@@ -155,8 +299,6 @@ const Groups = () => {
         setIsEditingGroup(false);
         setGroupToEdit(null);
     };
-
-
 
     const handleDeleteGroup = async () => {
         const targetGroup = groupToDelete;
@@ -180,6 +322,34 @@ const Groups = () => {
         }
     };
 
+    // --- REORDER LOGIC ---
+    const handleDragEnd = async (event) => {
+        const { active, over } = event;
+        if (!over || active.id === over.id) return;
+
+        const oldIndex = groups.findIndex(g => g.id === active.id);
+        const newIndex = groups.findIndex(g => g.id === over.id);
+
+        // Optimistic Update
+        const newGroups = arrayMove(groups, oldIndex, newIndex);
+        setGroups(newGroups);
+
+        // Update Backend - use individual updates instead of upsert to avoid RLS issues
+        try {
+            await Promise.all(newGroups.map((g, index) =>
+                supabase
+                    .from('Groupe')
+                    .update({ ordre: index })
+                    .eq('id', g.id)
+            ));
+        } catch (error) {
+            console.error("Error updating group order:", error);
+            // Revert on error
+            fetchGroups();
+        }
+    };
+
+
     // Student Handlers
     const handleEditStudent = (student) => {
         setIsEditingStudent(true);
@@ -193,24 +363,32 @@ const Groups = () => {
         }
     };
 
-    const handleRemoveStudentFromGroup = async (e, studentId) => {
-        e.stopPropagation(); // Prevent opening the edit modal
-        if (!confirm('Êtes-vous sûr de vouloir retirer cet enfant du groupe ?')) return;
+    // Remove Student Modal Handlers
+    const handleRemoveClick = (e, student) => {
+        e.stopPropagation();
+        setStudentToRemove(student);
+        setShowRemoveModal(true);
+    };
+
+    const confirmRemoveStudent = async () => {
+        if (!selectedGroup || !studentToRemove) return;
 
         try {
-            // Delete from Join Table
             const { error } = await supabase
                 .from('EleveGroupe')
                 .delete()
-                .match({ eleve_id: studentId, groupe_id: selectedGroup.id });
+                .match({ eleve_id: studentToRemove.id, groupe_id: selectedGroup.id });
 
             if (error) throw error;
             fetchStudentsInGroup(selectedGroup.id);
+            setShowRemoveModal(false);
+            setStudentToRemove(null);
         } catch (error) {
             alert('Erreur: ' + error.message);
         }
     };
 
+    // The logic to generate the PDF
     const handleGenerateGroupTodoList = async (ecoMode = false) => {
         if (!selectedGroup || studentsInGroup.length === 0) return;
 
@@ -233,8 +411,6 @@ const Groups = () => {
             }
         }
 
-
-
         setLoading(true);
         abortRef.current = false; // Reset abort flag
         setProgress(10);
@@ -244,7 +420,6 @@ const Groups = () => {
             if (abortRef.current) throw new Error('ABORTED');
 
             // 2. Fetch data needed for PDF generation
-            // Fetch all modules with activities
             const { data: modulesData, error: modulesError } = await supabase
                 .from('Module')
                 .select(`
@@ -313,28 +488,19 @@ const Groups = () => {
             setProgressText('Préparation de la fusion...');
 
             // 4. Generate & Merge PDFs
-            // We create a new PDF Document to merge individual student PDFs
-            // This ensures page numbering (1/N) is reset for each student
             const mergedPdf = await PDFDocument.create();
 
             let processed = 0;
             for (const studentData of bulkData) {
                 if (abortRef.current) throw new Error('ABORTED');
                 processed++;
-                // Shifting to 10-80% as per user feedback
                 const percentage = 10 + Math.round((processed / bulkData.length) * 70);
                 setProgress(percentage);
                 setProgressText(`Génération : ${studentData.studentName}...`);
 
-                // Generate individual PDF blob for this student
-                // We use the 'data' prop to generate a single-student document
                 const blob = await pdf(<StudentTrackingPDFModern data={studentData} />).toBlob();
                 const arrayBuffer = await blob.arrayBuffer();
-
-                // Load into pdf-lib
                 const studentDoc = await PDFDocument.load(arrayBuffer);
-
-                // Copy pages
                 const copiedPages = await mergedPdf.copyPages(studentDoc, studentDoc.getPageIndices());
                 copiedPages.forEach((page) => mergedPdf.addPage(page));
             }
@@ -347,14 +513,9 @@ const Groups = () => {
                 setProgressText('Mise en page LIVRET A5...');
 
                 const bookletPdf = await PDFDocument.create();
-
-                // We need to save and reload to be able to embed the merged pages
                 const mergedPdfBytes = await mergedPdf.save();
                 const srcDoc = await PDFDocument.load(mergedPdfBytes);
-
-                // Embed all pages
                 const embeddedPages = await bookletPdf.embedPdf(srcDoc, srcDoc.getPageIndices());
-
                 const pageCount = embeddedPages.length;
 
                 for (let i = 0; i < pageCount; i += 2) {
@@ -364,20 +525,16 @@ const Groups = () => {
                     setProgress(assemblyPercentage);
                     setProgressText(`Assemblage page ${Math.floor(i / 2) + 1}...`);
 
-                    // Create A4 Landscape page (approx [841.89, 595.28])
                     const page = bookletPdf.addPage([841.89, 595.28]);
-
-                    // Left Page (i)
                     const leftPage = embeddedPages[i];
 
                     page.drawPage(leftPage, {
                         x: 0,
                         y: 0,
-                        width: 420.945, // Half width
-                        height: 595.28 // Full height
+                        width: 420.945,
+                        height: 595.28
                     });
 
-                    // Right Page (i+1)
                     if (i + 1 < pageCount) {
                         const rightPage = embeddedPages[i + 1];
                         page.drawPage(rightPage, {
@@ -388,7 +545,6 @@ const Groups = () => {
                         });
                     }
 
-                    // Divider Line
                     page.drawLine({
                         start: { x: 420.945, y: 0 },
                         end: { x: 420.945, y: 595.28 },
@@ -400,7 +556,6 @@ const Groups = () => {
                 const bookletBytes = await bookletPdf.save();
                 finalPdfBlob = new Blob([bookletBytes], { type: 'application/pdf' });
             } else {
-                // 5. Standard Save
                 const mergedPdfBytes = await mergedPdf.save();
                 finalPdfBlob = new Blob([mergedPdfBytes], { type: 'application/pdf' });
             }
@@ -426,7 +581,6 @@ const Groups = () => {
         } catch (error) {
             if (error.message === 'ABORTED') {
                 console.log('Génération annulée par l\'utilisateur');
-                // No alert, just clean state returns
             } else {
                 console.error("Error generating PDF:", error);
                 alert("Erreur lors de la génération du PDF.");
@@ -475,73 +629,27 @@ const Groups = () => {
                             <Loader2 className="text-primary animate-spin" size={32} />
                         </div>
                     ) : filteredGroups.length > 0 ? (
-                        filteredGroups.map(group => (
-                            <div
-                                key={group.id}
-                                onClick={() => setSelectedGroup(group)}
-                                className={clsx(
-                                    "w-full flex items-center gap-4 p-4 rounded-xl transition-all border text-left group relative hover:z-50 cursor-pointer",
-                                    selectedGroup?.id === group.id
-                                        ? "selected-state"
-                                        : "bg-surface/50 border-transparent hover:border-white/10 hover:bg-surface"
-                                )}
-                                role="button"
-                                tabIndex={0}
-                                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setSelectedGroup(group); }}
+                        <DndContext
+                            sensors={sensors}
+                            collisionDetection={closestCenter}
+                            onDragEnd={handleDragEnd}
+                        >
+                            <SortableContext
+                                items={filteredGroups.map(g => g.id)}
+                                strategy={verticalListSortingStrategy}
                             >
-                                <div className={clsx(
-                                    "w-10 h-10 rounded-lg flex items-center justify-center text-lg font-bold shadow-inner overflow-hidden",
-                                    selectedGroup?.id === group.id ? "bg-white/20 text-text-dark" : "bg-background text-primary",
-                                    group.photo_base64 && "bg-[#D9B981]"
-                                )}>
-                                    {group.photo_base64 ? (
-                                        <img src={group.photo_base64} alt="Group" className="w-[90%] h-[90%] object-contain" />
-                                    ) : (
-                                        <Layers size={20} />
-                                    )}
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                    <p className={clsx(
-                                        "font-semibold truncate",
-                                        selectedGroup?.id === group.id ? "text-text-dark" : "text-text-main"
-                                    )}>
-                                        {group.nom}
-                                    </p>
-                                </div>
-
-                                <div className={clsx(
-                                    "flex gap-1 transition-opacity",
-                                    selectedGroup?.id === group.id ? "opacity-100" : "opacity-0 group-hover:opacity-100"
-                                )}>
-                                    <div
-                                        onClick={(e) => { e.stopPropagation(); handleEditGroup(group); }}
-                                        className={clsx(
-                                            "p-1.5 rounded-lg transition-colors cursor-pointer",
-                                            selectedGroup?.id === group.id
-                                                ? "text-text-dark/70 hover:text-text-dark hover:bg-text-dark/10"
-                                                : "text-grey-medium hover:text-white hover:bg-white/10"
-                                        )}
-                                        title="Modifier"
-                                    >
-                                        <Edit size={14} />
-                                    </div>
-                                </div>
-
-                                {/* Absolute Delete Button */}
-                                <button
-                                    onClick={(e) => { e.stopPropagation(); setGroupToDelete(group); }}
-                                    className="absolute -top-2 -right-2 z-10 p-2 bg-danger/10 hover:bg-danger text-danger hover:text-white rounded-full border border-danger/20 opacity-0 group-hover:opacity-100 transition-all shadow-lg scale-90 hover:scale-100"
-                                    title="Supprimer le groupe"
-                                >
-                                    <X size={14} strokeWidth={3} />
-                                </button>
-
-                                <ChevronRight size={16} className={clsx(
-                                    "transition-transform",
-                                    selectedGroup?.id === group.id ? "text-text-dark translate-x-1" : "text-grey-dark group-hover:translate-x-1"
-                                )} />
-                            </div>
-                        ))
+                                {filteredGroups.map(group => (
+                                    <SortableGroupItem
+                                        key={group.id}
+                                        group={group}
+                                        selectedGroup={selectedGroup}
+                                        onClick={setSelectedGroup}
+                                        onEdit={handleEditGroup}
+                                        onDelete={(g) => { setGroupToDelete(g); }}
+                                    />
+                                ))}
+                            </SortableContext>
+                        </DndContext>
                     ) : (
                         <div className="text-center py-12 px-4">
                             <p className="text-grey-dark italic">Aucun groupe trouvé</p>
@@ -601,28 +709,36 @@ const Groups = () => {
 
                         </div>
 
-                        {/* Tabs */}
-                        <div className="flex items-center gap-1 px-8 border-b border-white/5 bg-surface/20">
-                            <button
-                                onClick={() => setActiveTab('students')}
-                                className={clsx(
-                                    "px-4 py-3 text-sm font-bold border-b-2 transition-colors flex items-center gap-2",
-                                    activeTab === 'students' ? "border-primary text-primary" : "border-transparent text-grey-medium hover:text-white"
-                                )}
-                            >
-                                <GraduationCap size={16} />
-                                Liste des élèves
-                            </button>
-                            <button
-                                onClick={() => setActiveTab('actions')}
-                                className={clsx(
-                                    "px-4 py-3 text-sm font-bold border-b-2 transition-colors flex items-center gap-2",
-                                    activeTab === 'actions' ? "border-primary text-primary" : "border-transparent text-grey-medium hover:text-white"
-                                )}
-                            >
-                                <LayoutList size={16} />
-                                Boutons d'action
-                            </button>
+                        {/* Tabs - Modern Capsule Style */}
+                        <div className="flex justify-center px-8 mb-6 mt-2">
+                            <div className="neu-selector-container flex p-1.5 rounded-2xl w-full max-w-md">
+                                <button
+                                    onClick={() => setActiveTab('students')}
+                                    data-active={activeTab === 'students'}
+                                    className={clsx(
+                                        "flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-xs font-black uppercase tracking-[0.12em] transition-all duration-300",
+                                        activeTab === 'students'
+                                            ? "bg-primary text-text-dark"
+                                            : "text-grey-medium hover:text-white"
+                                    )}
+                                >
+                                    <GraduationCap size={16} />
+                                    Liste des élèves
+                                </button>
+                                <button
+                                    onClick={() => setActiveTab('actions')}
+                                    data-active={activeTab === 'actions'}
+                                    className={clsx(
+                                        "flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-xs font-black uppercase tracking-[0.12em] transition-all duration-300",
+                                        activeTab === 'actions'
+                                            ? "bg-primary text-text-dark"
+                                            : "text-grey-medium hover:text-white"
+                                    )}
+                                >
+                                    <LayoutList size={16} />
+                                    Actions
+                                </button>
+                            </div>
                         </div>
 
                         {/* Students List Tab */}
@@ -652,7 +768,7 @@ const Groups = () => {
                                             {studentsInGroup.map(student => (
                                                 <div key={student.id} className="relative group/card">
                                                     <button
-                                                        onClick={(e) => handleRemoveStudentFromGroup(e, student.id)}
+                                                        onClick={(e) => handleRemoveClick(e, student)}
                                                         className="absolute -top-2 -right-2 z-10 p-2 bg-danger/10 hover:bg-danger text-danger hover:text-white rounded-full border border-danger/20 opacity-0 group-hover/card:opacity-100 transition-all shadow-lg scale-90 hover:scale-100"
                                                         title="Retirer du groupe"
                                                     >
@@ -743,10 +859,10 @@ const Groups = () => {
 
                                                     <button
                                                         onClick={handleCancelGeneration}
-                                                        className="self-end text-xs text-danger hover:text-danger/80 hover:underline flex items-center gap-1 mt-1 transition-colors"
+                                                        className="mx-auto mt-3 px-4 py-2 rounded-lg bg-white/5 hover:bg-danger/10 text-xs font-bold text-grey-medium hover:text-danger border border-white/5 hover:border-danger/20 transition-all flex items-center gap-2 group"
                                                     >
-                                                        <X size={12} />
-                                                        Annuler (ESC)
+                                                        <X size={14} className="group-hover:scale-110 transition-transform" />
+                                                        Annuler <span className="opacity-50 text-[10px] ml-1 font-normal">(ESC)</span>
                                                     </button>
                                                 </div>
                                             ) : (
@@ -791,12 +907,52 @@ const Groups = () => {
 
             {/* Add Student to Group Modal */}
             <AddStudentToGroupModal
-                showModal={showAddToGroupModal}
-                handleCloseModal={() => setShowAddToGroupModal(false)}
+                isOpen={showAddToGroupModal}
+                onClose={() => setShowAddToGroupModal(false)}
                 groupId={selectedGroup?.id}
-                groupName={selectedGroup?.nom}
-                onAdded={() => fetchStudentsInGroup(selectedGroup.id)}
+                onAdded={() => {
+                    fetchStudentsInGroup(selectedGroup.id);
+                    fetchGroups(); // Update counts
+                }}
             />
+
+            {/* CONFIRMATION MODAL FOR REMOVAL */}
+            {showRemoveModal && (
+                <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+                    <div
+                        className="bg-[#1C1C1E] border border-white/10 rounded-2xl shadow-2xl max-w-sm w-full p-6 animate-in zoom-in-95 duration-200"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <div className="flex flex-col items-center text-center gap-4">
+                            <div className="w-12 h-12 rounded-full bg-danger/10 flex items-center justify-center text-danger">
+                                <Trash2 size={24} />
+                            </div>
+
+                            <div>
+                                <h3 className="text-lg font-bold text-white mb-2">Retirer l'élève ?</h3>
+                                <p className="text-sm text-grey-medium">
+                                    Êtes-vous sûr de vouloir retirer <span className="text-white font-bold">{studentToRemove?.prenom} {studentToRemove?.nom}</span> du groupe <span className="text-primary">{selectedGroup?.nom}</span> ?
+                                </p>
+                            </div>
+
+                            <div className="flex gap-3 w-full mt-2">
+                                <button
+                                    onClick={() => setShowRemoveModal(false)}
+                                    className="flex-1 py-3 bg-white/5 hover:bg-white/10 text-white rounded-xl font-bold transition-colors"
+                                >
+                                    Annuler
+                                </button>
+                                <button
+                                    onClick={confirmRemoveStudent}
+                                    className="flex-1 py-3 bg-danger hover:bg-danger/90 text-white rounded-xl font-bold transition-colors shadow-lg shadow-danger/20"
+                                >
+                                    Retirer
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
             {/* Delete Confirmation Modal */}
             {
                 groupToDelete && (

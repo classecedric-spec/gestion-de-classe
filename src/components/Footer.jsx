@@ -14,6 +14,7 @@ const Footer = () => {
             <div className="flex flex-wrap items-center justify-center gap-10 mb-10">
                 <button onClick={() => handleNavigation('/')} className="text-xs uppercase tracking-widest font-black hover:text-primary transition-colors cursor-pointer">Accueil</button>
                 <button onClick={() => handleNavigation('/features')} className="text-xs uppercase tracking-widest font-black hover:text-primary transition-colors cursor-pointer">Fonctionnalités</button>
+                <button onClick={() => handleNavigation('/fonctionnement')} className="text-xs uppercase tracking-widest font-black hover:text-primary transition-colors cursor-pointer">Fonctionnement</button>
                 <button onClick={() => handleNavigation('/privacy')} className="text-xs uppercase tracking-widest font-black hover:text-primary transition-colors cursor-pointer">Confidentialité</button>
             </div>
             <div className="flex items-center justify-center gap-3 mb-4 opacity-50">

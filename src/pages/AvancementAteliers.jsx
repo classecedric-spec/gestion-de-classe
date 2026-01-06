@@ -499,51 +499,52 @@ const AvancementAteliers = () => {
                     <BookOpen className="text-primary" />
                     Avancement des Ateliers
                 </h1>
-
-                {/* PDF Export Button */}
-                <button
-                    onClick={handleGeneratePDF}
-                    disabled={generatingPDF || students.length === 0 || activities.length === 0}
-                    className={clsx(
-                        "px-4 py-2.5 rounded-xl font-bold flex items-center gap-2 transition-all shadow-lg",
-                        students.length === 0 || activities.length === 0
-                            ? "bg-white/5 text-grey-medium cursor-not-allowed"
-                            : "bg-primary hover:bg-primary/90 text-black hover:scale-105"
-                    )}
-                >
-                    {generatingPDF ? (
-                        <Loader2 size={18} className="animate-spin" />
-                    ) : (
-                        <FileText size={18} />
-                    )}
-                    <span className="text-sm uppercase tracking-wider">
-                        {generatingPDF ? 'Génération...' : 'Exporter PDF'}
-                    </span>
-                </button>
             </div>
 
             {/* FILTERS BAR */}
             <div className="flex flex-wrap items-center gap-4 bg-surface p-4 rounded-xl border border-white/5 shadow-lg">
 
-                {/* 1. Group Selector */}
-                <div className="flex-1 min-w-[200px]">
-                    <label className="text-xs font-bold text-grey-medium uppercase tracking-wider mb-1.5 block">
-                        Groupe
-                    </label>
-                    <div className="relative">
-                        <select
-                            value={selectedGroupId}
-                            onChange={(e) => setSelectedGroupId(e.target.value)}
-                            className="w-full bg-background border border-white/10 text-white rounded-lg p-2.5 pl-10 appearance-none focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all"
-                        >
-                            <option value="">Sélectionner un groupe...</option>
-                            {groups.map(g => (
-                                <option key={g.id} value={g.id}>{g.nom}</option>
-                            ))}
-                        </select>
-                        <Users className="absolute left-3 top-1/2 -translate-y-1/2 text-grey-medium" size={16} />
-                        <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-grey-medium pointer-events-none" size={16} />
+                {/* 1. Group Selector & PDF Button */}
+                <div className="flex-[2] min-w-[400px] flex items-end gap-4">
+                    <div className="flex-1">
+                        <label className="text-[10px] font-black uppercase tracking-[0.2em] text-grey-medium mb-2 block ml-1">
+                            Groupe
+                        </label>
+                        <div className="relative group">
+                            <select
+                                value={selectedGroupId}
+                                onChange={(e) => setSelectedGroupId(e.target.value)}
+                                className="w-full bg-background border border-white/5 text-white rounded-xl py-3 pl-10 pr-10 appearance-none focus:outline-none focus:border-primary/50 transition-all cursor-pointer"
+                            >
+                                <option value="">Sélectionner un groupe...</option>
+                                {groups.map(g => (
+                                    <option key={g.id} value={g.id} className="bg-surface">{g.nom}</option>
+                                ))}
+                            </select>
+                            <Users className="absolute left-3 top-1/2 -translate-y-1/2 text-primary" size={16} />
+                            <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-grey-medium pointer-events-none group-hover:text-primary transition-colors" size={16} />
+                        </div>
                     </div>
+
+                    <button
+                        onClick={handleGeneratePDF}
+                        disabled={generatingPDF || students.length === 0 || activities.length === 0}
+                        className={clsx(
+                            "px-6 py-3 rounded-xl font-bold flex items-center justify-center gap-2 transition-all min-h-[48px]",
+                            students.length === 0 || activities.length === 0
+                                ? "bg-white/5 text-grey-medium cursor-not-allowed opacity-50"
+                                : "bg-primary/10 border border-primary/20 text-primary hover:bg-primary hover:text-black hover:border-primary"
+                        )}
+                    >
+                        {generatingPDF ? (
+                            <Loader2 size={18} className="animate-spin" />
+                        ) : (
+                            <FileText size={18} />
+                        )}
+                        <span className="text-[11px] uppercase tracking-[0.15em] font-black">
+                            {generatingPDF ? 'Génération...' : 'Générer les listes de travail'}
+                        </span>
+                    </button>
                 </div>
 
                 {/* 2. Operator Selector */}

@@ -9,11 +9,14 @@ import {
 import clsx from 'clsx';
 import { toast } from 'sonner';
 import { useLocation } from 'react-router-dom';
+import { fetchWithCache } from '../lib/offline';
+import { useOfflineSync } from '../context/OfflineSyncContext';
 import TimerModal from '../components/TimerModal';
 
 const SuiviPedagogique = ({ timer, setTimer, timerFinished, setTimerFinished }) => {
     // --- STATE ---
     const location = useLocation();
+    const { isOnline, addToQueue } = useOfflineSync();
     const [currentAdultSelection, setCurrentAdultSelection] = useState(null);
     const [currentActivityTypeSelection, setCurrentActivityTypeSelection] = useState(null);
     const [groups, setGroups] = useState([]);
@@ -127,61 +130,83 @@ const SuiviPedagogique = ({ timer, setTimer, timerFinished, setTimerFinished }) 
     }, []);
 
     const fetchAdultTracking = async () => {
-        try {
-            const today = new Date().toISOString().split('T')[0];
-            const { data, error } = await supabase
-                .from('SuiviAdulte')
-                .select(`
-                    *,
-                    Adulte (id, nom, prenom),
-                    TypeActiviteAdulte (id, label)
-                `)
-                .gte('created_at', today)
-                .order('created_at', { ascending: false });
+        await fetchWithCache(
+            'adult_tracking_today',
+            async () => {
+                const today = new Date().toISOString().split('T')[0];
+                const { data, error } = await supabase
+                    .from('SuiviAdulte')
+                    .select(`
+                        *,
+                        Adulte (id, nom, prenom),
+                        TypeActiviteAdulte (id, label)
+                    `)
+                    .gte('created_at', today)
+                    .order('created_at', { ascending: false });
 
-            if (error) throw error;
-            setAdultActivities(data || []);
-        } catch (error) {
-            console.error('Error fetching adult tracking:', error);
-        }
+                if (error) throw error;
+                return data || [];
+            },
+            setAdultActivities,
+            (err) => console.error('Error fetching adult tracking:', err)
+        );
     };
 
     const fetchAllAdults = async () => {
-        try {
-            const { data, error } = await supabase
-                .from('Adulte')
-                .select('*')
-                .order('nom');
-            if (error) throw error;
-            setAllAdults(data || []);
-        } catch (error) {
-            console.error('Error fetching adults:', error);
-        }
+        await fetchWithCache(
+            'all_adults',
+            async () => {
+                const { data, error } = await supabase.from('Adulte').select('*').order('nom');
+                if (error) throw error;
+                return data || [];
+            },
+            setAllAdults,
+            (err) => console.error('Error fetching adults:', err)
+        );
     };
 
     const fetchActivityTypes = async () => {
-        try {
-            const { data, error } = await supabase
-                .from('TypeActiviteAdulte')
-                .select('*')
-                .order('label');
-            if (error) throw error;
-            setAvailableActivityTypes(data || []);
-        } catch (error) {
-            console.error('Error fetching activity types:', error);
-        }
+        await fetchWithCache(
+            'activity_types_adult',
+            async () => {
+                const { data, error } = await supabase.from('TypeActiviteAdulte').select('*').order('label');
+                if (error) throw error;
+                return data || [];
+            },
+            setAvailableActivityTypes,
+            (err) => console.error('Error fetching activity types:', err)
+        );
     };
 
     const handleAddAdultActivity = async (adulteId, activiteId) => {
         setLoadingAdults(true);
         try {
             const { data: { user } } = await supabase.auth.getUser();
+            const userId = user?.id;
+
+            if (!isOnline) {
+                addToQueue({
+                    type: 'SUPABASE_CALL',
+                    table: 'SuiviAdulte',
+                    method: 'insert',
+                    payload: {
+                        adulte_id: adulteId,
+                        activite_id: activiteId,
+                        user_id: userId
+                    },
+                    contextDescription: `Ajout tâche adulte`
+                });
+                setShowAdultModal(false);
+                toast.success("Tâche ajoutée (hors-ligne)");
+                return;
+            }
+
             const { error } = await supabase
                 .from('SuiviAdulte')
                 .insert([{
                     adulte_id: adulteId,
                     activite_id: activiteId,
-                    user_id: user.id
+                    user_id: userId
                 }]);
 
             if (error) throw error;
@@ -197,6 +222,20 @@ const SuiviPedagogique = ({ timer, setTimer, timerFinished, setTimerFinished }) 
 
     const handleDeleteAdultSuivi = async (id) => {
         try {
+            if (!isOnline) {
+                addToQueue({
+                    type: 'SUPABASE_CALL',
+                    table: 'SuiviAdulte',
+                    method: 'delete',
+                    payload: null,
+                    match: { id },
+                    contextDescription: "Suppression tâche"
+                });
+                setAdultActivities(prev => prev.filter(p => p.id !== id));
+                toast.success("Suppression en file d'attente");
+                return;
+            }
+
             const { error } = await supabase
                 .from('SuiviAdulte')
                 .delete()
@@ -425,8 +464,15 @@ const SuiviPedagogique = ({ timer, setTimer, timerFinished, setTimerFinished }) 
     }, [columnWidths, rowHeights, selectedGroupId, showPendingOnly, isPreferencesLoaded]);
 
     const fetchGroups = async () => {
-        const { data } = await supabase.from('Groupe').select('*').order('nom');
-        setGroups(data || []);
+        await fetchWithCache(
+            'groups',
+            async () => {
+                const { data, error } = await supabase.from('Groupe').select('*').order('nom');
+                if (error) throw error;
+                return data || [];
+            },
+            setGroups
+        );
     };
 
     // --- FETCH DATA LOGIC ---
@@ -460,258 +506,241 @@ const SuiviPedagogique = ({ timer, setTimer, timerFinished, setTimerFinished }) 
     const fetchStudents = async (groupId) => {
         setLoadingStudents(true);
         try {
-            // New N:N Logic: Join with EleveGroupe
-            // We use !inner to filter Eleves that have an entry in EleveGroupe for this groupId
-            const { data, error } = await supabase
-                .from('Eleve')
-                .select(`
-                    *,
-                    importance_suivi,
-                    Classe (
-                    nom,
-                    ClasseAdulte (
-                    role,
-                    Adulte (id, nom, prenom)
-                    )
-                    ),
-                    Niveau (nom),
-                    EleveGroupe!inner(
-                    groupe_id,
-                    Groupe(id, nom)
-                    )
-                    `)
-                .eq('EleveGroupe.groupe_id', groupId)
-                .order('prenom');
+            await fetchWithCache(
+                `students_pedago_${groupId}`,
+                async () => {
+                    const { data, error } = await supabase
+                        .from('Eleve')
+                        .select(`
+                            *,
+                            importance_suivi,
+                            Classe (
+                                nom,
+                                ClasseAdulte (
+                                    role,
+                                    Adulte (id, nom, prenom)
+                                )
+                            ),
+                            Niveau (nom),
+                            EleveGroupe!inner(
+                                groupe_id,
+                                Groupe(id, nom)
+                            )
+                        `)
+                        .eq('EleveGroupe.groupe_id', groupId)
+                        .order('prenom');
 
-            if (error) throw error;
-            setStudents(data || []);
-        } catch (err) {
-            console.error(err);
-            setStudents([]);
+                    if (error) throw error;
+                    return data || [];
+                },
+                setStudents,
+                (err) => {
+                    console.error(err);
+                    setStudents([]);
+                }
+            );
         } finally {
             setLoadingStudents(false);
         }
     };
 
     const fetchBranches = async () => {
-        const { data } = await supabase.from('Branche').select('id, nom').order('ordre');
-        setBranches(data || []);
+        await fetchWithCache(
+            'branches',
+            async () => {
+                const { data } = await supabase.from('Branche').select('id, nom').order('ordre');
+                return data || [];
+            },
+            setBranches
+        );
     };
 
     const fetchGroupProgressions = async (groupId) => {
-        // Fetch all progressions for students in this group to calculate weights
-        // We need: Progression -> Activite -> Module -> SousBranche -> Branche
-        // This allows us to map student -> branch -> success %
-
-        try {
-            const { data, error } = await supabase
-                .from('Progression')
-                .select(`
-                    eleve_id,
-                    etat,
-                    Activite!inner (
-                    id,
-                    Module!inner (
-                    id,
-                    SousBranche!inner (
-                    branche_id
-                    )
-                    )
-                    )
-                    `)
-                .not('Activite.Module.SousBranche.branche_id', 'is', null)
-                // We actually need to filter by students in the group. 
-                // Since this is a complex join, we might fetch wide and filter in JS or rely on RLS.
-                // Better: Get students first (we have them), then fetch progressions for those IDs.
-                ;
-
-            // Alternative: Fetch for the specific student IDs we loaded.
-            // However, typical classroom is small (~30). fetching all progressions is okay.
-            // Let's rely on the fact that we can filter by student IDs in JS if needed, or if RLS handles it.
-
-            // Actually, we need to filter `eleve_id` in the `students` list. 
-            // But `students` state might not be set yet if run in parallel. 
-            // We'll trust the caller `useEffect` order or just fetch broader.
-
-            // To be safe and efficient for "Generate" feature:
-            const { data: rawData } = await supabase
-                .from('Progression')
-                .select(`
-                    eleve_id,
-                    etat,
-                    Activite (
-                    Module (
-                    SousBranche (
-                    branche_id
-                    )
-                    )
-                    )
+        await fetchWithCache(
+            `group_progressions_${groupId}`,
+            async () => {
+                const { data: rawData, error } = await supabase
+                    .from('Progression')
+                    .select(`
+                        eleve_id,
+                        etat,
+                        Activite (
+                            Module (
+                                SousBranche (
+                                    branche_id
+                                )
+                            )
+                        )
                     `);
+                if (error) throw error;
+                return rawData || [];
+            },
+            (rawData) => {
+                const map = {}; // studentId -> {branchId: {total: 0, done: 0 } }
+                rawData.forEach(p => {
+                    const sId = p.eleve_id;
+                    const bId = p.Activite?.Module?.SousBranche?.branche_id;
 
-            if (!rawData) return;
+                    if (!sId || !bId) return;
 
-            // Process into efficient map
-            const map = {}; // studentId -> {branchId: {total: 0, done: 0 } }
+                    if (!map[sId]) map[sId] = {};
+                    if (!map[sId][bId]) map[sId][bId] = { total: 0, done: 0 };
 
-            rawData.forEach(p => {
-                const sId = p.eleve_id;
-                const bId = p.Activite?.Module?.SousBranche?.branche_id;
-
-                if (!sId || !bId) return;
-
-                if (!map[sId]) map[sId] = {};
-                if (!map[sId][bId]) map[sId][bId] = { total: 0, done: 0 };
-
-                map[sId][bId].total++;
-                if (p.etat === 'termine' || p.etat === 'a_verifier') map[sId][bId].done++;
-            });
-
-            setGroupedProgressions(map);
-
-        } catch (err) {
-            console.error("Error fetching group stats", err);
-        }
+                    map[sId][bId].total++;
+                    if (p.etat === 'termine' || p.etat === 'a_verifier') map[sId][bId].done++;
+                });
+                setGroupedProgressions(map);
+            },
+            (err) => console.error("Error fetching group stats", err)
+        );
     };
 
 
     const fetchModules = async (studentId) => {
         if (!studentId) return;
         setLoadingModules(true);
-        try {
-            const { data, error } = await supabase
-                .from('Module')
-                .select(`
-                    *,
-                    SousBranche:sous_branche_id (
-                    nom,
-                    ordre,
-                    Branche:branche_id (nom, ordre)
-                    ),
-                    Activite (
-                    id,
-                    ActiviteNiveau (niveau_id),
-                    Progression (etat, eleve_id)
-                    )
+
+        await fetchWithCache(
+            `modules_pedago_${studentId}`,
+            async () => {
+                const { data, error } = await supabase
+                    .from('Module')
+                    .select(`
+                        *,
+                        SousBranche:sous_branche_id (
+                            nom,
+                            ordre,
+                            Branche:branche_id (nom, ordre)
+                        ),
+                        Activite (
+                            id,
+                            ActiviteNiveau (niveau_id),
+                            Progression (etat, eleve_id)
+                        )
                     `)
-                .eq('statut', 'en_cours');
+                    .eq('statut', 'en_cours');
+                if (error) throw error;
+                return data || [];
+            },
+            (data) => {
+                const modulesWithStats = (data || []).map(m => {
+                    const studentLevelId = selectedStudent?.niveau_id;
 
-            if (error) throw error;
+                    const validActivities = m.Activite?.filter(act => {
+                        if (!studentLevelId) return true;
+                        const levels = act.ActiviteNiveau?.map(an => an.niveau_id) || [];
+                        return levels.length > 0 && levels.includes(studentLevelId);
+                    }) || [];
 
-            const modulesWithStats = (data || []).map(m => {
-                const studentLevelId = selectedStudent?.niveau_id;
+                    const totalActivities = validActivities.length;
+                    const completedActivities = validActivities.filter(act =>
+                        act.Progression?.some(p => p.eleve_id === studentId && (p.etat === 'termine' || p.etat === 'a_verifier'))
+                    ).length;
 
-                // Only count activities that are meant for this student's level
-                const validActivities = m.Activite?.filter(act => {
-                    if (!studentLevelId) return true; // Should ideally always have it
-                    const levels = act.ActiviteNiveau?.map(an => an.niveau_id) || [];
-                    return levels.length > 0 && levels.includes(studentLevelId);
-                }) || [];
+                    return {
+                        ...m,
+                        totalActivities,
+                        completedActivities,
+                        percent: totalActivities > 0 ? Math.round((completedActivities / totalActivities) * 100) : 0
+                    };
+                });
 
-                const totalActivities = validActivities.length;
-                const completedActivities = validActivities.filter(act =>
-                    act.Progression?.some(p => p.eleve_id === studentId && (p.etat === 'termine' || p.etat === 'a_verifier'))
-                ).length;
+                const filteredByCompletion = modulesWithStats.filter(m => {
+                    if (m.totalActivities === 0) return false;
+                    if (showPendingOnly) {
+                        return m.completedActivities < m.totalActivities;
+                    }
+                    return true;
+                });
 
-                return {
-                    ...m,
-                    totalActivities,
-                    completedActivities,
-                    percent: totalActivities > 0 ? Math.round((completedActivities / totalActivities) * 100) : 0
-                };
-            });
+                const sortedModules = filteredByCompletion.sort((a, b) => {
+                    if (a.date_fin !== b.date_fin) {
+                        if (!a.date_fin) return 1;
+                        if (!b.date_fin) return -1;
+                        return a.date_fin.localeCompare(b.date_fin);
+                    }
+                    const aB = a.SousBranche?.Branche;
+                    const bB = b.SousBranche?.Branche;
+                    if (aB?.ordre !== bB?.ordre) return (aB?.ordre || 0) - (bB?.ordre || 0);
+                    if (aB?.nom !== bB?.nom) return (aB?.nom || '').localeCompare(bB?.nom || '');
+                    const aSB = a.SousBranche;
+                    const bSB = b.SousBranche;
+                    if (aSB?.ordre !== bSB?.ordre) return (aSB?.ordre || 0) - (bSB?.ordre || 0);
+                    if (aSB?.nom !== bSB?.nom) return (aSB?.nom || '').localeCompare(bSB?.nom || '');
+                    return a.nom.localeCompare(b.nom);
+                });
 
-            const filteredByCompletion = modulesWithStats.filter(m => {
-                // Si aucune activité, on ne l'affiche pas
-                if (m.totalActivities === 0) return false;
-
-                // Filter based on toggle
-                if (showPendingOnly) {
-                    return m.completedActivities < m.totalActivities;
-                }
-                return true;
-            });
-
-            const sortedModules = filteredByCompletion.sort((a, b) => {
-                // 1. Date de fin (nulls à la fin)
-                if (a.date_fin !== b.date_fin) {
-                    if (!a.date_fin) return 1;
-                    if (!b.date_fin) return -1;
-                    return a.date_fin.localeCompare(b.date_fin);
-                }
-
-                // 2. Branche (ordre then nom)
-                const aB = a.SousBranche?.Branche;
-                const bB = b.SousBranche?.Branche;
-                if (aB?.ordre !== bB?.ordre) return (aB?.ordre || 0) - (bB?.ordre || 0);
-                if (aB?.nom !== bB?.nom) return (aB?.nom || '').localeCompare(bB?.nom || '');
-
-                // 3. Sous-Branche (ordre then nom)
-                const aSB = a.SousBranche;
-                const bSB = b.SousBranche;
-                if (aSB?.ordre !== bSB?.ordre) return (aSB?.ordre || 0) - (bSB?.ordre || 0);
-                if (aSB?.nom !== bSB?.nom) return (aSB?.nom || '').localeCompare(bSB?.nom || '');
-
-                // 4. Alphabétique (Orthographe)
-                return a.nom.localeCompare(b.nom);
-            });
-
-            setModules(sortedModules);
-        } catch (err) {
-            console.error(err);
-        } finally {
-            setLoadingModules(false);
-        }
+                setModules(sortedModules);
+                setLoadingModules(false);
+            },
+            (err) => {
+                console.error(err);
+                setLoadingModules(false);
+            }
+        );
     };
 
     const fetchActivities = async (moduleId) => {
         setLoadingActivities(true);
-        try {
-            const { data, error } = await supabase
-                .from('Activite')
-                .select(`
-                    *,
-                    ActiviteNiveau (niveau_id),
-                    Module (
-                    id,
-                    SousBranche (
-                    id,
-                    Branche (
-                    id
-                    )
-                    )
-                    ),
-                    ActiviteMateriel (
-                    TypeMateriel (
-                    acronyme
-                    )
-                    )
+        await fetchWithCache(
+            `activities_pedago_${moduleId}`,
+            async () => {
+                const { data, error } = await supabase
+                    .from('Activite')
+                    .select(`
+                        *,
+                        ActiviteNiveau (niveau_id),
+                        Module (
+                            id,
+                            SousBranche (
+                                id,
+                                Branche (
+                                    id
+                                )
+                            )
+                        ),
+                        ActiviteMateriel (
+                            TypeMateriel (
+                                acronyme
+                            )
+                        )
                     `)
-                .eq('module_id', moduleId)
-                .order('ordre', { ascending: true }); // Assuming 'ordre' or just created_at
-            if (error) throw error;
-            setActivities(data || []);
-        } catch (err) {
-            console.error(err);
-        } finally {
-            setLoadingActivities(false);
-        }
+                    .eq('module_id', moduleId)
+                    .order('ordre', { ascending: true }); // Assuming 'ordre' or just created_at
+                if (error) throw error;
+                return data || [];
+            },
+            (data) => {
+                setActivities(data);
+                setLoadingActivities(false);
+            },
+            (err) => {
+                console.error(err);
+                setLoadingActivities(false);
+            }
+        );
     };
 
     const fetchStudentProgressions = async (studentId) => {
-        try {
-            const { data } = await supabase
-                .from('Progression')
-                .select('activite_id, etat')
-                .eq('eleve_id', studentId);
-
-            const progMap = {};
-            data?.forEach(p => {
-                progMap[p.activite_id] = p.etat;
-            });
-            setProgressions(progMap);
-        } catch (err) {
-            console.error("Error fetching progressions", err);
-        }
+        await fetchWithCache(
+            `progressions_pedago_${studentId}`,
+            async () => {
+                const { data, error } = await supabase
+                    .from('Progression')
+                    .select('activite_id, etat')
+                    .eq('eleve_id', studentId);
+                if (error) throw error;
+                return data || [];
+            },
+            (data) => {
+                const progMap = {};
+                data?.forEach(p => {
+                    progMap[p.activite_id] = p.etat;
+                });
+                setProgressions(progMap);
+            },
+            (err) => console.error("Error fetching progressions", err)
+        );
     };
 
     // --- POLLING SYNC (Backup for Realtime) ---
@@ -887,6 +916,28 @@ const SuiviPedagogique = ({ timer, setTimer, timerFinished, setTimerFinished }) 
         // We'll add a subtle toast or just rely on the UI update.
 
         try {
+            const { data: { user } } = await supabase.auth.getUser();
+            const userId = user?.id;
+
+            if (!isOnline) {
+                addToQueue({
+                    type: 'SUPABASE_CALL',
+                    table: 'Progression',
+                    method: 'upsert',
+                    payload: {
+                        eleve_id: targetStudentId,
+                        activite_id: activityId,
+                        etat: newStatus,
+                        updated_at: new Date().toISOString(),
+                        user_id: userId
+                    },
+                    match: null,
+                    contextDescription: `Maj statut ${activities.find(a => a.id === activityId)?.nom || 'activité'}`
+                });
+                toast.info("Sauvegardé hors-ligne");
+                return;
+            }
+
             const { error } = await supabase
                 .from('Progression')
                 .upsert(
@@ -895,7 +946,7 @@ const SuiviPedagogique = ({ timer, setTimer, timerFinished, setTimerFinished }) 
                         activite_id: activityId,
                         etat: newStatus,
                         updated_at: new Date().toISOString(),
-                        user_id: (await supabase.auth.getUser()).data.user?.id
+                        user_id: userId
                     },
                     { onConflict: 'eleve_id,activite_id' }
                 );
@@ -1039,13 +1090,13 @@ const SuiviPedagogique = ({ timer, setTimer, timerFinished, setTimerFinished }) 
     };
 
     // --- VIEW LOGIC ---
-    const currentView = selectedModule ? 'activities' : selectedStudent ? 'modules' : 'students';
+    const currentView = selectedStudent ? 'modules' : 'students';
 
     const handleBack = () => {
-        if (currentView === 'activities') {
+        if (selectedModule) {
             setSelectedModule(null);
             setActivities([]);
-        } else if (currentView === 'modules') {
+        } else if (selectedStudent) {
             setSelectedStudent(null);
             setModules([]);
         }
@@ -1204,47 +1255,29 @@ const SuiviPedagogique = ({ timer, setTimer, timerFinished, setTimerFinished }) 
                                                             </div>
                                                         )}
                                                     </div>
-                                                    <div className="min-w-0">
-                                                        <h3 className="text-xl font-bold text-white leading-tight truncate">
-                                                            {selectedStudent.prenom}
-                                                        </h3>
-                                                    </div>
-                                                </div>
+                                                    <div className="min-w-0 flex-1">
+                                                        <div className="flex items-center justify-between gap-2">
+                                                            <h3 className="text-xl font-bold text-white leading-tight truncate">
+                                                                {selectedStudent.prenom}
+                                                            </h3>
 
-                                                {selectedModule && (
-                                                    <div className="p-3 bg-primary/10 rounded-xl border border-primary/20 animate-in slide-in-from-top-1">
-                                                        <span className="text-[10px] uppercase tracking-widest font-black text-primary opacity-70 block mb-1">Module en cours</span>
-                                                        <div className="text-sm font-bold text-white truncate leading-tight">
-                                                            {selectedModule.nom}
+                                                            <button
+                                                                onClick={() => setShowPendingOnly(!showPendingOnly)}
+                                                                className={clsx(
+                                                                    "text-[10px] font-bold uppercase tracking-wider flex items-center gap-1.5 px-2 py-1.5 rounded-lg border transition-all shrink-0",
+                                                                    showPendingOnly
+                                                                        ? "bg-primary/10 border-primary text-primary"
+                                                                        : "bg-surface/30 border-white/5 text-grey-medium hover:text-white"
+                                                                )}
+                                                            >
+                                                                <Filter size={10} />
+                                                                {showPendingOnly ? "À faire" : "Tous"}
+                                                            </button>
                                                         </div>
                                                     </div>
-                                                )}
+                                                </div>
                                             </div>
                                         )}
-                                    </div>
-
-                                    {/* Navigation Area */}
-                                    <div className="px-4 pb-3 pt-1 flex items-center justify-between">
-                                        <button
-                                            onClick={handleBack}
-                                            className="text-xs text-grey-medium hover:text-white flex items-center gap-1.5 transition-colors py-1 px-2 rounded-lg hover:bg-white/5 -ml-2"
-                                        >
-                                            <span className="text-primary text-base">‹</span>
-                                            <span className="font-medium">Retour</span>
-                                        </button>
-
-                                        <button
-                                            onClick={() => setShowPendingOnly(!showPendingOnly)}
-                                            className={clsx(
-                                                "text-[10px] font-bold uppercase tracking-wider flex items-center gap-1.5 px-2 py-1 rounded-lg border transition-all",
-                                                showPendingOnly
-                                                    ? "bg-primary/10 border-primary text-primary"
-                                                    : "bg-surface/30 border-white/5 text-grey-medium hover:text-white"
-                                            )}
-                                        >
-                                            <Filter size={10} />
-                                            {showPendingOnly ? "À faire" : "Tous"}
-                                        </button>
                                     </div>
                                 </div>
                             )}
@@ -1327,162 +1360,198 @@ const SuiviPedagogique = ({ timer, setTimer, timerFinished, setTimerFinished }) 
                                 )
                             )}
 
-                            {/* VIEW 2: MODULES LIST */}
+                            {/* VIEW 2: MODULES & ACTIVITIES (ACCORDION) */}
                             {currentView === 'modules' && (
                                 loadingModules ? (
                                     <div className="flex justify-center p-4"><Loader2 className="animate-spin text-primary" /></div>
                                 ) : (
-                                    <div className="space-y-2 animate-in fade-in slide-in-from-right-4 duration-300">
+                                    <div className="space-y-3 animate-in fade-in slide-in-from-right-4 duration-300 pb-10">
                                         {modules.map(module => {
                                             const isExpired = module.date_fin && new Date(module.date_fin) < new Date();
+                                            const isExpanded = selectedModule?.id === module.id;
+
                                             return (
-                                                <button
+                                                <div
                                                     key={module.id}
-                                                    onClick={() => setSelectedModule(module)}
                                                     className={clsx(
-                                                        "w-full text-left px-3 py-2.5 rounded-xl border group transition-all",
-                                                        isExpired
-                                                            ? "bg-surface/30 border-danger/40 hover:border-danger/60"
-                                                            : "bg-surface/30 border-white/5 hover:bg-surface/50 hover:border-primary/30"
+                                                        "rounded-2xl border-2 transition-all duration-300 overflow-hidden flex flex-col",
+                                                        isExpanded
+                                                            ? "bg-surface/40 border-primary/40 shadow-xl shadow-primary/5"
+                                                            : isExpired
+                                                                ? "bg-surface/30 border-danger/40 hover:border-danger/60"
+                                                                : "bg-surface/30 border-white/10 hover:bg-surface/50 hover:border-primary/30"
                                                     )}
                                                 >
-                                                    <div className="text-sm font-medium text-gray-200 group-hover:text-white transition-colors truncate mb-1.5">
-                                                        {module.nom}
-                                                    </div>
-                                                    <div className="flex items-center gap-2">
-                                                        <div className="flex-1 h-1.5 rounded-full bg-black/20 overflow-hidden">
-                                                            <div
+                                                    {/* MODULE HEADER BUTTON */}
+                                                    <button
+                                                        onClick={() => {
+                                                            if (isExpanded) {
+                                                                setSelectedModule(null);
+                                                                setActivities([]);
+                                                            } else {
+                                                                setSelectedModule(module);
+                                                            }
+                                                        }}
+                                                        className={clsx(
+                                                            "w-full text-left px-4 py-3.5 transition-all flex flex-col gap-2 group",
+                                                            isExpanded ? "bg-primary/5" : "hover:bg-white/[0.02]"
+                                                        )}
+                                                    >
+                                                        <div className="flex items-center justify-between gap-3">
+                                                            <div className={clsx(
+                                                                "text-sm font-bold transition-colors truncate",
+                                                                isExpanded ? "text-primary" : "text-gray-200 group-hover:text-white"
+                                                            )}>
+                                                                {module.nom}
+                                                            </div>
+                                                            <ChevronDown
+                                                                size={16}
                                                                 className={clsx(
-                                                                    "h-full transition-all duration-500 ease-out",
-                                                                    isExpired ? "bg-danger" : "bg-success"
+                                                                    "transition-transform duration-300 text-grey-medium",
+                                                                    isExpanded && "rotate-180 text-primary"
                                                                 )}
-                                                                style={{
-                                                                    width: `${(() => {
-                                                                        const studentLevelId = selectedStudent?.niveau_id;
-                                                                        if (!studentLevelId || !module.Activite) return 0;
-
-                                                                        const validActivities = module.Activite.filter(act => {
-                                                                            const levels = act.ActiviteNiveau?.map(an => an.niveau_id) || [];
-                                                                            return levels.length > 0 && levels.includes(studentLevelId);
-                                                                        });
-
-                                                                        if (validActivities.length === 0) return 0;
-
-                                                                        const completedCount = validActivities.filter(act => ['termine', 'a_verifier'].includes(progressions[act.id])).length;
-                                                                        return (completedCount / validActivities.length) * 100;
-                                                                    })()}%`
-                                                                }}
                                                             />
                                                         </div>
-                                                        {module.date_fin && (
-                                                            <div className={clsx(
-                                                                "text-[10px] font-bold shrink-0",
-                                                                isExpired ? "text-danger" : "text-white/50"
-                                                            )}>
-                                                                {new Date(module.date_fin).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' })}
+
+                                                        <div className="flex items-center gap-3">
+                                                            <div className="flex-1 h-1.5 rounded-full bg-black/30 overflow-hidden border border-white/5">
+                                                                <div
+                                                                    className={clsx(
+                                                                        "h-full transition-all duration-700 ease-out",
+                                                                        isExpired ? "bg-danger" : "bg-success"
+                                                                    )}
+                                                                    style={{
+                                                                        width: `${(() => {
+                                                                            const studentLevelId = selectedStudent?.niveau_id;
+                                                                            if (!studentLevelId || !module.Activite) return 0;
+
+                                                                            const validActivities = module.Activite.filter(act => {
+                                                                                const levels = act.ActiviteNiveau?.map(an => an.niveau_id) || [];
+                                                                                return levels.length > 0 && levels.includes(studentLevelId);
+                                                                            });
+
+                                                                            if (validActivities.length === 0) return 0;
+
+                                                                            const completedCount = validActivities.filter(act => {
+                                                                                let s = progressions[act.id];
+                                                                                if (!s || !['besoin_d_aide', 'a_verifier', 'termine', 'a_domicile'].includes(s)) s = 'a_commencer';
+                                                                                return ['termine', 'a_verifier'].includes(s);
+                                                                            }).length;
+                                                                            return (completedCount / validActivities.length) * 100;
+                                                                        })()}%`
+                                                                    }}
+                                                                />
                                                             </div>
-                                                        )}
-                                                    </div>
-                                                </button>
+                                                            {module.date_fin && (
+                                                                <div className={clsx(
+                                                                    "text-[10px] font-black shrink-0 uppercase tracking-tighter",
+                                                                    isExpired ? "text-danger" : "text-white/40"
+                                                                )}>
+                                                                    {new Date(module.date_fin).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' })}
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    </button>
+
+                                                    {/* INLINE ACTIVITIES ACCORDION (ENCOMPASSED) */}
+                                                    {isExpanded && (
+                                                        <div className="px-3 pb-4 space-y-2.5 animate-in slide-in-from-top-2 duration-300 border-t border-white/5 pt-3">
+                                                            {loadingActivities ? (
+                                                                <div className="flex justify-center p-4"><Loader2 className="animate-spin text-primary/50" size={16} /></div>
+                                                            ) : (
+                                                                activities.filter(activity => {
+                                                                    if (!selectedStudent?.niveau_id) return false;
+                                                                    const activityLevels = activity.ActiviteNiveau?.map(an => an.niveau_id) || [];
+                                                                    if (activityLevels.length === 0) return false;
+                                                                    return activityLevels.includes(selectedStudent.niveau_id);
+                                                                }).map(activity => {
+                                                                    let currentStatus = progressions[activity.id];
+                                                                    if (!currentStatus || !['besoin_d_aide', 'a_verifier', 'termine', 'a_domicile'].includes(currentStatus)) {
+                                                                        currentStatus = 'a_commencer';
+                                                                    }
+                                                                    return (
+                                                                        <div key={activity.id} className="p-3 bg-white/[0.03] rounded-xl border border-white/5 flex flex-col gap-3">
+                                                                            <div className="flex items-center gap-3">
+                                                                                <span className={clsx(
+                                                                                    "text-xs font-semibold leading-tight transition-colors",
+                                                                                    currentStatus === 'termine' && "text-success",
+                                                                                    currentStatus === 'besoin_d_aide' && "text-grey-medium",
+                                                                                    currentStatus !== 'termine' && currentStatus !== 'besoin_d_aide' && "text-gray-200"
+                                                                                )}>
+                                                                                    {activity.titre}
+                                                                                    {activity.ActiviteMateriel && activity.ActiviteMateriel.length > 0 && (
+                                                                                        <span className="ml-1 opacity-50 font-normal">
+                                                                                            [{activity.ActiviteMateriel.map(am => am.TypeMateriel?.acronyme).filter(Boolean).join(', ')}]
+                                                                                        </span>
+                                                                                    )}
+                                                                                </span>
+                                                                            </div>
+
+                                                                            <div className="flex items-center gap-2 w-full mt-1">
+                                                                                <button
+                                                                                    onClick={() => handleStatusClick(activity.id, 'a_commencer')}
+                                                                                    className={clsx(
+                                                                                        "flex-1 py-2 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all border shrink-0",
+                                                                                        currentStatus === 'a_commencer'
+                                                                                            ? "bg-primary text-text-dark border-primary shadow-sm"
+                                                                                            : currentStatus === 'a_domicile'
+                                                                                                ? "bg-primary text-danger border-danger border-2 shadow-sm"
+                                                                                                : "bg-black/20 border-white/5 text-grey-medium hover:border-primary/40"
+                                                                                    )}
+                                                                                >
+                                                                                    A.C.
+                                                                                </button>
+
+                                                                                <button
+                                                                                    onClick={() => handleStatusClick(activity.id, 'besoin_d_aide')}
+                                                                                    className={clsx(
+                                                                                        "flex-1 py-2 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all border shrink-0",
+                                                                                        currentStatus === 'besoin_d_aide'
+                                                                                            ? "bg-[#A0A8AD] text-white border-[#A0A8AD] shadow-sm"
+                                                                                            : "bg-black/20 border-white/5 text-grey-medium hover:border-grey-medium/40"
+                                                                                    )}
+                                                                                >
+                                                                                    Aide
+                                                                                </button>
+
+                                                                                <button
+                                                                                    onClick={() => handleStatusClick(activity.id, 'termine')}
+                                                                                    className={clsx(
+                                                                                        "flex-[1.5] py-2 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all border flex items-center justify-center gap-1.5 shrink-0",
+                                                                                        (currentStatus === 'termine' || currentStatus === 'a_verifier')
+                                                                                            ? (currentStatus === 'a_verifier'
+                                                                                                ? "bg-[#8B5CF6] text-white border-[#8B5CF6] shadow-sm"
+                                                                                                : "bg-success text-white border-success shadow-sm")
+                                                                                            : "bg-black/20 border-white/5 text-grey-medium hover:border-success/40"
+                                                                                    )}
+                                                                                >
+                                                                                    {currentStatus === 'a_verifier' ? (
+                                                                                        <>
+                                                                                            <ShieldCheck size={11} className="shrink-0" />
+                                                                                            <span>Verif</span>
+                                                                                        </>
+                                                                                    ) : (
+                                                                                        <>
+                                                                                            <Check size={11} className={clsx("shrink-0", currentStatus !== 'termine' && "opacity-50")} />
+                                                                                            <span>{currentStatus === 'termine' ? 'Validé' : 'Valider'}</span>
+                                                                                        </>
+                                                                                    )}
+                                                                                </button>
+                                                                            </div>
+                                                                        </div>
+                                                                    );
+                                                                })
+                                                            )}
+                                                            {activities.length === 0 && !loadingActivities && (
+                                                                <p className="text-center text-grey-medium text-[10px] py-2 italic">Aucune activité.</p>
+                                                            )}
+                                                        </div>
+                                                    )}
+                                                </div>
                                             );
                                         })}
                                         {modules.length === 0 && !loadingModules && (
                                             <p className="text-center text-grey-medium text-sm py-4">Aucun module en cours.</p>
-                                        )}
-                                    </div>
-                                )
-                            )}
-
-                            {/* VIEW 3: ACTIVITIES & ACTIONS */}
-                            {currentView === 'activities' && (
-                                loadingActivities ? (
-                                    <div className="flex justify-center p-4"><Loader2 className="animate-spin text-primary" /></div>
-                                ) : (
-                                    <div className="space-y-3 animate-in fade-in slide-in-from-right-4 duration-300">
-                                        {activities.filter(activity => {
-                                            if (!selectedStudent?.niveau_id) return false;
-                                            const activityLevels = activity.ActiviteNiveau?.map(an => an.niveau_id) || [];
-                                            // STRICT MATCHING: Show only if levels exist AND student matches one
-                                            if (activityLevels.length === 0) return false;
-                                            return activityLevels.includes(selectedStudent.niveau_id);
-                                        }).map(activity => {
-                                            const currentStatus = progressions[activity.id] || 'a_commencer';
-                                            return (
-                                                <div key={activity.id} className="p-3 bg-surface/20 rounded-xl border border-white/5 flex flex-col gap-3">
-                                                    <div className="flex items-center gap-3">
-                                                        <span className={clsx(
-                                                            "text-sm font-medium leading-tight transition-colors",
-                                                            currentStatus === 'termine' && "text-success font-bold",
-                                                            currentStatus === 'besoin_d_aide' && "text-[#A0A8AD] font-bold",
-                                                            currentStatus !== 'termine' && currentStatus !== 'besoin_d_aide' && "text-gray-200"
-                                                        )}>
-                                                            {activity.titre}
-                                                            {activity.ActiviteMateriel && activity.ActiviteMateriel.length > 0 && (
-                                                                <span className="ml-1 opacity-70 font-normal">
-                                                                    [{activity.ActiviteMateriel.map(am => am.TypeMateriel?.acronyme).filter(Boolean).join(', ')}]
-                                                                </span>
-                                                            )}
-                                                        </span>
-                                                    </div>
-
-                                                    {/* ACTION BUTTONS */}
-                                                    <div className="flex items-center gap-2 w-full">
-                                                        {/* A commencer */}
-                                                        <button
-                                                            onClick={() => handleStatusClick(activity.id, 'a_commencer')}
-                                                            className={clsx(
-                                                                "flex-1 py-2 rounded-lg text-[10px] font-bold uppercase tracking-wide transition-all border",
-                                                                currentStatus === 'a_commencer'
-                                                                    ? "bg-primary text-text-dark border-primary shadow-sm"
-                                                                    : "bg-black/20 border-white/10 text-grey-medium hover:text-primary hover:border-primary/50"
-                                                            )}
-                                                        >
-                                                            A.C.
-                                                        </button>
-
-                                                        {/* Aide */}
-                                                        <button
-                                                            onClick={() => handleStatusClick(activity.id, 'besoin_d_aide')}
-                                                            className={clsx(
-                                                                "flex-1 py-2 rounded-lg text-[10px] font-bold uppercase tracking-wide transition-all border",
-                                                                currentStatus === 'besoin_d_aide'
-                                                                    ? "bg-[#A0A8AD] text-white border-[#A0A8AD] shadow-sm"
-                                                                    : "bg-black/20 border-white/10 text-grey-medium hover:text-[#A0A8AD] hover:border-[#A0A8AD]/50"
-                                                            )}
-                                                        >
-                                                            Aide
-                                                        </button>
-
-                                                        {/* Fini / Verif */}
-                                                        <button
-                                                            onClick={() => handleStatusClick(activity.id, 'termine')}
-                                                            className={clsx(
-                                                                "flex-1 py-2 rounded-lg text-[10px] font-bold uppercase tracking-wide transition-all border flex items-center justify-center gap-1",
-                                                                (currentStatus === 'termine' || currentStatus === 'a_verifier')
-                                                                    ? (currentStatus === 'a_verifier'
-                                                                        ? "bg-[#8B5CF6] text-white border-[#8B5CF6] shadow-sm"
-                                                                        : "bg-success text-white border-success shadow-sm")
-                                                                    : "bg-black/20 border-white/10 text-grey-medium hover:text-success hover:border-success/50"
-                                                            )}
-                                                        >
-                                                            {currentStatus === 'a_verifier' ? (
-                                                                <>
-                                                                    <ShieldCheck size={12} className="inline" />
-                                                                    Verif
-                                                                </>
-                                                            ) : (
-                                                                <>
-                                                                    <Check size={12} className={currentStatus === 'termine' ? "inline" : "hidden"} />
-                                                                    {currentStatus === 'termine' ? 'Validé' : 'Valider'}
-                                                                </>
-                                                            )}
-                                                        </button>
-                                                    </div>
-                                                </div>
-                                            );
-                                        })}
-                                        {activities.length === 0 && !loadingActivities && (
-                                            <p className="text-center text-grey-medium text-sm py-4">Aucune activité dans ce module.</p>
                                         )}
                                     </div>
                                 )
@@ -1905,7 +1974,7 @@ const SuiviPedagogique = ({ timer, setTimer, timerFinished, setTimerFinished }) 
                                     <select
                                         value={currentAdultSelection || ''}
                                         onChange={(e) => setCurrentAdultSelection(e.target.value)}
-                                        className="w-full bg-white/5 border border-white/10 rounded-xl pl-10 pr-10 py-3 text-sm text-text-main appearance-none focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all cursor-pointer"
+                                        className="w-full bg-surface/40 border border-white/10 rounded-xl pl-10 pr-10 py-3.5 text-[11px] font-bold uppercase tracking-wider text-text-main appearance-none focus:outline-none focus:border-primary/50 transition-all cursor-pointer hover:bg-surface/60 group-hover:border-primary/30"
                                     >
                                         <option value="" disabled className="bg-surface">Sélectionner un adulte...</option>
                                         {allAdults.map(adult => (
@@ -1914,8 +1983,8 @@ const SuiviPedagogique = ({ timer, setTimer, timerFinished, setTimerFinished }) 
                                             </option>
                                         ))}
                                     </select>
-                                    <div className="absolute right-3 top-1/2 -translate-y-1/2 text-grey-medium pointer-events-none">
-                                        <ChevronDown size={16} />
+                                    <div className="absolute right-3 top-1/2 -translate-y-1/2 text-grey-medium pointer-events-none group-hover:text-primary transition-colors">
+                                        <ChevronDown size={14} />
                                     </div>
                                 </div>
                             </div>
@@ -1930,7 +1999,7 @@ const SuiviPedagogique = ({ timer, setTimer, timerFinished, setTimerFinished }) 
                                     <select
                                         value={currentActivityTypeSelection || ''}
                                         onChange={(e) => setCurrentActivityTypeSelection(e.target.value)}
-                                        className="w-full bg-white/5 border border-white/10 rounded-xl pl-10 pr-10 py-3 text-sm text-text-main appearance-none focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all cursor-pointer"
+                                        className="w-full bg-surface/40 border border-white/10 rounded-xl pl-10 pr-10 py-3.5 text-[11px] font-bold uppercase tracking-wider text-text-main appearance-none focus:outline-none focus:border-primary/50 transition-all cursor-pointer hover:bg-surface/60 group-hover:border-primary/30"
                                     >
                                         <option value="" disabled className="bg-surface">Sélectionner une action...</option>
                                         {availableActivityTypes.map(type => (
@@ -1939,8 +2008,8 @@ const SuiviPedagogique = ({ timer, setTimer, timerFinished, setTimerFinished }) 
                                             </option>
                                         ))}
                                     </select>
-                                    <div className="absolute right-3 top-1/2 -translate-y-1/2 text-grey-medium pointer-events-none">
-                                        <ChevronDown size={16} />
+                                    <div className="absolute right-3 top-1/2 -translate-y-1/2 text-grey-medium pointer-events-none group-hover:text-primary transition-colors">
+                                        <ChevronDown size={14} />
                                     </div>
                                 </div>
                             </div>

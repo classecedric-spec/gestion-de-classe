@@ -34,6 +34,9 @@ export const cleanupOrphanProgressions = async () => {
         const students = studentResponse.data || [];
         const activityLevels = actLevelResponse.data || [];
 
+        // DEBUG: Log counts
+        console.log(`📊 Cleanup Stats: ${progressions.length} progressions, ${students.length} students, ${activityLevels.length} activity-level links`);
+
         // 2. Build Lookup Maps
         const studentLevelMap = new Map(); // studentId -> niveauId
         students.forEach(s => studentLevelMap.set(s.id, s.niveau_id));
@@ -46,34 +49,42 @@ export const cleanupOrphanProgressions = async () => {
             activityAllowedLevelsMap.get(al.activite_id).add(al.niveau_id);
         });
 
+        // DEBUG: How many activities have level restrictions?
+        console.log(`📊 Activities with level restrictions: ${activityAllowedLevelsMap.size}`);
+
         // 3. Identify Orphans
         const idsToDelete = [];
+        let noStudentLevelCount = 0;
+        let noActivityLevelCount = 0;
+        let mismatchCount = 0;
 
         for (const prog of progressions) {
             const studentLevel = studentLevelMap.get(prog.eleve_id);
             const allowedLevels = activityAllowedLevelsMap.get(prog.activite_id);
 
-            // Case 1: Student has no level? (Should usually be valid, but if undefined, maybe delete?)
-            // Assuming student MUST have a level to have valid work.
+            // Case 1: Student has no level
             if (!studentLevel) {
-                // If logic dictates students must have levels, this is an orphan.
-                // But let's be safe: only delete if we are sure the mismatch is level-based.
+                noStudentLevelCount++;
                 continue;
             }
 
-            // Case 2: Activity has NO allowed levels defined.
-            // In the app logic, this means "Strict Restriction" / Hidden.
-            // So ANY progression on it is invalid.
+            // Case 2: Activity has NO allowed levels defined (means open to all OR strict hidden)
+            // We should NOT delete if activity has no restrictions (open to all)
             if (!allowedLevels || allowedLevels.size === 0) {
-                idsToDelete.push(prog.id);
+                // Skip - activity is open to all levels
+                noActivityLevelCount++;
                 continue;
             }
 
             // Case 3: Activity has levels, but Student's level is not one of them.
             if (!allowedLevels.has(studentLevel)) {
                 idsToDelete.push(prog.id);
+                mismatchCount++;
             }
         }
+
+        // DEBUG: Log breakdown
+        console.log(`📊 Breakdown: ${noStudentLevelCount} no student level, ${noActivityLevelCount} no activity restrictions, ${mismatchCount} mismatches`);
 
         // 4. Delete orphans
         if (idsToDelete.length > 0) {
