@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Users, Table, GraduationCap, Calendar, Clock } from 'lucide-react';
+import { Users, Table, GraduationCap, Calendar, Clock, Monitor, Tablet } from 'lucide-react';
 import clsx from 'clsx';
 import SuiviPedagogique from './SuiviPedagogique';
 import AvancementAteliers from './AvancementAteliers';
@@ -71,9 +71,10 @@ const SuiviGlobal = () => {
             {/* View Toggle Header */}
             <div className="bg-surface/50 border-b border-white/5 px-6 py-4 flex items-center sticky top-0 z-40 backdrop-blur-md shrink-0">
                 {/* Left spacer to balance right side content for perfect centering */}
+                {/* Left spacer to balance right side content for perfect centering */}
                 <div className="flex-1 hidden lg:block" />
 
-                <div className="neu-selector-container flex p-1.5 rounded-2xl w-full max-w-xl mx-auto shadow-2xl">
+                <div className="neu-selector-container flex p-1.5 rounded-2xl w-full max-w-4xl mx-auto shadow-2xl">
                     <button
                         onClick={() => setActiveView('suivi')}
                         data-active={activeView === 'suivi'}
@@ -99,6 +100,20 @@ const SuiviGlobal = () => {
                     >
                         <Table size={20} />
                         Suivi des groupes
+                    </button>
+                    <button
+                        onClick={() => window.open('/suivi-tablet', '_blank')}
+                        className="flex-1 flex items-center justify-center gap-3 px-8 py-4 rounded-xl text-[13px] font-black uppercase tracking-[0.15em] transition-all duration-300 text-grey-medium hover:text-white hover:bg-white/5"
+                    >
+                        <Tablet size={20} />
+                        Tablette
+                    </button>
+                    <button
+                        onClick={() => window.open('/suivi-tbi', '_blank')}
+                        className="flex-1 flex items-center justify-center gap-3 px-8 py-4 rounded-xl text-[13px] font-black uppercase tracking-[0.15em] transition-all duration-300 text-grey-medium hover:text-white hover:bg-white/5"
+                    >
+                        <Monitor size={20} />
+                        TBI
                     </button>
                 </div>
 

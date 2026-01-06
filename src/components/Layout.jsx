@@ -21,7 +21,8 @@ import {
     Smartphone,
     ShieldCheck, UserCheck,
     Tablet,
-    Monitor
+    Monitor,
+    Download
 } from 'lucide-react';
 import clsx from 'clsx';
 
@@ -33,6 +34,25 @@ const Layout = () => {
     const [pendingValidation, setPendingValidation] = useState(false);
     const location = useLocation();
     const navigate = useNavigate();
+    const [deferredPrompt, setDeferredPrompt] = useState(null);
+
+    useEffect(() => {
+        const handler = (e) => {
+            e.preventDefault();
+            setDeferredPrompt(e);
+        };
+        window.addEventListener('beforeinstallprompt', handler);
+        return () => window.removeEventListener('beforeinstallprompt', handler);
+    }, []);
+
+    const handleInstallClick = async () => {
+        if (!deferredPrompt) return;
+        deferredPrompt.prompt();
+        const { outcome } = await deferredPrompt.userChoice;
+        if (outcome === 'accepted') {
+            setDeferredPrompt(null);
+        }
+    };
 
     const isSuiviPage = location.pathname === '/dashboard/suivi';
     const isPresencePage = location.pathname === '/dashboard/presence';
@@ -114,8 +134,6 @@ const Layout = () => {
         { type: 'separator' },
         { icon: UserCheck, label: 'Présence', path: '/dashboard/presence' },
         { icon: GraduationCap, label: 'Suivi Global', path: '/dashboard/suivi' },
-        { icon: Tablet, label: 'Suivi Tablette', path: '/suivi-tablet', isExternal: true },
-        { icon: Monitor, label: 'Suivi TBI', path: '/suivi-tbi', isExternal: true },
         { type: 'separator' },
         { icon: Users, label: 'Utilisateurs', path: '/dashboard/user' },
         { icon: Puzzle, label: 'Activités', path: '/dashboard/activities' },
@@ -236,6 +254,15 @@ const Layout = () => {
                 </nav>
 
                 <div className="pb-4 px-4 sticky bottom-0 bg-surface">
+                    {deferredPrompt && (
+                        <button
+                            onClick={handleInstallClick}
+                            className="flex items-center w-full px-4 py-3 rounded-lg transition-colors group text-text-main hover:bg-input hover:text-primary mb-2"
+                        >
+                            <Download className="w-5 h-5 mr-3 shrink-0 text-primary" />
+                            <span className="truncate">Installer l'app</span>
+                        </button>
+                    )}
                     <button
                         onClick={handleLogout}
                         className="flex items-center w-full px-4 py-3 rounded-lg transition-colors group text-text-main hover:bg-input hover:text-danger mt-2"
