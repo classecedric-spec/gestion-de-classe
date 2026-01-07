@@ -19,6 +19,14 @@ const Auth = () => {
     const [copied, setCopied] = useState(false);
     const navigate = useNavigate();
 
+    // Detect if user is on mobile phone
+    const isMobilePhone = () => {
+        const ua = navigator.userAgent || navigator.vendor || window.opera;
+        const isMobile = /Android|webOS|iPhone|iPod|BlackBerry|IEMobile|Opera Mini/i.test(ua);
+        const isSmallScreen = window.innerWidth < 768;
+        return isMobile && isSmallScreen;
+    };
+
     useEffect(() => {
         const checkDB = async () => {
             setDbStatus(prev => ({ ...prev, checked: false }));
@@ -77,7 +85,13 @@ const Auth = () => {
                     password,
                 });
                 if (signInError) throw signInError;
-                navigate('/dashboard');
+
+                // Redirect based on device type
+                if (isMobilePhone()) {
+                    navigate('/mobile-dashboard');
+                } else {
+                    navigate('/dashboard');
+                }
             }
         } catch (err) {
             setError(err.message);

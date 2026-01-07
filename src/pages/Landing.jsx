@@ -1,9 +1,25 @@
-import { Link } from 'react-router-dom';
+import { Link, Navigate } from 'react-router-dom';
 import { LogIn, Layers, Users, BookOpen, ChevronRight, CheckCircle2, Star, ShieldCheck, Zap, Sparkles } from 'lucide-react';
 import clsx from 'clsx';
 import Footer from '../components/Footer';
 
+// Function to detect if the user is on a mobile phone (not tablet)
+const isMobilePhone = () => {
+    if (typeof window === 'undefined') return false;
+    const ua = navigator.userAgent || navigator.vendor || window.opera;
+    // Check for mobile phones specifically (excludes tablets like iPad)
+    const isMobile = /Android|webOS|iPhone|iPod|BlackBerry|IEMobile|Opera Mini/i.test(ua);
+    // Also check screen width for extra safety (phones are typically < 768px)
+    const isSmallScreen = window.innerWidth < 768;
+    return isMobile && isSmallScreen;
+};
+
 const Landing = () => {
+    // Redirect mobile phone users to the mobile version
+    if (isMobilePhone()) {
+        return <Navigate to="/mobile" replace />;
+    }
+
     return (
         <div className="min-h-screen bg-background text-text-main font-sans overflow-x-hidden flex flex-col selection:bg-primary/30 selection:text-white transition-colors duration-500">
             {/* Header */}

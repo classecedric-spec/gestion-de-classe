@@ -26,12 +26,18 @@ import MobileSuivi from './pages/MobileSuivi';
 import Features from './pages/Features';
 import Privacy from './pages/Privacy';
 import Fonctionnement from './pages/Fonctionnement';
+import LandingMobile from './pages/LandingMobile';
+import MobileDashboard from './pages/MobileDashboard';
+import MobileEncodage from './pages/MobileEncodage';
 import { Navigate } from 'react-router-dom';
 
 function App() {
   return (
     <Routes>
       <Route path="/" element={<Landing />} />
+      <Route path="/mobile" element={<LandingMobile />} />
+      <Route path="/mobile-dashboard" element={<MobileDashboard />} />
+      <Route path="/mobile-encodage" element={<MobileEncodage />} />
       <Route path="/features" element={<Features />} />
       <Route path="/privacy" element={<Privacy />} />
       <Route path="/login" element={<Auth />} />
