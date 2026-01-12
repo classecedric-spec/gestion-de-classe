@@ -8,6 +8,8 @@ import { resizeAndConvertToBase64 } from '../lib/imageUtils';
 import clsx from 'clsx';
 import StudentModal from '../components/StudentModal';
 import { pdf } from '@react-pdf/renderer';
+import { format } from 'date-fns';
+import { fr } from 'date-fns/locale';
 
 import StudentTrackingPDFModern from '../components/StudentTrackingPDFModern';
 import { saveAs } from 'file-saver';
@@ -1033,7 +1035,7 @@ const Students = () => {
                                                                                 <Layers size={20} />
                                                                             </div>
                                                                             <div>
-                                                                                <h3 className="font-bold text-text-main">{module.nom}</h3>
+                                                                                <h3 className="font-bold text-text-main">{module.nom} {module.date_fin && <span className="text-primary/70 font-black ml-1 text-xs">({format(new Date(module.date_fin), 'dd/MM', { locale: fr })})</span>}</h3>
                                                                             </div>
                                                                         </div>
                                                                         <div className="flex items-center gap-4">
@@ -1214,7 +1216,7 @@ const Students = () => {
                                                                                                             >
                                                                                                                 <div className="flex items-center gap-2">
                                                                                                                     <BookOpen size={14} className="text-primary/70" />
-                                                                                                                    <span className="text-grey-light font-medium">{mod.nom}</span>
+                                                                                                                    <span className="text-grey-light font-medium">{mod.nom} {mod.date_fin && <span className="text-primary/70 font-black ml-1 text-[10px]">({format(new Date(mod.date_fin), 'dd/MM', { locale: fr })})</span>}</span>
                                                                                                                 </div>
                                                                                                                 <div className="flex items-center gap-2">
                                                                                                                     <div className="w-10 h-0.5 bg-background/50 rounded-full overflow-hidden">

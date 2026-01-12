@@ -113,18 +113,23 @@ export function useMandatoryActivities(selectedGroupId, students) {
                         ),
                         Activite (
                             id,
-                            ActiviteNiveau!inner (niveau_id)
+                            statut_exigence,
+                            ActiviteNiveau!inner (niveau_id, statut_exigence)
                         )
                     `)
                     .eq('statut', 'en_cours');
 
                 if (modErr) throw modErr;
 
-                // Filter modules to only those having activities for the selected level
+                // Filter modules to only those having mandatory activities for the selected level
                 const modulesWithStats = modules.map(mod => {
-                    const levelActivities = mod.Activite.filter(act =>
-                        act.ActiviteNiveau.some(an => an.niveau_id === selectedLevelId)
-                    );
+                    const levelActivities = mod.Activite.filter(act => {
+                        const levelLink = act.ActiviteNiveau.find(an => an.niveau_id === selectedLevelId);
+                        if (!levelLink) return false;
+
+                        const status = levelLink?.statut_exigence || act.statut_exigence || 'obligatoire';
+                        return status === 'obligatoire';
+                    });
 
                     if (levelActivities.length === 0) return null;
 
@@ -144,14 +149,19 @@ export function useMandatoryActivities(selectedGroupId, students) {
                     const studentIds = levelStudents.map(s => s.id);
                     const activityIds = levelActivities.map(a => a.id);
 
-                    const totalPotential = studentIds.length * activityIds.length;
+                    // Count existing progressions (not theoretical)
+                    const totalExisting = groupProgressions.filter(p =>
+                        studentIds.includes(p.eleve_id) &&
+                        activityIds.includes(p.activite_id)
+                    ).length;
+
                     const completedCount = groupProgressions.filter(p =>
                         studentIds.includes(p.eleve_id) &&
                         activityIds.includes(p.activite_id) &&
                         (p.etat === 'termine' || p.etat === 'a_verifier')
                     ).length;
 
-                    const percent = totalPotential > 0 ? Math.round((completedCount / totalPotential) * 100) : 0;
+                    const percent = totalExisting > 0 ? Math.round((completedCount / totalExisting) * 100) : 0;
 
                     return {
                         id: mod.id,
@@ -219,7 +229,8 @@ export function useMandatoryActivities(selectedGroupId, students) {
                     ),
                     Activite (
                         id,
-                        ActiviteNiveau (niveau_id)
+                        statut_exigence,
+                        ActiviteNiveau (niveau_id, statut_exigence)
                     )
                 `)
                 .in('id', moduleIds);
@@ -235,32 +246,53 @@ export function useMandatoryActivities(selectedGroupId, students) {
                         const level = levels.find(l => l.id === mm.level_id);
                         const levelName = level?.nom || 'Inconnu';
 
-                        const levelActivities = mod.Activite.filter(act =>
-                            act.ActiviteNiveau.some(an => an.niveau_id === mm.level_id)
-                        );
+                        // Determine if an activity is mandatory for this level
+                        const levelActivities = mod.Activite.filter(act => {
+                            // 1. Check if activity is linked to this level
+                            const levelLink = act.ActiviteNiveau.find(an => an.niveau_id === mm.level_id);
+                            if (!levelLink) return false;
+
+                            // 2. Respect requirement status (Specific level status overrides base activity status)
+                            const status = levelLink?.statut_exigence || act.statut_exigence || 'obligatoire';
+                            return status === 'obligatoire';
+                        });
 
                         const levelStudents = students.filter(s => (s.niveau_id === mm.level_id || s.Niveau?.id === mm.level_id));
                         const studentIds = levelStudents.map(s => s.id);
                         const activityIds = levelActivities.map(a => a.id);
 
-                        const totalPotential = studentIds.length * activityIds.length;
+                        // Count existing progressions (not theoretical)
+                        const totalExisting = groupProgressions.filter(p =>
+                            studentIds.includes(p.eleve_id) &&
+                            activityIds.includes(p.activite_id)
+                        ).length;
+
                         const completedCount = groupProgressions.filter(p =>
                             studentIds.includes(p.eleve_id) &&
                             activityIds.includes(p.activite_id) &&
                             (p.etat === 'termine' || p.etat === 'a_verifier')
                         ).length;
 
-                        const percent = totalPotential > 0 ? Math.round((completedCount / totalPotential) * 100) : 0;
+                        const percent = totalExisting > 0 ? Math.round((completedCount / totalExisting) * 100) : 0;
 
                         // Find students who haven't finished all activities of this level in this module
                         const remainingStudents = levelStudents
                             .filter(s => {
+                                // Count completed activities
                                 const completedForStudent = groupProgressions.filter(p =>
                                     p.eleve_id === s.id &&
                                     activityIds.includes(p.activite_id) &&
                                     (p.etat === 'termine' || p.etat === 'a_verifier')
                                 ).length;
-                                return completedForStudent < activityIds.length;
+
+                                // Check if student has ANY progression for this module's activities
+                                const hasProgressions = groupProgressions.some(p =>
+                                    p.eleve_id === s.id &&
+                                    activityIds.includes(p.activite_id)
+                                );
+
+                                // Only show students who have started AND haven't finished all
+                                return hasProgressions && completedForStudent < activityIds.length;
                             })
                             .map(s => {
                                 const completedForStudent = groupProgressions.filter(p =>

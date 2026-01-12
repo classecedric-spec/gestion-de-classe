@@ -90,7 +90,7 @@ export function useBranchesAndModules(selectedStudent, showPendingOnly, selected
                 const { data, error } = await supabase
                     .from('Module')
                     .select(`
-                        id, nom, sous_branche_id, statut,
+                        id, nom, date_fin, sous_branche_id, statut,
                         SousBranche:sous_branche_id (
                             nom,
                             ordre,

@@ -4,6 +4,8 @@ import { Check, Users, Loader2, X } from 'lucide-react';
 import { getInitials } from '../../../lib/utils';
 import clsx from 'clsx';
 import { toast } from 'sonner';
+import { format } from 'date-fns';
+import { fr } from 'date-fns/locale';
 
 /**
  * HelpRequestsPanel
@@ -85,6 +87,11 @@ const HelpRequestsPanel = ({
                                             <p className="font-medium text-primary/80 truncate" style={{ fontSize: 'clamp(10px, 3.5cqw, 20px)' }}>
                                                 {/* Fallback if module name not explicitly available */}
                                                 {req.activite?.Module?.nom || 'Module'}
+                                                {req.activite?.Module?.date_fin && (
+                                                    <span className="text-primary/60 ml-1 font-black">
+                                                        ({format(new Date(req.activite.Module.date_fin), 'dd/MM', { locale: fr })})
+                                                    </span>
+                                                )}
                                             </p>
                                         </div>
 

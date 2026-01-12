@@ -8,6 +8,8 @@ import clsx from 'clsx';
 import { pdf } from '@react-pdf/renderer';
 import { saveAs } from 'file-saver';
 import AvancementPDF from '../components/AvancementPDF';
+import { format } from 'date-fns';
+import { fr } from 'date-fns/locale';
 
 const AvancementAteliers = () => {
     // --- STATE ---
@@ -262,11 +264,22 @@ const AvancementAteliers = () => {
                 const studentIds = students.map(s => s.id);
                 const actIds = sortedActs.map(a => a.id);
 
-                const { data: progs } = await supabase
-                    .from('Progression')
-                    .select('eleve_id, activite_id, etat')
-                    .in('eleve_id', studentIds)
-                    .in('activite_id', actIds);
+                // CHUNKING: Split actIds into smaller chunks to avoid URL length limits
+                const CHUNK_SIZE = 50;
+                let allProgs = [];
+
+                for (let i = 0; i < actIds.length; i += CHUNK_SIZE) {
+                    const chunk = actIds.slice(i, i + CHUNK_SIZE);
+                    const { data: chunkProgs } = await supabase
+                        .from('Progression')
+                        .select('eleve_id, activite_id, etat')
+                        .in('eleve_id', studentIds)
+                        .in('activite_id', chunk);
+
+                    if (chunkProgs) {
+                        allProgs = allProgs.concat(chunkProgs);
+                    }
+                }
 
                 // Filter Logic: Keep activities relevant to ANY student in the group
                 // If activity has NO levels defined, we assume it's strict (hidden).
@@ -282,7 +295,7 @@ const AvancementAteliers = () => {
                 setActivities(filteredActs);
 
                 const progMap = {};
-                progs?.forEach(p => {
+                allProgs.forEach(p => {
                     progMap[`${p.eleve_id}-${p.activite_id}`] = p.etat;
                 });
                 setProgressions(progMap);
@@ -313,28 +326,12 @@ const AvancementAteliers = () => {
         const currentStatus = progressions[`${student.id}-${activity.id}`] || 'a_commencer';
         let nextStatus = 'termine';
 
-        // Cycle: a_commencer -> besoin_d_aide -> ajustement -> termine -> a_commencer
+        // Cycle: a_commencer → besoin_d_aide → a_domicile → ajustement → termine → a_commencer
         if (currentStatus === 'a_commencer') nextStatus = 'besoin_d_aide';
-        else if (currentStatus === 'besoin_d_aide') nextStatus = 'ajustement';
+        else if (currentStatus === 'besoin_d_aide') nextStatus = 'a_domicile';
+        else if (currentStatus === 'a_domicile') nextStatus = 'ajustement';
         else if (currentStatus === 'ajustement') nextStatus = 'termine';
-        else if (currentStatus === 'termine' || currentStatus === 'a_verifier') nextStatus = 'a_commencer';
-
-        // Auto-Verification Logic
-        if (nextStatus === 'termine') {
-            const branchId = activity.Module?.SousBranche?.Branche?.id;
-            const studentIndex = studentIndices[student.id]?.[branchId] ?? 50; // Default 50
-            const roll = Math.random() * 100;
-
-            // If roll is LESS than index, trigger verification
-            // High index = High chance of verif? User said: "Si ce nombre est inférieur a l'indice... ajouté d'office"
-            // So if Index is 80, Rolls 0-79 trigger it (80% chance).
-            // Logic: High Index = Need more monitoring. Correct.
-
-            if (roll < studentIndex) {
-                nextStatus = 'a_verifier';
-                toast("Verif. requise (Auto)", { description: "L'élève a été ajouté à la liste de vérification." });
-            }
-        }
+        else if (currentStatus === 'termine') nextStatus = 'a_commencer';
 
         // Optimistic Update
         const key = `${student.id}-${activity.id}`;
@@ -523,26 +520,6 @@ const AvancementAteliers = () => {
                             <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-grey-medium pointer-events-none group-hover:text-primary transition-colors" size={16} />
                         </div>
                     </div>
-
-                    <button
-                        onClick={handleGeneratePDF}
-                        disabled={generatingPDF || students.length === 0 || activities.length === 0}
-                        className={clsx(
-                            "px-6 py-3 rounded-xl font-bold flex items-center justify-center gap-2 transition-all min-h-[48px]",
-                            students.length === 0 || activities.length === 0
-                                ? "bg-white/5 text-grey-medium cursor-not-allowed opacity-50"
-                                : "bg-primary/10 border border-primary/20 text-primary hover:bg-primary hover:text-black hover:border-primary"
-                        )}
-                    >
-                        {generatingPDF ? (
-                            <Loader2 size={18} className="animate-spin" />
-                        ) : (
-                            <FileText size={18} />
-                        )}
-                        <span className="text-[11px] uppercase tracking-[0.15em] font-black">
-                            {generatingPDF ? 'Génération...' : 'Générer les listes de travail'}
-                        </span>
-                    </button>
                 </div>
 
                 {/* 2. Operator Selector */}
@@ -673,8 +650,13 @@ const AvancementAteliers = () => {
                                                     colSpan={span.count}
                                                     className="sticky top-0 z-30 p-2 bg-surface"
                                                 >
-                                                    <div className="bg-white/5 border border-white/10 rounded-lg py-1.5 px-3 text-[10px] font-bold text-primary uppercase tracking-widest whitespace-nowrap mx-1">
-                                                        {span.nom}
+                                                    <div className="bg-white/5 border border-white/10 rounded-lg py-1.5 px-3 text-[10px] font-bold text-primary uppercase tracking-widest whitespace-nowrap mx-1 flex items-center justify-between gap-4">
+                                                        <span>{span.nom}</span>
+                                                        {modules.find(m => m.id === span.id)?.date_fin && (
+                                                            <span className="text-primary font-medium opacity-80 shrink-0">
+                                                                {format(new Date(modules.find(m => m.id === span.id).date_fin), 'dd/MM', { locale: fr })}
+                                                            </span>
+                                                        )}
                                                     </div>
                                                 </th>
                                             ))}

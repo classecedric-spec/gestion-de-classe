@@ -421,9 +421,10 @@ const SuiviGlobalTBI = () => {
 
         let nextStatus = 'termine';
         if (currentStatus === 'a_commencer' || !currentStatus) nextStatus = 'besoin_d_aide';
-        else if (currentStatus === 'besoin_d_aide') nextStatus = 'ajustement';
+        else if (currentStatus === 'besoin_d_aide') nextStatus = 'a_domicile';
+        else if (currentStatus === 'a_domicile') nextStatus = 'ajustement';
         else if (currentStatus === 'ajustement') nextStatus = 'termine';
-        else if (currentStatus === 'termine' || currentStatus === 'a_verifier') nextStatus = 'a_commencer';
+        else if (currentStatus === 'termine') nextStatus = 'a_commencer';
 
         // Optimistic UI update
         setProgressions(prev => ({ ...prev, [activityId]: nextStatus }));

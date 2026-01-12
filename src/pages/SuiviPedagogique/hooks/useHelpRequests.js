@@ -40,6 +40,7 @@ export function useHelpRequests(students, selectedStudent, fetchStudentProgressi
                     Module(
                     id,
                     nom,
+                    date_fin,
                     statut,
                     SousBranche (
                     Branche (

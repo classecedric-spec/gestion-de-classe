@@ -8,6 +8,8 @@ import clsx from 'clsx';
 import { toast } from 'sonner';
 import { getInitials, calculateAge } from '../../lib/utils';
 import TimerModal from '../../components/TimerModal';
+import { format } from 'date-fns';
+import { fr } from 'date-fns/locale';
 
 // Hooks
 import { useTimerIntegration } from './hooks/useTimerIntegration';
@@ -354,19 +356,26 @@ const SuiviPedagogique = ({ timer, setTimer, timerFinished, setTimerFinished }) 
                                                             )}
                                                         >
                                                             <div className="flex items-center justify-between gap-3">
-                                                                <div className={clsx(
-                                                                    "text-sm font-bold transition-colors truncate",
-                                                                    isExpanded ? "text-primary" : "text-gray-200 group-hover:text-white"
-                                                                )}>
-                                                                    {module.nom}
+                                                                <div className="flex items-center gap-3 min-w-0">
+                                                                    <ChevronDown
+                                                                        size={16}
+                                                                        className={clsx(
+                                                                            "transition-transform duration-300 text-grey-medium shrink-0",
+                                                                            isExpanded && "rotate-180 text-primary"
+                                                                        )}
+                                                                    />
+                                                                    <div className={clsx(
+                                                                        "text-sm font-bold transition-colors truncate",
+                                                                        isExpanded ? "text-primary" : "text-gray-200 group-hover:text-white"
+                                                                    )}>
+                                                                        {module.nom}
+                                                                    </div>
                                                                 </div>
-                                                                <ChevronDown
-                                                                    size={16}
-                                                                    className={clsx(
-                                                                        "transition-transform duration-300 text-grey-medium",
-                                                                        isExpanded && "rotate-180 text-primary"
-                                                                    )}
-                                                                />
+                                                                {module.date_fin && (
+                                                                    <div className="text-[11px] font-medium text-primary/70 shrink-0">
+                                                                        {format(new Date(module.date_fin), 'dd/MM', { locale: fr })}
+                                                                    </div>
+                                                                )}
                                                             </div>
 
                                                             <div className="flex items-center gap-3">
@@ -381,14 +390,6 @@ const SuiviPedagogique = ({ timer, setTimer, timerFinished, setTimerFinished }) 
                                                                         }}
                                                                     />
                                                                 </div>
-                                                                {module.date_fin && (
-                                                                    <div className={clsx(
-                                                                        "text-[10px] font-black shrink-0 uppercase tracking-tighter",
-                                                                        isExpired ? "text-danger" : "text-white/40"
-                                                                    )}>
-                                                                        {new Date(module.date_fin).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' })}
-                                                                    </div>
-                                                                )}
                                                             </div>
                                                         </button>
 

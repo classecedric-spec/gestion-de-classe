@@ -40,21 +40,26 @@ export const fetchStudentPdfData = async (studentId, studentNiveauId) => {
 
     if (progError) throw progError;
 
-    // Filter progressions
+    // Filter progressions - STRICT INCLUSION
     const filteredProgressions = (progressionData || []).filter(p => {
-        // Must have Activite and Module
+        // 1. Must have Activite and Module
         if (!p.Activite?.Module) return false;
-        // Module must be 'en_cours'
+
+        // 2. Module must be 'en_cours'
         if (p.Activite.Module.statut !== 'en_cours') return false;
-        // Exclude 'termine' state
-        if (p.etat === 'termine') return false;
-        // Filter by student level (ActiviteNiveau)
+
+        // 3. STRICT: Only include 'en_cours' and 'a_domicile' states
+        const validStates = ['en_cours', 'a_domicile'];
+        if (!validStates.includes(p.etat)) return false;
+
+        // 4. Filter by student level (ActiviteNiveau)
         if (studentNiveauId && p.Activite.ActiviteNiveau?.length > 0) {
             const hasMatchingLevel = p.Activite.ActiviteNiveau.some(
                 an => an.niveau_id === studentNiveauId
             );
             if (!hasMatchingLevel) return false;
         }
+
         return true;
     });
 

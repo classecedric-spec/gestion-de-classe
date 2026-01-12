@@ -820,57 +820,11 @@ const Groups = () => {
                         {/* Actions Tab */}
                         {activeTab === 'actions' && (
                             <div className="flex-1 flex flex-col items-center justify-center text-grey-dark p-12 text-center bg-background/20">
-                                <div className="w-full max-w-md space-y-4">
-                                    <div className="bg-surface/50 p-6 rounded-2xl border border-white/10 shadow-lg">
-                                        <div className="w-16 h-16 bg-primary/20 text-primary rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-inner">
-                                            <FileText size={32} />
-                                        </div>
-                                        <h3 className="text-lg font-bold text-text-main mb-2">Générer les listes de travail</h3>
-                                        <p className="text-sm text-grey-medium mb-6">
-                                            Téléchargez un fichier PDF unique contenant les listes de travail (To-Do Lists) pour tous les élèves de ce groupe.
-                                        </p>
-                                        <div className="w-full">
-                                            {loading && progress > 0 ? (
-                                                <div className="w-full bg-surface border border-white/10 rounded-xl p-4 flex flex-col gap-3">
-                                                    <div className="flex justify-between items-center text-sm font-medium text-text-main">
-                                                        <span className="truncate pr-4">{progressText}</span>
-                                                        <span className="text-primary">{progress}%</span>
-                                                    </div>
-
-                                                    {/* Progress Track */}
-                                                    <div className="w-full h-3 bg-background/50 rounded-full overflow-hidden border border-white/5">
-                                                        {/* Solid Bar instead of Gradient to reduce 'jumping' visual perception */}
-                                                        <div
-                                                            className="h-full bg-primary transition-all duration-200 ease-linear shadow-[0_0_10px_rgba(217,185,129,0.3)]"
-                                                            style={{ width: `${progress}%` }}
-                                                        />
-                                                    </div>
-
-                                                    <button
-                                                        onClick={handleCancelGeneration}
-                                                        className="mx-auto mt-3 px-4 py-2 rounded-lg bg-white/5 hover:bg-danger/10 text-xs font-bold text-grey-medium hover:text-danger border border-white/5 hover:border-danger/20 transition-all flex items-center gap-2 group"
-                                                    >
-                                                        <X size={14} className="group-hover:scale-110 transition-transform" />
-                                                        Annuler <span className="opacity-50 text-[10px] ml-1 font-normal">(ESC)</span>
-                                                    </button>
-                                                </div>
-                                            ) : (
-                                                <button
-                                                    onClick={() => handleGenerateGroupTodoList(true)}
-                                                    disabled={loading}
-                                                    className="w-full py-4 bg-primary hover:bg-primary/90 text-white rounded-xl font-bold shadow-lg shadow-primary/20 flex flex-col items-center justify-center gap-2 transition-all hover:scale-[1.01] active:scale-[0.99]"
-                                                    title="Générer le PDF (Mode Éco A5)"
-                                                >
-                                                    <div className="flex items-center gap-2">
-                                                        <FileText size={20} />
-                                                        <span className="text-lg">Générer les livrets (Mode Éco A5)</span>
-                                                    </div>
-                                                    <span className="text-xs opacity-70 font-normal">2 pages par feuille • Économie de papier</span>
-                                                </button>
-                                            )}
-                                        </div>
-                                    </div>
+                                <div className="w-20 h-20 rounded-full bg-white/5 flex items-center justify-center mb-6">
+                                    <LayoutList size={40} />
                                 </div>
+                                <h3 className="text-xl font-bold text-grey-medium mb-2">Aucune action disponible</h3>
+                                <p className="max-w-xs text-grey-medium">Il n'y a actuellement aucune action rapide pour ce groupe.</p>
                             </div>
                         )}
                     </>
