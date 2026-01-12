@@ -1,101 +1,105 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { ShieldCheck, Lock, EyeOff, Database, FileText, ChevronLeft } from 'lucide-react';
+import { ShieldCheck, Lock, EyeOff, Database, ChevronLeft } from 'lucide-react';
 import Footer from '../components/Footer';
 
 const Privacy = () => {
     return (
         <div className="min-h-screen bg-background text-text-main font-sans selection:bg-primary/30">
+            {/* Background Effects */}
+            <div className="fixed top-0 left-0 w-full h-full overflow-hidden -z-10 pointer-events-none">
+                <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-primary/5 rounded-full blur-[120px]"></div>
+                <div className="absolute bottom-0 left-0 w-[500px] h-[500px] bg-blue-500/5 rounded-full blur-[120px]"></div>
+            </div>
+
             {/* Header */}
-            <header className="h-20 flex items-center justify-between px-6 md:px-12 border-b border-border bg-background/50 backdrop-blur-md sticky top-0 z-50">
-                <Link to="/" className="flex items-center gap-3 hover:scale-105 transition-transform group">
-                    <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center text-text-dark font-black shadow-lg">G</div>
-                    <span className="text-sm font-black uppercase tracking-widest text-white italic">Gestion<span className="text-primary not-italic">Classe</span></span>
+            <header className="h-20 flex items-center justify-between px-6 md:px-12 border-b border-white/5 bg-background/50 backdrop-blur-md sticky top-0 z-50">
+                <Link to="/" className="flex items-center gap-3 hover:opacity-80 transition-opacity">
+                    <div className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center text-white font-black border border-white/10">G</div>
+                    <span className="text-sm font-bold uppercase tracking-widest text-white">Gestion<span className="text-primary">Classe</span></span>
                 </Link>
-                <Link to="/" className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-grey-medium hover:text-primary transition-colors">
-                    <ChevronLeft size={14} /> Retour à l'accueil
+                <Link to="/" className="text-xs font-bold uppercase tracking-widest text-grey-medium hover:text-white transition-colors">
+                    Fermer
                 </Link>
             </header>
 
-            <main className="max-w-4xl mx-auto px-6 py-20">
-                <div className="mb-20 text-center relative">
-                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-64 bg-primary/10 rounded-full blur-[80px] -z-10"></div>
-                    <div className="w-20 h-20 bg-primary/10 rounded-3xl flex items-center justify-center text-primary mx-auto mb-8 border border-primary/20 shadow-xl">
-                        <ShieldCheck size={40} />
-                    </div>
-                    <h1 className="text-4xl md:text-6xl font-black text-white mb-6 tracking-tighter uppercase italic leading-none">
-                        VIE PRIVÉE & <br /> <span className="text-primary not-italic">CONFIDENTIALITÉ</span>
+            <main className="max-w-3xl mx-auto px-6 py-24">
+                <div className="mb-24">
+                    <h1 className="text-5xl md:text-7xl font-black text-white mb-8 tracking-tighter">
+                        Confidentialité. <br />
+                        <span className="text-grey-dark">D'abord.</span>
                     </h1>
-                    <p className="text-grey-medium font-medium">Nous plaçons la protection de vos données et de celles de vos élèves au cœur de notre développement.</p>
+                    <p className="text-xl text-grey-medium font-medium leading-loose">
+                        Votre confiance est notre priorité absolue. Nous avons conçu GestionClasse pour protéger vos données et celles de vos élèves par défaut.
+                    </p>
                 </div>
 
-                <div className="space-y-12">
+                <div className="space-y-24">
                     {/* Section 1 */}
-                    <div className="bg-surface/30 p-8 md:p-10 rounded-[2.5rem] border border-border backdrop-blur-sm shadow-xl">
-                        <div className="flex items-center gap-4 mb-6">
-                            <div className="w-10 h-10 rounded-xl bg-primary/20 flex items-center justify-center text-primary border border-primary/10">
-                                <Database size={20} />
-                            </div>
-                            <h2 className="text-2xl font-black text-white tracking-tight uppercase italic">Nature des données collectées</h2>
+                    <section className="border-t border-white/10 pt-12">
+                        <div className="flex items-start gap-6 mb-8">
+                            <Database size={32} className="text-primary shrink-0 mt-1" />
+                            <h2 className="text-3xl font-bold text-white tracking-tight">Données collectées</h2>
                         </div>
-                        <div className="space-y-4 text-grey-light font-medium leading-relaxed">
-                            <p>Nous collectons uniquement les informations nécessaires au bon fonctionnement de l'application pédagogique :</p>
-                            <ul className="list-disc list-inside space-y-2 ml-4">
-                                <li>Informations de l'enseignant (Nom, Prénom, Email, École)</li>
-                                <li>Informations des élèves (Nom, Prénom, Niveau scolaire)</li>
-                                <li>Suivi pédagogique (Progressions, réussites, besoins d'aide)</li>
-                                <li>Préférences d'affichage et réglages de l'interface</li>
+                        <div className="pl-14 text-lg text-grey-light leading-relaxed space-y-6">
+                            <p>Nous collectons strictement le minimum nécessaire au fonctionnement pédagogique :</p>
+                            <ul className="grid gap-4">
+                                {[
+                                    "Identité de l'enseignant (Nom, Email professionnel)",
+                                    "Liste des élèves (Prénom, Nom, Niveau)",
+                                    "Données pédagogiques (Progression, Compétences)",
+                                    "Paramètres d'interface"
+                                ].map((item, i) => (
+                                    <li key={i} className="flex items-center gap-3 text-grey-medium">
+                                        <div className="w-1.5 h-1.5 rounded-full bg-white/20"></div>
+                                        {item}
+                                    </li>
+                                ))}
                             </ul>
                         </div>
-                    </div>
+                    </section>
 
                     {/* Section 2 */}
-                    <div className="bg-surface/30 p-8 md:p-10 rounded-[2.5rem] border border-border backdrop-blur-sm shadow-xl">
-                        <div className="flex items-center gap-4 mb-6">
-                            <div className="w-10 h-10 rounded-xl bg-primary/20 flex items-center justify-center text-primary border border-primary/10">
-                                <Lock size={20} />
+                    <section className="border-t border-white/10 pt-12">
+                        <div className="flex items-start gap-6 mb-8">
+                            <Lock size={32} className="text-primary shrink-0 mt-1" />
+                            <h2 className="text-3xl font-bold text-white tracking-tight">Sécurité & RGPD</h2>
+                        </div>
+                        <div className="pl-14 text-lg text-grey-light leading-relaxed space-y-6">
+                            <p>
+                                L'application respecte les normes les plus strictes. Vos données sont hébergées sur des serveurs sécurisés en Europe.
+                            </p>
+                            <div className="bg-surface/50 border border-white/5 rounded-2xl p-6 text-base">
+                                <p className="mb-4 text-white font-bold">Vos droits (RGPD)</p>
+                                <p className="text-grey-medium">
+                                    Vous restez seul propriétaire de vos données. Vous pouvez à tout moment demander l'export complet ou la suppression définitive de votre compte et de toutes les données associées depuis votre espace personnel.
+                                </p>
                             </div>
-                            <h2 className="text-2xl font-black text-white tracking-tight uppercase italic">Sécurité & RGPD</h2>
                         </div>
-                        <div className="space-y-4 text-grey-light font-medium leading-relaxed">
-                            <p>L'application est conçue dans le respect des principes du RGPD (Règlement Général sur la Protection des Données) :</p>
-                            <ul className="list-disc list-inside space-y-2 ml-4">
-                                <li>Les données sont exclusivement stockées sur des serveurs sécurisés.</li>
-                                <li>Aucune donnée n'est revendue à des tiers ou utilisée à des fins publicitaires.</li>
-                                <li>L'accès aux données des élèves est strictement limité à l'enseignant titulaire du compte.</li>
-                                <li>Vous disposez d'un droit d'accès, de rectification et de suppression totale de vos données via les paramètres de l'application.</li>
-                            </ul>
-                        </div>
-                    </div>
+                    </section>
 
                     {/* Section 3 */}
-                    <div className="bg-surface/30 p-8 md:p-10 rounded-[2.5rem] border border-border backdrop-blur-sm shadow-xl">
-                        <div className="flex items-center gap-4 mb-6">
-                            <div className="w-10 h-10 rounded-xl bg-primary/20 flex items-center justify-center text-primary border border-primary/10">
-                                <EyeOff size={20} />
-                            </div>
-                            <h2 className="text-2xl font-black text-white tracking-tight uppercase italic">Droit à l'image</h2>
+                    <section className="border-t border-white/10 pt-12">
+                        <div className="flex items-start gap-6 mb-8">
+                            <EyeOff size={32} className="text-primary shrink-0 mt-1" />
+                            <h2 className="text-3xl font-bold text-white tracking-tight">Photos & Médias</h2>
                         </div>
-                        <div className="space-y-4 text-grey-light font-medium leading-relaxed">
-                            <p>Si vous téléchargez des photos d'élèves pour faciliter leur identification dans l'interface :</p>
-                            <ul className="list-disc list-inside space-y-2 ml-4">
-                                <li>Ces photos sont converties et stockées sous forme cryptée.</li>
-                                <li>Elles ne sont visibles que par vous-même au sein de votre session sécurisée.</li>
-                                <li>Nous recommandons d'obtenir l'accord parental classique pour l'utilisation d'outils numériques internes.</li>
-                            </ul>
+                        <div className="pl-14 text-lg text-grey-light leading-relaxed space-y-6">
+                            <p>
+                                Les photos des élèves utilisées pour les trombinoscopes sont chiffrées. Elles ne sont visibles que par vous, au sein de votre session authentifiée.
+                            </p>
+                            <p className="text-grey-medium italic text-base">
+                                Nous n'utilisons aucun algorithme de reconnaissance faciale. Les photos servent uniquement d'aide visuelle pour l'enseignant.
+                            </p>
                         </div>
-                    </div>
+                    </section>
                 </div>
 
-                <div className="mt-20 text-center">
-                    <p className="text-[10px] font-black text-grey-dark uppercase tracking-widest mb-4">Dernière mise à jour : Janvier 2026</p>
-                    <Link to="/login" className="text-primary hover:text-white underline underline-offset-8 transition-colors text-sm font-bold uppercase tracking-widest">
-                        Retour au Dashboard
-                    </Link>
+                <div className="mt-32 pt-12 border-t border-white/10 flex flex-col md:flex-row items-center justify-between gap-6 text-sm text-grey-dark">
+                    <p>© 2026 GestionClasse. Tous droits réservés.</p>
+                    <p>Dernière mise à jour : Janvier 2026</p>
                 </div>
             </main>
-
-            <Footer />
         </div>
     );
 };

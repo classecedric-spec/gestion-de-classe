@@ -61,6 +61,8 @@ export const getStatusColorClasses = (status) => {
             return 'bg-success text-white border-success';
         case 'besoin_d_aide':
             return 'bg-[#A0A8AD] text-white border-[#A0A8AD]';
+        case 'ajustement':
+            return 'bg-[#F59E0B] text-black border-[#F59E0B]';
         case 'en_cours':
             return 'bg-primary/20 text-primary border-primary';
         case 'a_domicile':
@@ -104,4 +106,17 @@ export const capitalize = (str) => {
  */
 export const generateId = () => {
     return Math.random().toString(36).substring(2, 9);
+};
+/**
+ * Detect if the user is on a mobile phone (not tablet)
+ * @returns {boolean} - True if mobile phone, false otherwise
+ */
+export const isMobilePhone = () => {
+    if (typeof window === 'undefined') return false;
+    const ua = navigator.userAgent || navigator.vendor || window.opera;
+    // Check for mobile phones specifically (excludes tablets like iPad)
+    const isMobile = /Android|webOS|iPhone|iPod|BlackBerry|IEMobile|Opera Mini/i.test(ua);
+    // Also check screen width for extra safety (phones are typically < 768px)
+    const isSmallScreen = window.innerWidth < 768;
+    return isMobile && isSmallScreen;
 };

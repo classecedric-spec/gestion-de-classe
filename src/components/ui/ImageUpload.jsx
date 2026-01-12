@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { Camera, X, Layers } from 'lucide-react';
 import clsx from 'clsx';
 import { resizeAndConvertToBase64 } from '../../lib/imageUtils';
+import { compressImage } from '../../lib/imageCompression';
+import { toast } from 'sonner';
 
 const ImageUpload = ({
     value,
@@ -11,17 +13,25 @@ const ImageUpload = ({
     className
 }) => {
     const [isDragging, setIsDragging] = useState(false);
+    const [isCompressing, setIsCompressing] = useState(false);
 
     const processFile = async (file) => {
         if (file && (file.type === 'image/jpeg' || file.type === 'image/png' || file.type === 'image/jpg')) {
             try {
-                const base64 = await resizeAndConvertToBase64(file, 100, 100);
-                onChange(base64);
+                setIsCompressing(true);
+                // First resize to get base64
+                const base64 = await resizeAndConvertToBase64(file, 200, 200);
+                // Then compress to target size (100x100, max 10KB)
+                const compressed = await compressImage(base64, 100, 100, 10);
+                onChange(compressed);
+                toast.success("Photo optimisée automatiquement");
             } catch (err) {
-                alert("Erreur lors du traitement de l'image");
+                toast.error("Erreur lors du traitement de l'image");
+            } finally {
+                setIsCompressing(false);
             }
         } else {
-            alert("Format non supporté. Veuillez utiliser JPG ou PNG.");
+            toast.error("Format non supporté. Veuillez utiliser JPG ou PNG.");
         }
     };
 
@@ -61,6 +71,11 @@ const ImageUpload = ({
             >
                 {value ? (
                     <img src={value} alt="Preview" className="w-[90%] h-[90%] object-contain" />
+                ) : isCompressing ? (
+                    <div className="flex flex-col items-center justify-center text-primary">
+                        <Camera size={24} className="animate-pulse" />
+                        <span className="text-[8px] mt-1">Optimisation...</span>
+                    </div>
                 ) : (
                     <div className="flex flex-col items-center justify-center text-grey-medium">
                         {isDragging ? <Camera size={24} className="text-primary animate-bounce" /> : <PlaceholderIcon size={32} />}

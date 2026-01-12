@@ -20,7 +20,7 @@ const UserManagement = () => {
             {/* Tabs Header - Hide if pending validation */}
             {!pendingValidation && (
                 <div className="bg-surface/50 border-b border-white/5 px-6 py-3 flex items-center sticky top-0 z-40 backdrop-blur-md pl-16">
-                    <div className="neu-selector-container flex p-1.5 rounded-2xl w-full max-w-4xl mx-auto overflow-x-auto custom-scrollbar-hide">
+                    <div className="neu-selector-container p-1.5 rounded-2xl mx-auto overflow-hidden">
                         {tabs.map((tab) => {
                             const Icon = tab.icon;
                             const isActive = location.pathname.includes(tab.path);
@@ -31,14 +31,14 @@ const UserManagement = () => {
                                     to={tab.path}
                                     data-active={isActive}
                                     className={clsx(
-                                        "flex-1 flex items-center justify-center gap-2 px-6 py-3 rounded-xl text-xs font-black uppercase tracking-[0.12em] transition-all duration-300 min-w-fit",
+                                        "rounded-xl font-black uppercase tracking-[0.12em] transition-all duration-300",
                                         isActive
                                             ? "bg-primary text-text-dark"
                                             : "text-grey-medium hover:text-white"
                                     )}
                                 >
                                     <Icon size={16} />
-                                    {tab.label}
+                                    <span className="tab-label">{tab.label}</span>
                                 </NavLink>
                             );
                         })}

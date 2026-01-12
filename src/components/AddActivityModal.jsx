@@ -528,7 +528,7 @@ const AddActivityModal = ({ isOpen, onClose, onAdded, activityToEdit, defaultMod
                                 <div className="w-full border-t border-white/10"></div>
                             </div>
                             <div className="relative flex justify-center">
-                                <span className="px-6 bg-[#1A1A1A] text-[10px] font-black uppercase tracking-[0.4em] text-primary/60 border border-white/10 rounded-full py-1">
+                                <span className="px-6 bg-input text-[10px] font-black uppercase tracking-[0.4em] text-primary/60 border border-white/10 rounded-full py-1">
                                     Exceptions par Niveau
                                 </span>
                             </div>

@@ -5,6 +5,7 @@ import clsx from 'clsx';
 import Modal from './ui/Modal';
 import Button from './ui/Button';
 import ImageUpload from './ui/ImageUpload';
+import { compressImage } from '../lib/imageCompression';
 import AddClassModal from './AddClassModal';
 import AddGroupModal from './AddGroupModal';
 import AddNiveauModal from './AddNiveauModal';
@@ -24,7 +25,8 @@ const StudentModal = ({ showModal, onClose, onSaved, isEditing = false, editId =
         parent2_prenom: '',
         parent2_email: '',
         nom_parents: '',
-        photo_base64: ''
+        photo_base64: '',
+        sex: ''
     };
 
     const [newStudent, setNewStudent] = useState(initialStudentState);
@@ -100,7 +102,8 @@ const StudentModal = ({ showModal, onClose, onSaved, isEditing = false, editId =
                     parent2_prenom: data.parent2_prenom || '',
                     parent2_email: data.parent2_email || '',
                     nom_parents: data.nom_parents || '',
-                    photo_base64: data.photo_base64 || ''
+                    photo_base64: data.photo_base64 || '',
+                    sex: data.sex || ''
                 });
             }
         } catch (err) {
@@ -196,7 +199,8 @@ const StudentModal = ({ showModal, onClose, onSaved, isEditing = false, editId =
                 parent2_prenom: newStudent.parent2_prenom,
                 parent2_email: newStudent.parent2_email,
                 nom_parents: newStudent.nom_parents,
-                photo_base64: newStudent.photo_base64
+                photo_base64: newStudent.photo_base64,
+                sex: newStudent.sex
             };
 
             let studentId = editId;
@@ -370,72 +374,115 @@ const StudentModal = ({ showModal, onClose, onSaved, isEditing = false, editId =
                                         name="date_naissance"
                                         value={newStudent.date_naissance}
                                         onChange={handleInputChange}
-                                        className="w-full bg-input border border-border/10 rounded-xl p-3 text-text-main focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all"
+                                        onClick={(e) => { try { e.target.showPicker(); } catch (err) { } }}
+                                        onFocus={(e) => { try { e.target.showPicker(); } catch (err) { } }}
+                                        className="w-full bg-input border border-border/10 rounded-xl p-3 text-text-main focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all [&::-webkit-calendar-picker-indicator]:hidden cursor-pointer"
                                     />
                                 </div>
 
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div className="space-y-1 relative">
-                                        <label className="text-xs font-semibold text-gray-400 uppercase">Classe</label>
-                                        <select
-                                            value={newStudent.classe_id}
-                                            onChange={handleClassChange}
-                                            className="w-full bg-input border border-border/10 rounded-xl p-3 text-text-main focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all appearance-none cursor-pointer"
-                                        >
-                                            <option value="">Sélectionner...</option>
-                                            {classesList.map(c => (
-                                                <option key={c.id} value={c.id}>{c.nom}</option>
-                                            ))}
-                                            <option value="create_new" className="font-bold text-primary bg-surface">+ Nouvelle classe</option>
-                                        </select>
-                                    </div>
-                                    <div className="space-y-1 relative">
-                                        <label className="text-xs font-semibold text-gray-400 uppercase">Niveau</label>
-                                        <select
-                                            value={newStudent.niveau_id}
-                                            onChange={handleNiveauChange}
-                                            className="w-full bg-input border border-border/10 rounded-xl p-3 text-text-main focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all appearance-none cursor-pointer"
-                                        >
-                                            <option value="">Sélectionner...</option>
-                                            {niveauxList.map(n => (
-                                                <option key={n.id} value={n.id}>{n.nom}</option>
-                                            ))}
-                                            <option value="create_new" className="font-bold text-primary bg-surface">+ Nouveau niveau</option>
-                                        </select>
-                                    </div>
-                                </div>
+                            </div>
 
-                                {/* Multi-Group Selection */}
-                                <div className="space-y-2">
-                                    <label className="text-xs font-semibold text-gray-400 uppercase flex items-center gap-2">
-                                        <Users size={14} />
-                                        Groupes (Sélection multiple)
+                            <div className="space-y-1">
+                                <label className="text-xs font-semibold text-gray-400 uppercase">Sexe</label>
+                                <div className="flex gap-4">
+                                    <label className={clsx(
+                                        "flex-1 p-3 rounded-xl border cursor-pointer transition-all flex items-center justify-center gap-2",
+                                        newStudent.sex === 'M'
+                                            ? "bg-blue-500/20 border-blue-500 text-blue-500 font-bold"
+                                            : "bg-input border-border/10 text-grey-medium hover:bg-white/5"
+                                    )}>
+                                        <input
+                                            type="radio"
+                                            name="sex"
+                                            value="M"
+                                            checked={newStudent.sex === 'M'}
+                                            onChange={handleInputChange}
+                                            className="hidden"
+                                        />
+                                        <span className="w-2 h-2 rounded-full bg-blue-500"></span>
+                                        Garçon
                                     </label>
-                                    <div className="flex flex-wrap gap-2 p-3 bg-input border border-border/10 rounded-xl min-h-[60px]">
-                                        {groupsList.map(g => (
-                                            <button
-                                                key={g.id}
-                                                type="button"
-                                                onClick={() => handleToggleGroup(g.id)}
-                                                className={clsx(
-                                                    "px-3 py-1.5 rounded-lg text-xs font-bold transition-all border user-select-none",
-                                                    newStudent.groupe_ids?.includes(g.id)
-                                                        ? "bg-primary text-text-dark border-primary shadow-sm ring-1 ring-primary/20"
-                                                        : "bg-surface text-grey-medium border-border/10 hover:border-border/30 hover:bg-input"
-                                                )}
-                                            >
-                                                {g.nom}
-                                            </button>
+                                    <label className={clsx(
+                                        "flex-1 p-3 rounded-xl border cursor-pointer transition-all flex items-center justify-center gap-2",
+                                        newStudent.sex === 'F'
+                                            ? "bg-pink-500/20 border-pink-500 text-pink-500 font-bold"
+                                            : "bg-input border-border/10 text-grey-medium hover:bg-white/5"
+                                    )}>
+                                        <input
+                                            type="radio"
+                                            name="sex"
+                                            value="F"
+                                            checked={newStudent.sex === 'F'}
+                                            onChange={handleInputChange}
+                                            className="hidden"
+                                        />
+                                        <span className="w-2 h-2 rounded-full bg-pink-500"></span>
+                                        Fille
+                                    </label>
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-1 relative">
+                                    <label className="text-xs font-semibold text-gray-400 uppercase">Classe</label>
+                                    <select
+                                        value={newStudent.classe_id}
+                                        onChange={handleClassChange}
+                                        className="w-full bg-input border border-border/10 rounded-xl p-3 text-text-main focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all appearance-none cursor-pointer"
+                                    >
+                                        <option value="">Sélectionner...</option>
+                                        {classesList.map(c => (
+                                            <option key={c.id} value={c.id}>{c.nom}</option>
                                         ))}
+                                        <option value="create_new" className="font-bold text-primary bg-surface">+ Nouvelle classe</option>
+                                    </select>
+                                </div>
+                                <div className="space-y-1 relative">
+                                    <label className="text-xs font-semibold text-gray-400 uppercase">Niveau</label>
+                                    <select
+                                        value={newStudent.niveau_id}
+                                        onChange={handleNiveauChange}
+                                        className="w-full bg-input border border-border/10 rounded-xl p-3 text-text-main focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all appearance-none cursor-pointer"
+                                    >
+                                        <option value="">Sélectionner...</option>
+                                        {niveauxList.map(n => (
+                                            <option key={n.id} value={n.id}>{n.nom}</option>
+                                        ))}
+                                        <option value="create_new" className="font-bold text-primary bg-surface">+ Nouveau niveau</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            {/* Multi-Group Selection */}
+                            <div className="space-y-2">
+                                <label className="text-xs font-semibold text-gray-400 uppercase flex items-center gap-2">
+                                    <Users size={14} />
+                                    Groupes (Sélection multiple)
+                                </label>
+                                <div className="flex flex-wrap gap-2 p-3 bg-input border border-border/10 rounded-xl min-h-[60px]">
+                                    {groupsList.map(g => (
                                         <button
+                                            key={g.id}
                                             type="button"
-                                            onClick={() => setShowAddGroupModal(true)}
-                                            className="px-3 py-1.5 rounded-lg text-xs font-bold transition-all border border-dashed border-primary/50 text-primary hover:bg-primary/10 flex items-center gap-1"
+                                            onClick={() => handleToggleGroup(g.id)}
+                                            className={clsx(
+                                                "px-3 py-1.5 rounded-lg text-xs font-bold transition-all border user-select-none",
+                                                newStudent.groupe_ids?.includes(g.id)
+                                                    ? "bg-primary text-text-dark border-primary shadow-sm ring-1 ring-primary/20"
+                                                    : "bg-surface text-grey-medium border-border/10 hover:border-border/30 hover:bg-input"
+                                            )}
                                         >
-                                            <Plus size={12} />
-                                            Nouveau
+                                            {g.nom}
                                         </button>
-                                    </div>
+                                    ))}
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowAddGroupModal(true)}
+                                        className="px-3 py-1.5 rounded-lg text-xs font-bold transition-all border border-dashed border-primary/50 text-primary hover:bg-primary/10 flex items-center gap-1"
+                                    >
+                                        <Plus size={12} />
+                                        Nouveau
+                                    </button>
                                 </div>
                             </div>
                         </div>
@@ -466,7 +513,7 @@ const StudentModal = ({ showModal, onClose, onSaved, isEditing = false, editId =
                                                 name="parent1_prenom"
                                                 value={newStudent.parent1_prenom}
                                                 onChange={handleInputChange}
-                                                className="w-full bg-black/20 border border-white/10 rounded-xl p-3 text-white focus:border-[#D9B981] focus:ring-1 focus:ring-[#D9B981] outline-none transition-all placeholder:text-gray-600"
+                                                className="w-full bg-black/20 border border-white/10 rounded-xl p-3 text-white focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all placeholder:text-gray-600"
                                             />
                                         </div>
                                         <div className="space-y-1">
@@ -476,7 +523,7 @@ const StudentModal = ({ showModal, onClose, onSaved, isEditing = false, editId =
                                                 name="parent1_nom"
                                                 value={newStudent.parent1_nom}
                                                 onChange={handleInputChange}
-                                                className="w-full bg-black/20 border border-white/10 rounded-xl p-3 text-white focus:border-[#D9B981] focus:ring-1 focus:ring-[#D9B981] outline-none transition-all placeholder:text-gray-600"
+                                                className="w-full bg-black/20 border border-white/10 rounded-xl p-3 text-white focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all placeholder:text-gray-600"
                                             />
                                         </div>
                                     </div>
@@ -487,7 +534,7 @@ const StudentModal = ({ showModal, onClose, onSaved, isEditing = false, editId =
                                             name="parent1_email"
                                             value={newStudent.parent1_email}
                                             onChange={handleInputChange}
-                                            className="w-full bg-black/20 border border-white/10 rounded-xl p-3 text-white focus:border-[#D9B981] focus:ring-1 focus:ring-[#D9B981] outline-none transition-all placeholder:text-gray-600"
+                                            className="w-full bg-black/20 border border-white/10 rounded-xl p-3 text-white focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all placeholder:text-gray-600"
                                         />
                                     </div>
                                 </div>
@@ -509,7 +556,7 @@ const StudentModal = ({ showModal, onClose, onSaved, isEditing = false, editId =
                                                 name="parent2_prenom"
                                                 value={newStudent.parent2_prenom}
                                                 onChange={handleInputChange}
-                                                className="w-full bg-black/20 border border-white/10 rounded-xl p-3 text-white focus:border-[#D9B981] focus:ring-1 focus:ring-[#D9B981] outline-none transition-all placeholder:text-gray-600"
+                                                className="w-full bg-black/20 border border-white/10 rounded-xl p-3 text-white focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all placeholder:text-gray-600"
                                             />
                                         </div>
                                         <div className="space-y-1">
@@ -519,7 +566,7 @@ const StudentModal = ({ showModal, onClose, onSaved, isEditing = false, editId =
                                                 name="parent2_nom"
                                                 value={newStudent.parent2_nom}
                                                 onChange={handleInputChange}
-                                                className="w-full bg-black/20 border border-white/10 rounded-xl p-3 text-white focus:border-[#D9B981] focus:ring-1 focus:ring-[#D9B981] outline-none transition-all placeholder:text-gray-600"
+                                                className="w-full bg-black/20 border border-white/10 rounded-xl p-3 text-white focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all placeholder:text-gray-600"
                                             />
                                         </div>
                                     </div>
@@ -530,7 +577,7 @@ const StudentModal = ({ showModal, onClose, onSaved, isEditing = false, editId =
                                             name="parent2_email"
                                             value={newStudent.parent2_email}
                                             onChange={handleInputChange}
-                                            className="w-full bg-black/20 border border-white/10 rounded-xl p-3 text-white focus:border-[#D9B981] focus:ring-1 focus:ring-[#D9B981] outline-none transition-all placeholder:text-gray-600"
+                                            className="w-full bg-black/20 border border-white/10 rounded-xl p-3 text-white focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all placeholder:text-gray-600"
                                         />
                                     </div>
                                 </div>

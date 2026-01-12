@@ -1,0 +1,132 @@
+import React from 'react';
+import PropTypes from 'prop-types';
+import { Check, ShieldCheck } from 'lucide-react';
+import clsx from 'clsx';
+
+/**
+ * ProgressionCell
+ * Individual activity cell with status buttons
+ */
+const ProgressionCell = ({ activity, currentStatus, onStatusClick, studentLevelId }) => {
+    // Filter activity by level
+    if (studentLevelId) {
+        const activityLevels = activity.ActiviteNiveau?.map(an => an.niveau_id) || [];
+        if (activityLevels.length > 0 && !activityLevels.includes(studentLevelId)) {
+            return null;
+        }
+    }
+
+    const isLocked = currentStatus === 'a_verifier';
+
+    const handleToggleStatus = (newStatus) => {
+        if (isLocked) return;
+        if (currentStatus === newStatus) {
+            onStatusClick(activity.id, 'a_commencer');
+        } else {
+            onStatusClick(activity.id, newStatus);
+        }
+    };
+
+    const isNotStarted = !currentStatus || currentStatus === 'a_commencer';
+
+    return (
+        <div className={clsx(
+            "p-2.5 rounded-xl border transition-all flex flex-col gap-2.5 h-full",
+            isLocked
+                ? "bg-purple-900/10 border-purple-500/30 ring-1 ring-purple-500/10"
+                : "bg-white/[0.03] border-white/5"
+        )}>
+            {/* Title Zone (Top, Full Width) */}
+            <div className="w-full min-w-0">
+                <span className={clsx(
+                    "text-xs leading-tight transition-all text-left block",
+                    isLocked ? "font-bold text-[#8B5CF6]" : (isNotStarted ? "font-bold underline text-white" : "font-semibold text-gray-400 opacity-80"),
+                    currentStatus === 'termine' && "text-success opacity-100",
+                    currentStatus === 'besoin_d_aide' && "text-grey-medium opacity-100",
+                    currentStatus === 'ajustement' && "text-[#F59E0B] opacity-100"
+                )}>
+                    {activity.titre}
+                    {activity.ActiviteMateriel && activity.ActiviteMateriel.length > 0 && (
+                        <span className="ml-1 opacity-50 font-normal no-underline">
+                            [{activity.ActiviteMateriel.map(am => am.TypeMateriel?.acronyme).filter(Boolean).join(', ')}]
+                        </span>
+                    )}
+                </span>
+            </div>
+
+            {/* Buttons Zone (Bottom, One Line) */}
+            <div className="grid grid-cols-3 gap-1.5 w-full mt-auto">
+                <button
+                    disabled={isLocked}
+                    onClick={() => handleToggleStatus('besoin_d_aide')}
+                    className={clsx(
+                        "py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all border truncate px-1",
+                        isLocked && "opacity-20 grayscale cursor-not-allowed",
+                        currentStatus === 'besoin_d_aide'
+                            ? "bg-[#A0A8AD] text-white border-[#A0A8AD] shadow-sm"
+                            : "bg-black/20 border-white/5 text-grey-medium hover:border-grey-medium/40"
+                    )}
+                    title="Besoin d'aide"
+                >
+                    Aide
+                </button>
+
+                <button
+                    disabled={isLocked}
+                    onClick={() => handleToggleStatus('ajustement')}
+                    className={clsx(
+                        "py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all border truncate px-1",
+                        isLocked && "opacity-20 grayscale cursor-not-allowed",
+                        currentStatus === 'ajustement'
+                            ? "bg-[#F59E0B] text-black border-[#F59E0B] shadow-sm"
+                            : "bg-black/20 border-white/5 text-grey-medium hover:border-[#F59E0B]/40"
+                    )}
+                    title="Ajustement"
+                >
+                    Ajust.
+                </button>
+
+                <button
+                    onClick={() => handleToggleStatus('termine')}
+                    className={clsx(
+                        "py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all border flex items-center justify-center gap-1 shrink-0 truncate px-1",
+                        isLocked
+                            ? "bg-[#8B5CF6] text-white border-[#8B5CF6] shadow-sm ring-2 ring-purple-500/50 scale-105"
+                            : ((currentStatus === 'termine' || currentStatus === 'a_verifier')
+                                ? (currentStatus === 'a_verifier'
+                                    ? "bg-[#8B5CF6] text-white border-[#8B5CF6] shadow-sm"
+                                    : "bg-success text-white border-success shadow-sm")
+                                : "bg-black/20 border-white/5 text-grey-medium hover:border-success/40")
+                    )}
+                    title={currentStatus === 'termine' ? 'Validé' : (isLocked ? 'En attente de vérification' : 'Valider')}
+                >
+                    {isLocked ? (
+                        <>
+                            <ShieldCheck size={11} className="shrink-0 animate-pulse" />
+                            <span className="truncate">Verif</span>
+                        </>
+                    ) : (
+                        <>
+                            <Check size={11} className={clsx("shrink-0", currentStatus !== 'termine' && "opacity-50")} />
+                            <span className="truncate">{currentStatus === 'termine' ? 'Validé' : 'Vérif'}</span>
+                        </>
+                    )}
+                </button>
+            </div>
+        </div>
+    );
+};
+
+ProgressionCell.propTypes = {
+    activity: PropTypes.shape({
+        id: PropTypes.string.isRequired,
+        titre: PropTypes.string.isRequired,
+        ActiviteNiveau: PropTypes.array,
+        ActiviteMateriel: PropTypes.array
+    }).isRequired,
+    currentStatus: PropTypes.string,
+    onStatusClick: PropTypes.func.isRequired,
+    studentLevelId: PropTypes.string
+};
+
+export default ProgressionCell;

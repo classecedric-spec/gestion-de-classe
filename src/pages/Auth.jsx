@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabaseClient';
 import { useNavigate } from 'react-router-dom';
 import { Mail, Lock, User, ArrowRight, Loader2, Database, Copy, Check, Eye, EyeOff } from 'lucide-react';
 import { checkDatabaseSetup, SETUP_SQL } from '../lib/databaseSetup';
+import { isMobilePhone } from '../lib/utils';
 
 const Auth = () => {
     const [isSignUp, setIsSignUp] = useState(false);
@@ -19,13 +20,6 @@ const Auth = () => {
     const [copied, setCopied] = useState(false);
     const navigate = useNavigate();
 
-    // Detect if user is on mobile phone
-    const isMobilePhone = () => {
-        const ua = navigator.userAgent || navigator.vendor || window.opera;
-        const isMobile = /Android|webOS|iPhone|iPod|BlackBerry|IEMobile|Opera Mini/i.test(ua);
-        const isSmallScreen = window.innerWidth < 768;
-        return isMobile && isSmallScreen;
-    };
 
     useEffect(() => {
         const checkDB = async () => {
@@ -101,237 +95,169 @@ const Auth = () => {
     };
 
     return (
-        <div className="min-h-screen flex items-center justify-center bg-background p-4">
-            {/* Decorative blobs */}
-            <div className="absolute top-1/4 -left-20 w-72 h-72 bg-primary/20 rounded-full blur-3xl animate-pulse"></div>
-            <div className="absolute bottom-1/4 -right-20 w-72 h-72 bg-success/20 rounded-full blur-3xl animate-pulse delay-700"></div>
+        <div className="min-h-screen flex items-center justify-center bg-background p-4 overflow-hidden relative selection:bg-primary/30 selection:text-white">
+            {/* Background Effects */}
+            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-primary/20 rounded-full blur-[120px] -z-10 animate-pulse-slow"></div>
+            <div className="absolute top-0 right-0 w-[400px] h-[400px] bg-blue-500/10 rounded-full blur-[100px] -z-10"></div>
+            <div className="absolute bottom-0 left-0 w-[300px] h-[300px] bg-purple-500/10 rounded-full blur-[80px] -z-10"></div>
 
-            <div className="w-full max-w-md relative">
-                <div className="bg-surface/80 backdrop-blur-xl border border-border/10 p-8 rounded-2xl shadow-2xl overflow-hidden">
+            <div className="w-full max-w-[420px] relative z-10 perspective-1000">
+                <div className="bg-surface/60 backdrop-blur-2xl border border-white/10 p-10 rounded-[2rem] shadow-2xl hover:shadow-[0_0_50px_rgba(217,185,129,0.15)] transition-shadow duration-500">
+
                     {/* Logo/Title */}
                     <div className="text-center mb-10">
-                        <h1 className="text-3xl font-bold text-text-main mb-2 tracking-tight">
-                            Gestion de <span className="text-primary text-4xl leading-none">Classe</span>
+                        <div className="w-12 h-12 bg-gradient-to-br from-primary to-primary-dark rounded-xl flex items-center justify-center text-text-dark font-black text-xl shadow-lg shadow-primary/20 mx-auto mb-6 transform hover:rotate-12 transition-transform duration-300">
+                            G
+                        </div>
+                        <h1 className="text-3xl font-black text-white mb-2 tracking-tight">
+                            {isForgotPassword ? 'Récupération' : (isSignUp ? 'Bienvenue' : 'Bon retour')}
                         </h1>
-                        <p className="text-grey-medium">
+                        <p className="text-grey-medium font-medium text-sm">
                             {isForgotPassword
-                                ? 'Entrez votre email pour réinitialiser votre mot de passe'
-                                : (isSignUp ? 'Créez votre compte pour commencer' : 'Bon retour parmi nous !')}
+                                ? 'Un email pour réinitialiser le mot de passe'
+                                : (isSignUp ? 'Créez votre espace enseignant' : 'Accédez à votre tableau de bord')}
                         </p>
                     </div>
 
-                    <form onSubmit={handleAuth} className="space-y-6">
+                    <form onSubmit={handleAuth} className="space-y-5">
+                        {/* Database Status Warning */}
                         {!dbStatus.exists && dbStatus.checked && (
-                            <div className="bg-amber-500/10 border border-amber-500/30 p-4 rounded-xl mb-6 animate-in fade-in slide-in-from-top-4">
+                            <div className="bg-amber-500/10 border border-amber-500/30 p-4 rounded-xl mb-6 animate-in fade-in zoom-in-95">
                                 {dbStatus.errorType === 'API_KEY' ? (
-                                    <>
-                                        <div className="flex items-center gap-2 text-danger mb-2 font-bold uppercase text-[10px] tracking-widest">
-                                            <Database size={14} />
-                                            <span>Erreur de Connexion</span>
-                                        </div>
-                                        <p className="text-sm text-grey-light mb-4">
-                                            Vos clés API Supabase semblent invalides. Veuillez vérifier votre fichier <code className="text-primary">.env.local</code>.
-                                        </p>
-                                    </>
+                                    <div className="text-xs text-amber-200">
+                                        <div className="font-bold flex items-center gap-2 mb-1"><Database size={12} /> API ERROR</div>
+                                        Vérifiez vos clés dans .env.local
+                                    </div>
                                 ) : (
-                                    <>
-                                        <div className="flex items-center gap-2 text-amber-500 mb-2 font-bold uppercase text-[10px] tracking-widest">
-                                            <Database size={14} />
-                                            <span>Configuration Requise</span>
-                                        </div>
-                                        <p className="text-xs text-grey-medium mb-3">
-                                            La table <code className="text-primary">CompteUtilisateur</code> est absente. Copiez ce SQL dans l'éditeur Supabase :
-                                        </p>
-                                        <div className="relative group/code mb-4">
-                                            <pre className="text-[9px] bg-background/80 p-3 rounded-lg overflow-x-auto text-grey-light border border-border/5 max-h-32">
-                                                {SETUP_SQL}
-                                            </pre>
-                                            <button
-                                                onClick={copySQL}
-                                                type="button"
-                                                className="absolute top-2 right-2 p-1.5 bg-primary text-text-dark rounded-md opacity-0 group-hover/code:opacity-100 transition-opacity hover:scale-105"
-                                                title="Copier le SQL"
-                                            >
-                                                {copied ? <Check size={14} /> : <Copy size={14} />}
-                                            </button>
-                                        </div>
-                                    </>
-                                )}
-                                {dbStatus.rawError && (
-                                    <div className="mt-2 text-[10px] text-grey-dark bg-black/20 p-2 rounded border border-border/5 font-mono">
-                                        Error {dbStatus.rawError.code || 'unknown'}: {dbStatus.rawError.message}
+                                    <div className="text-xs text-grey-medium">
+                                        <div className="font-bold text-amber-500 flex items-center gap-2 mb-1"><Database size={12} /> SETUP REQUIS</div>
+                                        Table manquante. <button type="button" onClick={copySQL} className="text-primary hover:underline">Copier SQL</button>
+                                        <pre className="mt-2 bg-black/40 p-2 rounded text-[10px] overflow-hidden truncate">{SETUP_SQL}</pre>
                                     </div>
                                 )}
-                                <button
-                                    onClick={() => {
-                                        setDbStatus(prev => ({ ...prev, checked: false }));
-                                        checkDatabaseSetup().then(status => {
-                                            setDbStatus({
-                                                checked: true,
-                                                exists: status.exists,
-                                                errorType: status.errorType,
-                                                rawError: status.rawError
-                                            });
-                                        });
-                                    }}
-                                    type="button"
-                                    className="w-full py-2 bg-white/5 hover:bg-white/10 rounded-lg text-xs text-grey-light transition-colors border border-border/5"
-                                >
-                                    Relancer la vérification
-                                </button>
                             </div>
                         )}
 
                         {isSignUp && (
-                            <div className="space-y-2">
-                                <label htmlFor="full_name" className="text-sm font-medium text-grey-light ml-1">Nom complet</label>
+                            <div className="space-y-1.5">
+                                <label className="text-[11px] font-bold text-grey-dark uppercase tracking-widest ml-1">Nom complet</label>
                                 <div className="relative group">
-                                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-grey-medium group-focus-within:text-primary transition-colors">
-                                        <User size={18} />
-                                    </span>
+                                    <User size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-grey-medium group-focus-within:text-primary transition-colors" />
                                     <input
-                                        id="full_name"
-                                        name="full_name"
                                         type="text"
-                                        placeholder="Jean Dupont"
+                                        placeholder="Ex: Jean Dupont"
                                         value={fullName}
                                         onChange={(e) => setFullName(e.target.value)}
                                         required
-                                        className="w-full bg-background/80 border border-border/10 rounded-xl py-3 pl-10 pr-4 text-text-main placeholder:text-grey-dark focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all"
+                                        className="w-full bg-white/5 border border-white/10 rounded-xl py-3.5 pl-11 pr-4 text-white placeholder:text-grey-dark focus:outline-none focus:bg-white/10 focus:border-primary/50 transition-all text-sm font-medium"
                                     />
                                 </div>
                             </div>
                         )}
 
-                        <div className="space-y-2">
-                            <label htmlFor="email" className="text-sm font-medium text-grey-light ml-1">Email</label>
+                        <div className="space-y-1.5">
+                            <label className="text-[11px] font-bold text-grey-dark uppercase tracking-widest ml-1">Email</label>
                             <div className="relative group">
-                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-grey-medium group-focus-within:text-primary transition-colors">
-                                    <Mail size={18} />
-                                </span>
+                                <Mail size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-grey-medium group-focus-within:text-primary transition-colors" />
                                 <input
-                                    id="email"
-                                    name="email"
                                     type="email"
-                                    placeholder="votre@email.com"
+                                    placeholder="prof@ecole.com"
                                     value={email}
                                     onChange={(e) => setEmail(e.target.value)}
                                     required
                                     autoComplete={rememberMe ? "email" : "off"}
-                                    className="w-full bg-background/80 border border-border/10 rounded-xl py-3 pl-10 pr-4 text-text-main placeholder:text-grey-dark focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all"
+                                    className="w-full bg-white/5 border border-white/10 rounded-xl py-3.5 pl-11 pr-4 text-white placeholder:text-grey-dark focus:outline-none focus:bg-white/10 focus:border-primary/50 transition-all text-sm font-medium"
                                 />
                             </div>
                         </div>
 
-                        <div className="space-y-2">
-                            <label htmlFor="password" className="text-sm font-medium text-grey-light ml-1">Mot de passe</label>
+                        <div className="space-y-1.5">
+                            <label className="text-[11px] font-bold text-grey-dark uppercase tracking-widest ml-1">Mot de passe</label>
                             <div className="relative group">
-                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-grey-medium group-focus-within:text-primary transition-colors">
-                                    <Lock size={18} />
-                                </span>
+                                <Lock size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-grey-medium group-focus-within:text-primary transition-colors" />
                                 <input
-                                    id="password"
-                                    name="password"
                                     type={showPassword ? "text" : "password"}
                                     placeholder="••••••••"
                                     value={password}
                                     onChange={(e) => setPassword(e.target.value)}
                                     required
                                     autoComplete={rememberMe ? "current-password" : "off"}
-                                    className="w-full bg-background/80 border border-border/10 rounded-xl py-3 pl-10 pr-12 text-text-main placeholder:text-grey-dark focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all"
+                                    className="w-full bg-white/5 border border-white/10 rounded-xl py-3.5 pl-11 pr-12 text-white placeholder:text-grey-dark focus:outline-none focus:bg-white/10 focus:border-primary/50 transition-all text-sm font-medium"
                                 />
                                 <button
                                     type="button"
                                     onClick={() => setShowPassword(!showPassword)}
-                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-grey-medium hover:text-text-main transition-colors p-1"
+                                    className="absolute right-4 top-1/2 -translate-y-1/2 text-grey-dark hover:text-white transition-colors"
                                 >
-                                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                                    {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                                 </button>
                             </div>
                         </div>
 
                         {!isSignUp && !isForgotPassword && (
-                            <div className="flex items-center justify-between ml-1">
-                                <div className="flex items-center space-x-2">
+                            <div className="flex items-center justify-between px-1">
+                                <label className="flex items-center gap-2 cursor-pointer group">
+                                    <div className={`w-4 h-4 rounded border flex items-center justify-center transition-all ${rememberMe ? 'bg-primary border-primary' : 'border-grey-dark bg-transparent'}`}>
+                                        {rememberMe && <Check size={10} className="text-text-dark" />}
+                                    </div>
                                     <input
                                         type="checkbox"
-                                        id="rememberMe"
                                         checked={rememberMe}
                                         onChange={(e) => setRememberMe(e.target.checked)}
-                                        className="w-4 h-4 rounded border-border/10 bg-background text-primary focus:ring-primary/50 transition-all cursor-pointer"
-                                        name="rememberMe"
+                                        className="hidden"
                                     />
-                                    <label htmlFor="rememberMe" className="text-sm text-grey-medium cursor-pointer hover:text-grey-light transition-colors">
-                                        Connexion auto.
-                                    </label>
-                                </div>
+                                    <span className="text-xs text-grey-medium group-hover:text-white transition-colors">Rester connecté</span>
+                                </label>
                                 <button
                                     type="button"
-                                    onClick={() => {
-                                        setIsForgotPassword(true);
-                                        setError(null);
-                                        setMessage(null);
-                                    }}
-                                    className="text-xs text-primary hover:text-white transition-colors"
+                                    onClick={() => { setIsForgotPassword(true); setError(null); setMessage(null); }}
+                                    className="text-xs text-primary font-bold hover:text-white transition-colors"
                                 >
-                                    Mot de passe oublié ?
+                                    Oublié ?
                                 </button>
                             </div>
                         )}
 
                         {error && (
-                            <div className="bg-danger/10 border border-danger/20 text-danger text-sm p-3 rounded-lg flex items-start gap-2 animate-in fade-in slide-in-from-top-1">
-                                <p>{error}</p>
+                            <div className="bg-red-500/10 border border-red-500/20 text-red-400 text-xs p-3 rounded-xl flex gap-2 animate-in fade-in slide-in-from-top-1 font-medium">
+                                <span>⚠️</span> {error}
                             </div>
                         )}
 
                         {message && (
-                            <div className="bg-success/10 border border-success/20 text-success text-sm p-3 rounded-lg flex items-start gap-2 animate-in fade-in slide-in-from-top-1">
-                                <p>{message}</p>
+                            <div className="bg-green-500/10 border border-green-500/20 text-green-400 text-xs p-3 rounded-xl flex gap-2 animate-in fade-in slide-in-from-top-1 font-medium">
+                                <span>✅</span> {message}
                             </div>
                         )}
 
                         <button
                             type="submit"
                             disabled={loading}
-                            className="w-full bg-primary hover:bg-primary/90 text-text-dark font-bold py-3 px-6 rounded-xl shadow-lg shadow-primary/20 flex items-center justify-center gap-2 group transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                            className="w-full bg-primary text-text-dark font-black py-4 rounded-xl shadow-lg shadow-primary/20 hover:shadow-primary/40 hover:-translate-y-0.5 active:translate-y-0 transition-all flex items-center justify-center gap-2 group disabled:opacity-50 disabled:cursor-not-allowed mt-4"
                         >
-                            {loading ? (
-                                <Loader2 className="animate-spin" size={20} />
-                            ) : (
+                            {loading ? <Loader2 className="animate-spin" size={20} /> : (
                                 <>
-                                    {isForgotPassword ? "Réinitialiser" : (isSignUp ? "S'inscrire" : 'Se connecter')}
-                                    <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />
+                                    <span className="text-xs uppercase tracking-widest">{isForgotPassword ? "Réinitialiser" : (isSignUp ? "Commencer maintenant" : 'Accéder au Dashboard')}</span>
+                                    <ArrowRight size={16} className="group-hover:translate-x-1 transition-transform" />
                                 </>
                             )}
                         </button>
                     </form>
 
-                    <div className="mt-8 pt-6 border-t border-border/5 text-center">
-                        <p className="text-grey-medium">
+                    <div className="mt-8 pt-6 border-t border-white/5 text-center">
+                        <p className="text-sm text-grey-medium">
                             {isForgotPassword ? (
-                                <button
-                                    onClick={() => {
-                                        setIsForgotPassword(false);
-                                        setError(null);
-                                        setMessage(null);
-                                    }}
-                                    className="text-primary hover:text-primary/80 font-semibold transition-colors focus:outline-none underline decoration-primary/30 underline-offset-4"
-                                >
-                                    Retour à la connexion
+                                <button onClick={() => { setIsForgotPassword(false); setError(null); setMessage(null); }} className="text-white hover:text-primary font-semibold transition-colors">
+                                    ← Retour à la connexion
                                 </button>
                             ) : (
                                 <>
-                                    {isSignUp ? 'Vous avez déjà un compte ?' : "Vous n'avez pas de compte ?"}
+                                    {isSignUp ? 'Déjà membre ? ' : "Pas encore de compte ? "}
                                     <button
-                                        onClick={() => {
-                                            setIsSignUp(!isSignUp);
-                                            setError(null);
-                                            setMessage(null);
-                                        }}
-                                        className="ml-2 text-primary hover:text-primary/80 font-semibold transition-colors focus:outline-none underline decoration-primary/30 underline-offset-4"
+                                        onClick={() => { setIsSignUp(!isSignUp); setError(null); setMessage(null); }}
+                                        className="text-white hover:text-primary font-bold transition-colors ml-1"
                                     >
-                                        {isSignUp ? 'Connectez-vous' : 'Inscrivez-vous'}
+                                        {isSignUp ? 'Se connecter' : "S'inscrire"}
                                     </button>
                                 </>
                             )}

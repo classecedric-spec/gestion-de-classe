@@ -1,5 +1,5 @@
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import Layout from './components/Layout';
 import Home from './pages/Home';
 import Landing from './pages/Landing';
@@ -29,19 +29,20 @@ import Fonctionnement from './pages/Fonctionnement';
 import LandingMobile from './pages/LandingMobile';
 import MobileDashboard from './pages/MobileDashboard';
 import MobileEncodage from './pages/MobileEncodage';
-import { Navigate } from 'react-router-dom';
+import ProtectedRoute from './components/ProtectedRoute';
+import PublicRoute from './components/PublicRoute';
 
 function App() {
   return (
     <Routes>
-      <Route path="/" element={<Landing />} />
-      <Route path="/mobile" element={<LandingMobile />} />
-      <Route path="/mobile-dashboard" element={<MobileDashboard />} />
-      <Route path="/mobile-encodage" element={<MobileEncodage />} />
+      <Route path="/" element={<PublicRoute><Landing /></PublicRoute>} />
+      <Route path="/mobile" element={<PublicRoute><LandingMobile /></PublicRoute>} />
+      <Route path="/mobile-dashboard" element={<ProtectedRoute><MobileDashboard /></ProtectedRoute>} />
+      <Route path="/mobile-encodage" element={<ProtectedRoute><MobileEncodage /></ProtectedRoute>} />
       <Route path="/features" element={<Features />} />
       <Route path="/privacy" element={<Privacy />} />
-      <Route path="/login" element={<Auth />} />
-      <Route path="/dashboard" element={<Layout />}>
+      <Route path="/login" element={<PublicRoute><Auth /></PublicRoute>} />
+      <Route path="/dashboard" element={<ProtectedRoute><Layout /></ProtectedRoute>}>
         <Route index element={<Home />} />
         <Route path="suivi" element={<SuiviGlobal />} />
         <Route path="avancement" element={<Navigate to="/dashboard/suivi" replace />} />
@@ -64,9 +65,9 @@ function App() {
         <Route path="settings" element={<Settings />} />
         <Route path="presence" element={<Presence />} />
       </Route>
-      <Route path="/suivi-tablet" element={<SuiviGlobalTablet />} />
-      <Route path="/suivi-tbi" element={<SuiviGlobalTBI />} />
-      <Route path="/mobile-suivi/:groupId" element={<MobileSuivi />} />
+      <Route path="/suivi-tablet" element={<ProtectedRoute><SuiviGlobalTablet /></ProtectedRoute>} />
+      <Route path="/suivi-tbi" element={<ProtectedRoute><SuiviGlobalTBI /></ProtectedRoute>} />
+      <Route path="/mobile-suivi/:groupId" element={<ProtectedRoute><MobileSuivi /></ProtectedRoute>} />
       <Route path="/fonctionnement" element={<Fonctionnement />} />
     </Routes>
   );

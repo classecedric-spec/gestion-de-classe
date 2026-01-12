@@ -16,6 +16,20 @@
     --input: #141414;
     --border: rgba(255, 255, 255, 0.1);
 
+    /* Additional colors for consistency */
+    --primary-dark: #b8955c;
+    /* Darker gold for gradients */
+    --primary-light: #ead2a8;
+    /* Lighter gold for gradients */
+    --modal-bg: #1A1D24;
+    /* Modal backgrounds */
+    --card-bg: #1C1C1E;
+    /* Card backgrounds */
+    --purple-accent: #8B5CF6;
+    /* Purple accent color */
+    --amber-accent: #F59E0B;
+    /* Amber/orange accent */
+
     --font-sans: "Inter", "system-ui", "Avenir", "Helvetica", "Arial", sans-serif;
   }
 
@@ -98,6 +112,8 @@
 
 @theme {
   --color-primary: var(--primary);
+  --color-primary-dark: var(--primary-dark);
+  --color-primary-light: var(--primary-light);
   --color-background: var(--background);
   --color-surface: var(--surface);
   --color-input: var(--input);
@@ -109,6 +125,10 @@
   --color-grey-medium: var(--grey-medium);
   --color-grey-light: var(--grey-light);
   --color-border: var(--border);
+  --color-modal-bg: var(--modal-bg);
+  --color-card-bg: var(--card-bg);
+  --color-purple-accent: var(--purple-accent);
+  --color-amber-accent: var(--amber-accent);
 
   --font-sans: "Inter", "system-ui", "Avenir", "Helvetica", "Arial", sans-serif;
 }
@@ -230,11 +250,89 @@
     border: 1px solid rgba(255, 255, 255, 0.03);
   }
 
+  /* Sidebar Reveal Region */
+  .sidebar-reveal-zone {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100px;
+    height: 100vh;
+    z-index: 45;
+    background: transparent;
+  }
+
+  /* Sidebar Reveal Logic */
+  .aside-sidebar {
+    transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease !important;
+  }
+
+  /* Reveal when mouse is in zone OR when sidebar is explicitly open */
+  .sidebar-reveal-zone:hover+.aside-sidebar,
+  .aside-sidebar:hover,
+  .aside-sidebar.is-explicitly-open {
+    transform: translateX(0) !important;
+    opacity: 1 !important;
+    pointer-events: auto !important;
+  }
+
+  .aside-sidebar:not(.is-explicitly-open):not(:hover) {
+    transform: translateX(-100%) !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
+  }
+
+  /* 3D Burger Button Effect */
+  .burger-3d {
+    perspective: 1000px;
+    transform-style: preserve-3d;
+    transition:
+      opacity 0.4s ease 0.3s,
+      transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) 0.3s !important;
+    opacity: 0;
+    transform: translateX(-20px) rotateY(-20deg);
+    pointer-events: none;
+  }
+
+  /* Reveal burger on zone hover */
+  .sidebar-reveal-zone:hover~.burger-3d,
+  .burger-3d:hover {
+    transition-delay: 0s !important;
+    opacity: 1;
+    transform: translateX(0) rotateY(0);
+    pointer-events: auto;
+  }
+
+  .burger-3d:hover {
+    transform: translateZ(20px) rotateY(10deg) !important;
+    box-shadow:
+      10px 10px 20px rgba(0, 0, 0, 0.4),
+      -2px -2px 10px rgba(255, 255, 255, 0.05) !important;
+    background: var(--primary) !important;
+    color: var(--text-dark) !important;
+    border-color: var(--primary) !important;
+  }
+
+  .burger-3d:active {
+    transform: translateZ(0) scale(0.95) !important;
+  }
+
   /* Universal Selector Container (Capsule Style) */
   .neu-selector-container {
     background: rgba(0, 0, 0, 0.2);
     box-shadow: inset 2px 2px 5px rgba(0, 0, 0, 0.3), inset -2px -2px 5px rgba(255, 255, 255, 0.05);
     border: 1px solid rgba(255, 255, 255, 0.05);
+    width: 100%;
+    margin-inline: auto;
+    container-type: inline-size;
+    display: flex;
+    align-items: center;
+    overflow: hidden;
+  }
+
+  @media (min-width: 768px) {
+    .neu-selector-container {
+      max-width: 50vw;
+    }
   }
 
   [data-theme="light"] .neu-selector-container,
@@ -246,10 +344,44 @@
   }
 
   /* Disable global button style inside selectors */
-  .neu-selector-container button {
+  .neu-selector-container button,
+  .neu-selector-container a {
     box-shadow: none !important;
     border: none !important;
     background: transparent;
+    flex: 1;
+    white-space: nowrap;
+    text-align: center;
+    /* Responsive font size: scales starting from 14px */
+    font-size: clamp(14px, 1.8cqw, 18px) !important;
+    padding-inline: clamp(4px, 1.5cqw, 16px) !important;
+    padding-block: clamp(10px, 1.5cqw, 16px) !important;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.8cqw;
+  }
+
+  /* Icon-only mode based on container width */
+  @container (max-width: 480px) {
+
+    .neu-selector-container button .tab-label,
+    .neu-selector-container a .tab-label {
+      display: none;
+    }
+
+    .neu-selector-container button,
+    .neu-selector-container a {
+      gap: 0;
+      padding-inline: 8px !important;
+      min-width: 48px;
+    }
+
+    /* Ensure icon stands out */
+    .neu-selector-container svg {
+      width: 20px !important;
+      height: 20px !important;
+    }
   }
 
   /* Active selector button gets a highlight */

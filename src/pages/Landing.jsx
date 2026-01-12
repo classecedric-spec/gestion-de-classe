@@ -2,17 +2,8 @@ import { Link, Navigate } from 'react-router-dom';
 import { LogIn, Layers, Users, BookOpen, ChevronRight, CheckCircle2, Star, ShieldCheck, Zap, Sparkles } from 'lucide-react';
 import clsx from 'clsx';
 import Footer from '../components/Footer';
+import { isMobilePhone } from '../lib/utils';
 
-// Function to detect if the user is on a mobile phone (not tablet)
-const isMobilePhone = () => {
-    if (typeof window === 'undefined') return false;
-    const ua = navigator.userAgent || navigator.vendor || window.opera;
-    // Check for mobile phones specifically (excludes tablets like iPad)
-    const isMobile = /Android|webOS|iPhone|iPod|BlackBerry|IEMobile|Opera Mini/i.test(ua);
-    // Also check screen width for extra safety (phones are typically < 768px)
-    const isSmallScreen = window.innerWidth < 768;
-    return isMobile && isSmallScreen;
-};
 
 const Landing = () => {
     // Redirect mobile phone users to the mobile version
@@ -25,7 +16,7 @@ const Landing = () => {
             {/* Header */}
             <header className="fixed top-0 left-0 w-full h-20 flex items-center justify-between px-6 md:px-12 z-50 bg-background/80 backdrop-blur-xl border-b border-border">
                 <div className="flex items-center gap-3 group cursor-pointer">
-                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-[#b8955c] flex items-center justify-center text-text-dark font-black text-xl shadow-lg shadow-primary/20 group-hover:scale-110 transition-transform duration-300">
+                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-primary-dark flex items-center justify-center text-text-dark font-black text-xl shadow-lg shadow-primary/20 group-hover:scale-110 transition-transform duration-300">
                         G
                     </div>
                     <span className="text-xl font-black text-white tracking-tighter uppercase italic">
@@ -44,100 +35,178 @@ const Landing = () => {
             <main className="w-full pt-32 pb-20">
 
                 {/* Hero Section */}
-                <section className="max-w-7xl mx-auto px-6 md:px-12 text-center mb-40 relative">
-                    {/* Background Effects */}
-                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-primary/10 rounded-full blur-[120px] -z-10 animate-pulse-slow"></div>
-                    <div className="absolute top-0 right-1/4 w-[400px] h-[400px] bg-primary/20 rounded-full blur-[100px] -z-10"></div>
+                <section className="max-w-7xl mx-auto px-6 md:px-12 text-center mb-32 relative pt-20">
 
                     {/* Badge */}
-                    <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-surface/50 border border-border text-[10px] font-black uppercase tracking-widest text-primary mb-8 animate-in fade-in slide-in-from-bottom-4 duration-700 shadow-xl shadow-black/40 hover:bg-surface transition-colors cursor-default">
+                    <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-surface/50 border border-white/10 text-[11px] font-bold uppercase tracking-widest text-primary mb-8 animate-in fade-in slide-in-from-bottom-4 duration-700 shadow-xl shadow-black/20 backdrop-blur-md">
                         <Sparkles size={12} />
-                        Version 1.2 est arrivée
+                        <span>Nouvelle Version 1.2</span>
                     </div>
 
                     {/* Title */}
-                    <h1 className="text-5xl md:text-8xl lg:text-9xl font-black text-white mb-8 tracking-tighter leading-[0.9] animate-in fade-in slide-in-from-bottom-8 duration-1000">
-                        LA GESTION DE CLASSE <br />
-                        <span className="bg-gradient-to-r from-primary via-[#ead2a8] to-primary bg-clip-text text-transparent bg-[length:200%_auto] animate-gradient uppercase">FACILITÉE</span>
+                    <h1 className="text-6xl md:text-8xl lg:text-9xl font-semibold text-white mb-8 tracking-tighter leading-[0.95] animate-in fade-in slide-in-from-bottom-8 duration-1000">
+                        Gestion de classe. <br />
+                        <span className="bg-gradient-to-b from-primary via-primary-light to-primary-dark bg-clip-text text-transparent">Réinventée.</span>
                     </h1>
 
                     {/* Description */}
-                    <p className="text-lg md:text-2xl text-grey-medium mb-12 max-w-3xl mx-auto leading-relaxed animate-in fade-in slide-in-from-bottom-10 duration-1000 delay-100 font-medium">
-                        Une suite intuitive pour orchestrer vos classes, suivre chaque progression et <span className="text-white underline decoration-primary/40 decoration-4 underline-offset-4">sublimer</span> votre enseignement quotidien.
+                    <p className="text-xl md:text-2xl text-grey-medium mb-12 max-w-2xl mx-auto leading-relaxed animate-in fade-in slide-in-from-bottom-10 duration-1000 delay-100 font-medium tracking-tight">
+                        La puissance d'un outil professionnel, la simplicité d'une app quotidienne. <br className="hidden md:block" />
+                        Conçu pour les enseignants qui exigent le meilleur.
                     </p>
 
                     {/* CTA Buttons */}
-                    <div className="flex flex-col md:flex-row items-center justify-center gap-6 animate-in fade-in slide-in-from-bottom-12 duration-1000 delay-200">
+                    <div className="flex flex-col md:flex-row items-center justify-center gap-4 animate-in fade-in slide-in-from-bottom-12 duration-1000 delay-200">
                         <Link
                             to="/login"
-                            className="w-full md:w-auto flex items-center justify-center gap-4 bg-primary text-text-dark font-black py-5 px-12 rounded-2xl hover:bg-primary/90 transition-all shadow-2xl shadow-primary/30 hover:shadow-primary/50 hover:-translate-y-1 text-xs uppercase tracking-widest"
+                            className="w-full md:w-auto flex items-center justify-center gap-2 bg-white text-black font-semibold py-4 px-8 rounded-full hover:scale-105 transition-all shadow-xl shadow-white/10 text-sm"
                         >
-                            Démarrer l'aventure
-                            <ChevronRight size={18} />
+                            Commencer maintenant
                         </Link>
-                        <Link to="/features" className="w-full md:w-auto flex items-center justify-center gap-4 bg-surface/50 border border-border text-white font-black py-5 px-12 rounded-2xl hover:bg-surface transition-all backdrop-blur-sm shadow-xl text-xs uppercase tracking-widest">
-                            Découvrir les outils
-                        </Link>
+                        <button
+                            onClick={() => document.getElementById('features')?.scrollIntoView({ behavior: 'smooth' })}
+                            className="w-full md:w-auto flex items-center justify-center gap-2 text-white hover:text-primary font-medium py-4 px-8 rounded-full hover:bg-white/5 transition-all text-sm cursor-pointer"
+                        >
+                            Découvrir les fonctionnalités
+                            <ChevronRight size={16} />
+                        </button>
+                    </div>
+
+                    {/* Hero Image (Dashboard) */}
+                    <div className="mt-24 relative max-w-5xl mx-auto perspective-1000 animate-in fade-in slide-in-from-bottom-16 duration-1000 delay-300">
+                        <div className="relative rounded-[2rem] overflow-hidden border border-white/10 shadow-2xl shadow-primary/20 bg-surface">
+                            <img src="/assets/documentation/dashboard.png" alt="Dashboard" className="w-full h-auto opacity-90 hover:opacity-100 transition-opacity duration-700" />
+                            {/* Reflection/Shine */}
+                            <div className="absolute inset-0 bg-gradient-to-tr from-white/10 to-transparent pointer-events-none"></div>
+                        </div>
+                        {/* Glow behind */}
+                        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[120%] h-[120%] bg-primary/10 rounded-full blur-[100px] -z-10"></div>
                     </div>
                 </section>
 
-                {/* Features Grid */}
-                <section id="features" className="max-w-7xl mx-auto px-6 md:px-12 mb-40">
-                    <div className="text-center mb-20 relative">
-                        <div className="absolute -top-10 left-1/2 -translate-x-1/2 w-40 h-1 bg-primary/20 rounded-full"></div>
-                        <h2 className="text-4xl md:text-5xl font-black text-white mb-4 tracking-tight uppercase">Écosystème Intelligent</h2>
-                        <p className="text-grey-medium max-w-xl mx-auto font-medium">L'alliance parfaite entre design épuré et puissance fonctionnelle.</p>
-                    </div>
+                {/* Bento Grid - Values */}
+                <section className="max-w-7xl mx-auto px-6 md:px-12 mb-40">
+                    <div className="grid md:grid-cols-3 gap-6">
+                        {/* Card 1 */}
+                        <div className="bg-surface/30 p-8 rounded-[2rem] border border-white/5 hover:border-primary/20 transition-all group backdrop-blur-sm">
+                            <div className="w-12 h-12 bg-primary/10 rounded-2xl flex items-center justify-center text-primary mb-6 group-hover:scale-110 transition-transform">
+                                <ShieldCheck size={24} />
+                            </div>
+                            <h3 className="text-2xl font-semibold text-white mb-2">Confidentialité Totale</h3>
+                            <p className="text-grey-medium leading-relaxed">Vos données et celles de vos élèves sont chiffrées et protégées. Conforme RGPD.</p>
+                        </div>
 
-                    <div className="grid md:grid-cols-3 gap-10">
-                        {[
-                            {
-                                icon: Users,
-                                title: "Structure Avancée",
-                                desc: "Gérez une hiérarchie complexe : Niveaux, Classes et Groupes. Une organisation sans faille.",
-                                color: "primary"
-                            },
-                            {
-                                icon: BookOpen,
-                                title: "Suivi Précis",
-                                desc: "Parcours détaillés avec Activités et Modules. Visualisez la réussite en temps réel.",
-                                color: "primary"
-                            },
-                            {
-                                icon: Zap,
-                                title: "Ultra Fluidité",
-                                desc: "Une interface réactive et des animations soignées pour une expérience utilisateur premium.",
-                                color: "primary"
-                            }
-                        ].map((feature, idx) => (
-                            <div key={idx} className="bg-surface/40 p-10 rounded-[2rem] border border-border hover:border-primary/50 transition-all group hover:-translate-y-3 relative overflow-hidden shadow-2xl backdrop-blur-sm">
-                                <div className="absolute -top-10 -right-10 w-40 h-40 bg-primary/5 rounded-full blur-3xl group-hover:bg-primary/10 transition-colors"></div>
-                                <div className="w-16 h-16 bg-gradient-to-br from-primary/20 to-transparent rounded-2xl flex items-center justify-center text-primary mb-8 group-hover:scale-110 group-hover:rotate-3 transition-all duration-500 border border-primary/10 shadow-lg">
-                                    <feature.icon size={32} strokeWidth={2.5} />
+                        {/* Card 2 */}
+                        <div className="bg-surface/30 p-8 rounded-[2rem] border border-white/5 hover:border-primary/20 transition-all group backdrop-blur-sm md:col-span-1 bg-gradient-to-b from-surface/50 to-surface/30">
+                            <div className="w-12 h-12 bg-blue-500/10 rounded-2xl flex items-center justify-center text-blue-400 mb-6 group-hover:scale-110 transition-transform">
+                                <Zap size={24} />
+                            </div>
+                            <h3 className="text-2xl font-semibold text-white mb-2">Performance Éclair</h3>
+                            <p className="text-grey-medium leading-relaxed">Une interface fluide qui répond instantanément. Zéro temps de chargement.</p>
+                        </div>
+
+                        {/* Card 3 */}
+                        <div className="bg-surface/30 p-8 rounded-[2rem] border border-white/5 hover:border-primary/20 transition-all group backdrop-blur-sm">
+                            <div className="w-12 h-12 bg-green-500/10 rounded-2xl flex items-center justify-center text-green-400 mb-6 group-hover:scale-110 transition-transform">
+                                <Layers size={24} />
+                            </div>
+                            <h3 className="text-2xl font-semibold text-white mb-2">Organisation Zen</h3>
+                            <p className="text-grey-medium leading-relaxed">Classes, groupes, niveaux. Tout est structuré pour vous libérer l'esprit.</p>
+                        </div>
+                    </div>
+                </section>
+
+                {/* Feature Showcase 1: Students (Text Left, Image Right) */}
+                <section id="features" className="max-w-7xl mx-auto px-6 md:px-12 mb-40 flex flex-col md:flex-row items-center gap-16">
+                    <div className="flex-1 space-y-8">
+                        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/5 border border-white/10 text-[11px] font-bold uppercase tracking-widest text-grey-light">
+                            Gestion Illimitée
+                        </div>
+                        <h2 className="text-4xl md:text-5xl font-semibold text-white tracking-tight">
+                            Vos élèves. <br />
+                            <span className="text-grey-dark">Au bout des doigts.</span>
+                        </h2>
+                        <p className="text-xl text-grey-medium leading-relaxed font-medium max-w-md">
+                            Accédez aux fiches détaillées, gérez les groupes et suivez les parcours individuels avec une aisance déconcertante.
+                        </p>
+                        <ul className="space-y-4 pt-4">
+                            {['Fiches complètes', 'Tri intelligent', 'Groupes dynamiques'].map((item, i) => (
+                                <li key={i} className="flex items-center gap-3 text-grey-light">
+                                    <CheckCircle2 size={18} className="text-primary" />
+                                    {item}
+                                </li>
+                            ))}
+                        </ul>
+                    </div>
+                    <div className="flex-1 relative group">
+                        <div className="absolute inset-0 bg-primary/20 rounded-[2rem] blur-[60px] opacity-0 group-hover:opacity-100 transition-opacity duration-700"></div>
+                        <div className="relative rounded-[2rem] overflow-hidden border border-white/10 shadow-2xl bg-surface transform group-hover:scale-[1.02] transition-transform duration-500">
+                            <img src="/assets/documentation/eleves.png" alt="Gestion Élèves" className="w-full h-auto" />
+                        </div>
+                    </div>
+                </section>
+
+                {/* Feature Showcase 2: Suivi (Image Left, Text Right) */}
+                <section className="max-w-7xl mx-auto px-6 md:px-12 mb-40 flex flex-col md:flex-row-reverse items-center gap-16">
+                    <div className="flex-1 space-y-8">
+                        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/5 border border-white/10 text-[11px] font-bold uppercase tracking-widest text-grey-light">
+                            Suivi Pédagogique
+                        </div>
+                        <h2 className="text-4xl md:text-5xl font-semibold text-white tracking-tight">
+                            La réussite. <br />
+                            <span className="text-grey-dark">Visualisée.</span>
+                        </h2>
+                        <p className="text-xl text-grey-medium leading-relaxed font-medium max-w-md">
+                            Identifiez les besoins en un coup d'œil grâce aux indicateurs de progression. Validez les compétences en temps réel.
+                        </p>
+                        <Link to="/login" className="inline-flex items-center gap-2 text-primary hover:text-white font-medium transition-colors mt-4">
+                            Voir comment ça marche <ChevronRight size={16} />
+                        </Link>
+                    </div>
+                    <div className="flex-1 relative group">
+                        <div className="absolute inset-0 bg-blue-500/20 rounded-[2rem] blur-[60px] opacity-0 group-hover:opacity-100 transition-opacity duration-700"></div>
+                        <div className="relative rounded-[2rem] overflow-hidden border border-white/10 shadow-2xl bg-surface transform group-hover:scale-[1.02] transition-transform duration-500">
+                            <img src="/assets/documentation/suivi.png" alt="Suivi Global" className="w-full h-auto" />
+                        </div>
+                    </div>
+                </section>
+
+                {/* Feature Showcase 3: Activities (Centered) */}
+                <section className="max-w-5xl mx-auto px-6 md:px-12 mb-40 text-center">
+                    <div className="mb-16 space-y-6">
+                        <h2 className="text-4xl md:text-6xl font-semibold text-white tracking-tight">
+                            Activités & Modules
+                        </h2>
+                        <p className="text-xl text-grey-medium max-w-2xl mx-auto font-medium">
+                            Créez vos propres parcours d'apprentissage. Organisez par branche, sous-branche et niveau.
+                        </p>
+                    </div>
+                    <div className="relative group max-w-4xl mx-auto">
+                        <div className="absolute -inset-1 bg-gradient-to-r from-primary via-white/20 to-primary rounded-[2.5rem] blur opacity-20 group-hover:opacity-40 transition-opacity duration-700"></div>
+                        <div className="relative rounded-[2rem] overflow-hidden border border-white/10 shadow-2xl bg-surface">
+                            <img src="/assets/documentation/activites.png" alt="Activités" className="w-full h-auto" />
+                        </div>
+                    </div>
+                </section>
+
+                {/* Trust / Reviews (Apple style quotes) */}
+                <section className="mb-40 py-20 border-y border-white/5 bg-white/[0.02]">
+                    <div className="max-w-7xl mx-auto px-6 text-center">
+                        <div className="grid md:grid-cols-3 gap-12">
+                            {[
+                                { q: "L'interface est d'une clarté absolue. Je ne perds plus de temps.", a: "Marie L., Enseignante CM1" },
+                                { q: "Enfin un outil qui comprend vraiment nos besoins quotidiens.", a: "Thomas B., Directeur" },
+                                { q: "Le suivi des élèves est devenu un jeu d'enfant.", a: "Sarah J., Professeur des écoles" }
+                            ].map((review, i) => (
+                                <div key={i} className="space-y-4">
+                                    <div className="flex justify-center text-primary mb-4">
+                                        {[1, 2, 3, 4, 5].map(s => <Star key={s} size={14} fill="currentColor" className="text-primary" />)}
+                                    </div>
+                                    <p className="text-xl font-medium text-white italic leading-relaxed">"{review.q}"</p>
+                                    <p className="text-sm font-bold text-grey-dark uppercase tracking-widest">{review.a}</p>
                                 </div>
-                                <h3 className="text-2xl font-black text-white mb-4 tracking-tight uppercase">{feature.title}</h3>
-                                <p className="text-grey-medium leading-relaxed font-medium">
-                                    {feature.desc}
-                                </p>
-                            </div>
-                        ))}
-                    </div>
-                </section>
-
-                {/* Trust / Stats Section */}
-                <section className="mb-40 border-y border-border bg-surface/20 backdrop-blur-md py-24">
-                    <div className="max-w-7xl mx-auto px-6 grid grid-cols-2 lg:grid-cols-4 gap-16 text-center">
-                        {[
-                            { val: "100%", label: "Sécurisé" },
-                            { val: "24/7", label: "Accessible" },
-                            { val: "OUI", label: "Responsif" },
-                            { val: "TOP", label: "Performant" }
-                        ].map((stat, i) => (
-                            <div key={i} className="group cursor-default">
-                                <div className="text-6xl font-black text-white mb-2 group-hover:text-primary transition-colors duration-300 tracking-tighter italic">{stat.val}</div>
-                                <div className="text-[10px] text-grey-medium uppercase tracking-[0.2em] font-black">{stat.label}</div>
-                            </div>
-                        ))}
+                            ))}
+                        </div>
                     </div>
                 </section>
 

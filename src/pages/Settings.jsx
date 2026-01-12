@@ -3,10 +3,13 @@ import { useOutletContext, useLocation, useNavigate } from 'react-router-dom';
 import {
     User, Mail, School, Camera, Save, Loader2,
     Moon, Sun, Monitor, Palette, AlertTriangle, Trash2, Database, Sparkles, Settings as SettingsIcon,
-    Key, Feather, Smartphone, Cpu
+    Key, Feather, Smartphone, Cpu, Image, Activity
 } from 'lucide-react';
 import { supabase } from '../lib/supabaseClient';
 import { resizeAndConvertToBase64 } from '../lib/imageUtils';
+import { compressImage, formatBytes, needsCompression } from '../lib/imageCompression';
+import { getCacheStats, clearPhotoCache, isCacheEnabled, setCacheEnabled } from '../lib/photoCache';
+import { getSyncStats, clearAllSyncData, resetSync } from '../lib/deltaSync';
 import { useTheme } from '../components/ThemeProvider';
 import { toast } from 'sonner';
 import clsx from 'clsx';
@@ -40,6 +43,25 @@ const Settings = () => {
     const [showPasswordModal, setShowPasswordModal] = useState(false);
     const [passwordData, setPasswordData] = useState({ oldPassword: '', newPassword: '', confirmPassword: '' });
     const [updatingPassword, setUpdatingPassword] = useState(false);
+
+    // Photo optimization state
+    const [isOptimizingPhotos, setIsOptimizingPhotos] = useState(false);
+    const [optimizationProgress, setOptimizationProgress] = useState({ current: 0, total: 0 });
+    const [optimizationStats, setOptimizationStats] = useState({ before: 0, after: 0, saved: 0 });
+
+    // Photo analysis state
+    const [photoAnalysis, setPhotoAnalysis] = useState([]);
+    const [isAnalyzing, setIsAnalyzing] = useState(false);
+    const [showPhotoAnalysis, setShowPhotoAnalysis] = useState(false);
+
+    // Cache management state
+    const [cacheStats, setCacheStats] = useState({ count: 0, estimatedSize: 0 });
+    const [cacheEnabled, setCacheEnabledState] = useState(isCacheEnabled());
+    const [isLoadingCacheStats, setIsLoadingCacheStats] = useState(false);
+
+    // Delta Sync state
+    const [syncStats, setSyncStats] = useState([]);
+    const [isLoadingSyncStats, setIsLoadingSyncStats] = useState(false);
 
     useEffect(() => {
         if (activeTab === 'profil') {
@@ -390,6 +412,200 @@ const Settings = () => {
         }
     };
 
+    const handleAnalyzePhotos = async () => {
+        setIsAnalyzing(true);
+        try {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) throw new Error("Utilisateur non trouvé");
+
+            // Fetch all students with photos
+            const { data: students, error } = await supabase
+                .from('Eleve')
+                .select('id, nom, prenom, photo_base64')
+                .eq('titulaire_id', user.id)
+                .order('nom', { ascending: true });
+
+            if (error) throw error;
+
+            // Calculate sizes
+            const analysis = students?.map(s => {
+                const size = s.photo_base64 ? (s.photo_base64.split(',')[1] || s.photo_base64).length * 0.75 : 0;
+                return {
+                    nom: s.nom || 'N/A',
+                    prenom: s.prenom || 'N/A',
+                    hasPhoto: !!s.photo_base64,
+                    sizeBytes: size,
+                    sizeFormatted: formatBytes(size),
+                    needsOptimization: size > 10 * 1024
+                };
+            }) || [];
+
+            setPhotoAnalysis(analysis);
+            setShowPhotoAnalysis(true);
+        } catch (error) {
+            toast.error("Erreur lors de l'analyse: " + error.message);
+        } finally {
+            setIsAnalyzing(false);
+        }
+    };
+
+    const loadCacheStats = async () => {
+        setIsLoadingCacheStats(true);
+        const stats = await getCacheStats();
+        setCacheStats(stats);
+        setIsLoadingCacheStats(false);
+    };
+
+    const handleClearCache = async () => {
+        if (!confirm('Vider le cache des photos ? Elles seront rechargées depuis le serveur au prochain chargement.')) return;
+
+        const success = await clearPhotoCache();
+        if (success) {
+            toast.success("Cache vidé avec succès");
+            loadCacheStats();
+        } else {
+            toast.error("Erreur lors du vidage du cache");
+        }
+    };
+
+    const handleToggleCache = (enabled) => {
+        setCacheEnabled(enabled);
+        setCacheEnabledState(enabled);
+        toast.success(enabled ? "Cache activé" : "Cache désactivé");
+        if (enabled) {
+            loadCacheStats();
+        }
+    };
+
+    useEffect(() => {
+        if (activeTab === 'systeme' && cacheEnabled) {
+            loadCacheStats();
+            loadSyncStats();
+        }
+    }, [activeTab]);
+
+    const loadSyncStats = async () => {
+        setIsLoadingSyncStats(true);
+        const stats = await getSyncStats();
+        setSyncStats(stats);
+        setIsLoadingSyncStats(false);
+    };
+
+    const handleClearSyncData = async () => {
+        if (!confirm('Vider toutes les données de synchronisation ? Les prochains chargements seront complets.')) return;
+
+        await clearAllSyncData();
+        toast.success("Données de sync vidées");
+        loadSyncStats();
+    };
+
+    const handleOptimizeAllPhotos = async () => {
+        setIsOptimizingPhotos(true);
+        const toastId = toast.loading("Optimisation des photos en cours...");
+
+        try {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) throw new Error("Utilisateur non trouvé");
+
+            let totalBefore = 0;
+            let totalAfter = 0;
+            let optimizedCount = 0;
+
+            // 1. Fetch all students with photos
+            const { data: students, error: studentsError } = await supabase
+                .from('Eleve')
+                .select('id, photo_base64')
+                .not('photo_base64', 'is', null)
+                .eq('titulaire_id', user.id);
+
+            if (studentsError) throw studentsError;
+
+            // 2. Fetch user profile photo
+            const { data: profile, error: profileError } = await supabase
+                .from('CompteUtilisateur')
+                .select('id, photo_base64')
+                .eq('id', user.id)
+                .maybeSingle();
+
+            if (profileError) throw profileError;
+
+            const allPhotos = [];
+
+            // Add student photos
+            students?.forEach(s => {
+                if (s.photo_base64 && needsCompression(s.photo_base64, 10)) {
+                    allPhotos.push({ type: 'student', id: s.id, photo: s.photo_base64 });
+                }
+            });
+
+            // Add profile photo
+            if (profile?.photo_base64 && needsCompression(profile.photo_base64, 10)) {
+                allPhotos.push({ type: 'profile', id: profile.id, photo: profile.photo_base64 });
+            }
+
+            setOptimizationProgress({ current: 0, total: allPhotos.length });
+
+            if (allPhotos.length === 0) {
+                toast.success("Toutes les photos sont déjà optimisées !", { id: toastId });
+                setIsOptimizingPhotos(false);
+                return;
+            }
+
+            // 3. Compress each photo
+            for (let i = 0; i < allPhotos.length; i++) {
+                const item = allPhotos[i];
+
+                // Calculate original size
+                const originalSize = (item.photo.split(',')[1] || item.photo).length * 0.75;
+                totalBefore += originalSize;
+
+                // Compress
+                const compressed = await compressImage(item.photo, 100, 100, 10);
+                const compressedSize = (compressed.split(',')[1] || compressed).length * 0.75;
+                totalAfter += compressedSize;
+
+                // Update database
+                if (item.type === 'student') {
+                    await supabase
+                        .from('Eleve')
+                        .update({ photo_base64: compressed })
+                        .eq('id', item.id);
+                } else {
+                    await supabase
+                        .from('CompteUtilisateur')
+                        .update({ photo_base64: compressed })
+                        .eq('id', item.id);
+
+                    // Update local profile state
+                    setProfile(prev => ({ ...prev, photo_base64: compressed }));
+                }
+
+                optimizedCount++;
+                setOptimizationProgress({ current: i + 1, total: allPhotos.length });
+            }
+
+            const saved = totalBefore - totalAfter;
+            setOptimizationStats({
+                before: totalBefore,
+                after: totalAfter,
+                saved: saved
+            });
+
+            toast.success(
+                `${optimizedCount} photo(s) optimisée(s) ! Économie: ${formatBytes(saved)}`,
+                { id: toastId, duration: 5000 }
+            );
+
+            if (refreshProfile) refreshProfile();
+
+        } catch (error) {
+            toast.error("Erreur lors de l'optimisation: " + error.message, { id: toastId });
+        } finally {
+            setIsOptimizingPhotos(false);
+            setOptimizationProgress({ current: 0, total: 0 });
+        }
+    };
+
     return (
         <div className="h-full flex flex-col overflow-hidden">
             {/* Header */}
@@ -611,6 +827,252 @@ const Settings = () => {
                                             >
                                                 <SettingsIcon size={16} />
                                                 Réparer
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Photo Optimization */}
+                                <div className="bg-surface/30 backdrop-blur-md border border-white/5 rounded-2xl p-6 shadow-xl">
+                                    <h2 className="text-lg font-bold text-text-main mb-6 flex items-center gap-2">
+                                        <Image size={20} className="text-primary" /> Optimisation des Photos
+                                    </h2>
+
+                                    <div className="space-y-4">
+                                        <div className="p-6 bg-primary/5 rounded-xl border border-primary/10 flex flex-col md:flex-row items-center justify-between gap-6">
+                                            <div className="flex-1">
+                                                <h3 className="text-sm font-bold text-white mb-1 uppercase tracking-tight">Compresser toutes les photos</h3>
+                                                <p className="text-xs text-grey-medium">
+                                                    Réduit la taille des photos de profil (élèves et utilisateur) à 100x100px et max 10 KB pour économiser de la bande passante.
+                                                </p>
+                                                {isOptimizingPhotos && optimizationProgress.total > 0 && (
+                                                    <div className="mt-3">
+                                                        <div className="flex items-center justify-between text-xs text-grey-light mb-1">
+                                                            <span>Progression</span>
+                                                            <span className="font-mono">{optimizationProgress.current}/{optimizationProgress.total}</span>
+                                                        </div>
+                                                        <div className="w-full h-2 bg-white/10 rounded-full overflow-hidden">
+                                                            <div
+                                                                className="h-full bg-primary transition-all duration-300"
+                                                                style={{ width: `${(optimizationProgress.current / optimizationProgress.total) * 100}%` }}
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                )}
+                                                {optimizationStats.saved > 0 && !isOptimizingPhotos && (
+                                                    <div className="mt-3 p-3 bg-success/10 border border-success/20 rounded-lg">
+                                                        <p className="text-xs text-success font-bold">
+                                                            ✓ Économie: {formatBytes(optimizationStats.saved)}
+                                                            ({formatBytes(optimizationStats.before)} → {formatBytes(optimizationStats.after)})
+                                                        </p>
+                                                    </div>
+                                                )}
+                                            </div>
+                                            <button
+                                                onClick={handleOptimizeAllPhotos}
+                                                disabled={isOptimizingPhotos}
+                                                className="w-full md:w-auto px-6 py-3 bg-primary text-text-dark font-black text-[10px] uppercase tracking-widest rounded-xl hover:bg-primary/90 transition-all flex items-center justify-center gap-2 shadow-lg disabled:opacity-50"
+                                            >
+                                                {isOptimizingPhotos ? <Loader2 size={16} className="animate-spin" /> : <Image size={16} />}
+                                                Optimiser
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Photo Analysis & Optimization */}
+                                <div className="bg-surface/30 backdrop-blur-md border border-white/5 rounded-2xl p-6 shadow-xl">
+                                    <h2 className="text-lg font-bold text-text-main mb-6 flex items-center gap-2">
+                                        <Image size={20} className="text-primary" /> Analyse & Optimisation des Photos
+                                    </h2>
+
+                                    <div className="space-y-4">
+                                        {/* Analysis Button */}
+                                        <div className="p-6 bg-white/5 rounded-xl border border-white/5 flex flex-col md:flex-row items-center justify-between gap-6">
+                                            <div className="flex-1">
+                                                <h3 className="text-sm font-bold text-white mb-1 uppercase tracking-tight">Analyser les tailles</h3>
+                                                <p className="text-xs text-grey-medium">
+                                                    Affiche un tableau détaillé des tailles de photos pour chaque élève.
+                                                </p>
+                                            </div>
+                                            <button
+                                                onClick={handleAnalyzePhotos}
+                                                disabled={isAnalyzing}
+                                                className="w-full md:w-auto px-6 py-3 bg-white/10 hover:bg-white/20 text-white font-black text-[10px] uppercase tracking-widest rounded-xl transition-all flex items-center justify-center gap-2 shadow-lg disabled:opacity-50"
+                                            >
+                                                {isAnalyzing ? <Loader2 size={16} className="animate-spin" /> : <Database size={16} />}
+                                                Analyser
+                                            </button>
+                                        </div>
+
+                                        {/* Analysis Table */}
+                                        {showPhotoAnalysis && photoAnalysis.length > 0 && (
+                                            <div className="p-6 bg-background/50 rounded-xl border border-white/10 max-h-96 overflow-y-auto">
+                                                <div className="flex items-center justify-between mb-4">
+                                                    <h4 className="text-sm font-bold text-white uppercase tracking-tight">Résultats de l'analyse</h4>
+                                                    <button
+                                                        onClick={() => setShowPhotoAnalysis(false)}
+                                                        className="text-xs text-grey-medium hover:text-white"
+                                                    >
+                                                        Fermer
+                                                    </button>
+                                                </div>
+                                                <div className="overflow-x-auto">
+                                                    <table className="w-full text-xs">
+                                                        <thead className="sticky top-0 bg-surface border-b border-white/10">
+                                                            <tr>
+                                                                <th className="text-left p-2 text-grey-light font-bold uppercase tracking-wider">Nom</th>
+                                                                <th className="text-left p-2 text-grey-light font-bold uppercase tracking-wider">Prénom</th>
+                                                                <th className="text-center p-2 text-grey-light font-bold uppercase tracking-wider">Photo</th>
+                                                                <th className="text-right p-2 text-grey-light font-bold uppercase tracking-wider">Taille</th>
+                                                                <th className="text-center p-2 text-grey-light font-bold uppercase tracking-wider">État</th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody>
+                                                            {photoAnalysis.map((student, idx) => (
+                                                                <tr key={idx} className="border-b border-white/5 hover:bg-white/5">
+                                                                    <td className="p-2 text-white">{student.nom}</td>
+                                                                    <td className="p-2 text-white">{student.prenom}</td>
+                                                                    <td className="p-2 text-center">
+                                                                        {student.hasPhoto ? (
+                                                                            <span className="text-success">✓</span>
+                                                                        ) : (
+                                                                            <span className="text-grey-dark">✗</span>
+                                                                        )}
+                                                                    </td>
+                                                                    <td className="p-2 text-right font-mono text-white">{student.sizeFormatted}</td>
+                                                                    <td className="p-2 text-center">
+                                                                        {student.needsOptimization ? (
+                                                                            <span className="text-xs bg-warning/20 text-warning px-2 py-1 rounded">À optimiser</span>
+                                                                        ) : student.hasPhoto ? (
+                                                                            <span className="text-xs bg-success/20 text-success px-2 py-1 rounded">OK</span>
+                                                                        ) : (
+                                                                            <span className="text-xs text-grey-dark">-</span>
+                                                                        )}
+                                                                    </td>
+                                                                </tr>
+                                                            ))}
+                                                        </tbody>
+                                                    </table>
+                                                </div>
+                                                <div className="mt-4 p-3 bg-primary/5 rounded-lg border border-primary/10">
+                                                    <p className="text-xs text-grey-light">
+                                                        <span className="font-bold text-white">Total:</span> {photoAnalysis.length} élèves |
+                                                        <span className="font-bold text-white ml-2">Avec photo:</span> {photoAnalysis.filter(s => s.hasPhoto).length} |
+                                                        <span className="font-bold text-warning ml-2">À optimiser:</span> {photoAnalysis.filter(s => s.needsOptimization).length}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+
+                                {/* Cache Management */}
+                                <div className="bg-surface/30 backdrop-blur-md border border-white/5 rounded-2xl p-6 shadow-xl">
+                                    <h2 className="text-lg font-bold text-text-main mb-6 flex items-center gap-2">
+                                        <Database size={20} className="text-primary" /> Gestion du Cache Local
+                                    </h2>
+
+                                    <div className="space-y-4">
+                                        {/* Cache Toggle */}
+                                        <div className="p-6 bg-white/5 rounded-xl border border-white/5 flex flex-col md:flex-row items-center justify-between gap-6">
+                                            <div className="flex-1">
+                                                <h3 className="text-sm font-bold text-white mb-1 uppercase tracking-tight">Cache des photos</h3>
+                                                <p className="text-xs text-grey-medium">
+                                                    Stocke les photos localement (chiffrées) pour réduire la bande passante. Les photos sont rechargées uniquement si modifiées.
+                                                </p>
+                                                {cacheEnabled && (
+                                                    <div className="mt-3 flex items-center gap-4 text-xs">
+                                                        <div className="flex items-center gap-2">
+                                                            <span className="text-grey-light">Photos en cache:</span>
+                                                            <span className="font-mono font-bold text-primary">{cacheStats.count}</span>
+                                                        </div>
+                                                        <div className="flex items-center gap-2">
+                                                            <span className="text-grey-light">Taille estimée:</span>
+                                                            <span className="font-mono font-bold text-primary">{formatBytes(cacheStats.estimatedSize)}</span>
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </div>
+                                            <div className="flex items-center gap-3">
+                                                <button
+                                                    onClick={() => handleToggleCache(!cacheEnabled)}
+                                                    className={clsx(
+                                                        "relative w-14 h-7 rounded-full transition-colors",
+                                                        cacheEnabled ? "bg-primary" : "bg-grey-dark"
+                                                    )}
+                                                >
+                                                    <div className={clsx(
+                                                        "absolute top-1 w-5 h-5 bg-white rounded-full transition-transform",
+                                                        cacheEnabled ? "right-1" : "left-1"
+                                                    )} />
+                                                </button>
+                                                <span className="text-xs font-bold text-white">{cacheEnabled ? "Activé" : "Désactivé"}</span>
+                                            </div>
+                                        </div>
+
+                                        {/* Clear Cache Button */}
+                                        {cacheEnabled && (
+                                            <div className="p-6 bg-danger/5 rounded-xl border border-danger/10 flex flex-col md:flex-row items-center justify-between gap-6">
+                                                <div className="flex-1">
+                                                    <h3 className="text-sm font-bold text-white mb-1 uppercase tracking-tight">Vider le cache</h3>
+                                                    <p className="text-xs text-grey-medium">
+                                                        Supprime toutes les photos en cache. Elles seront rechargées depuis le serveur au prochain chargement.
+                                                    </p>
+                                                </div>
+                                                <button
+                                                    onClick={handleClearCache}
+                                                    className="w-full md:w-auto px-6 py-3 bg-danger/20 hover:bg-danger text-danger hover:text-white font-black text-[10px] uppercase tracking-widest rounded-xl transition-all flex items-center justify-center gap-2 shadow-lg"
+                                                >
+                                                    <Trash2 size={16} />
+                                                    Vider
+                                                </button>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+
+                                {/* Delta Sync Management */}
+                                <div className="bg-surface/30 backdrop-blur-md border border-white/5 rounded-2xl p-6 shadow-xl">
+                                    <h2 className="text-lg font-bold text-text-main mb-6 flex items-center gap-2">
+                                        <Activity size={20} className="text-primary" /> Synchronisation Incrémentale
+                                    </h2>
+
+                                    <div className="space-y-4">
+                                        <div className="p-6 bg-white/5 rounded-xl border border-white/5">
+                                            <h3 className="text-sm font-bold text-white mb-1 uppercase tracking-tight">Delta Sync</h3>
+                                            <p className="text-xs text-grey-medium mb-4">
+                                                Charge uniquement les données modifiées depuis la dernière visite. Réduit la bande passante de 80-95%.
+                                            </p>
+
+                                            {syncStats.length > 0 && (
+                                                <div className="space-y-2">
+                                                    <p className="text-xs font-bold text-white uppercase tracking-wider">Dernières synchronisations :</p>
+                                                    <div className="max-h-40 overflow-y-auto space-y-1">
+                                                        {syncStats.map((stat, idx) => (
+                                                            <div key={idx} className="flex items-center justify-between text-xs bg-black/20 p-2 rounded">
+                                                                <span className="font-mono text-primary">{stat.table}</span>
+                                                                <span className="text-grey-light">{new Date(stat.lastSync).toLocaleString('fr-FR')}</span>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        <div className="p-6 bg-danger/5 rounded-xl border border-danger/10 flex flex-col md:flex-row items-center justify-between gap-6">
+                                            <div className="flex-1">
+                                                <h3 className="text-sm font-bold text-white mb-1 uppercase tracking-tight">Réinitialiser la sync</h3>
+                                                <p className="text-xs text-grey-medium">
+                                                    Force un rechargement complet des données au prochain chargement.
+                                                </p>
+                                            </div>
+                                            <button
+                                                onClick={handleClearSyncData}
+                                                className="w-full md:w-auto px-6 py-3 bg-danger/20 hover:bg-danger text-danger hover:text-white font-black text-[10px] uppercase tracking-widest rounded-xl transition-all flex items-center justify-center gap-2 shadow-lg"
+                                            >
+                                                <Trash2 size={16} />
+                                                Réinitialiser
                                             </button>
                                         </div>
                                     </div>

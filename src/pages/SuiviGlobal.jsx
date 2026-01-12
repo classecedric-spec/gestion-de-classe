@@ -74,46 +74,46 @@ const SuiviGlobal = () => {
                 {/* Left spacer to balance right side content for perfect centering */}
                 <div className="flex-1 hidden lg:block" />
 
-                <div className="neu-selector-container flex p-1.5 rounded-2xl w-full max-w-4xl mx-auto shadow-2xl">
+                <div className="neu-selector-container p-1.5 rounded-2xl mx-auto shadow-2xl overflow-hidden">
                     <button
                         onClick={() => setActiveView('suivi')}
                         data-active={activeView === 'suivi'}
                         className={clsx(
-                            "flex-1 flex items-center justify-center gap-3 px-8 py-4 rounded-xl text-[13px] font-black uppercase tracking-[0.15em] transition-all duration-300",
+                            "rounded-xl font-black uppercase tracking-[0.15em] transition-all duration-300",
                             activeView === 'suivi'
                                 ? "bg-primary text-text-dark shadow-lg scale-[1.02]"
                                 : "text-grey-medium hover:text-white hover:bg-white/5"
                         )}
                     >
                         <Users size={20} />
-                        Encodage
+                        <span className="tab-label">Encodage</span>
                     </button>
                     <button
                         onClick={() => setActiveView('avancement')}
                         data-active={activeView === 'avancement'}
                         className={clsx(
-                            "flex-1 flex items-center justify-center gap-3 px-8 py-4 rounded-xl text-[13px] font-black uppercase tracking-[0.15em] transition-all duration-300",
+                            "rounded-xl font-black uppercase tracking-[0.15em] transition-all duration-300",
                             activeView === 'avancement'
                                 ? "bg-primary text-text-dark shadow-lg scale-[1.02]"
                                 : "text-grey-medium hover:text-white hover:bg-white/5"
                         )}
                     >
                         <Table size={20} />
-                        Suivi des groupes
+                        <span className="tab-label">Suivi des groupes</span>
                     </button>
                     <button
                         onClick={() => window.open('/suivi-tablet', '_blank')}
-                        className="flex-1 flex items-center justify-center gap-3 px-8 py-4 rounded-xl text-[13px] font-black uppercase tracking-[0.15em] transition-all duration-300 text-grey-medium hover:text-white hover:bg-white/5"
+                        className="rounded-xl font-black uppercase tracking-[0.15em] transition-all duration-300 text-grey-medium hover:text-white hover:bg-white/5"
                     >
                         <Tablet size={20} />
-                        Tablette
+                        <span className="tab-label">Tablette</span>
                     </button>
                     <button
                         onClick={() => window.open('/suivi-tbi', '_blank')}
-                        className="flex-1 flex items-center justify-center gap-3 px-8 py-4 rounded-xl text-[13px] font-black uppercase tracking-[0.15em] transition-all duration-300 text-grey-medium hover:text-white hover:bg-white/5"
+                        className="rounded-xl font-black uppercase tracking-[0.15em] transition-all duration-300 text-grey-medium hover:text-white hover:bg-white/5"
                     >
                         <Monitor size={20} />
-                        TBI
+                        <span className="tab-label">TBI</span>
                     </button>
                 </div>
 

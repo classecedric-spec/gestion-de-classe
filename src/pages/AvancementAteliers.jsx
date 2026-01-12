@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabaseClient';
 import { checkOverdueActivities } from '../lib/overdueLogic';
-import { getInitials, getStatusColorClasses } from '../lib/utils';
-import { BookOpen, Calendar, ChevronDown, Clock, Search, FileText, Loader2, Users, Check, AlertCircle, Home, GitBranch, ShieldCheck } from 'lucide-react';
+import { getInitials } from '../lib/utils';
+import { BookOpen, Calendar, ChevronDown, Clock, Search, FileText, Loader2, Users, Check, AlertCircle, Home, GitBranch, ShieldCheck, Settings2 } from 'lucide-react';
 import { toast } from 'sonner';
 import clsx from 'clsx';
 import { pdf } from '@react-pdf/renderer';
@@ -313,9 +313,10 @@ const AvancementAteliers = () => {
         const currentStatus = progressions[`${student.id}-${activity.id}`] || 'a_commencer';
         let nextStatus = 'termine';
 
-        // Cycle: a_commencer -> besoin_d_aide -> termine -> a_commencer
+        // Cycle: a_commencer -> besoin_d_aide -> ajustement -> termine -> a_commencer
         if (currentStatus === 'a_commencer') nextStatus = 'besoin_d_aide';
-        else if (currentStatus === 'besoin_d_aide') nextStatus = 'termine';
+        else if (currentStatus === 'besoin_d_aide') nextStatus = 'ajustement';
+        else if (currentStatus === 'ajustement') nextStatus = 'termine';
         else if (currentStatus === 'termine' || currentStatus === 'a_verifier') nextStatus = 'a_commencer';
 
         // Auto-Verification Logic
@@ -359,6 +360,7 @@ const AvancementAteliers = () => {
         switch (status) {
             case 'termine': return <Check size={14} />;
             case 'besoin_d_aide': return <AlertCircle size={14} />;
+            case 'ajustement': return <Settings2 size={14} />;
             case 'a_verifier': return <ShieldCheck size={14} />;
             case 'a_domicile': return <Home size={14} />;
             case 'a_commencer': return <div className="w-1.5 h-1.5 rounded-full bg-white/30" />;
@@ -370,7 +372,8 @@ const AvancementAteliers = () => {
         switch (status) {
             case 'termine': return "bg-success border-success text-white";
             case 'besoin_d_aide': return "bg-[#A0A8AD] border-[#A0A8AD] text-white";
-            case 'a_verifier': return "bg-[#8B5CF6] border-[#8B5CF6] text-white"; // Violet
+            case 'ajustement': return "bg-[#F59E0B] border-[#F59E0B] text-black";
+            case 'a_verifier': return "bg-purple-accent border-[#8B5CF6] text-white"; // Violet
             case 'a_domicile': return "bg-danger border-danger text-white";
             case 'a_commencer': return "bg-white/5 border-white/10 text-grey-medium hover:bg-white/10";
             default: return "bg-transparent border-transparent text-transparent"; // Completely invisible for undefined/null
@@ -777,13 +780,19 @@ const AvancementAteliers = () => {
                         <span className="text-xs font-medium text-grey-light">Besoin d'aide</span>
                     </div>
                     <div className="flex items-center gap-2">
+                        <div className="w-4 h-4 rounded bg-[#F59E0B] flex items-center justify-center text-black">
+                            <Settings2 size={10} />
+                        </div>
+                        <span className="text-xs font-medium text-grey-light">Ajustement</span>
+                    </div>
+                    <div className="flex items-center gap-2">
                         <div className="w-4 h-4 rounded bg-danger flex items-center justify-center text-white">
                             <Home size={10} />
                         </div>
                         <span className="text-xs font-medium text-grey-light">À domicile (Retard)</span>
                     </div>
                     <div className="flex items-center gap-2">
-                        <div className="w-4 h-4 rounded bg-[#8B5CF6] flex items-center justify-center text-white">
+                        <div className="w-4 h-4 rounded bg-purple-accent flex items-center justify-center text-white">
                             <ShieldCheck size={10} />
                         </div>
                         <span className="text-xs font-medium text-grey-light">À Vérifier</span>

@@ -621,7 +621,9 @@ const PresenceConfigurationModal = ({
                                             type="date"
                                             value={selectedDay}
                                             onChange={e => setSelectedDay(e.target.value)}
-                                            className="w-full bg-input border border-border/10 rounded-lg p-2 text-text-main focus:border-primary outline-none"
+                                            onClick={(e) => { try { e.target.showPicker(); } catch (err) { } }}
+                                            onFocus={(e) => { try { e.target.showPicker(); } catch (err) { } }}
+                                            className="w-full bg-input border border-border/10 rounded-lg p-2 text-text-main focus:border-primary outline-none [&::-webkit-calendar-picker-indicator]:hidden cursor-pointer"
                                         />
                                     </div>
                                 )}

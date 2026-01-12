@@ -1,4 +1,5 @@
 import React from 'react';
+import PropTypes from 'prop-types';
 import { Loader2 } from 'lucide-react';
 import clsx from 'clsx';
 
@@ -50,6 +51,18 @@ const Button = ({
             )}
         </button>
     );
+};
+
+Button.propTypes = {
+    children: PropTypes.node,
+    onClick: PropTypes.func,
+    type: PropTypes.oneOf(['button', 'submit', 'reset']),
+    variant: PropTypes.oneOf(['primary', 'secondary', 'danger', 'ghost', 'success']),
+    size: PropTypes.oneOf(['sm', 'default', 'lg']),
+    disabled: PropTypes.bool,
+    loading: PropTypes.bool,
+    className: PropTypes.string,
+    icon: PropTypes.elementType
 };
 
 export default Button;

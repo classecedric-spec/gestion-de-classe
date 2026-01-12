@@ -300,7 +300,9 @@ const AddModuleModal = ({ isOpen, onClose, onAdded, moduleToEdit }) => {
                                         type="date"
                                         value={endDate}
                                         onChange={(e) => setEndDate(e.target.value)}
-                                        className="w-full pl-10 pr-4 py-2 bg-black/20 border border-white/10 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all [color-scheme:dark]"
+                                        onClick={(e) => { try { e.target.showPicker(); } catch (err) { } }}
+                                        onFocus={(e) => { try { e.target.showPicker(); } catch (err) { } }}
+                                        className="w-full pl-10 pr-4 py-2 bg-black/20 border border-white/10 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all [color-scheme:dark] [&::-webkit-calendar-picker-indicator]:hidden cursor-pointer"
                                     />
                                 </div>
                                 <div className="flex gap-2">

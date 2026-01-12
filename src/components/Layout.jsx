@@ -158,12 +158,15 @@ const Layout = () => {
 
     return (
         <div className="flex h-screen bg-background text-text-main font-sans overflow-hidden">
+            {/* Sidebar Reveal Trigger Zone */}
+            <div className="sidebar-reveal-zone" />
+
             {/* Toggle Button */}
             {!isSidebarOpen && (
                 <button
                     onClick={() => setIsSidebarOpen(true)}
                     className={clsx(
-                        "fixed z-[100] h-[46px] w-[46px] bg-surface text-primary border border-white/10 rounded-xl shadow-xl flex items-center justify-center animate-in fade-in slide-in-from-left-2 transition-all hover:bg-white/5 hover:scale-105 active:scale-95",
+                        "fixed z-[100] h-[46px] w-[46px] bg-surface text-primary border border-white/10 rounded-xl shadow-xl flex items-center justify-center animate-in fade-in slide-in-from-left-2 burger-3d",
                         isFullPage ? "top-[11px] left-4" : "top-[33px] left-6"
                     )}
                     title="Afficher le menu"
@@ -172,10 +175,10 @@ const Layout = () => {
                 </button>
             )}
 
-            {/* Sidebar */}
+            {/* Sidebar (Always Fixed for hover/3D support) */}
             <aside className={clsx(
-                "bg-surface flex flex-col border-r border-border/10 shadow-lg transition-all duration-300 relative z-50",
-                isSidebarOpen ? "w-64" : "w-0 border-none opacity-0 pointer-events-none overflow-hidden"
+                "aside-sidebar fixed top-0 left-0 h-full w-64 bg-surface flex flex-col border-r border-border/10 shadow-lg z-50 transition-all duration-400",
+                isSidebarOpen ? "is-explicitly-open" : "shadow-2xl translate-x-[-100%] opacity-0 pointer-events-none"
             )}>
                 <div className="p-6 flex items-center justify-between">
                     <h1 className="text-xl font-bold text-primary truncate">Gestion Classe</h1>
@@ -187,7 +190,7 @@ const Layout = () => {
                     </button>
                 </div>
 
-                <nav className="flex-1 px-4 py-4 space-y-2">
+                <nav className="flex-1 px-4 py-4 space-y-2 overflow-y-auto">
                     {displayedNavItems.map((item, index) => {
                         if (item.type === 'separator') {
                             return (
@@ -206,13 +209,11 @@ const Layout = () => {
                                 <button
                                     key={item.label}
                                     onClick={async () => {
-                                        // Direct links for tablet and TBI
                                         if (item.path === '/suivi-tablet' || item.path === '/suivi-tbi') {
                                             window.open(item.path, '_blank');
                                             return;
                                         }
 
-                                        // iPhone - needs group ID from preferences
                                         const { data } = await supabase
                                             .from('UserPreference')
                                             .select('value')
@@ -278,13 +279,20 @@ const Layout = () => {
                 </div>
             </aside >
 
+            {/* Sidebar Spacer (Pushes content when open) */}
+            <div
+                className={clsx(
+                    "hidden md:block transition-all duration-400 shrink-0 overflow-hidden",
+                    isSidebarOpen ? "w-64" : "w-0"
+                )}
+            />
+
             {/* Main Content */}
             <main
                 onClick={() => isSidebarOpen && setIsSidebarOpen(false)}
                 className={
                     clsx(
                         "flex-1 overflow-y-auto relative transition-all duration-300",
-                        !isSidebarOpen && (isFullPage ? "pl-0" : "pl-20"),
                         isFullPage ? "p-0" : "p-8"
                     )}>
 

@@ -208,7 +208,7 @@ const MobileDashboard = () => {
             <header className="bg-surface/80 backdrop-blur-md border-b border-white/5 p-4 sticky top-0 z-20">
                 <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-[#b8955c] flex items-center justify-center text-text-dark font-black text-lg shadow-lg shadow-primary/20">
+                        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-primary-dark flex items-center justify-center text-text-dark font-black text-lg shadow-lg shadow-primary/20">
                             G
                         </div>
                         <div>
@@ -231,7 +231,7 @@ const MobileDashboard = () => {
                 <section className="grid grid-cols-2 gap-3">
                     <div className="bg-surface/50 border border-border rounded-xl p-4">
                         <div className="flex items-center gap-2 mb-2">
-                            <AlertCircle size={14} className="text-[#A0A8AD]" />
+                            <AlertCircle size={14} className="text-grey-medium" />
                             <span className="text-[9px] font-bold uppercase tracking-widest text-grey-medium">En attente</span>
                         </div>
                         <div className="text-2xl font-black text-white">
@@ -256,8 +256,8 @@ const MobileDashboard = () => {
                 {stats.studentsToFollow.length > 0 && (
                     <section className="bg-[#A0A8AD]/10 border border-[#A0A8AD]/20 rounded-xl p-4">
                         <div className="flex items-center gap-2 mb-3">
-                            <TrendingUp size={14} className="text-[#A0A8AD]" />
-                            <span className="text-[10px] font-bold uppercase tracking-widest text-[#A0A8AD]">Priorité suivi</span>
+                            <TrendingUp size={14} className="text-grey-medium" />
+                            <span className="text-[10px] font-bold uppercase tracking-widest text-grey-medium">Priorité suivi</span>
                         </div>
                         <div className="flex gap-2 overflow-x-auto pb-1">
                             {stats.studentsToFollow.map(student => (
@@ -277,7 +277,7 @@ const MobileDashboard = () => {
                                     </div>
                                     <div>
                                         <p className="text-xs font-bold text-white leading-tight">{student.prenom}</p>
-                                        <p className="text-[9px] text-[#A0A8AD]">{student.helpCount} aide{student.helpCount > 1 ? 's' : ''}</p>
+                                        <p className="text-[9px] text-grey-medium">{student.helpCount} aide{student.helpCount > 1 ? 's' : ''}</p>
                                     </div>
                                 </Link>
                             ))}

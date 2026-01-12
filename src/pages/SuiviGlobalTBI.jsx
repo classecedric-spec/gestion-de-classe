@@ -4,7 +4,7 @@ import { getInitials } from '../lib/utils';
 import {
     Users, BookOpen, Check, AlertCircle, Clock,
     ShieldCheck, ChevronLeft, ChevronDown, Home, User, ArrowLeft, Play, Pause, RotateCcw,
-    Plus, Trash2, X
+    Plus, Trash2, X, Settings2
 } from 'lucide-react';
 import clsx from 'clsx';
 import { toast } from 'sonner';
@@ -404,7 +404,8 @@ const SuiviGlobalTBI = () => {
 
         let nextStatus = 'termine';
         if (currentStatus === 'a_commencer' || !currentStatus) nextStatus = 'besoin_d_aide';
-        else if (currentStatus === 'besoin_d_aide') nextStatus = 'termine';
+        else if (currentStatus === 'besoin_d_aide') nextStatus = 'ajustement';
+        else if (currentStatus === 'ajustement') nextStatus = 'termine';
         else if (currentStatus === 'termine' || currentStatus === 'a_verifier') nextStatus = 'a_commencer';
 
         // Optimistic UI update
@@ -545,6 +546,7 @@ const SuiviGlobalTBI = () => {
             case 'termine': return 'bg-success text-white';
             case 'a_verifier': return 'bg-violet-500 text-white';
             case 'besoin_d_aide': return 'bg-gray-400 text-white';
+            case 'ajustement': return 'bg-[#F59E0B] text-black';
             case 'a_domicile': return 'bg-danger text-white';
             default: return 'bg-white/10 text-grey-medium border border-white/20';
         }
@@ -555,6 +557,7 @@ const SuiviGlobalTBI = () => {
             case 'termine': return <Check size={14} />;
             case 'a_verifier': return <ShieldCheck size={14} />;
             case 'besoin_d_aide': return <AlertCircle size={14} />;
+            case 'ajustement': return <Settings2 size={14} />;
             case 'a_domicile': return <Home size={14} />;
             default: return null;
         }

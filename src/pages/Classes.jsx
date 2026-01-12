@@ -2,9 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabaseClient';
 import {
     BookOpen, Plus, X, Loader2, Trash2, Search,
-    ChevronRight, GraduationCap, Edit
+
+    ChevronRight, GraduationCap, Edit, LayoutGrid, Table as TableIcon, Save,
+    ArrowUpDown, ArrowUp, ArrowDown
 } from 'lucide-react';
 import clsx from 'clsx';
+import { getCachedPhoto, setCachedPhoto, isCacheEnabled } from '../lib/photoCache';
 import StudentModal from '../components/StudentModal';
 import AddStudentToClassModal from '../components/AddStudentToClassModal';
 import AddClassModal from '../components/AddClassModal';
@@ -15,6 +18,8 @@ const Classes = () => {
     const [selectedClass, setSelectedClass] = useState(null);
     const [studentsInClass, setStudentsInClass] = useState([]);
     const [loadingStudents, setLoadingStudents] = useState(false);
+    const [viewMode, setViewMode] = useState('grid'); // 'grid' | 'table'
+    const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
 
     // Modals state
     const [showClassModal, setShowClassModal] = useState(false);
@@ -41,7 +46,7 @@ const Classes = () => {
             const { data, error } = await supabase
                 .from('Classe')
                 .select(`
-                    *,
+                    id, nom, acronyme, photo_base64, logo_url,
                     ClasseAdulte (
                         role,
                         Adulte (id, nom, prenom)
@@ -70,7 +75,7 @@ const Classes = () => {
             const { data, error } = await supabase
                 .from('Eleve')
                 .select(`
-                    *,
+                    id, nom, prenom, date_naissance, sex, photo_base64, photo_hash,
                     Classe (nom),
                     EleveGroupe (
                         Groupe (id, nom)
@@ -80,8 +85,32 @@ const Classes = () => {
                 .order('nom');
 
             if (error) throw error;
-            setStudentsInClass(data || []);
+
+            // Apply photo caching if enabled
+            if (isCacheEnabled() && data) {
+                const studentsWithCachedPhotos = await Promise.all(
+                    data.map(async (student) => {
+                        if (student.photo_hash) {
+                            // Try to get from cache
+                            const cachedPhoto = await getCachedPhoto(student.id, student.photo_hash);
+
+                            if (cachedPhoto) {
+                                // Cache hit - use cached photo
+                                return { ...student, photo_base64: cachedPhoto };
+                            } else if (student.photo_base64) {
+                                // Cache miss - cache the photo for next time
+                                await setCachedPhoto(student.id, student.photo_base64, student.photo_hash);
+                            }
+                        }
+                        return student;
+                    })
+                );
+                setStudentsInClass(studentsWithCachedPhotos || []);
+            } else {
+                setStudentsInClass(data || []);
+            }
         } catch (error) {
+            console.error('Error fetching students:', error);
         } finally {
             setLoadingStudents(false);
         }
@@ -151,6 +180,47 @@ const Classes = () => {
             alert('Erreur: ' + error.message);
         }
     };
+
+    const handleUpdateStudentField = async (studentId, field, value) => {
+        // Optimistic update
+        setStudentsInClass(prev => prev.map(s =>
+            s.id === studentId ? { ...s, [field]: value } : s
+        ));
+
+        try {
+            const { error } = await supabase
+                .from('Eleve')
+                .update({ [field]: value })
+                .eq('id', studentId);
+
+            if (error) throw error;
+        } catch (error) {
+            console.error('Error updating student:', error);
+            // Revert on error (could be improved by refetching)
+            fetchStudentsInClass(selectedClass.id);
+        }
+    };
+
+    const handleSort = (key) => {
+        let direction = 'asc';
+        if (sortConfig.key === key && sortConfig.direction === 'asc') {
+            direction = 'desc';
+        }
+        setSortConfig({ key, direction });
+    };
+
+    const sortedStudents = React.useMemo(() => {
+        if (!sortConfig.key) return studentsInClass;
+        return [...studentsInClass].sort((a, b) => {
+            if (a[sortConfig.key] < b[sortConfig.key]) {
+                return sortConfig.direction === 'asc' ? -1 : 1;
+            }
+            if (a[sortConfig.key] > b[sortConfig.key]) {
+                return sortConfig.direction === 'asc' ? 1 : -1;
+            }
+            return 0;
+        });
+    }, [studentsInClass, sortConfig]);
 
     const filteredClasses = classes.filter(c =>
         c.nom.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -333,78 +403,219 @@ const Classes = () => {
                         </div>
 
                         {/* Students List */}
-                        <div className="flex-1 overflow-y-auto p-8 custom-scrollbar bg-background/20">
-                            <h3 className="text-sm font-bold uppercase tracking-widest text-grey-dark border-b border-border/5 pb-4 mb-10 flex items-center gap-2">
-                                <GraduationCap size={18} className="text-primary" />
-                                Les enfants de cette classe
+                        {/* Students Section Header (Fixed) */}
+                        <div className="px-6 pt-6 pb-4 border-b border-border/5 bg-surface/5">
+                            <h3 className="text-xs font-bold uppercase tracking-widest text-grey-dark flex items-center justify-between gap-2">
+                                <div className="flex items-center gap-2">
+                                    <GraduationCap size={16} className="text-primary" />
+                                    Les enfants de cette classe
+                                </div>
+                                <div className="flex bg-surface p-1 rounded-lg border border-white/5">
+                                    <button
+                                        onClick={() => setViewMode('grid')}
+                                        className={clsx(
+                                            "p-1.5 rounded-md transition-all",
+                                            viewMode === 'grid' ? "bg-primary text-white shadow-sm" : "text-grey-medium hover:text-white"
+                                        )}
+                                        title="Vue Grille"
+                                    >
+                                        <LayoutGrid size={16} />
+                                    </button>
+                                    <button
+                                        onClick={() => setViewMode('table')}
+                                        className={clsx(
+                                            "p-1.5 rounded-md transition-all",
+                                            viewMode === 'table' ? "bg-primary text-white shadow-sm" : "text-grey-medium hover:text-white"
+                                        )}
+                                        title="Vue Tableur"
+                                    >
+                                        <TableIcon size={16} />
+                                    </button>
+                                </div>
                             </h3>
+                        </div>
+
+                        {/* Scrollable Students List */}
+                        <div className="flex-1 overflow-y-auto px-6 pb-6 custom-scrollbar bg-background/20 relative">
 
                             {loadingStudents ? (
                                 <div className="flex flex-col items-center justify-center py-12 gap-3">
-                                    <Loader2 className="animate-spin text-primary" size={32} />
-                                    <p className="text-grey-medium animate-pulse text-sm">Chargement des élèves...</p>
+                                    <Loader2 className="animate-spin text-primary" size={24} />
+                                    <p className="text-grey-medium animate-pulse text-xs">Chargement des élèves...</p>
                                 </div>
                             ) : studentsInClass.length === 0 ? (
                                 <div className="text-center py-12 p-8 bg-input/10 rounded-2xl border border-dashed border-border/10 flex flex-col items-center gap-4">
-                                    <GraduationCap size={48} className="mx-auto text-grey-dark opacity-20" />
+                                    <GraduationCap size={32} className="mx-auto text-grey-dark opacity-20" />
                                     <div>
-                                        <p className="text-grey-medium italic">Aucun enfant dans cette classe pour le moment.</p>
+                                        <p className="text-grey-medium italic text-sm">Aucun enfant dans cette classe pour le moment.</p>
                                         <p className="text-xs text-grey-dark mt-1">Cliquez sur le bouton ci-dessous pour ajouter des élèves.</p>
                                     </div>
                                 </div>
+                            ) : viewMode === 'table' ? (
+                                <div className="rounded-xl border border-white/5 bg-surface/30">
+                                    <table className="w-full text-sm text-left student-table relative">
+                                        <thead className="text-xs text-grey-medium uppercase bg-surface sticky top-0 z-20 shadow-sm border-b border-white/5">
+                                            <tr>
+                                                <th className="px-4 py-3 font-bold cursor-pointer hover:bg-white/10 transition-colors select-none group/th" onClick={() => handleSort('prenom')}>
+                                                    <div className="flex items-center gap-1">
+                                                        Prénom
+                                                        {sortConfig.key === 'prenom' ? (
+                                                            sortConfig.direction === 'asc' ? <ArrowUp size={12} className="text-primary" /> : <ArrowDown size={12} className="text-primary" />
+                                                        ) : <ArrowUpDown size={12} className="opacity-0 group-hover/th:opacity-50" />}
+                                                    </div>
+                                                </th>
+                                                <th className="px-4 py-3 font-bold cursor-pointer hover:bg-white/10 transition-colors select-none group/th" onClick={() => handleSort('nom')}>
+                                                    <div className="flex items-center gap-1">
+                                                        Nom
+                                                        {sortConfig.key === 'nom' ? (
+                                                            sortConfig.direction === 'asc' ? <ArrowUp size={12} className="text-primary" /> : <ArrowDown size={12} className="text-primary" />
+                                                        ) : <ArrowUpDown size={12} className="opacity-0 group-hover/th:opacity-50" />}
+                                                    </div>
+                                                </th>
+                                                <th className="px-4 py-3 font-bold w-24 cursor-pointer hover:bg-white/10 transition-colors select-none group/th" onClick={() => handleSort('sex')}>
+                                                    <div className="flex items-center gap-1">
+                                                        Sexe
+                                                        {sortConfig.key === 'sex' ? (
+                                                            sortConfig.direction === 'asc' ? <ArrowUp size={12} className="text-primary" /> : <ArrowDown size={12} className="text-primary" />
+                                                        ) : <ArrowUpDown size={12} className="opacity-0 group-hover/th:opacity-50" />}
+                                                    </div>
+                                                </th>
+                                                <th className="px-4 py-3 font-bold cursor-pointer hover:bg-white/10 transition-colors select-none group/th" onClick={() => handleSort('date_naissance')}>
+                                                    <div className="flex items-center gap-1">
+                                                        Date de naissance
+                                                        {sortConfig.key === 'date_naissance' ? (
+                                                            sortConfig.direction === 'asc' ? <ArrowUp size={12} className="text-primary" /> : <ArrowDown size={12} className="text-primary" />
+                                                        ) : <ArrowUpDown size={12} className="opacity-0 group-hover/th:opacity-50" />}
+                                                    </div>
+                                                </th>
+                                                <th className="px-4 py-3 font-bold w-20 text-center">Actions</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-white/5">
+                                            {sortedStudents.map(student => (
+                                                <tr key={student.id} className="hover:bg-white/5 transition-colors group">
+                                                    <td className="px-2 py-2">
+                                                        <input
+                                                            type="text"
+                                                            value={student.prenom}
+                                                            onChange={(e) => handleUpdateStudentField(student.id, 'prenom', e.target.value)}
+                                                            className="w-full bg-transparent border-transparent focus:border-primary/50 focus:bg-black/20 rounded px-2 py-1 outline-none transition-all font-medium text-text-main placeholder-grey-dark/50"
+                                                            placeholder="Prénom"
+                                                        />
+                                                    </td>
+                                                    <td className="px-2 py-2">
+                                                        <input
+                                                            type="text"
+                                                            value={student.nom}
+                                                            onChange={(e) => handleUpdateStudentField(student.id, 'nom', e.target.value)}
+                                                            className="w-full bg-transparent border-transparent focus:border-primary/50 focus:bg-black/20 rounded px-2 py-1 outline-none transition-all font-medium text-text-main placeholder-grey-dark/50"
+                                                            placeholder="Nom"
+                                                        />
+                                                    </td>
+                                                    <td className="px-2 py-2">
+                                                        <select
+                                                            value={student.sex || ''}
+                                                            onChange={(e) => handleUpdateStudentField(student.id, 'sex', e.target.value)}
+                                                            className={clsx(
+                                                                "w-full bg-transparent border-transparent focus:border-primary/50 focus:bg-black/20 rounded px-2 py-1 outline-none transition-all font-medium cursor-pointer appearance-none",
+                                                                student.sex === 'M' ? "text-blue-400" : student.sex === 'F' ? "text-pink-400" : "text-grey-medium"
+                                                            )}
+                                                        >
+                                                            <option value="" className="bg-surface text-grey-medium">-</option>
+                                                            <option value="M" className="bg-surface text-blue-400">Garçon</option>
+                                                            <option value="F" className="bg-surface text-pink-400">Fille</option>
+                                                        </select>
+                                                    </td>
+                                                    <td className="px-2 py-2">
+                                                        <input
+                                                            type="date"
+                                                            value={student.date_naissance || ''}
+                                                            onChange={(e) => handleUpdateStudentField(student.id, 'date_naissance', e.target.value)}
+                                                            onClick={(e) => {
+                                                                try {
+                                                                    e.target.showPicker();
+                                                                } catch (err) {
+                                                                    // Fallback or ignore if not supported
+                                                                }
+                                                            }}
+                                                            onFocus={(e) => {
+                                                                // Select text for manual entry if needed, but showPicker is priority if supported
+                                                                // e.target.select(); // HTML date inputs often don't support .select() well, behavior varies.
+                                                                try {
+                                                                    e.target.showPicker();
+                                                                } catch (err) { }
+                                                            }}
+                                                            className="w-full bg-transparent border-transparent focus:border-primary/50 focus:bg-black/20 rounded px-2 py-1 outline-none transition-all text-grey-light [&::-webkit-calendar-picker-indicator]:hidden cursor-pointer"
+                                                        />
+                                                    </td>
+                                                    <td className="px-2 py-2 text-center">
+                                                        <div className="flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                            <button
+                                                                onClick={() => handleEditStudent(student)}
+                                                                className="p-1.5 text-grey-medium hover:text-primary hover:bg-primary/10 rounded-md transition-colors"
+                                                                title="Détails complets"
+                                                            >
+                                                                <Edit size={14} />
+                                                            </button>
+                                                            <button
+                                                                onClick={(e) => handleRemoveStudentFromClass(e, student.id)}
+                                                                className="p-1.5 text-grey-medium hover:text-danger hover:bg-danger/10 rounded-md transition-colors"
+                                                                title="Retirer"
+                                                            >
+                                                                <Trash2 size={14} />
+                                                            </button>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
                             ) : (
                                 <div
-                                    className="grid gap-10 auto-rows-fr"
+                                    className="grid gap-3 auto-rows-fr"
                                     style={{
-                                        gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
-                                        '--card-font-size': studentsInClass.length > 0
-                                            ? `${Math.max(14, Math.min(24, 300 / Math.max(...studentsInClass.map(s => Math.max(s.prenom.length, s.nom.length) + 1))))}px`
-                                            : '20px'
+                                        gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))',
                                     }}
                                 >
-                                    {studentsInClass.map(student => (
+                                    {sortedStudents.map(student => (
                                         <div key={student.id} className="relative group/card h-full">
                                             <button
                                                 onClick={(e) => handleRemoveStudentFromClass(e, student.id)}
-                                                className="absolute top-4 right-4 z-10 p-3 bg-danger/10 hover:bg-danger text-danger hover:text-white rounded-full border border-danger/20 opacity-0 group-hover/card:opacity-100 transition-all shadow-lg scale-90 hover:scale-100 focus:outline-none"
+                                                className="absolute top-2 right-2 z-10 p-1.5 bg-danger/10 hover:bg-danger text-danger hover:text-white rounded-full border border-danger/20 opacity-0 group-hover/card:opacity-100 transition-all shadow-sm scale-90 hover:scale-100 focus:outline-none"
                                                 title="Retirer de la classe"
                                             >
-                                                <X size={16} strokeWidth={3} />
+                                                <X size={12} strokeWidth={3} />
                                             </button>
                                             <button
                                                 onClick={() => handleEditStudent(student)}
-                                                className="w-full h-full flex flex-col items-center justify-center text-center p-12 rounded-[3.5rem] bg-surface/40 backdrop-blur-sm border border-white/5 hover:border-primary/40 hover:bg-surface/60 transition-all duration-500 group shadow-xl hover:shadow-primary/20 relative overflow-hidden"
-                                                style={{ fontSize: 'var(--card-font-size)' }}
+                                                className="w-full h-full flex flex-col items-center justify-center text-center p-4 rounded-2xl bg-surface/40 backdrop-blur-sm border border-white/5 hover:border-primary/40 hover:bg-surface/60 transition-all duration-300 group shadow-sm hover:shadow-md relative overflow-hidden"
                                             >
-                                                {/* Decorative background circle */}
-                                                <div className="absolute -bottom-16 -right-16 w-48 h-48 bg-primary/5 rounded-full blur-[100px] group-hover:bg-primary/10 transition-colors" />
-
                                                 <div className={clsx(
-                                                    "w-40 h-40 rounded-[3rem] flex items-center justify-center font-bold text-primary group-hover:scale-110 transition-transform duration-500 overflow-hidden shadow-2xl mb-10 shrink-0 relative",
-                                                    student.photo_base64 ? "bg-[#D9B981] p-3" : "bg-background"
+                                                    "w-16 h-16 rounded-2xl flex items-center justify-center font-bold text-primary group-hover:scale-105 transition-transform duration-300 overflow-hidden shadow-md mb-3 shrink-0",
+                                                    student.photo_base64 ? "bg-[#D9B981] p-1" : "bg-background"
                                                 )}>
                                                     {student.photo_base64 ? (
-                                                        <img src={student.photo_base64} alt="Student" className="w-full h-full object-contain rounded-[2.2rem]" />
+                                                        <img src={student.photo_base64} alt="Student" className="w-full h-full object-contain rounded-xl" />
                                                     ) : (
-                                                        <span className="text-[2.5em] tracking-tighter">{student.prenom[0]}{student.nom[0]}</span>
+                                                        <span className="text-xl tracking-tighter">{student.prenom[0]}{student.nom[0]}</span>
                                                     )}
                                                 </div>
 
-                                                <div className="flex flex-col items-center min-w-0 w-full">
-                                                    <p className="font-black text-text-main group-hover:text-primary transition-colors leading-[1.2] tracking-tight mb-4 uppercase break-words px-4">
-                                                        {student.prenom} <br />
-                                                        <span className="opacity-80 font-extrabold">{student.nom}</span>
+                                                <div className="flex flex-col items-center min-w-0 w-full px-1">
+                                                    <p className="font-bold text-text-main group-hover:text-primary transition-colors text-sm truncate w-full">
+                                                        {student.prenom} {student.nom}
                                                     </p>
-                                                    <div className="h-2 w-16 bg-primary/20 rounded-full mb-6 group-hover:w-24 group-hover:bg-primary/50 transition-all duration-500" />
-                                                    <p className="text-[0.55em] uppercase font-black tracking-[0.35em] text-grey-medium opacity-60 truncate w-full px-6">
+                                                    <p className="text-[10px] uppercase font-bold text-grey-medium opacity-60 truncate w-full mt-1">
                                                         {student.EleveGroupe?.length > 0
                                                             ? student.EleveGroupe[0].Groupe?.nom
                                                             : 'Sans groupe'}
                                                     </p>
                                                 </div>
 
-                                                <div className="mt-12 opacity-0 group-hover:opacity-100 transition-all duration-500 transform translate-y-4 group-hover:translate-y-0">
-                                                    <ChevronRight size={32} className="text-primary" />
+                                                {/* Edit icon appears on hover */}
+                                                <div className="absolute top-2 left-2 opacity-0 group-hover/card:opacity-100 transition-opacity">
+                                                    <Edit size={12} className="text-grey-medium" />
                                                 </div>
                                             </button>
                                         </div>
@@ -456,36 +667,38 @@ const Classes = () => {
                 onAdded={() => fetchStudentsInClass(selectedClass.id)}
             />
             {/* Delete Confirmation Modal */}
-            {classToDelete && (
-                <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-                    <div className="w-full max-w-sm bg-surface border border-white/10 rounded-2xl shadow-2xl p-6 text-center animate-in zoom-in-95 duration-200">
-                        <div className="w-16 h-16 bg-danger/10 text-danger rounded-full flex items-center justify-center mx-auto mb-4">
-                            <Trash2 size={32} />
-                        </div>
-                        <h2 className="text-xl font-bold text-text-main mb-2">Supprimer la classe ?</h2>
-                        <p className="text-sm text-grey-medium mb-6">
-                            Êtes-vous sûr de vouloir supprimer la classe <span className="text-text-main font-bold">"{classToDelete.nom}"</span> ?
-                            <br />Les élèves ne seront pas supprimés mais n'auront plus de classe assignée.
-                        </p>
-                        <div className="flex gap-3">
-                            <button
-                                onClick={() => setClassToDelete(null)}
-                                className="flex-1 py-3 bg-white/5 hover:bg-white/10 text-grey-light rounded-xl font-medium transition-colors"
-                            >
-                                Annuler
-                            </button>
-                            <button
-                                onClick={handleDeleteClass}
-                                disabled={loading}
-                                className="flex-1 py-3 bg-danger hover:bg-danger/90 text-white rounded-xl font-bold shadow-lg shadow-danger/20 flex items-center justify-center gap-2"
-                            >
-                                {loading ? <Loader2 className="animate-spin" size={20} /> : "Supprimer"}
-                            </button>
+            {
+                classToDelete && (
+                    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+                        <div className="w-full max-w-sm bg-surface border border-white/10 rounded-2xl shadow-2xl p-6 text-center animate-in zoom-in-95 duration-200">
+                            <div className="w-16 h-16 bg-danger/10 text-danger rounded-full flex items-center justify-center mx-auto mb-4">
+                                <Trash2 size={32} />
+                            </div>
+                            <h2 className="text-xl font-bold text-text-main mb-2">Supprimer la classe ?</h2>
+                            <p className="text-sm text-grey-medium mb-6">
+                                Êtes-vous sûr de vouloir supprimer la classe <span className="text-text-main font-bold">"{classToDelete.nom}"</span> ?
+                                <br />Les élèves ne seront pas supprimés mais n'auront plus de classe assignée.
+                            </p>
+                            <div className="flex gap-3">
+                                <button
+                                    onClick={() => setClassToDelete(null)}
+                                    className="flex-1 py-3 bg-white/5 hover:bg-white/10 text-grey-light rounded-xl font-medium transition-colors"
+                                >
+                                    Annuler
+                                </button>
+                                <button
+                                    onClick={handleDeleteClass}
+                                    disabled={loading}
+                                    className="flex-1 py-3 bg-danger hover:bg-danger/90 text-white rounded-xl font-bold shadow-lg shadow-danger/20 flex items-center justify-center gap-2"
+                                >
+                                    {loading ? <Loader2 className="animate-spin" size={20} /> : "Supprimer"}
+                                </button>
+                            </div>
                         </div>
                     </div>
-                </div>
-            )}
-        </div>
+                )
+            }
+        </div >
     );
 };
 

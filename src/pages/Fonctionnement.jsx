@@ -45,6 +45,7 @@ const Fonctionnement = () => {
             id: 'users',
             title: 'Utilisateurs',
             icon: Users,
+            image: '/assets/documentation/eleves.png',
             content: (
                 <>
                     <p>Gérez l'ensemble de votre effectif scolaire avec simplicité.</p>
@@ -76,6 +77,7 @@ const Fonctionnement = () => {
             id: 'presence',
             title: 'Présence',
             icon: Fingerprint,
+            image: '/assets/documentation/presence.png',
             content: (
                 <>
                     <p>Un outil rapide pour la gestion administrative quotidienne.</p>
@@ -140,7 +142,7 @@ const Fonctionnement = () => {
             {/* Header */}
             <header className="fixed top-0 left-0 w-full h-20 flex items-center justify-between px-6 md:px-12 z-50 bg-background/80 backdrop-blur-xl border-b border-border">
                 <Link to="/" className="flex items-center gap-3 group cursor-pointer">
-                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-[#b8955c] flex items-center justify-center text-text-dark font-black text-xl shadow-lg shadow-primary/20 group-hover:scale-110 transition-transform duration-300">
+                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-primary-dark flex items-center justify-center text-text-dark font-black text-xl shadow-lg shadow-primary/20 group-hover:scale-110 transition-transform duration-300">
                         G
                     </div>
                     <span className="text-xl font-black text-white tracking-tighter uppercase italic">
@@ -200,36 +202,58 @@ const Fonctionnement = () => {
                     </aside>
 
                     {/* Main Content */}
-                    <div className="lg:col-span-9 space-y-24">
-                        {sections.map((section) => (
-                            <section key={section.id} id={section.id} className="scroll-mt-32">
-                                <div className="bg-surface/30 backdrop-blur-sm border border-border rounded-3xl p-8 md:p-12 relative overflow-hidden group hover:border-primary/30 transition-colors duration-500">
-                                    <div className="absolute top-0 right-0 p-32 bg-primary/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 group-hover:bg-primary/10 transition-colors duration-700"></div>
+                    <div className="lg:col-span-9 space-y-32">
+                        {sections.map((section, index) => (
+                            <section key={section.id} id={section.id} className="scroll-mt-40 group">
+                                <div className={clsx(
+                                    "flex flex-col gap-16 items-center",
+                                    index % 2 === 0 ? "lg:flex-row" : "lg:flex-row-reverse"
+                                )}>
 
-                                    <div className="flex items-center gap-4 mb-8 relative z-10 w-full md:w-auto">
-                                        <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-primary/20 to-transparent flex items-center justify-center text-primary border border-primary/10 shadow-lg shrink-0">
-                                            <section.icon size={24} />
+                                    {/* Text Content */}
+                                    <div className="flex-1 space-y-6">
+                                        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/5 border border-white/10 text-[10px] font-bold uppercase tracking-widest text-primary mb-2">
+                                            <section.icon size={12} />
+                                            {section.title}
                                         </div>
-                                        <h2 className="text-3xl font-black text-white tracking-tight uppercase">{section.title}</h2>
-                                    </div>
-
-                                    <div className="grid md:grid-cols-2 gap-10 items-center relative z-10">
-                                        <div className="order-2 md:order-1 text-grey-light leading-relaxed text-lg">
+                                        <h2 className="text-4xl md:text-5xl font-black text-white tracking-tight leading-[0.95]">
+                                            {section.title === 'Tableau de bord' && <>Votre journée. <br /><span className="text-grey-dark">En un clin d'œil.</span></>}
+                                            {section.title === 'Suivi' && <>Progression. <br /><span className="text-grey-dark">Maîtrisée.</span></>}
+                                            {section.title === 'Utilisateurs' && <>Vos élèves. <br /><span className="text-grey-dark">Au centre.</span></>}
+                                            {section.title === 'Activités' && <>Parcours. <br /><span className="text-grey-dark">Sur mesure.</span></>}
+                                            {section.title === 'Présence' && <>Appel. <br /><span className="text-grey-dark">Simplifié.</span></>}
+                                            {section.title === 'Paramètres' && <>Votre espace. <br /><span className="text-grey-dark">Personnalisé.</span></>}
+                                        </h2>
+                                        <div className="text-lg text-grey-medium leading-relaxed font-medium">
                                             {section.content}
                                         </div>
-                                        {section.image && (
-                                            <div className="order-1 md:order-2">
-                                                <div className="relative rounded-2xl overflow-hidden shadow-2xl border border-white/10 group-hover:scale-[1.02] transition-transform duration-500">
-                                                    <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 z-10"></div>
+                                    </div>
+
+                                    {/* Image Content */}
+                                    {section.image && (
+                                        <div className="flex-1 w-full max-w-xl">
+                                            <div className="relative group/image">
+                                                {/* Glow effect */}
+                                                <div className="absolute -inset-4 bg-gradient-to-r from-primary/20 to-purple-500/20 rounded-[2.5rem] blur-[50px] opacity-0 group-hover/image:opacity-100 transition-opacity duration-700"></div>
+
+                                                {/* Image Frame */}
+                                                <div className="relative rounded-[2rem] overflow-hidden border border-white/10 shadow-2xl bg-surface transform group-hover/image:scale-[1.02] transition-transform duration-500">
+                                                    <div className="absolute top-0 left-0 w-full h-8 bg-black/20 backdrop-blur-md border-b border-white/5 flex items-center gap-2 px-4">
+                                                        <div className="w-2 h-2 rounded-full bg-red-500/50"></div>
+                                                        <div className="w-2 h-2 rounded-full bg-amber-500/50"></div>
+                                                        <div className="w-2 h-2 rounded-full bg-green-500/50"></div>
+                                                    </div>
                                                     <img
                                                         src={section.image}
                                                         alt={`Aperçu ${section.title}`}
-                                                        className="w-full h-auto object-cover"
+                                                        className="w-full h-auto object-cover pt-8" // pt-8 to clear the "browser bar"
                                                     />
+                                                    {/* Reflection */}
+                                                    <div className="absolute inset-0 bg-gradient-to-tr from-white/5 to-transparent pointer-events-none"></div>
                                                 </div>
                                             </div>
-                                        )}
-                                    </div>
+                                        </div>
+                                    )}
                                 </div>
                             </section>
                         ))}

@@ -700,32 +700,32 @@ const Groups = () => {
 
                         {/* Tabs - Modern Capsule Style */}
                         <div className="flex justify-center px-8 mb-6 mt-2">
-                            <div className="neu-selector-container flex p-1.5 rounded-2xl w-full max-w-md">
+                            <div className="neu-selector-container p-1.5 rounded-2xl w-full">
                                 <button
                                     onClick={() => setActiveTab('students')}
                                     data-active={activeTab === 'students'}
                                     className={clsx(
-                                        "flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-xs font-black uppercase tracking-[0.12em] transition-all duration-300",
+                                        "flex items-center justify-center gap-2 rounded-xl font-black uppercase tracking-[0.12em] transition-all duration-300",
                                         activeTab === 'students'
                                             ? "bg-primary text-text-dark"
                                             : "text-grey-medium hover:text-white"
                                     )}
                                 >
                                     <GraduationCap size={16} />
-                                    Liste des élèves
+                                    <span className="tab-label">Liste des élèves</span>
                                 </button>
                                 <button
                                     onClick={() => setActiveTab('actions')}
                                     data-active={activeTab === 'actions'}
                                     className={clsx(
-                                        "flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-xs font-black uppercase tracking-[0.12em] transition-all duration-300",
+                                        "flex items-center justify-center gap-2 rounded-xl font-black uppercase tracking-[0.12em] transition-all duration-300",
                                         activeTab === 'actions'
                                             ? "bg-primary text-text-dark"
                                             : "text-grey-medium hover:text-white"
                                     )}
                                 >
                                     <LayoutList size={16} />
-                                    Actions
+                                    <span className="tab-label">Actions</span>
                                 </button>
                             </div>
                         </div>
@@ -909,7 +909,7 @@ const Groups = () => {
             {showRemoveModal && (
                 <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
                     <div
-                        className="bg-[#1C1C1E] border border-white/10 rounded-2xl shadow-2xl max-w-sm w-full p-6 animate-in zoom-in-95 duration-200"
+                        className="bg-card-bg border border-white/10 rounded-2xl shadow-2xl max-w-sm w-full p-6 animate-in zoom-in-95 duration-200"
                         onClick={(e) => e.stopPropagation()}
                     >
                         <div className="flex flex-col items-center text-center gap-4">

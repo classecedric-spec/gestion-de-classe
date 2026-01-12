@@ -492,7 +492,7 @@ const Students = () => {
                     {/* Filters Row */}
                     <div className="flex gap-2">
                         {/* Group Filter */}
-                        <div className="relative group neu-selector-container rounded-xl flex-1">
+                        <div className="relative group neu-selector-container rounded-xl overflow-hidden min-w-[120px]">
                             <select
                                 value={filterGroup}
                                 onChange={(e) => setFilterGroup(e.target.value)}
@@ -509,7 +509,7 @@ const Students = () => {
                         </div>
 
                         {/* Class Filter */}
-                        <div className="relative group neu-selector-container rounded-xl flex-1">
+                        <div className="relative group neu-selector-container rounded-xl overflow-hidden min-w-[120px]">
                             <select
                                 value={filterClass}
                                 onChange={(e) => setFilterClass(e.target.value)}
@@ -722,36 +722,36 @@ const Students = () => {
 
                             {/* TABS - Modern Capsule Style */}
                             <div className="flex justify-center w-full px-8 mb-4 mt-2">
-                                <div className="neu-selector-container flex p-1.5 rounded-2xl w-full max-w-2xl">
+                                <div className="neu-selector-container p-1 rounded-2xl w-full">
                                     <button
                                         onClick={() => setCurrentTab('infos')}
                                         data-active={currentTab === 'infos'}
                                         className={clsx(
-                                            "flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-xs font-black uppercase tracking-[0.12em] transition-all duration-300",
+                                            "flex items-center justify-center gap-2 rounded-xl font-black uppercase tracking-[0.12em] transition-all duration-300",
                                             currentTab === 'infos' ? "bg-primary text-text-dark" : "text-grey-medium hover:text-white"
                                         )}
                                     >
-                                        Informations
+                                        <span className="tab-label">Informations</span>
                                     </button>
                                     <button
                                         onClick={() => setCurrentTab('suivi')}
                                         data-active={currentTab === 'suivi'}
                                         className={clsx(
-                                            "flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-xs font-black uppercase tracking-[0.12em] transition-all duration-300",
+                                            "flex items-center justify-center gap-2 rounded-xl font-black uppercase tracking-[0.12em] transition-all duration-300",
                                             currentTab === 'suivi' ? "bg-primary text-text-dark" : "text-grey-medium hover:text-white"
                                         )}
                                     >
-                                        Suivi Pédagogique
+                                        <span className="tab-label">Suivi Pédagogique</span>
                                     </button>
                                     <button
                                         onClick={() => setCurrentTab('todo')}
                                         data-active={currentTab === 'todo'}
                                         className={clsx(
-                                            "flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-xs font-black uppercase tracking-[0.12em] transition-all duration-300",
+                                            "flex items-center justify-center gap-2 rounded-xl font-black uppercase tracking-[0.12em] transition-all duration-300",
                                             currentTab === 'todo' ? "bg-primary text-text-dark" : "text-grey-medium hover:text-white"
                                         )}
                                     >
-                                        To-Do List
+                                        <span className="tab-label">To-Do List</span>
                                     </button>
                                 </div>
                             </div>
