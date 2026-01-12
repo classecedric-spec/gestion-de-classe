@@ -119,9 +119,10 @@ const MobileEncodage = () => {
         // Process modules - filter activities by level and calculate stats
         const processedModules = (modulesData || []).map(m => {
             const validActivities = (m.Activite || []).filter(act => {
-                if (!levelId) return true;
                 const levels = act.ActiviteNiveau?.map(an => an.niveau_id) || [];
-                return levels.length === 0 || levels.includes(levelId);
+                // STRICT: Activity must have level defined AND match student level
+                if (!levelId) return levels.length > 0;
+                return levels.length > 0 && levels.includes(levelId);
             }).sort((a, b) => (a.ordre || 0) - (b.ordre || 0));
 
             const totalActivities = validActivities.length;

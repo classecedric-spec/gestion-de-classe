@@ -378,18 +378,23 @@ const SuiviPedagogique = ({ timer, setTimer, timerFinished, setTimerFinished }) 
                                                                 )}
                                                             </div>
 
-                                                            <div className="flex items-center gap-3">
-                                                                <div className="flex-1 h-1.5 rounded-full bg-black/30 overflow-hidden border border-white/5">
+                                                            <div className="flex items-center gap-3 w-full">
+                                                                <div className="flex-grow h-2 rounded-full bg-white/10 overflow-hidden min-w-[60px]">
                                                                     <div
                                                                         className={clsx(
                                                                             "h-full transition-all duration-700 ease-out",
-                                                                            isExpired ? "bg-danger" : "bg-success"
+                                                                            module.percent >= 70 ? "bg-success" :
+                                                                                module.percent >= 40 ? "bg-primary" :
+                                                                                    "bg-danger"
                                                                         )}
                                                                         style={{
-                                                                            width: `${calculateModuleProgress(module, groupsHook.states.selectedStudent?.niveau_id, progressionsHook.states.progressions)}%`
+                                                                            width: `${module.percent || 0}%`
                                                                         }}
                                                                     />
                                                                 </div>
+                                                                <span className="text-[9px] text-grey-medium font-medium whitespace-nowrap">
+                                                                    {module.completedActivities || 0}/{module.totalActivities || 0}
+                                                                </span>
                                                             </div>
                                                         </button>
 

@@ -110,13 +110,17 @@ const HelpRequestsPanel = ({
                                                 "px-2 py-1 rounded-md font-black uppercase tracking-wider transition-colors shadow-sm whitespace-nowrap",
                                                 req.is_suivi
                                                     ? "bg-primary text-black border border-primary"
-                                                    : (req.etat === 'a_verifier'
+                                                    : req.etat === 'a_verifier'
                                                         ? "bg-[#8B5CF6] text-white border border-[#8B5CF6]"
-                                                        : "bg-[#A0A8AD] text-white border border-[#A0A8AD]")
+                                                        : req.etat === 'ajustement'
+                                                            ? "bg-[#F59E0B] text-black border border-[#F59E0B]"
+                                                            : "bg-[#A0A8AD] text-white border border-[#A0A8AD]"
                                             )}
                                             style={{ fontSize: 'clamp(8px, 2.5cqw, 16px)' }}
                                         >
-                                            {req.is_suivi ? 'Suivi' : (req.etat === 'a_verifier' ? 'Vérif' : 'Aide')}
+                                            {req.is_suivi ? 'Suivi' :
+                                                req.etat === 'a_verifier' ? 'Vérif' :
+                                                    req.etat === 'ajustement' ? 'Ajust.' : 'Aide'}
                                         </div>
                                     </div>
                                 </div>

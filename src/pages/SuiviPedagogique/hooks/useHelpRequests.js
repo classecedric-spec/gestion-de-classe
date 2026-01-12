@@ -14,6 +14,7 @@ export function useHelpRequests(students, selectedStudent, fetchStudentProgressi
     const [helpRequests, setHelpRequests] = useState([]);
     const [expandedRequestId, setExpandedRequestId] = useState(null);
     const [helpersCache, setHelpersCache] = useState({});
+    const [ajustementBoost, setAjustementBoost] = useState(0); // Boost counter for ajustement priority
 
     const selectedStudentRef = useRef(selectedStudent);
 
@@ -61,12 +62,33 @@ export function useHelpRequests(students, selectedStudent, fetchStudentProgressi
 
             if (error) return;
 
+            // Filter: include if is_suivi OR module is 'en_cours'
             const validRequests = (data || []).filter(req => {
                 if (req.is_suivi) return true;
-                return req.activite?.Module?.statut === 'en_cours';
+                // If no module data, still include to avoid hiding valid requests
+                if (!req.activite?.Module) return true;
+                return req.activite.Module.statut === 'en_cours';
             });
 
-            setHelpRequests(validRequests);
+            // Sort with ajustement priority boost
+            // Each boost cycle moves ajustement items up by 3 positions
+            const sortedRequests = [...validRequests].sort((a, b) => {
+                const aIsAjustement = a.etat === 'ajustement';
+                const bIsAjustement = b.etat === 'ajustement';
+
+                // Calculate effective position (lower = higher priority)
+                // ajustement items get a negative boost based on the cycle counter
+                const aBoost = aIsAjustement ? -(ajustementBoost * 3) : 0;
+                const bBoost = bIsAjustement ? -(ajustementBoost * 3) : 0;
+
+                // Original index + boost
+                const aIndex = validRequests.indexOf(a) + aBoost;
+                const bIndex = validRequests.indexOf(b) + bBoost;
+
+                return aIndex - bIndex;
+            });
+
+            setHelpRequests(sortedRequests);
         } catch (err) {
         }
     };
@@ -145,6 +167,23 @@ export function useHelpRequests(students, selectedStudent, fetchStudentProgressi
 
         return () => clearInterval(interval);
     }, [students]);
+
+    // Ajustement boost timer: every 2 minutes, increase boost by 1
+    // This moves ajustement items up by 3 positions each cycle
+    useEffect(() => {
+        const boostInterval = setInterval(() => {
+            setAjustementBoost(prev => prev + 1);
+        }, 120000); // 2 minutes = 120,000 ms
+
+        return () => clearInterval(boostInterval);
+    }, []);
+
+    // Re-sort when boost changes
+    useEffect(() => {
+        if (ajustementBoost > 0 && students.length > 0) {
+            fetchHelpRequests();
+        }
+    }, [ajustementBoost]);
 
     return {
         states: {
