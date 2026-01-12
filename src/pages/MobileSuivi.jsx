@@ -2,9 +2,10 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabaseClient';
 import { getInitials } from '../lib/utils';
-import { ShieldCheck, Check, X, Users, Loader2, Smartphone, Activity, ArrowLeft, ChevronDown } from 'lucide-react';
+import { ShieldCheck, Check, X, Users, Loader2, Smartphone, Activity, ArrowLeft, ChevronDown, WifiOff, RefreshCw } from 'lucide-react';
 import clsx from 'clsx';
 import { toast } from 'sonner';
+import { useOfflineSync } from '../hooks/useOfflineSync';
 
 const MobileSuivi = () => {
     const { groupId } = useParams();
@@ -20,6 +21,7 @@ const MobileSuivi = () => {
     const [isIndicesLoaded, setIsIndicesLoaded] = useState(false);
     const [rotationSkips, setRotationSkips] = useState({});
     const [isAutoGenerating, setIsAutoGenerating] = useState(false);
+    const { isOnline, addToQueue } = useOfflineSync();
     const [fullStudents, setFullStudents] = useState([]);
     const [selectedStudentFilter, setSelectedStudentFilter] = useState(null);
 
@@ -226,6 +228,23 @@ const MobileSuivi = () => {
     const fetchHelpRequests = async () => {
         if (students.length === 0) return;
 
+        // Load from cache first if available
+        try {
+            const cached = localStorage.getItem(`suivi_cache_requests_${groupId}`);
+            if (cached) {
+                const parsed = JSON.parse(cached);
+                setHelpRequests(parsed);
+                setLoading(false);
+            }
+        } catch (e) {
+            console.error(e);
+        }
+
+        if (!navigator.onLine) {
+            setLoading(false);
+            return;
+        }
+
         try {
             const { data } = await supabase
                 .from('Progression')
@@ -235,6 +254,7 @@ const MobileSuivi = () => {
                     is_suivi,
                     eleve_id,
                     eleve:Eleve(id, prenom, nom, photo_base64),
+                    updated_at,
                     activite:Activite(
                         id,
                         titre,
@@ -257,6 +277,8 @@ const MobileSuivi = () => {
             });
 
             setHelpRequests(validRequests);
+            // Cache the fresh data
+            localStorage.setItem(`suivi_cache_requests_${groupId}`, JSON.stringify(validRequests));
         } catch (err) {
         } finally {
             setLoading(false);
@@ -327,6 +349,28 @@ const MobileSuivi = () => {
                 });
             }
 
+            // Offline Handling
+            if (!isOnline) {
+                const actionType = 'update';
+                let payload = { etat: newStatus, updated_at: new Date().toISOString() };
+                if (req.is_suivi) {
+                    payload = { ...payload, is_suivi: false };
+                }
+
+                addToQueue({
+                    type: actionType,
+                    table: 'Progression',
+                    payload: payload,
+                    id: req.id
+                });
+
+                // Optimistic UI Update
+                setHelpRequests(prev => prev.filter(r => r.id !== req.id));
+                toast.success("Action sauvegardée (Hors ligne)");
+                setExpandedRequestId(null);
+                return;
+            }
+
             // Update Database (Progression)
             if (req.is_suivi) {
                 await supabase
@@ -363,6 +407,28 @@ const MobileSuivi = () => {
 
     const handleClear = async (req) => {
         try {
+            if (!isOnline) {
+                if (req.is_suivi) {
+                    addToQueue({
+                        type: 'delete',
+                        table: 'Progression',
+                        id: req.id
+                    });
+                } else {
+                    addToQueue({
+                        type: 'update',
+                        table: 'Progression',
+                        payload: { etat: 'a_commencer', updated_at: new Date().toISOString() },
+                        id: req.id
+                    });
+                }
+
+                // Optimistic UI Update
+                setHelpRequests(prev => prev.filter(r => r.id !== req.id));
+                toast.success("Action sauvegardée (Hors ligne)");
+                return;
+            }
+
             if (req.is_suivi) {
                 // Delete the progression for follow-up
                 await supabase.from('Progression').delete().eq('id', req.id);
@@ -435,16 +501,21 @@ const MobileSuivi = () => {
 
                 {/* Bottom Row: Title + Actions */}
                 <div className="flex items-center justify-between">
-                    <div>
+                    <div className="flex items-center gap-2">
                         <h1 className="text-lg font-black uppercase tracking-tighter text-primary leading-none">Suivi Mobile</h1>
+                        {!isOnline && (
+                            <div className="bg-danger/20 p-1.5 rounded-full animate-pulse" title="Mode Hors-ligne">
+                                <WifiOff size={14} className="text-danger" />
+                            </div>
+                        )}
                     </div>
                     <div className="flex items-center gap-2">
                         <button
                             onClick={handleAutoSuivi}
-                            disabled={isAutoGenerating}
+                            disabled={isAutoGenerating || !isOnline}
                             className={clsx(
                                 "flex items-center gap-2 bg-primary text-black px-3 py-1.5 rounded-full border border-primary/20 shadow-lg shadow-primary/5 active:scale-95 transition-all text-[10px] font-black uppercase tracking-widest",
-                                isAutoGenerating && "opacity-50 animate-pulse"
+                                (isAutoGenerating || !isOnline) && "opacity-50"
                             )}
                         >
                             {isAutoGenerating ? <Loader2 size={12} className="animate-spin" /> : <Activity size={12} />}

@@ -764,32 +764,17 @@ const Students = () => {
                                     <div className="space-y-6">
                                         <h3 className="text-sm font-bold uppercase tracking-widest text-grey-dark border-b border-white/5 pb-2">Parcours Scolaire</h3>
                                         <div className="space-y-4">
-                                            <div className="flex items-center gap-3">
-                                                <div className="p-2 rounded-lg bg-white/5 text-primary"><BookOpen size={18} /></div>
-                                                <p className="text-text-main font-bold">{selectedStudent.Classe?.nom || 'Non affecté'}</p>
+                                            <div className="flex items-center gap-4">
+                                                <div className="p-3 rounded-xl bg-white/5 text-primary"><BookOpen size={24} /></div>
+                                                <p className="text-text-main font-bold text-lg">{selectedStudent.Classe?.nom || 'Non affecté'}</p>
                                             </div>
-                                            <div className="flex items-center gap-3">
-                                                <div className="p-2 rounded-lg bg-white/5 text-primary"><Layers size={18} /></div>
-                                                <p className="text-text-main font-bold">{selectedStudent.Niveau?.nom || 'Non renseigné'}</p>
+                                            <div className="flex items-center gap-4">
+                                                <div className="p-3 rounded-xl bg-white/5 text-primary"><Layers size={24} /></div>
+                                                <p className="text-text-main font-bold text-lg">{selectedStudent.Niveau?.nom || 'Non renseigné'}</p>
                                             </div>
-                                            <div className="flex items-center gap-3">
-                                                <div className="p-2 rounded-lg bg-white/5 text-primary"><Calendar size={18} /></div>
-                                                <p className="text-text-main font-bold">{calculateAge(selectedStudent.date_naissance)}</p>
-                                            </div>
-                                            <div className="flex items-center gap-3">
-                                                <div className="p-2 rounded-lg bg-white/5 text-primary"><Activity size={18} /></div>
-                                                <div className="flex flex-col">
-                                                    <span className="text-[10px] text-grey-medium uppercase tracking-wider">Importance Suivi (0-100)</span>
-                                                    <input
-                                                        type="number"
-                                                        min="0"
-                                                        max="100"
-                                                        value={selectedStudent.importance_suivi ?? ''}
-                                                        onChange={(e) => handleUpdateImportance(e.target.value)}
-                                                        placeholder="50"
-                                                        className="bg-transparent text-text-main font-bold border-b border-white/10 focus:border-primary focus:outline-none w-16"
-                                                    />
-                                                </div>
+                                            <div className="flex items-center gap-4">
+                                                <div className="p-3 rounded-xl bg-white/5 text-primary"><Calendar size={24} /></div>
+                                                <p className="text-text-main font-bold text-lg">{calculateAge(selectedStudent.date_naissance)}</p>
                                             </div>
                                         </div>
                                     </div>
@@ -839,37 +824,101 @@ const Students = () => {
                                     </div>
 
                                     {/* Branch Indices Section */}
-                                    <div className="space-y-6">
+                                    <div className="md:col-span-2 flex flex-col h-full space-y-4">
                                         <h3 className="text-sm font-bold uppercase tracking-widest text-grey-dark border-b border-white/5 pb-2">Indices de Branche (Performance)</h3>
-                                        {branches.length === 0 ? (
-                                            <p className="text-xs text-grey-medium italic">Aucune branche définie.</p>
-                                        ) : (
-                                            <div className="grid grid-cols-2 gap-3">
-                                                {branches.map(branch => {
-                                                    const val = studentIndices[selectedStudent.id]?.[branch.id];
-                                                    return (
-                                                        <div key={branch.id} className="bg-white/5 p-3 rounded-xl border border-white/5 flex items-center justify-between">
-                                                            <div className="flex items-center gap-2 overflow-hidden">
-                                                                <GitBranch size={14} className="text-primary shrink-0" />
-                                                                <span className="text-xs font-bold text-gray-300 truncate" title={branch.nom}>{branch.nom}</span>
+
+                                        <div className="grid md:grid-cols-2 gap-6 flex-1">
+                                            {/* Left Column: Indices Cards */}
+                                            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 content-start">
+                                                {/* Importance Suivi Card */}
+                                                <div className="bg-white/5 p-1 rounded-xl border border-white/5 flex flex-col gap-0.5 shadow-lg hover:bg-white/10 transition-colors">
+                                                    <div className="flex items-center gap-2 overflow-hidden px-1">
+                                                        <Activity size={12} className="text-primary shrink-0" />
+                                                        <span className="text-xs font-bold text-gray-300 truncate" title="Importance Globale">Global</span>
+                                                    </div>
+                                                    <input
+                                                        type="number"
+                                                        min="0"
+                                                        max="100"
+                                                        placeholder="50"
+                                                        className="w-full bg-black/20 text-center text-xs font-mono font-bold text-white rounded-lg py-1 focus:outline-none focus:ring-1 focus:ring-primary/50"
+                                                        value={selectedStudent.importance_suivi ?? ''}
+                                                        onChange={(e) => handleUpdateImportance(e.target.value)}
+                                                    />
+                                                </div>
+
+                                                {branches.length > 0 ? (
+                                                    branches.map(branch => {
+                                                        const val = studentIndices[selectedStudent.id]?.[branch.id];
+                                                        return (
+                                                            <div key={branch.id} className="bg-white/5 p-1 rounded-xl border border-white/5 flex flex-col gap-0.5 shadow-lg hover:bg-white/10 transition-colors">
+                                                                <div className="flex items-center gap-2 overflow-hidden px-1">
+                                                                    <GitBranch size={12} className="text-primary shrink-0" />
+                                                                    <span className="text-xs font-bold text-gray-300 truncate" title={branch.nom}>{branch.nom}</span>
+                                                                </div>
+                                                                <input
+                                                                    type="number"
+                                                                    min="0"
+                                                                    max="100"
+                                                                    placeholder="50"
+                                                                    className="w-full bg-black/20 text-center text-xs font-mono font-bold text-white rounded-lg py-1 focus:outline-none focus:ring-1 focus:ring-primary/50"
+                                                                    value={val ?? ''}
+                                                                    onChange={(e) => handleUpdateBranchIndex(selectedStudent.id, branch.id, e.target.value)}
+                                                                />
                                                             </div>
-                                                            <input
-                                                                type="number"
-                                                                min="0"
-                                                                max="100"
-                                                                placeholder="50"
-                                                                className="w-12 bg-black/20 text-right text-xs font-mono font-bold text-white rounded px-1 py-1 focus:outline-none focus:ring-1 focus:ring-primary/50"
-                                                                value={val ?? ''}
-                                                                onChange={(e) => handleUpdateBranchIndex(selectedStudent.id, branch.id, e.target.value)}
-                                                            />
-                                                        </div>
-                                                    );
-                                                })}
+                                                        );
+                                                    })
+                                                ) : (
+                                                    <div className="col-span-full py-8 flex flex-col items-center justify-center text-grey-medium opacity-60 bg-white/5 rounded-2xl border border-dashed border-white/10 h-full">
+                                                        <GitBranch size={32} className="mb-3" />
+                                                        <p className="text-sm italic text-center">Aucune branche (matière) définie.</p>
+                                                    </div>
+                                                )}
                                             </div>
-                                        )}
-                                        <p className="text-[10px] text-grey-medium italic mt-2">
-                                            Ces indices influencent la probabilité de sélection dans le générateur de suivi. (Base: 50)
-                                        </p>
+
+                                            {/* Right Column: Rules & Explanation */}
+                                            <div className="bg-blue-500/10 border border-blue-500/20 rounded-2xl p-6 text-sm text-grey-light flex flex-col justify-center h-full min-h-[300px]">
+                                                <p className="font-bold uppercase tracking-wider text-blue-400 border-b border-blue-500/20 pb-3 mb-3 text-base">Règles de régulation</p>
+                                                <p className="mb-4 text-base leading-relaxed">Le système ajuste la fréquence de passage de l'élève en fonction de ses résultats :</p>
+                                                <ul className="space-y-4 opacity-90">
+                                                    <li className="flex items-start gap-3">
+                                                        <span className="bg-blue-500/20 text-blue-300 px-2 py-0.5 rounded text-xs font-bold mt-1 shrink-0">+5</span>
+                                                        <span>En cas de difficulté (Refusé) → <strong className="text-white">Augmente la fréquence</strong>.</span>
+                                                    </li>
+                                                    <li className="flex items-start gap-3">
+                                                        <span className="bg-blue-500/20 text-blue-300 px-2 py-0.5 rounded text-xs font-bold mt-1 shrink-0">-2</span>
+                                                        <span>En cas de réussite (Validé) → <strong className="text-white">Diminue la fréquence</strong>.</span>
+                                                    </li>
+                                                    <li className="flex items-start gap-3">
+                                                        <span className="bg-blue-500/20 text-blue-300 px-2 py-0.5 rounded text-xs font-bold mt-1 shrink-0">Ratio</span>
+                                                        <span>Un élève à <strong>100</strong> a ~2x plus de chances d'être tiré qu'à <strong>50</strong>.</span>
+                                                    </li>
+                                                    <li className="flex items-start gap-3">
+                                                        <span className="bg-red-500/20 text-red-300 px-2 py-0.5 rounded text-xs font-bold mt-1 shrink-0">STOP</span>
+                                                        <span><strong className="text-white">0</strong> : Exclut totalement l'élève du tirage au sort.</span>
+                                                    </li>
+                                                </ul>
+
+                                                <div className="mt-6 pt-4 border-t border-blue-500/20">
+                                                    <p className="font-bold uppercase tracking-wider text-blue-400 mb-3 text-sm">Fréquence de Vérification (Par Branche)</p>
+                                                    <div className="grid grid-cols-2 gap-2 text-xs">
+                                                        {[
+                                                            { label: "Toutes (100%)", val: "100" },
+                                                            { label: "1 sur 2 (50%)", val: "50" },
+                                                            { label: "1 sur 4 (25%)", val: "25" },
+                                                            { label: "1 sur 5 (20%)", val: "20" },
+                                                            { label: "1 sur 7 (14%)", val: "14" },
+                                                            { label: "1 sur 10 (10%)", val: "10" },
+                                                        ].map(item => (
+                                                            <div key={item.val} className="flex justify-between items-center bg-blue-500/10 rounded px-3 py-1.5 border border-blue-500/10">
+                                                                <span className="text-white font-medium">{item.label}</span>
+                                                                <span className="font-black text-blue-300 text-sm">{item.val}</span>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
                             )}
