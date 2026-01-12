@@ -631,7 +631,7 @@ const MobileSuivi = () => {
                                 onChange={(e) => setSelectedStudentFilter(e.target.value || null)}
                                 className="w-full bg-background border border-white/10 text-white rounded-xl py-3 pl-10 pr-8 appearance-none text-sm font-bold shadow-lg"
                             >
-                                <option value="">Tous les élèves ({helpRequests.length})</option>
+                                <option value="">Tous les élèves ({uniqueStudents.length})</option>
                                 {uniqueStudents.map(student => (
                                     <option key={student.id} value={student.id}>
                                         {student.prenom} {student.nom}
