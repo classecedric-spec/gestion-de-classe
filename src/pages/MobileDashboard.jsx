@@ -22,7 +22,6 @@ const MobileDashboard = () => {
     const navigate = useNavigate();
     const [session, setSession] = useState(null);
     const [loading, setLoading] = useState(true);
-    const [groups, setGroups] = useState([]);
     const [userName, setUserName] = useState('');
 
     // Stats state
@@ -40,7 +39,6 @@ const MobileDashboard = () => {
             setLoading(false);
             if (session) {
                 fetchUserInfo(session.user.id);
-                fetchGroups();
                 fetchStats(session.user.id);
                 fetchRecentStudents(session.user.id);
             }
@@ -66,15 +64,6 @@ const MobileDashboard = () => {
         if (data) {
             setUserName(`${data.prenom || ''} ${data.nom || ''}`.trim());
         }
-    };
-
-    const fetchGroups = async () => {
-        const { data } = await supabase
-            .from('Groupe')
-            .select('id, nom')
-            .order('nom');
-
-        if (data) setGroups(data);
     };
 
     const fetchStats = async (userId) => {
@@ -173,6 +162,56 @@ const MobileDashboard = () => {
         navigate('/mobile');
     };
 
+    const handleGoToSuivi = async () => {
+        try {
+            // Get current user
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) {
+                toast.error('Non connecté');
+                return;
+            }
+
+            // Try to get the last selected group from Supabase
+            const { data: userData } = await supabase
+                .from('CompteUtilisateur')
+                .select('last_selected_group_id')
+                .eq('id', user.id)
+                .single();
+
+            const savedGroupId = userData?.last_selected_group_id;
+
+            if (savedGroupId) {
+                // Verify the group still exists
+                const { data: group } = await supabase
+                    .from('Groupe')
+                    .select('id')
+                    .eq('id', savedGroupId)
+                    .single();
+
+                if (group) {
+                    navigate(`/mobile-suivi/${savedGroupId}`);
+                    return;
+                }
+            }
+
+            // Fallback: fetch first group available
+            const { data: groups } = await supabase
+                .from('Groupe')
+                .select('id')
+                .order('nom')
+                .limit(1);
+
+            if (groups && groups.length > 0) {
+                navigate(`/mobile-suivi/${groups[0].id}`);
+            } else {
+                toast.error('Aucun groupe disponible');
+            }
+        } catch (error) {
+            console.error('Error fetching groups:', error);
+            toast.error('Erreur lors du chargement');
+        }
+    };
+
     // Get current date
     const today = new Date();
     const dateString = today.toLocaleDateString('fr-FR', {
@@ -229,18 +268,24 @@ const MobileDashboard = () => {
 
                 {/* Stats Cards */}
                 <section className="grid grid-cols-2 gap-3">
-                    <div className="bg-surface/50 border border-border rounded-xl p-4">
+                    <div
+                        onClick={handleGoToSuivi}
+                        className="bg-surface/50 border border-border rounded-xl p-4 hover:bg-surface hover:border-primary/30 transition-all group cursor-pointer"
+                    >
                         <div className="flex items-center gap-2 mb-2">
-                            <AlertCircle size={14} className="text-grey-medium" />
+                            <AlertCircle size={14} className="text-grey-medium group-hover:text-primary transition-colors" />
                             <span className="text-[9px] font-bold uppercase tracking-widest text-grey-medium">En attente</span>
                         </div>
                         <div className="text-2xl font-black text-white">
                             {loadingStats ? <Loader2 size={20} className="animate-spin" /> : stats.helpPending}
                         </div>
-                        <p className="text-[10px] text-grey-medium mt-1">demandes d'aide</p>
+                        <p className="text-[10px] text-grey-medium mt-1 group-hover:text-primary transition-colors">demandes d'aide • cliquez pour voir</p>
                     </div>
 
-                    <div className="bg-surface/50 border border-border rounded-xl p-4">
+                    <Link
+                        to="/mobile-encodage"
+                        className="bg-surface/50 border border-border rounded-xl p-4 hover:bg-surface hover:border-success/30 transition-all group cursor-pointer"
+                    >
                         <div className="flex items-center gap-2 mb-2">
                             <Check size={14} className="text-success" />
                             <span className="text-[9px] font-bold uppercase tracking-widest text-grey-medium">Aujourd'hui</span>
@@ -248,8 +293,8 @@ const MobileDashboard = () => {
                         <div className="text-2xl font-black text-white">
                             {loadingStats ? <Loader2 size={20} className="animate-spin" /> : stats.validationsToday}
                         </div>
-                        <p className="text-[10px] text-grey-medium mt-1">validations</p>
-                    </div>
+                        <p className="text-[10px] text-grey-medium mt-1 group-hover:text-success transition-colors">validations • cliquez pour encoder</p>
+                    </Link>
                 </section>
 
                 {/* Priority Students Alert */}
@@ -285,24 +330,6 @@ const MobileDashboard = () => {
                     </section>
                 )}
 
-                {/* Quick Actions */}
-                <section>
-                    <h2 className="text-[10px] font-bold uppercase tracking-widest text-grey-medium mb-3">Actions</h2>
-                    <Link
-                        to="/mobile-encodage"
-                        className="flex items-center gap-4 bg-primary/10 border border-primary/20 p-4 rounded-xl hover:bg-primary/20 transition-all group"
-                    >
-                        <div className="w-12 h-12 bg-primary rounded-xl flex items-center justify-center text-text-dark shadow-lg shadow-primary/20">
-                            <ClipboardCheck size={24} />
-                        </div>
-                        <div className="flex-1">
-                            <h3 className="text-sm font-black text-white uppercase tracking-tight">Encodage</h3>
-                            <p className="text-[11px] text-grey-medium">Encoder les progressions</p>
-                        </div>
-                        <ChevronRight size={20} className="text-primary group-hover:translate-x-1 transition-transform" />
-                    </Link>
-                </section>
-
                 {/* Recent Students */}
                 {recentStudents.length > 0 && (
                     <section>
@@ -331,38 +358,6 @@ const MobileDashboard = () => {
                         </div>
                     </section>
                 )}
-
-                {/* Groups for Suivi */}
-                <section>
-                    <h2 className="text-[10px] font-bold uppercase tracking-widest text-grey-medium mb-3">Suivi par groupe</h2>
-                    <div className="space-y-2">
-                        {groups.length === 0 ? (
-                            <div className="bg-surface/40 border border-border rounded-xl p-6 text-center">
-                                <Users size={32} className="text-grey-medium mx-auto mb-3 opacity-50" />
-                                <p className="text-sm text-grey-medium">Aucun groupe</p>
-                            </div>
-                        ) : (
-                            groups.slice(0, 4).map(group => (
-                                <Link
-                                    key={group.id}
-                                    to={`/mobile-suivi/${group.id}`}
-                                    className="flex items-center gap-3 bg-surface/40 border border-border p-3 rounded-xl hover:bg-surface hover:border-primary/30 transition-all group"
-                                >
-                                    <div className="w-9 h-9 bg-white/5 rounded-lg flex items-center justify-center text-primary border border-white/5">
-                                        <Users size={16} />
-                                    </div>
-                                    <span className="text-sm font-bold text-white flex-1">{group.nom}</span>
-                                    <Smartphone size={14} className="text-grey-medium group-hover:text-primary transition-colors" />
-                                </Link>
-                            ))
-                        )}
-                        {groups.length > 4 && (
-                            <p className="text-[10px] text-grey-dark text-center pt-1">
-                                + {groups.length - 4} autres groupes
-                            </p>
-                        )}
-                    </div>
-                </section>
 
             </main>
 

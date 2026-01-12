@@ -180,9 +180,22 @@ export function useGroupsAndStudents() {
     }, [selectedGroupId]);
 
     // Actions
-    const handleGroupSelect = (groupId) => {
+    const handleGroupSelect = async (groupId) => {
         setSelectedGroupId(groupId);
         setShowGroupSelector(false);
+
+        // Save to Supabase for cross-device sync
+        try {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (user) {
+                await supabase
+                    .from('CompteUtilisateur')
+                    .update({ last_selected_group_id: groupId })
+                    .eq('id', user.id);
+            }
+        } catch (error) {
+            console.error('Error saving selected group:', error);
+        }
     };
 
     const handleBack = () => {

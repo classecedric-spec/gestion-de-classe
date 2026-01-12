@@ -57,12 +57,29 @@ const SuiviGlobalTablet = () => {
 
     useEffect(() => {
         if (selectedGroupId) {
+            // Save to Supabase for cross-device sync
+            saveSelectedGroup(selectedGroupId);
+
             fetchStudents(selectedGroupId);
             setSelectedStudent(null);
             setSelectedModule(null);
             setActivities([]);
         }
     }, [selectedGroupId]);
+
+    const saveSelectedGroup = async (groupId) => {
+        try {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (user) {
+                await supabase
+                    .from('CompteUtilisateur')
+                    .update({ last_selected_group_id: groupId })
+                    .eq('id', user.id);
+            }
+        } catch (error) {
+            console.error('Error saving selected group:', error);
+        }
+    };
 
     useEffect(() => {
         if (selectedStudent) {

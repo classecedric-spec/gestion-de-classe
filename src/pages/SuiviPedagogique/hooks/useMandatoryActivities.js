@@ -166,8 +166,17 @@ export function useMandatoryActivities(selectedGroupId, students) {
                     };
                 }).filter(Boolean);
 
-                // Initial suggested sort: Branch order
+                // Sort by: 1) End date, 2) Completion % (least first), 3) Branch
                 const sortedModules = modulesWithStats.sort((a, b) => {
+                    // 1. End date (earliest first, null/undefined last)
+                    const dateA = a.date_fin ? new Date(a.date_fin).getTime() : Infinity;
+                    const dateB = b.date_fin ? new Date(b.date_fin).getTime() : Infinity;
+                    if (dateA !== dateB) return dateA - dateB;
+
+                    // 2. Completion percentage (least finished first)
+                    if (a.percent !== b.percent) return a.percent - b.percent;
+
+                    // 3. Branch/SubBranch order
                     if (a.orderInfo.branchOrder !== b.orderInfo.branchOrder) return a.orderInfo.branchOrder - b.orderInfo.branchOrder;
                     if (a.orderInfo.subBranchOrder !== b.orderInfo.subBranchOrder) return a.orderInfo.subBranchOrder - b.orderInfo.subBranchOrder;
                     return a.nom.localeCompare(b.nom);
@@ -244,14 +253,37 @@ export function useMandatoryActivities(selectedGroupId, students) {
                         const percent = totalPotential > 0 ? Math.round((completedCount / totalPotential) * 100) : 0;
 
                         // Find students who haven't finished all activities of this level in this module
-                        const remainingStudents = levelStudents.filter(s => {
-                            const completedForStudent = groupProgressions.filter(p =>
-                                p.eleve_id === s.id &&
-                                activityIds.includes(p.activite_id) &&
-                                (p.etat === 'termine' || p.etat === 'a_verifier')
-                            ).length;
-                            return completedForStudent < activityIds.length;
-                        }).map(s => `${s.prenom} ${s.nom}`);
+                        const remainingStudents = levelStudents
+                            .filter(s => {
+                                const completedForStudent = groupProgressions.filter(p =>
+                                    p.eleve_id === s.id &&
+                                    activityIds.includes(p.activite_id) &&
+                                    (p.etat === 'termine' || p.etat === 'a_verifier')
+                                ).length;
+                                return completedForStudent < activityIds.length;
+                            })
+                            .map(s => {
+                                const completedForStudent = groupProgressions.filter(p =>
+                                    p.eleve_id === s.id &&
+                                    activityIds.includes(p.activite_id) &&
+                                    (p.etat === 'termine' || p.etat === 'a_verifier')
+                                ).length;
+                                const percentage = activityIds.length > 0
+                                    ? Math.round((completedForStudent / activityIds.length) * 100)
+                                    : 0;
+                                return {
+                                    name: `${s.prenom} ${s.nom}`,
+                                    prenom: s.prenom,
+                                    completed: completedForStudent,
+                                    total: activityIds.length,
+                                    percentage
+                                };
+                            })
+                            // Sort by percentage (ascending) then alphabetically by prenom
+                            .sort((a, b) => {
+                                if (a.percentage !== b.percentage) return a.percentage - b.percentage;
+                                return a.prenom.localeCompare(b.prenom);
+                            });
 
                         if (!grouped[mm.level_id]) {
                             grouped[mm.level_id] = {
@@ -348,6 +380,13 @@ export function useMandatoryActivities(selectedGroupId, students) {
         toast.success("Ordre automatique appliqué");
     };
 
+    const removeModule = (levelId, moduleId) => {
+        setMandatoryModules(prev =>
+            prev.filter(m => !(m.module_id === moduleId && m.level_id === levelId))
+        );
+        toast.success("Module retiré");
+    };
+
     return {
         states: {
             isModalOpen,
@@ -365,6 +404,7 @@ export function useMandatoryActivities(selectedGroupId, students) {
             setSelectedLevelId,
             toggleMandatory,
             reorderModule,
+            removeModule,
             sortMandatoryModules,
             fetchGroupProgressions
         }

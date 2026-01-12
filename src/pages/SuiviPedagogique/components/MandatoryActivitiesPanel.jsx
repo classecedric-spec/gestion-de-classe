@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import PropTypes from 'prop-types';
-import { Layers, Plus, CheckCircle2, Info, X, ChevronUp, ChevronDown, RefreshCw } from 'lucide-react';
+import { Layers, Plus, CheckCircle2, Info, X, GripVertical } from 'lucide-react';
 import clsx from 'clsx';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
@@ -8,10 +8,36 @@ import { fr } from 'date-fns/locale';
 const MandatoryActivitiesPanel = ({
     mandatoryGroups,
     onAddClick,
-    onReorder,
-    onAutoSort
+    onRemove
 }) => {
     const [selectedInfo, setSelectedInfo] = useState(null);
+    const [draggedItem, setDraggedItem] = useState(null);
+
+    const handleDragStart = (e, levelId, moduleId) => {
+        setDraggedItem({ levelId, moduleId });
+        e.dataTransfer.effectAllowed = 'move';
+    };
+
+    const handleDragOver = (e) => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+    };
+
+    const handleDrop = (e, targetLevelId, targetModuleId) => {
+        e.preventDefault();
+        if (!draggedItem || draggedItem.levelId !== targetLevelId) return;
+
+        // Only allow reordering within the same level
+        if (draggedItem.moduleId !== targetModuleId) {
+            // For now we'll implement this later with proper reorder logic
+            console.log('Reorder:', draggedItem.moduleId, 'to position of', targetModuleId);
+        }
+        setDraggedItem(null);
+    };
+
+    const handleDragEnd = () => {
+        setDraggedItem(null);
+    };
 
     return (
         <div className="flex-1 overflow-hidden flex flex-col h-full">
@@ -21,22 +47,13 @@ const MandatoryActivitiesPanel = ({
                     <Layers size={14} className="text-primary" />
                     <span className="text-[10px] font-black uppercase tracking-[0.2em] text-grey-light">Modules Obligatoires</span>
                 </div>
-                <div className="flex items-center gap-2">
-                    <button
-                        onClick={onAutoSort}
-                        className="p-1 px-2 bg-white/5 text-grey-medium border border-white/5 rounded-md hover:bg-white/10 hover:text-primary transition-all active:scale-95"
-                        title="Trier automatiquement (Ancienneté > % Fini > Branche)"
-                    >
-                        <RefreshCw size={12} />
-                    </button>
-                    <button
-                        onClick={onAddClick}
-                        className="p-1 px-2.5 bg-primary/20 text-primary border border-primary/20 rounded-md hover:bg-primary/30 transition-all active:scale-95"
-                        title="Ajouter des modules obligatoires"
-                    >
-                        <Plus size={14} />
-                    </button>
-                </div>
+                <button
+                    onClick={onAddClick}
+                    className="p-1 px-2.5 bg-primary/20 text-primary border border-primary/20 rounded-md hover:bg-primary/30 transition-all active:scale-95"
+                    title="Ajouter des modules obligatoires"
+                >
+                    <Plus size={14} />
+                </button>
             </div>
 
             {/* Content with Responsive Flex Layout */}
@@ -71,9 +88,33 @@ const MandatoryActivitiesPanel = ({
                                         return (
                                             <div
                                                 key={`${module.id}-${group.levelId}`}
-                                                className="bg-surface/30 border border-white/5 rounded-xl p-3 flex flex-col gap-3 hover:bg-surface/50 transition-colors group relative overflow-hidden"
+                                                draggable={module.percent !== 100}
+                                                onDragStart={(e) => handleDragStart(e, group.levelId, module.id)}
+                                                onDragOver={handleDragOver}
+                                                onDrop={(e) => handleDrop(e, group.levelId, module.id)}
+                                                onDragEnd={handleDragEnd}
+                                                className={clsx(
+                                                    "bg-surface/30 border border-white/5 rounded-xl p-3 flex flex-col gap-3 hover:bg-surface/50 transition-colors group relative cursor-grab active:cursor-grabbing",
+                                                    draggedItem?.moduleId === module.id && draggedItem?.levelId === group.levelId && "opacity-50"
+                                                )}
                                             >
+                                                {/* Delete Button - Positioned absolutely */}
+                                                <button
+                                                    onClick={() => onRemove(group.levelId, module.id)}
+                                                    className="absolute -top-2 -right-2 z-10 p-1.5 bg-danger/10 hover:bg-danger text-danger hover:text-white rounded-full border border-danger/20 opacity-0 group-hover:opacity-100 transition-all shadow-lg scale-90 hover:scale-100"
+                                                    title="Retirer ce module"
+                                                >
+                                                    <X size={12} strokeWidth={3} />
+                                                </button>
+
                                                 <div className="flex items-start gap-3">
+                                                    {/* Drag Handle */}
+                                                    {module.percent !== 100 && (
+                                                        <div className="mt-0.5 shrink-0 cursor-move opacity-0 group-hover:opacity-100 transition-opacity text-grey-medium hover:text-primary">
+                                                            <GripVertical size={16} />
+                                                        </div>
+                                                    )}
+
                                                     {/* Info Pill Style - Fixed width/height, inset look */}
                                                     <button
                                                         onClick={() => setSelectedInfo({
@@ -94,31 +135,15 @@ const MandatoryActivitiesPanel = ({
                                                     </div>
 
                                                     <div className={clsx(
-                                                        "shrink-0 flex flex-col items-end gap-1",
+                                                        "shrink-0",
                                                         module.percent === 100 ? "text-success" : "text-primary"
                                                     )}>
                                                         {module.percent === 100 ? (
                                                             <CheckCircle2 size={18} />
                                                         ) : (
-                                                            <div className="flex items-center gap-2">
-                                                                <div className="flex flex-col gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                                    <button
-                                                                        onClick={() => onReorder(group.levelId, module.id, 'up')}
-                                                                        className="p-0.5 hover:bg-white/10 rounded text-grey-medium hover:text-white"
-                                                                    >
-                                                                        <ChevronUp size={10} />
-                                                                    </button>
-                                                                    <button
-                                                                        onClick={() => onReorder(group.levelId, module.id, 'down')}
-                                                                        className="p-0.5 hover:bg-white/10 rounded text-grey-medium hover:text-white"
-                                                                    >
-                                                                        <ChevronDown size={10} />
-                                                                    </button>
-                                                                </div>
-                                                                <span className="text-lg font-black leading-none drop-shadow-sm">
-                                                                    {module.percent}<span className="text-[10px] opacity-60 ml-0.5">%</span>
-                                                                </span>
-                                                            </div>
+                                                            <span className="text-lg font-black leading-none drop-shadow-sm">
+                                                                {module.percent}<span className="text-[10px] opacity-60 ml-0.5">%</span>
+                                                            </span>
                                                         )}
                                                     </div>
                                                 </div>
@@ -180,10 +205,15 @@ const MandatoryActivitiesPanel = ({
                                     selectedInfo.students.map((student, idx) => (
                                         <div
                                             key={idx}
-                                            className="px-4 py-2 bg-white/5 border border-white/5 rounded-xl text-[12px] font-medium text-grey-light flex items-center gap-3"
+                                            className="px-4 py-2 bg-white/5 border border-white/5 rounded-xl text-[12px] font-medium text-grey-light flex items-center justify-between gap-3"
                                         >
-                                            <div className="w-1.5 h-1.5 rounded-full bg-primary/40" />
-                                            {student}
+                                            <div className="flex items-center gap-3 flex-1 min-w-0">
+                                                <div className="w-1.5 h-1.5 rounded-full bg-primary/40 shrink-0" />
+                                                <span className="truncate">{student.name}</span>
+                                            </div>
+                                            <span className="text-[11px] font-black text-primary shrink-0">
+                                                {student.completed}/{student.total}
+                                            </span>
                                         </div>
                                     ))
                                 )}
@@ -213,12 +243,17 @@ MandatoryActivitiesPanel.propTypes = {
             percent: PropTypes.number.isRequired,
             date_fin: PropTypes.string,
             created_at: PropTypes.string,
-            remainingStudents: PropTypes.arrayOf(PropTypes.string).isRequired
+            remainingStudents: PropTypes.arrayOf(PropTypes.shape({
+                name: PropTypes.string.isRequired,
+                prenom: PropTypes.string.isRequired,
+                completed: PropTypes.number.isRequired,
+                total: PropTypes.number.isRequired,
+                percentage: PropTypes.number.isRequired
+            })).isRequired
         })).isRequired
     })).isRequired,
     onAddClick: PropTypes.func.isRequired,
-    onReorder: PropTypes.func.isRequired,
-    onAutoSort: PropTypes.func.isRequired
+    onRemove: PropTypes.func.isRequired
 };
 
 export default MandatoryActivitiesPanel;

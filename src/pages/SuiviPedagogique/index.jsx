@@ -525,8 +525,7 @@ const SuiviPedagogique = ({ timer, setTimer, timerFinished, setTimerFinished }) 
                     <MandatoryActivitiesPanel
                         mandatoryGroups={mandatoryHook.states.resolvedMandatoryModules}
                         onAddClick={() => mandatoryHook.actions.setIsModalOpen(true)}
-                        onReorder={mandatoryHook.actions.reorderModule}
-                        onAutoSort={mandatoryHook.actions.sortMandatoryModules}
+                        onRemove={mandatoryHook.actions.removeModule}
                     />
                 </div >
 
