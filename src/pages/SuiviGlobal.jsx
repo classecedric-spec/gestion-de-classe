@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Users, Table, GraduationCap, Calendar, Clock, Monitor, Tablet } from 'lucide-react';
+import { useLocation, useNavigate } from 'react-router-dom';
+import { Users, Table, GraduationCap, Calendar, Clock, Monitor } from 'lucide-react';
 import clsx from 'clsx';
 import SuiviPedagogique from './SuiviPedagogique';
 import AvancementAteliers from './AvancementAteliers';
@@ -8,8 +9,13 @@ import TimerModal from '../components/TimerModal';
 import { cleanupOrphanProgressions } from '../lib/cleanupUtils';
 
 const SuiviGlobal = () => {
-    const [activeView, setActiveView] = useState('suivi'); // 'suivi' or 'avancement'
+    const location = useLocation();
+    const navigate = useNavigate();
+
+    const params = new URLSearchParams(location.search);
+    const activeView = params.get('tab') === 'groups' ? 'avancement' : 'suivi';
     const [currentTime, setCurrentTime] = useState(new Date());
+
 
     useEffect(() => {
         const timer = setInterval(() => setCurrentTime(new Date()), 30000);
@@ -32,23 +38,26 @@ const SuiviGlobal = () => {
 
     // --- TIMER LOGIC ---
     useEffect(() => {
-        let interval;
-        if (timer.active && timer.timeLeft > 0) {
-            interval = setInterval(() => {
-                setTimer(prev => ({
-                    ...prev,
-                    timeLeft: prev.timeLeft - 1
-                }));
-            }, 1000);
-        } else if (timer.active && timer.timeLeft === 0) {
-            setTimer(prev => ({ ...prev, active: false }));
-            setTimerFinished(true);
-            if ('vibrate' in navigator) {
-                navigator.vibrate([200, 100, 200]);
-            }
-        }
+        if (!timer.active) return;
+
+        const interval = setInterval(() => {
+            setTimer(prev => {
+                if (prev.timeLeft <= 1) {
+                    clearInterval(interval);
+                    setTimeout(() => {
+                        setTimerFinished(true);
+                        if ('vibrate' in navigator) {
+                            navigator.vibrate([200, 100, 200]);
+                        }
+                    }, 0);
+                    return { ...prev, timeLeft: 0, active: false };
+                }
+                return { ...prev, timeLeft: prev.timeLeft - 1 };
+            });
+        }, 1000);
+
         return () => clearInterval(interval);
-    }, [timer.active, timer.timeLeft]);
+    }, [timer.active]);
 
     const startTimer = (duration, message) => {
         setTimer({
@@ -76,7 +85,7 @@ const SuiviGlobal = () => {
 
                 <div className="neu-selector-container p-1.5 rounded-2xl mx-auto shadow-2xl overflow-hidden">
                     <button
-                        onClick={() => setActiveView('suivi')}
+                        onClick={() => navigate('/dashboard/suivi')}
                         data-active={activeView === 'suivi'}
                         className={clsx(
                             "rounded-xl font-black uppercase tracking-[0.15em] transition-all duration-300",
@@ -89,7 +98,7 @@ const SuiviGlobal = () => {
                         <span className="tab-label">Encodage</span>
                     </button>
                     <button
-                        onClick={() => setActiveView('avancement')}
+                        onClick={() => navigate('/dashboard/suivi?tab=groups')}
                         data-active={activeView === 'avancement'}
                         className={clsx(
                             "rounded-xl font-black uppercase tracking-[0.15em] transition-all duration-300",
@@ -100,13 +109,6 @@ const SuiviGlobal = () => {
                     >
                         <Table size={20} />
                         <span className="tab-label">Suivi des groupes</span>
-                    </button>
-                    <button
-                        onClick={() => window.open('/suivi-tablet', '_blank')}
-                        className="rounded-xl font-black uppercase tracking-[0.15em] transition-all duration-300 text-grey-medium hover:text-white hover:bg-white/5"
-                    >
-                        <Tablet size={20} />
-                        <span className="tab-label">Tablette</span>
                     </button>
                     <button
                         onClick={() => window.open('/suivi-tbi', '_blank')}

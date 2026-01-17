@@ -63,7 +63,8 @@
     --text-dark: #00131E;
     --success: #10b981;
     --danger: #ef4444;
-    --grey-dark: #49555C;
+    --grey-dark: #6B7C87;
+    /* Improved from #49555C for WCAG AA compliance */
     --grey-medium: #A0A8AD;
     --grey-light: #D7DADB;
     --input: #19303D;
@@ -81,7 +82,8 @@
     --text-dark: #00131E;
     --success: #10b981;
     --danger: #ef4444;
-    --grey-dark: #49555C;
+    --grey-dark: #6B7C87;
+    /* Improved from #49555C for WCAG AA compliance */
     --grey-medium: #A0A8AD;
     --grey-light: #D7DADB;
     --input: #19303D;

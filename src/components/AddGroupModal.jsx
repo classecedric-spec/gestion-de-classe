@@ -6,7 +6,7 @@ import Button from './ui/Button';
 import ImageUpload from './ui/ImageUpload';
 
 const AddGroupModal = ({ isOpen, onClose, onAdded, groupToEdit = null }) => {
-    const [newGroup, setNewGroup] = useState({ nom: '', acronyme: '', photo_base64: '' });
+    const [newGroup, setNewGroup] = useState({ nom: '', acronyme: '', photo_base64: '', photo_url: '' });
     const [loading, setLoading] = useState(false);
 
     useEffect(() => {
@@ -15,10 +15,11 @@ const AddGroupModal = ({ isOpen, onClose, onAdded, groupToEdit = null }) => {
                 setNewGroup({
                     nom: groupToEdit.nom || '',
                     acronyme: groupToEdit.acronyme || '',
-                    photo_base64: groupToEdit.photo_base64 || ''
+                    photo_base64: groupToEdit.photo_base64 || '',
+                    photo_url: groupToEdit.photo_url || ''
                 });
             } else {
-                setNewGroup({ nom: '', acronyme: '', photo_base64: '' });
+                setNewGroup({ nom: '', acronyme: '', photo_base64: '', photo_url: '' });
             }
         }
     }, [isOpen, groupToEdit]);
@@ -34,6 +35,7 @@ const AddGroupModal = ({ isOpen, onClose, onAdded, groupToEdit = null }) => {
                 nom: newGroup.nom,
                 acronyme: newGroup.acronyme,
                 photo_base64: newGroup.photo_base64,
+                photo_url: newGroup.photo_url,
                 user_id: user.id
             };
 
@@ -44,7 +46,8 @@ const AddGroupModal = ({ isOpen, onClose, onAdded, groupToEdit = null }) => {
                     .update({
                         nom: newGroup.nom,
                         acronyme: newGroup.acronyme,
-                        photo_base64: newGroup.photo_base64
+                        photo_base64: newGroup.photo_base64,
+                        photo_url: newGroup.photo_url
                     })
                     .eq('id', groupToEdit.id)
                     .select()
@@ -94,10 +97,17 @@ const AddGroupModal = ({ isOpen, onClose, onAdded, groupToEdit = null }) => {
         >
             <form onSubmit={(e) => { e.preventDefault(); handleSubmit(e); }} className="space-y-4">
                 <ImageUpload
-                    value={newGroup.photo_base64}
-                    onChange={(base64) => setNewGroup(prev => ({ ...prev, photo_base64: base64 }))}
+                    value={newGroup.photo_url || newGroup.photo_base64}
+                    onChange={(v) => {
+                        if (v && v.startsWith('http')) {
+                            setNewGroup(prev => ({ ...prev, photo_url: v }));
+                        } else {
+                            setNewGroup(prev => ({ ...prev, photo_base64: v }));
+                        }
+                    }}
                     label="Photo du groupe"
                     placeholderIcon={Layers}
+                    storagePath={groupToEdit ? `groupe/${groupToEdit.id}.jpg` : null}
                 />
 
                 <div className="space-y-1">

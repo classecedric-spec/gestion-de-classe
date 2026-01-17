@@ -150,11 +150,7 @@ const LandingMobile = () => {
 
             {/* Footer */}
             <footer className="text-center text-grey-medium py-8 border-t border-white/5 mt-auto px-5 bg-black/20 backdrop-blur-lg">
-                <div className="flex flex-wrap items-center justify-center gap-4 mb-6">
-                    <Link to="/" className="text-[10px] uppercase tracking-widest font-bold hover:text-white transition-colors">Accueil</Link>
-                    <Link to="/features" className="text-[10px] uppercase tracking-widest font-bold hover:text-white transition-colors">Outils</Link>
-                    <Link to="/privacy" className="text-[10px] uppercase tracking-widest font-bold hover:text-white transition-colors">Privé</Link>
-                </div>
+
                 <p className="text-[9px] font-bold uppercase tracking-widest opacity-30">&copy; 2026 — GestionClasse</p>
             </footer>
         </div>

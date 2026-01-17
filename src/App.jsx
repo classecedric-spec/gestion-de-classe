@@ -1,79 +1,142 @@
-import React from 'react';
+import React, { Suspense, lazy } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import Layout from './components/Layout';
-import Home from './pages/Home';
-import Landing from './pages/Landing';
-import Auth from './pages/Auth';
-import Students from './pages/Students';
-import Classes from './pages/Classes';
-import Groups from './pages/Groups';
-import UserManagement from './pages/UserManagement';
-import ActivitiesLayout from './pages/ActivitiesLayout';
-import Branches from './pages/Branches';
-import SubBranches from './pages/SubBranches';
-
-import Modules from './pages/Modules';
-import Activities from './pages/Activities';
-import Niveaux from './pages/Niveaux';
-import Materiels from './pages/Materiels';
-import Presence from './pages/Presence';
-import Settings from './pages/Settings';
-import SuiviGlobal from './pages/SuiviGlobal';
-import SuiviGlobalTablet from './pages/SuiviGlobalTablet';
-import SuiviGlobalTBI from './pages/SuiviGlobalTBI';
-import Adults from './pages/Adults';
-import MobileSuivi from './pages/MobileSuivi';
-import Features from './pages/Features';
-import Privacy from './pages/Privacy';
-import Fonctionnement from './pages/Fonctionnement';
-import LandingMobile from './pages/LandingMobile';
-import MobileDashboard from './pages/MobileDashboard';
-import MobileEncodage from './pages/MobileEncodage';
 import ProtectedRoute from './components/ProtectedRoute';
 import PublicRoute from './components/PublicRoute';
+import { PageLoader, DashboardLoader } from './components/Loading';
+
+// Lazy load all pages
+const Layout = lazy(() => import('./components/Layout'));
+const Home = lazy(() => import('./pages/Home'));
+const Landing = lazy(() => import('./pages/Landing'));
+const Auth = lazy(() => import('./pages/Auth'));
+const Students = lazy(() => import('./pages/Students'));
+const Classes = lazy(() => import('./pages/Classes'));
+const Groups = lazy(() => import('./pages/Groups'));
+const UserManagement = lazy(() => import('./pages/UserManagement'));
+const ActivitiesLayout = lazy(() => import('./pages/ActivitiesLayout'));
+const Branches = lazy(() => import('./pages/Branches'));
+const SubBranches = lazy(() => import('./pages/SubBranches'));
+const Modules = lazy(() => import('./pages/Modules'));
+const Activities = lazy(() => import('./pages/Activities'));
+const Niveaux = lazy(() => import('./pages/Niveaux'));
+const Materiels = lazy(() => import('./pages/Materiels'));
+const Presence = lazy(() => import('./pages/Presence'));
+const Settings = lazy(() => import('./pages/Settings'));
+const SuiviGlobal = lazy(() => import('./pages/SuiviGlobal'));
+const SuiviGlobalTBI = lazy(() => import('./pages/SuiviGlobalTBI'));
+const Adults = lazy(() => import('./pages/Adults'));
+const MobileSuivi = lazy(() => import('./pages/MobileSuivi'));
+const Features = lazy(() => import('./pages/Features'));
+const Privacy = lazy(() => import('./pages/Privacy'));
+const Fonctionnement = lazy(() => import('./pages/Fonctionnement'));
+const LandingMobile = lazy(() => import('./pages/LandingMobile'));
+const MobileDashboard = lazy(() => import('./pages/MobileDashboard'));
+const MobileEncodage = lazy(() => import('./pages/MobileEncodage'));
+const MobilePresence = lazy(() => import('./pages/MobilePresence'));
 
 function App() {
   return (
     <Routes>
-      <Route path="/" element={<PublicRoute><Landing /></PublicRoute>} />
-      <Route path="/mobile" element={<PublicRoute><LandingMobile /></PublicRoute>} />
-      <Route path="/mobile-dashboard" element={<ProtectedRoute><MobileDashboard /></ProtectedRoute>} />
-      <Route path="/mobile-encodage" element={<ProtectedRoute><MobileEncodage /></ProtectedRoute>} />
-      <Route path="/features" element={<Features />} />
-      <Route path="/privacy" element={<Privacy />} />
-      <Route path="/login" element={<PublicRoute><Auth /></PublicRoute>} />
-      <Route path="/dashboard" element={<ProtectedRoute><Layout /></ProtectedRoute>}>
-        <Route index element={<Home />} />
-        <Route path="suivi" element={<SuiviGlobal />} />
+      <Route path="/" element={
+        <Suspense fallback={<PageLoader />}>
+          <PublicRoute><Landing /></PublicRoute>
+        </Suspense>
+      } />
+
+      <Route path="/mobile" element={
+        <Suspense fallback={<PageLoader />}>
+          <PublicRoute><LandingMobile /></PublicRoute>
+        </Suspense>
+      } />
+
+      <Route path="/mobile-dashboard" element={
+        <Suspense fallback={<PageLoader />}>
+          <ProtectedRoute><MobileDashboard /></ProtectedRoute>
+        </Suspense>
+      } />
+
+      <Route path="/mobile-presence" element={
+        <Suspense fallback={<PageLoader />}>
+          <ProtectedRoute><MobilePresence /></ProtectedRoute>
+        </Suspense>
+      } />
+
+      <Route path="/mobile-encodage" element={
+        <Suspense fallback={<PageLoader />}>
+          <ProtectedRoute><MobileEncodage /></ProtectedRoute>
+        </Suspense>
+      } />
+
+      <Route path="/features" element={
+        <Suspense fallback={<PageLoader />}>
+          <Features />
+        </Suspense>
+      } />
+
+      <Route path="/privacy" element={
+        <Suspense fallback={<PageLoader />}>
+          <Privacy />
+        </Suspense>
+      } />
+
+      <Route path="/login" element={
+        <Suspense fallback={<PageLoader />}>
+          <PublicRoute><Auth /></PublicRoute>
+        </Suspense>
+      } />
+
+      <Route path="/dashboard" element={
+        <Suspense fallback={<DashboardLoader />}>
+          <ProtectedRoute><Layout /></ProtectedRoute>
+        </Suspense>
+      }>
+        <Route index element={<Suspense fallback={<PageLoader />}><Home /></Suspense>} />
+        <Route path="suivi" element={<Suspense fallback={<PageLoader />}><SuiviGlobal /></Suspense>} />
         <Route path="avancement" element={<Navigate to="/dashboard/suivi" replace />} />
-        <Route path="user" element={<UserManagement />}>
+
+        <Route path="user" element={<Suspense fallback={<PageLoader />}><UserManagement /></Suspense>}>
           <Route index element={<Navigate to="groups" replace />} />
-          <Route path="students" element={<Students />} />
-          <Route path="groups" element={<Groups />} />
-          <Route path="classes" element={<Classes />} />
-          <Route path="niveaux" element={<Niveaux />} />
-          <Route path="adults" element={<Adults />} />
+          <Route path="students" element={<Suspense fallback={<PageLoader />}><Students /></Suspense>} />
+          <Route path="groups" element={<Suspense fallback={<PageLoader />}><Groups /></Suspense>} />
+          <Route path="classes" element={<Suspense fallback={<PageLoader />}><Classes /></Suspense>} />
+          <Route path="niveaux" element={<Suspense fallback={<PageLoader />}><Niveaux /></Suspense>} />
+          <Route path="adults" element={<Suspense fallback={<PageLoader />}><Adults /></Suspense>} />
         </Route>
-        <Route path="activities" element={<ActivitiesLayout />}>
+
+        <Route path="activities" element={<Suspense fallback={<PageLoader />}><ActivitiesLayout /></Suspense>}>
           <Route index element={<Navigate to="modules" replace />} />
-          <Route path="branches" element={<Branches />} />
-          <Route path="sub-branches" element={<SubBranches />} />
-          <Route path="modules" element={<Modules />} />
-          <Route path="materiels" element={<Materiels />} />
-          <Route path="list" element={<Activities />} />
+          <Route path="branches" element={<Suspense fallback={<PageLoader />}><Branches /></Suspense>} />
+          <Route path="sub-branches" element={<Suspense fallback={<PageLoader />}><SubBranches /></Suspense>} />
+          <Route path="modules" element={<Suspense fallback={<PageLoader />}><Modules /></Suspense>} />
+          <Route path="materiels" element={<Suspense fallback={<PageLoader />}><Materiels /></Suspense>} />
+          <Route path="list" element={<Suspense fallback={<PageLoader />}><Activities /></Suspense>} />
         </Route>
-        <Route path="settings" element={<Settings />} />
-        <Route path="presence" element={<Presence />} />
+
+        <Route path="settings" element={<Suspense fallback={<PageLoader />}><Settings /></Suspense>} />
+        <Route path="presence" element={<Suspense fallback={<PageLoader />}><Presence /></Suspense>} />
       </Route>
-      <Route path="/suivi-tablet" element={<ProtectedRoute><SuiviGlobalTablet /></ProtectedRoute>} />
-      <Route path="/suivi-tbi" element={<ProtectedRoute><SuiviGlobalTBI /></ProtectedRoute>} />
-      <Route path="/mobile-suivi/:groupId" element={<ProtectedRoute><MobileSuivi /></ProtectedRoute>} />
-      <Route path="/fonctionnement" element={<Fonctionnement />} />
+
+
+
+      <Route path="/suivi-tbi" element={
+        <Suspense fallback={<PageLoader />}>
+          <ProtectedRoute><SuiviGlobalTBI /></ProtectedRoute>
+        </Suspense>
+      } />
+
+      <Route path="/mobile-suivi/:groupId" element={
+        <Suspense fallback={<PageLoader />}>
+          <ProtectedRoute><MobileSuivi /></ProtectedRoute>
+        </Suspense>
+      } />
+
+      <Route path="/fonctionnement" element={
+        <Suspense fallback={<PageLoader />}>
+          <Fonctionnement />
+        </Suspense>
+      } />
     </Routes>
   );
 }
 
-
-
 export default App;
-

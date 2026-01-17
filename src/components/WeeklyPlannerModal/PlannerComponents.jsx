@@ -1,0 +1,203 @@
+import React, { useState, useEffect, useRef } from 'react';
+import { X, GripVertical, Trash2, ChevronLeft, ChevronRight, Calendar } from 'lucide-react';
+import { useDraggable, useDroppable } from '@dnd-kit/core';
+import { CSS } from '@dnd-kit/utilities';
+import { DAYS, PERIODS } from './useWeeklyPlanner';
+
+/**
+ * DraggableDockItem - Item draggable dans le dock
+ */
+export const DraggableDockItem = ({ item, onDelete, variant }) => {
+    const { attributes, listeners, setNodeRef, transform } = useDraggable({
+        id: `dock-${item.id}`,
+        data: { type: 'dockItem', item }
+    });
+
+    const style = transform ? {
+        transform: CSS.Translate.toString(transform),
+        opacity: 0.5,
+    } : undefined;
+
+    const formatDateShort = (dateStr) => {
+        if (!dateStr) return '';
+        const d = new Date(dateStr);
+        return d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'numeric' });
+    };
+
+    if (variant === 'pill') {
+        return (
+            <div
+                ref={setNodeRef}
+                style={style}
+                {...listeners}
+                {...attributes}
+                className="relative group flex flex-col items-center justify-center text-center bg-surface hover:bg-surface-hover border border-border hover:border-primary/50 rounded-xl p-[5px] w-[140px] h-auto min-h-[50px] cursor-grab active:cursor-grabbing transition-all shadow-sm hover:shadow-md flex-shrink-0"
+            >
+                <div className="flex-1 flex flex-col items-center justify-center w-full overflow-hidden">
+                    <span className="font-bold text-[11px] md:text-xs text-text-main line-clamp-3 leading-tight w-full break-words">
+                        {item.activity_title}
+                    </span>
+                    {item.date_fin && (
+                        <span className="text-[9px] text-grey-medium mt-1 font-normal block">
+                            ({formatDateShort(item.date_fin)})
+                        </span>
+                    )}
+                </div>
+
+                {(item.niveaux && item.niveaux.length > 0) && (
+                    <div className="w-full flex justify-center border-t border-border/50 pt-1 mt-1 shrink-0">
+                        <span className="text-[9px] text-primary font-medium uppercase tracking-wide">
+                            {item.niveaux.join(', ')}
+                        </span>
+                    </div>
+                )}
+
+                <button
+                    onPointerDown={(e) => e.stopPropagation()}
+                    onClick={(e) => { e.stopPropagation(); onDelete(item.id); }}
+                    className="absolute -top-1 -right-1 p-1 bg-surface border border-border rounded-full hover:text-danger hover:border-danger opacity-0 group-hover:opacity-100 transition-all shadow-sm"
+                >
+                    <X size={10} />
+                </button>
+            </div>
+        );
+    }
+
+    // Default Card Style
+    return (
+        <div
+            ref={setNodeRef}
+            style={style}
+            {...listeners}
+            {...attributes}
+            className="p-2 min-w-[120px] max-w-[160px] h-20 rounded-xl cursor-grab active:cursor-grabbing bg-surface border border-border hover:border-primary/50 hover:bg-white/5 flex flex-col relative group transition-all flex-shrink-0"
+        >
+            <span className="font-bold text-xs text-text-main line-clamp-2 leading-tight mb-1">{item.activity_title}</span>
+            <div className="mt-auto flex justify-between items-end">
+                <div className="opacity-50 text-text-main"><GripVertical size={14} /></div>
+                <button
+                    onPointerDown={(e) => e.stopPropagation()}
+                    onClick={(e) => { e.stopPropagation(); onDelete(item.id); }}
+                    className="p-1.5 hover:bg-danger/10 rounded-lg text-grey-medium hover:text-danger transition-colors opacity-0 group-hover:opacity-100"
+                >
+                    <Trash2 size={12} />
+                </button>
+            </div>
+        </div>
+    );
+};
+
+/**
+ * PlannerSlot - Case de planning avec support carousel
+ */
+export const PlannerSlot = ({ dayIndex, periodIndex, items, onDelete, onResizeStart, onExtend, isPlaceholder, isOver, isDisabled, modules, ...props }) => {
+    const { setNodeRef } = useDroppable({
+        id: `${DAYS[dayIndex]}-${PERIODS[periodIndex]}`,
+        data: { day: DAYS[dayIndex], period: PERIODS[periodIndex] },
+        disabled: isDisabled
+    });
+
+    const [currentIndex, setCurrentIndex] = useState(0);
+    const [isFilling, setIsFilling] = useState(false);
+    const timerRef = useRef(null);
+
+    useEffect(() => {
+        if (!items || items.length === 0) setCurrentIndex(0);
+        else if (currentIndex >= items.length) setCurrentIndex(0);
+    }, [items?.length]);
+
+    const currentItem = items && items[currentIndex];
+    const moduleInfo = currentItem ? modules?.find(m => m.nom === currentItem.activity_title) : null;
+    const branchInfo = moduleInfo?.SousBranche?.Branche?.nom;
+    const subBranchInfo = moduleInfo?.SousBranche?.nom;
+    const duration = currentItem ? (currentItem.duration || 1) : 1;
+
+    const handleMouseDown = (e) => {
+        if (!currentItem) return;
+        onResizeStart(e, currentItem);
+        setIsFilling(true);
+        timerRef.current = setTimeout(() => {
+            onExtend(currentItem);
+            setIsFilling(false);
+        }, 1000);
+    };
+
+    const clearTimer = () => {
+        if (timerRef.current) clearTimeout(timerRef.current);
+        setIsFilling(false);
+    };
+
+    const nextItem = (e) => { e.stopPropagation(); setCurrentIndex(prev => (prev + 1) % items.length); };
+    const prevItem = (e) => { e.stopPropagation(); setCurrentIndex(prev => (prev - 1 + items.length) % items.length); };
+
+    const gridStyle = {
+        gridColumn: dayIndex + 2,
+        gridRow: `${periodIndex + 2} / span ${duration}`,
+    };
+
+    if (isPlaceholder) return null;
+
+    return (
+        <div
+            ref={setNodeRef}
+            style={gridStyle}
+            {...props}
+            className={`
+                relative rounded-xl border transition-all flex flex-col items-start justify-start text-left p-2.5 group
+                ${isOver ? 'border-primary bg-primary/10 scale-[1.02] shadow-[0_0_15px_rgba(var(--primary),0.3)] z-10' : ''}
+                ${isDisabled ? 'bg-black/80 border-white/5 opacity-50 cursor-not-allowed' : (currentItem ? `${currentItem.color_code} border-white/10` : 'border-border bg-surface/50 h-full min-h-0')}
+                ${items && items.length > 1 ? '!border-purple-500 !border-[3px] shadow-[0_0_10px_rgba(168,85,247,0.5)]' : ''}
+            `}
+        >
+            {isDisabled && !currentItem && (
+                <div className="flex flex-col items-center gap-1 w-full h-full justify-center">
+                    <Calendar size={18} className="text-white/20" />
+                    <span className="text-[10px] font-bold text-white/20 uppercase tracking-widest">OFF</span>
+                </div>
+            )}
+
+            {currentItem ? (
+                <>
+                    {items.length > 1 && (
+                        <div className="absolute top-1 right-8 flex items-center gap-1 z-30">
+                            <button onClick={prevItem} className="p-0.5 hover:bg-black/20 rounded text-white/80"><ChevronLeft size={10} /></button>
+                            <span className="text-[9px] font-bold text-white/90">{currentIndex + 1}/{items.length}</span>
+                            <button onClick={nextItem} className="p-0.5 hover:bg-black/20 rounded text-white/80"><ChevronRight size={10} /></button>
+                        </div>
+                    )}
+
+                    <div className="flex flex-col gap-0.5 w-full">
+                        <span className="font-bold text-sm line-clamp-2 text-white leading-tight text-left pr-6">{currentItem.activity_title}</span>
+                        {(branchInfo || subBranchInfo) && (
+                            <span className="text-[9px] text-white/70 line-clamp-1 italic font-medium text-left">
+                                {branchInfo}{subBranchInfo ? ` > ${subBranchInfo}` : ''}
+                            </span>
+                        )}
+                    </div>
+
+                    <button
+                        onClick={(e) => { e.stopPropagation(); onDelete(currentItem.id); }}
+                        className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 p-1 hover:bg-black/30 rounded text-white/70 hover:text-red-400 transition-all z-30"
+                    >
+                        <Trash2 size={12} />
+                    </button>
+
+                    <div className="absolute top-1 left-1 w-1 h-1 rounded-full bg-white/50"></div>
+
+                    <div
+                        onMouseDown={handleMouseDown}
+                        onMouseUp={clearTimer}
+                        onMouseLeave={clearTimer}
+                        className={`absolute bottom-0 inset-x-0 h-4 cursor-s-resize flex items-end justify-center pb-1 opacity-0 group-hover:opacity-100 transition-all rounded-b-xl z-20 overflow-hidden ${isFilling ? 'bg-black/20 !opacity-100' : 'hover:bg-black/10'}`}
+                    >
+                        <div className={`h-1 rounded-full transition-all ease-out ${isFilling ? 'w-[80%] bg-emerald-400 duration-[1000ms]' : 'w-8 bg-white/30 duration-300'}`}></div>
+                    </div>
+                </>
+            ) : (
+                <div className="opacity-0 group-hover:opacity-100 text-xs text-grey-medium uppercase font-bold tracking-widest scale-90 duration-300 w-full h-full flex items-center justify-center">
+                    Déposer
+                </div>
+            )}
+        </div>
+    );
+};

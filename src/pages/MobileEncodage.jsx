@@ -31,13 +31,11 @@ const MobileEncodage = () => {
     const [groups, setGroups] = useState([]);
     const [students, setStudents] = useState([]);
     const [modules, setModules] = useState([]);
-    const [activities, setActivities] = useState([]);
     const [progressions, setProgressions] = useState({});
 
     // Selection state
     const [selectedGroup, setSelectedGroup] = useState(null);
     const [selectedStudent, setSelectedStudent] = useState(null);
-    const [selectedModule, setSelectedModule] = useState(null);
     const [expandedModuleId, setExpandedModuleId] = useState(null);
 
     // Loading states
@@ -157,7 +155,6 @@ const MobileEncodage = () => {
     const handleSelectGroup = (group) => {
         setSelectedGroup(group);
         setSelectedStudent(null);
-        setSelectedModule(null);
         setExpandedModuleId(null);
         setStep('students');
         fetchStudents(group.id);
@@ -165,7 +162,6 @@ const MobileEncodage = () => {
 
     const handleSelectStudent = (student) => {
         setSelectedStudent(student);
-        setSelectedModule(null);
         setExpandedModuleId(null);
         setStep('modules');
         fetchModulesAndActivities(student.id, student.niveau_id);
@@ -180,7 +176,9 @@ const MobileEncodage = () => {
     };
 
     const handleBack = () => {
-        if (step === 'students') {
+        if (step === 'groups') {
+            navigate('/mobile-dashboard');
+        } else if (step === 'students') {
             setStep('groups');
             setSelectedGroup(null);
         } else if (step === 'modules') {
@@ -284,14 +282,12 @@ const MobileEncodage = () => {
     const renderHeader = () => (
         <header className="bg-surface/80 backdrop-blur-md border-b border-white/5 p-4 sticky top-0 z-20">
             <div className="flex items-center gap-3">
-                {step !== 'groups' && (
-                    <button
-                        onClick={handleBack}
-                        className="w-10 h-10 bg-white/5 rounded-xl flex items-center justify-center text-grey-medium hover:text-white hover:bg-white/10 transition-all border border-white/5"
-                    >
-                        <ArrowLeft size={20} />
-                    </button>
-                )}
+                <button
+                    onClick={handleBack}
+                    className="w-10 h-10 bg-white/5 rounded-xl flex items-center justify-center text-grey-medium hover:text-white hover:bg-white/10 transition-all border border-white/5"
+                >
+                    <ArrowLeft size={20} />
+                </button>
 
                 <div className="flex-1 min-w-0">
                     <h1 className="text-base font-black text-white uppercase tracking-tight truncate">

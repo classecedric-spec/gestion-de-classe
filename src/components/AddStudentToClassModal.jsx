@@ -75,6 +75,7 @@ const AddStudentToClassModal = ({ showModal, handleCloseModal, classId, classNam
             setClasses(classesData || []);
             setGroups(groupsData || []);
         } catch (error) {
+            console.error('Error fetching students/classes/groups:', error);
         } finally {
             setLoading(false);
         }
@@ -98,8 +99,6 @@ const AddStudentToClassModal = ({ showModal, handleCloseModal, classId, classNam
         if (selectedStudentIds.length === 0) return;
         setSaving(true);
         try {
-            const { data: { user } } = await supabase.auth.getUser();
-
             // Update eleves with new class_id
             const { error } = await supabase
                 .from('Eleve')
@@ -111,6 +110,7 @@ const AddStudentToClassModal = ({ showModal, handleCloseModal, classId, classNam
             onAdded();
             handleCloseModal();
         } catch (err) {
+            console.error('Error adding students to class:', err);
         } finally {
             setSaving(false);
         }

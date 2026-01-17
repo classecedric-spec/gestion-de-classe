@@ -1,6 +1,6 @@
 import React from 'react';
 import PropTypes from 'prop-types';
-import { Plus, GripVertical } from 'lucide-react';
+import { Plus, GripVertical, Sparkles } from 'lucide-react';
 import { DndContext, closestCenter, PointerSensor, KeyboardSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
@@ -69,7 +69,7 @@ const SortableActivityItem = ({ activity, onEdit }) => {
  * ActivitiesTab
  * Displays sortable activities list with drag-drop
  */
-const ActivitiesTab = ({ activities, onDragEnd, onEditActivity, onAddActivity }) => {
+const ActivitiesTab = ({ activities, onDragEnd, onEditActivity, onAddActivity, onCreateSeries }) => {
     const sensors = useSensors(
         useSensor(PointerSensor, {
             activationConstraint: {
@@ -84,13 +84,21 @@ const ActivitiesTab = ({ activities, onDragEnd, onEditActivity, onAddActivity })
     if (!activities || activities.length === 0) {
         return (
             <div className="space-y-1 animate-in fade-in duration-300">
-                <div className="pt-4">
+                <div className="pt-4 space-y-3">
                     <button
                         onClick={onAddActivity}
                         className="w-full h-12 bg-white/5 hover:bg-primary/20 hover:text-primary text-grey-light rounded-xl border border-dashed border-white/20 hover:border-primary/50 transition-all flex items-center justify-center gap-2 group"
                     >
                         <Plus size={18} className="group-hover:scale-110 transition-transform" />
                         <span className="font-medium">Ajouter une activité</span>
+                    </button>
+
+                    <button
+                        onClick={onCreateSeries}
+                        className="w-full h-10 bg-yellow-500/10 hover:bg-yellow-500 text-yellow-500 hover:text-white rounded-xl border border-dashed border-yellow-500/30 hover:border-yellow-500 transition-all flex items-center justify-center gap-2 group"
+                    >
+                        <Sparkles size={16} className="group-hover:scale-110 transition-transform" />
+                        <span className="font-medium text-sm">Créer une série</span>
                     </button>
                 </div>
             </div>
@@ -117,14 +125,22 @@ const ActivitiesTab = ({ activities, onDragEnd, onEditActivity, onAddActivity })
                     ))}
                 </SortableContext>
 
-                {/* Bottom Add Activity Button */}
-                <div className="pt-4">
+                {/* Bottom Buttons */}
+                <div className="pt-4 space-y-3">
                     <button
                         onClick={onAddActivity}
                         className="w-full h-12 bg-white/5 hover:bg-primary/20 hover:text-primary text-grey-light rounded-xl border border-dashed border-white/20 hover:border-primary/50 transition-all flex items-center justify-center gap-2 group"
                     >
                         <Plus size={18} className="group-hover:scale-110 transition-transform" />
                         <span className="font-medium">Ajouter une activité</span>
+                    </button>
+
+                    <button
+                        onClick={onCreateSeries}
+                        className="w-full h-10 bg-yellow-500/10 hover:bg-yellow-500 text-yellow-500 hover:text-white rounded-xl border border-dashed border-yellow-500/30 hover:border-yellow-500 transition-all flex items-center justify-center gap-2 group"
+                    >
+                        <Sparkles size={16} className="group-hover:scale-110 transition-transform" />
+                        <span className="font-medium text-sm">Créer une série</span>
                     </button>
                 </div>
             </DndContext>
@@ -136,7 +152,8 @@ ActivitiesTab.propTypes = {
     activities: PropTypes.array.isRequired,
     onDragEnd: PropTypes.func.isRequired,
     onEditActivity: PropTypes.func.isRequired,
-    onAddActivity: PropTypes.func.isRequired
+    onAddActivity: PropTypes.func.isRequired,
+    onCreateSeries: PropTypes.func.isRequired
 };
 
 export default ActivitiesTab;

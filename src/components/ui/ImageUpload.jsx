@@ -3,6 +3,7 @@ import { Camera, X, Layers } from 'lucide-react';
 import clsx from 'clsx';
 import { resizeAndConvertToBase64 } from '../../lib/imageUtils';
 import { compressImage } from '../../lib/imageCompression';
+import { uploadImageToStorage } from '../../lib/storageUtils';
 import { toast } from 'sonner';
 
 const ImageUpload = ({
@@ -10,7 +11,8 @@ const ImageUpload = ({
     onChange,
     label = "Photo",
     placeholderIcon: PlaceholderIcon = Layers,
-    className
+    className,
+    storagePath // New prop: e.g. 'eleve/student_id.jpg'
 }) => {
     const [isDragging, setIsDragging] = useState(false);
     const [isCompressing, setIsCompressing] = useState(false);
@@ -23,7 +25,18 @@ const ImageUpload = ({
                 const base64 = await resizeAndConvertToBase64(file, 200, 200);
                 // Then compress to target size (100x100, max 10KB)
                 const compressed = await compressImage(base64, 100, 100, 10);
-                onChange(compressed);
+
+                if (storagePath) {
+                    const publicUrl = await uploadImageToStorage(compressed, storagePath);
+                    if (publicUrl) {
+                        onChange(publicUrl);
+                    } else {
+                        toast.error("Erreur lors de l'envoi au stockage");
+                    }
+                } else {
+                    onChange(compressed);
+                }
+
                 toast.success("Photo optimisée automatiquement");
             } catch (err) {
                 toast.error("Erreur lors du traitement de l'image");

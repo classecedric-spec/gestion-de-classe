@@ -2,8 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabaseClient';
 import { Loader2, Plus, Box, Calendar } from 'lucide-react';
 import clsx from 'clsx';
-import AddBranchModal from './AddBranchModal';
-import AddSubBranchModal from './AddSubBranchModal';
+import { branchService } from '../features/branches/services/branchService';
+import AddBranchModal from '../features/branches/components/AddBranchModal';
+import AddSubBranchModal from '../features/branches/components/AddSubBranchModal';
 import Modal from './ui/Modal';
 import Button from './ui/Button';
 
@@ -52,6 +53,7 @@ const AddModuleModal = ({ isOpen, onClose, onAdded, moduleToEdit }) => {
             if (error) throw error;
             setBranches(data || []);
         } catch (err) {
+            // ignore error
         }
     };
 
@@ -61,6 +63,7 @@ const AddModuleModal = ({ isOpen, onClose, onAdded, moduleToEdit }) => {
             if (error) throw error;
             setSubBranches(data || []);
         } catch (err) {
+            // ignore error
         }
     };
 
@@ -121,34 +124,35 @@ const AddModuleModal = ({ isOpen, onClose, onAdded, moduleToEdit }) => {
         }
     };
 
-    const handleBranchAdded = (newBranch) => {
-        if (newBranch) {
-            setBranches(prev => [...prev, newBranch].sort((a, b) => a.nom.localeCompare(b.nom)));
-            setBranchId(newBranch.id);
-            setSubBranchId('');
-            setSubBranches([]);
-        } else {
-            fetchBranches();
+    const handleBranchSubmit = async (branchData) => {
+        try {
+            const newBranch = await branchService.createBranch(branchData);
+            if (newBranch) {
+                setBranches(prev => [...prev, newBranch].sort((a, b) => a.nom.localeCompare(b.nom)));
+                setBranchId(newBranch.id);
+                setSubBranchId('');
+                setSubBranches([]);
+            }
+        } catch (error) {
+            console.error("Error creating branch:", error);
+            throw error;
         }
-        setShowAddBranchModal(false);
     };
 
-    const handleSubBranchAdded = async (newSubBranch) => {
-        if (newSubBranch) {
-            setBranchId(newSubBranch.branche_id);
+    const handleSubBranchSubmit = async (subBranchData) => {
+        try {
+            const newSubBranch = await branchService.createSubBranch(subBranchData);
+            if (newSubBranch) {
+                setBranchId(newSubBranch.branche_id);
 
-            try {
-                const { data } = await supabase
-                    .from('SousBranche')
-                    .select('id, nom')
-                    .eq('branche_id', newSubBranch.branche_id)
-                    .order('nom');
+                const data = await branchService.fetchSubBranches(newSubBranch.branche_id);
                 setSubBranches(data || []);
                 setSubBranchId(newSubBranch.id);
-            } catch (err) {
             }
+        } catch (error) {
+            console.error("Error creating sub-branch:", error);
+            throw error;
         }
-        setShowAddSubBranchModal(false);
     };
 
     const handleSubmit = async (e) => {
@@ -300,8 +304,8 @@ const AddModuleModal = ({ isOpen, onClose, onAdded, moduleToEdit }) => {
                                         type="date"
                                         value={endDate}
                                         onChange={(e) => setEndDate(e.target.value)}
-                                        onClick={(e) => { try { e.target.showPicker(); } catch (err) { } }}
-                                        onFocus={(e) => { try { e.target.showPicker(); } catch (err) { } }}
+                                        onClick={(e) => { try { e.target.showPicker(); } catch { } }}
+                                        onFocus={(e) => { try { e.target.showPicker(); } catch { } }}
                                         className="w-full pl-10 pr-4 py-2 bg-black/20 border border-white/10 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all [color-scheme:dark] [&::-webkit-calendar-picker-indicator]:hidden cursor-pointer"
                                     />
                                 </div>
@@ -353,14 +357,15 @@ const AddModuleModal = ({ isOpen, onClose, onAdded, moduleToEdit }) => {
             <AddBranchModal
                 isOpen={showAddBranchModal}
                 onClose={() => setShowAddBranchModal(false)}
-                onAdded={handleBranchAdded}
+                onSubmit={handleBranchSubmit}
             />
 
             {/* Nested Modal: Add SubBranch */}
             <AddSubBranchModal
                 isOpen={showAddSubBranchModal}
                 onClose={() => setShowAddSubBranchModal(false)}
-                onAdded={handleSubBranchAdded}
+                onSubmit={handleSubBranchSubmit}
+                branches={branches}
             />
         </>
     );

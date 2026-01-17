@@ -2,26 +2,12 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { ShieldCheck, Lock, EyeOff, Database, ChevronLeft } from 'lucide-react';
 import Footer from '../components/Footer';
+import PublicHeader from '../components/PublicHeader';
 
 const Privacy = () => {
     return (
         <div className="min-h-screen bg-background text-text-main font-sans selection:bg-primary/30">
-            {/* Background Effects */}
-            <div className="fixed top-0 left-0 w-full h-full overflow-hidden -z-10 pointer-events-none">
-                <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-primary/5 rounded-full blur-[120px]"></div>
-                <div className="absolute bottom-0 left-0 w-[500px] h-[500px] bg-blue-500/5 rounded-full blur-[120px]"></div>
-            </div>
-
-            {/* Header */}
-            <header className="h-20 flex items-center justify-between px-6 md:px-12 border-b border-white/5 bg-background/50 backdrop-blur-md sticky top-0 z-50">
-                <Link to="/" className="flex items-center gap-3 hover:opacity-80 transition-opacity">
-                    <div className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center text-white font-black border border-white/10">G</div>
-                    <span className="text-sm font-bold uppercase tracking-widest text-white">Gestion<span className="text-primary">Classe</span></span>
-                </Link>
-                <Link to="/" className="text-xs font-bold uppercase tracking-widest text-grey-medium hover:text-white transition-colors">
-                    Fermer
-                </Link>
-            </header>
+            <PublicHeader solidBackground />
 
             <main className="max-w-3xl mx-auto px-6 py-24">
                 <div className="mb-24">

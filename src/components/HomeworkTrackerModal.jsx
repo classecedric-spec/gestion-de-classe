@@ -11,7 +11,6 @@ const HomeworkTrackerModal = ({ isOpen, onClose, students }) => {
     const [statusMap, setStatusMap] = useState({}); // { studentId: 'fait' | 'non_fait' | 'rattrape' }
     const [loading, setLoading] = useState(false);
     const [saving, setSaving] = useState(false);
-    const [view, setView] = useState('entry'); // 'entry' | 'history'
 
     useEffect(() => {
         if (isOpen && students.length > 0) {
@@ -22,7 +21,7 @@ const HomeworkTrackerModal = ({ isOpen, onClose, students }) => {
     const fetchDayStatus = async () => {
         setLoading(true);
         try {
-            const { data, error } = await supabase
+            const { data } = await supabase
                 .from('Devoirs')
                 .select('eleve_id, statut')
                 .eq('date', date)
@@ -115,8 +114,8 @@ const HomeworkTrackerModal = ({ isOpen, onClose, students }) => {
                         type="date"
                         value={date}
                         onChange={(e) => setDate(e.target.value)}
-                        onClick={(e) => { try { e.target.showPicker(); } catch (err) { } }}
-                        onFocus={(e) => { try { e.target.showPicker(); } catch (err) { } }}
+                        onClick={(e) => { try { e.target.showPicker(); } catch (err) { /* Silently fail if showPicker not supported */ } }}
+                        onFocus={(e) => { try { e.target.showPicker(); } catch (err) { /* Silently fail if showPicker not supported */ } }}
                         className="bg-background border border-white/10 rounded-xl px-4 py-2 text-sm font-bold text-text-main focus:ring-2 focus:ring-primary/50 outline-none [&::-webkit-calendar-picker-indicator]:hidden cursor-pointer"
                     />
                     <div className="flex-1" />

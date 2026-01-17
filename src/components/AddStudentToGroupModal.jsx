@@ -89,6 +89,7 @@ const AddStudentToGroupModal = ({ showModal, handleCloseModal, groupId, groupNam
             setGroups(groupsData || []);
             setNiveaux(niveauxData || []);
         } catch (error) {
+            console.error('Error fetching students/classes/groups/levels:', error);
         } finally {
             setLoading(false);
         }

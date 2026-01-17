@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabaseClient';
 import { checkOverdueActivities } from '../lib/overdueLogic';
 import { cleanupOrphanProgressions } from '../lib/cleanupUtils';
+import { toast } from 'react-hot-toast';
 import {
     LayoutDashboard,
     Users,
@@ -20,7 +21,6 @@ import {
     Flame,
     Smartphone,
     ShieldCheck, UserCheck,
-    Tablet,
     Monitor,
     Download
 } from 'lucide-react';
@@ -61,44 +61,8 @@ const Layout = () => {
     const isSettingsPage = location.pathname.startsWith('/dashboard/settings');
     const isFullPage = isSuiviPage || isPresencePage || isUserPage || isActivitiesPage || isSettingsPage;
 
-
-    useEffect(() => {
-        supabase.auth.getSession().then(({ data: { session } }) => {
-            setSession(session);
-            setLoading(false);
-            if (session) {
-                checkProfile(session.user.id);
-                checkOverdueActivities(session.user.id);
-            }
-        });
-
-        const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-            setSession(session);
-            setLoading(false);
-            if (session) {
-                checkProfile(session.user.id);
-                checkOverdueActivities(session.user.id);
-                cleanupOrphanProgressions(); // Clean up mismatched level progressions
-            }
-        });
-
-        return () => subscription.unsubscribe();
-    }, []);
-
-
-
-    // Effect to enforce profile completion on route change
-    // Effect to enforce profile completion OR pending validation on route change
-    useEffect(() => {
-        const queryParams = new URLSearchParams(location.search);
-        const isProfileTab = location.pathname === '/dashboard/settings' && queryParams.get('tab') === 'profil';
-
-        if (session && (profileIncomplete || pendingValidation) && !isProfileTab) {
-            navigate('/dashboard/settings?tab=profil');
-        }
-    }, [location.pathname, location.search, session, profileIncomplete, pendingValidation, navigate]);
-
-    const checkProfile = async (userId) => {
+    // Define checkProfile before useEffect to avoid "accessed before declaration" error
+    const checkProfile = useCallback(async (userId) => {
         // Use maybeSingle to handle case where row doesn't exist yet
         // We also check for 'validation_admin' (Boolean). 
         // If it's explicitly FALSE, we block. If undefined/null, we allow (backward compat).
@@ -122,7 +86,43 @@ const Layout = () => {
         if ((isIncomplete || isPending) && (location.pathname !== '/dashboard/settings' || !location.search.includes('tab=profil'))) {
             navigate('/dashboard/settings?tab=profil');
         }
-    };
+    }, [location.pathname, location.search, navigate]);
+
+    useEffect(() => {
+        supabase.auth.getSession().then(({ data: { session } }) => {
+            setSession(session);
+            setLoading(false);
+            if (session) {
+                checkProfile(session.user.id);
+                checkOverdueActivities(session.user.id);
+            }
+        });
+
+        const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+            setSession(session);
+            setLoading(false);
+            if (session) {
+                checkProfile(session.user.id);
+                checkOverdueActivities(session.user.id);
+                cleanupOrphanProgressions(); // Clean up mismatched level progressions
+            }
+        });
+
+        return () => subscription.unsubscribe();
+    }, [checkProfile]);
+
+
+
+    // Effect to enforce profile completion on route change
+    // Effect to enforce profile completion OR pending validation on route change
+    useEffect(() => {
+        const queryParams = new URLSearchParams(location.search);
+        const isProfileTab = location.pathname === '/dashboard/settings' && queryParams.get('tab') === 'profil';
+
+        if (session && (profileIncomplete || pendingValidation) && !isProfileTab) {
+            navigate('/dashboard/settings?tab=profil');
+        }
+    }, [location.pathname, location.search, session, profileIncomplete, pendingValidation, navigate]);
 
     const handleLogout = async () => {
         await supabase.auth.signOut();
@@ -209,7 +209,7 @@ const Layout = () => {
                                 <button
                                     key={item.label}
                                     onClick={async () => {
-                                        if (item.path === '/suivi-tablet' || item.path === '/suivi-tbi') {
+                                        if (item.path === '/suivi-tbi') {
                                             window.open(item.path, '_blank');
                                             return;
                                         }

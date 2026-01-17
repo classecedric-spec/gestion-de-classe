@@ -1,28 +1,28 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabaseClient';
-import { getInitials } from '../lib/utils';
+import RandomPickerModal from '../components/RandomPickerModal';
+
 import {
-    Smartphone,
     LogOut,
-    Users,
     Loader2,
-    ClipboardCheck,
-    ChevronRight,
     User,
     AlertCircle,
     Check,
-    Clock,
-    TrendingUp,
-    Calendar
+    Zap
 } from 'lucide-react';
-import clsx from 'clsx';
+import { toast } from 'react-hot-toast';
 
 const MobileDashboard = () => {
     const navigate = useNavigate();
     const [session, setSession] = useState(null);
     const [loading, setLoading] = useState(true);
     const [userName, setUserName] = useState('');
+    const [activeGroup, setActiveGroup] = useState(null);
+
+    // Random Picker State
+    const [isRandomPickerOpen, setIsRandomPickerOpen] = useState(false);
+    const [groupStudents, setGroupStudents] = useState([]);
 
     // Stats state
     const [stats, setStats] = useState({
@@ -30,8 +30,190 @@ const MobileDashboard = () => {
         validationsToday: 0,
         studentsToFollow: []
     });
-    const [recentStudents, setRecentStudents] = useState([]);
+
+    // Attendance Summary State
+    const [attendanceSummary, setAttendanceSummary] = useState({ present: 0, absent: 0, hasEncoding: false, period: 'matin' });
+    // Default to today for summary
+    const [selectedDate] = useState(new Date().toISOString().split('T')[0]);
+    const [loadingAttendance, setLoadingAttendance] = useState(false);
     const [loadingStats, setLoadingStats] = useState(true);
+
+    // Helper to determine period based on time
+    const getPeriodFromTime = () => {
+        const now = new Date();
+        const hours = now.getHours();
+        const minutes = now.getMinutes();
+        const currentTime = hours * 60 + minutes;
+
+        // Matin: < 12:00 (720 minutes)
+        if (currentTime < 720) {
+            return 'matin';
+        } else {
+            return 'apres_midi';
+        }
+    };
+
+    const fetchUserInfo = useCallback(async (userId) => {
+        try {
+            const { data: user } = await supabase
+                .from('CompteUtilisateur')
+                .select('prenom, nom, last_selected_group_id')
+                .eq('id', userId)
+                .maybeSingle();
+
+            if (user) {
+                setUserName(`${user.prenom} ${user.nom}`);
+
+                let groupToSet = null;
+                // Try to get last selected group
+                if (user.last_selected_group_id) {
+                    const { data: group } = await supabase
+                        .from('Groupe')
+                        .select('id, nom')
+                        .eq('id', user.last_selected_group_id)
+                        .single();
+                    if (group) groupToSet = group;
+                }
+
+                // Fallback: get first group if no last selection
+                if (!groupToSet) {
+                    const { data: firstGroup } = await supabase
+                        .from('Groupe')
+                        .select('id, nom')
+                        .eq('user_id', userId)
+                        .order('nom')
+                        .limit(1)
+                        .maybeSingle();
+                    if (firstGroup) groupToSet = firstGroup;
+                }
+
+                if (groupToSet) setActiveGroup(groupToSet);
+            }
+        } catch (error) {
+            console.error('Error fetching user info:', error);
+        }
+    }, []);
+
+    const fetchStats = useCallback(async (groupId = null) => {
+        setLoadingStats(true);
+        try {
+            let filterStudentIds = null;
+            if (groupId) {
+                const { data: s } = await supabase.from('EleveGroupe').select('eleve_id').eq('groupe_id', groupId);
+                filterStudentIds = s ? s.map(x => x.eleve_id) : [];
+            }
+
+            // Optimization: If filtering by group but no students found, return 0 immediately
+            if (filterStudentIds !== null && filterStudentIds.length === 0) {
+                setStats({
+                    helpPending: 0,
+                    validationsToday: 0,
+                    studentsToFollow: []
+                });
+                setLoadingStats(false);
+                return;
+            }
+
+            // Get help pending count
+            let queryHelp = supabase
+                .from('Progression')
+                .select('*', { count: 'exact', head: true })
+                .in('etat', ['besoin_d_aide', 'a_verifier', 'ajustement']);
+
+            if (filterStudentIds) {
+                queryHelp = queryHelp.in('eleve_id', filterStudentIds);
+            }
+
+            const { count: helpCount } = await queryHelp;
+
+            // Get validations today
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+
+            let queryVal = supabase
+                .from('Progression')
+                .select('*', { count: 'exact', head: true })
+                .eq('etat', 'valide')
+                .gte('updated_at', today.toISOString());
+
+            if (filterStudentIds) {
+                queryVal = queryVal.in('eleve_id', filterStudentIds);
+            }
+
+            const { count: valCount } = await queryVal;
+
+            setStats({
+                helpPending: helpCount || 0,
+                validationsToday: valCount || 0,
+                studentsToFollow: []
+            });
+        } catch (error) {
+            console.error('Error fetching stats:', error);
+        } finally {
+            setLoadingStats(false);
+        }
+    }, []);
+
+    const fetchDailyAttendance = useCallback(async () => {
+        setLoadingAttendance(true);
+        try {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) return;
+
+            // 1. Get user's groups
+            const { data: groups } = await supabase.from('Groupe').select('id').eq('user_id', user.id);
+            const groupIds = groups?.map(g => g.id) || [];
+
+            if (groupIds.length === 0) return;
+
+            // 2. Get students ids for these groups
+            const { data: students } = await supabase
+                .from('Eleve')
+                .select('id, EleveGroupe!inner(groupe_id)')
+                .in('EleveGroupe.groupe_id', groupIds);
+
+            if (!students) return;
+
+            const studentIds = students.map(s => s.id);
+            const targetDateStr = selectedDate; // Today
+            const currentPeriod = getPeriodFromTime();
+
+            // 3. Get attendance for today AND current period only
+            const { data: attendances } = await supabase
+                .from('Attendance')
+                .select('status, eleve_id')
+                .eq('date', targetDateStr)
+                .eq('periode', currentPeriod)
+                .in('eleve_id', studentIds);
+
+            const hasData = attendances && attendances.length > 0;
+
+            if (!hasData) {
+                setAttendanceSummary({
+                    present: 0,
+                    absent: 0,
+                    hasEncoding: false,
+                    period: currentPeriod
+                });
+            } else {
+                const totalStudents = studentIds.length;
+                const absentCount = attendances.filter(a => a.status === 'absent').length;
+                const presentCount = totalStudents - absentCount;
+
+                setAttendanceSummary({
+                    present: presentCount,
+                    absent: absentCount,
+                    hasEncoding: true,
+                    period: currentPeriod
+                });
+            }
+
+        } catch (error) {
+            console.error('Error fetching attendance summary:', error);
+        } finally {
+            setLoadingAttendance(false);
+        }
+    }, [selectedDate]);
 
     useEffect(() => {
         supabase.auth.getSession().then(({ data: { session } }) => {
@@ -39,8 +221,7 @@ const MobileDashboard = () => {
             setLoading(false);
             if (session) {
                 fetchUserInfo(session.user.id);
-                fetchStats(session.user.id);
-                fetchRecentStudents(session.user.id);
+                // fetchStats is now triggered by activeGroup change
             }
         });
 
@@ -52,110 +233,35 @@ const MobileDashboard = () => {
         });
 
         return () => subscription.unsubscribe();
-    }, []);
+    }, [navigate, fetchUserInfo]);
 
-    const fetchUserInfo = async (userId) => {
-        const { data } = await supabase
-            .from('CompteUtilisateur')
-            .select('prenom, nom')
-            .eq('id', userId)
-            .maybeSingle();
-
-        if (data) {
-            setUserName(`${data.prenom || ''} ${data.nom || ''}`.trim());
+    // Update stats when active group changes
+    useEffect(() => {
+        if (activeGroup) {
+            fetchStats(activeGroup.id);
+            // Fetch students for random picker
+            const fetchGroupStudents = async () => {
+                const { data } = await supabase
+                    .from('Eleve')
+                    .select('*, EleveGroupe!inner(groupe_id)')
+                    .eq('EleveGroupe.groupe_id', activeGroup.id)
+                    .order('nom');
+                setGroupStudents(data || []);
+            };
+            fetchGroupStudents();
+        } else if (session) {
+            // Fallback: fetch global stats if no group and session exists
+            fetchStats();
+            setGroupStudents([]);
         }
-    };
+    }, [activeGroup, fetchStats, session]);
 
-    const fetchStats = async (userId) => {
-        setLoadingStats(true);
-        try {
-            // Get today's date range
-            const today = new Date();
-            today.setHours(0, 0, 0, 0);
-            const todayISO = today.toISOString();
-
-            // Count help requests pending (besoin_d_aide + a_verifier)
-            const { data: helpData, count: helpCount } = await supabase
-                .from('Progression')
-                .select('id', { count: 'exact', head: true })
-                .in('etat', ['besoin_d_aide', 'a_verifier']);
-
-            // Count validations today
-            const { data: validationsData, count: validationsCount } = await supabase
-                .from('Progression')
-                .select('id', { count: 'exact', head: true })
-                .eq('etat', 'termine')
-                .gte('updated_at', todayISO);
-
-            // Get students with most help requests (priority follow)
-            const { data: priorityData } = await supabase
-                .from('Progression')
-                .select(`
-                    eleve_id,
-                    Eleve (id, prenom, nom, photo_base64)
-                `)
-                .in('etat', ['besoin_d_aide'])
-                .limit(50);
-
-            // Count occurrences per student
-            const studentCounts = {};
-            priorityData?.forEach(p => {
-                if (p.Eleve) {
-                    const id = p.eleve_id;
-                    if (!studentCounts[id]) {
-                        studentCounts[id] = { student: p.Eleve, count: 0 };
-                    }
-                    studentCounts[id].count++;
-                }
-            });
-
-            // Sort by count and take top 3
-            const studentsToFollow = Object.values(studentCounts)
-                .sort((a, b) => b.count - a.count)
-                .slice(0, 3)
-                .map(s => ({ ...s.student, helpCount: s.count }));
-
-            setStats({
-                helpPending: helpCount || 0,
-                validationsToday: validationsCount || 0,
-                studentsToFollow
-            });
-        } catch (error) {
-            console.error('Error fetching stats:', error);
-        } finally {
-            setLoadingStats(false);
+    // Update attendance when date changes
+    useEffect(() => {
+        if (session) {
+            fetchDailyAttendance();
         }
-    };
-
-    const fetchRecentStudents = async (userId) => {
-        try {
-            // Get recent progressions updated by this user
-            const { data } = await supabase
-                .from('Progression')
-                .select(`
-                    eleve_id,
-                    updated_at,
-                    Eleve (id, prenom, nom, photo_base64)
-                `)
-                .eq('user_id', userId)
-                .order('updated_at', { ascending: false })
-                .limit(20);
-
-            // Deduplicate by student
-            const seen = new Set();
-            const recent = [];
-            data?.forEach(p => {
-                if (p.Eleve && !seen.has(p.eleve_id)) {
-                    seen.add(p.eleve_id);
-                    recent.push(p.Eleve);
-                }
-            });
-
-            setRecentStudents(recent.slice(0, 5));
-        } catch (error) {
-            console.error('Error fetching recent students:', error);
-        }
-    };
+    }, [fetchDailyAttendance, session]);
 
     const handleLogout = async () => {
         await supabase.auth.signOut();
@@ -164,7 +270,6 @@ const MobileDashboard = () => {
 
     const handleGoToSuivi = async () => {
         try {
-            // Get current user
             const { data: { user } } = await supabase.auth.getUser();
             if (!user) {
                 toast.error('Non connecté');
@@ -242,7 +347,7 @@ const MobileDashboard = () => {
     }
 
     return (
-        <div className="min-h-screen bg-background text-text-main font-sans flex flex-col">
+        <div className="h-screen bg-background text-text-main font-sans flex flex-col overflow-hidden">
             {/* Header */}
             <header className="bg-surface/80 backdrop-blur-md border-b border-white/5 p-4 sticky top-0 z-20">
                 <div className="flex items-center justify-between">
@@ -264,7 +369,7 @@ const MobileDashboard = () => {
                 </div>
             </header>
 
-            <main className="flex-1 p-4 space-y-5 pb-8">
+            <main className="flex-1 p-4 space-y-5 pb-4 flex flex-col h-[calc(100vh-80px)]">
 
                 {/* Stats Cards */}
                 <section className="grid grid-cols-2 gap-3">
@@ -274,7 +379,7 @@ const MobileDashboard = () => {
                     >
                         <div className="flex items-center gap-2 mb-2">
                             <AlertCircle size={14} className="text-grey-medium group-hover:text-primary transition-colors" />
-                            <span className="text-[9px] font-bold uppercase tracking-widest text-grey-medium">En attente</span>
+                            <span className="text-[9px] font-bold uppercase tracking-widest text-grey-medium">En attente {activeGroup ? `(${activeGroup.nom})` : ''}</span>
                         </div>
                         <div className="text-2xl font-black text-white">
                             {loadingStats ? <Loader2 size={20} className="animate-spin" /> : stats.helpPending}
@@ -295,69 +400,51 @@ const MobileDashboard = () => {
                         </div>
                         <p className="text-[10px] text-grey-medium mt-1 group-hover:text-success transition-colors">validations • cliquez pour encoder</p>
                     </Link>
+
+                    {/* Random Picker */}
+                    <div
+                        onClick={() => setIsRandomPickerOpen(true)}
+                        className="bg-surface/50 border border-border rounded-xl p-4 hover:bg-surface hover:border-purple-500/30 transition-all group cursor-pointer"
+                    >
+                        <div className="flex items-center gap-2 mb-2">
+                            <Zap size={14} className="text-purple-500" />
+                            <span className="text-[9px] font-bold uppercase tracking-widest text-grey-medium">Main Innocente</span>
+                        </div>
+                        <div className="text-2xl font-black text-white flex items-center gap-2">
+                            <span className="text-2xl">🎲</span>
+                        </div>
+                        <p className="text-[10px] text-grey-medium mt-1 group-hover:text-purple-500 transition-colors">
+                            Tirage au sort
+                        </p>
+                    </div>
+
+                    <Link
+                        to="/mobile-presence"
+                        state={{ period: attendanceSummary.period }}
+                        className="bg-surface/50 border border-border rounded-xl p-4 hover:bg-surface hover:border-primary/30 transition-all group cursor-pointer"
+                    >
+                        <div className="flex items-center gap-2 mb-2">
+                            <User size={14} className="text-grey-medium group-hover:text-primary transition-colors" />
+                            <span className="text-[9px] font-bold uppercase tracking-widest text-grey-medium">
+                                Présences ({attendanceSummary.period === 'matin' ? 'Matin' : 'Apr-Midi'})
+                            </span>
+                        </div>
+                        <div className="text-2xl font-black text-white flex items-center gap-2">
+                            {loadingAttendance ? (
+                                <Loader2 size={20} className="animate-spin" />
+                            ) : !attendanceSummary.hasEncoding ? (
+                                <span className="text-xl text-grey-light italic">-</span>
+                            ) : (
+                                <span>{attendanceSummary.present}</span>
+                            )}
+                        </div>
+                        <p className="text-[10px] text-grey-medium mt-1 group-hover:text-primary transition-colors">
+                            {!attendanceSummary.hasEncoding
+                                ? "Pas d'encodage • cliquez pour voir"
+                                : `${attendanceSummary.absent} ${attendanceSummary.absent > 1 ? 'absents' : 'absent'} • cliquez pour voir`}
+                        </p>
+                    </Link>
                 </section>
-
-                {/* Priority Students Alert */}
-                {stats.studentsToFollow.length > 0 && (
-                    <section className="bg-[#A0A8AD]/10 border border-[#A0A8AD]/20 rounded-xl p-4">
-                        <div className="flex items-center gap-2 mb-3">
-                            <TrendingUp size={14} className="text-grey-medium" />
-                            <span className="text-[10px] font-bold uppercase tracking-widest text-grey-medium">Priorité suivi</span>
-                        </div>
-                        <div className="flex gap-2 overflow-x-auto pb-1">
-                            {stats.studentsToFollow.map(student => (
-                                <Link
-                                    key={student.id}
-                                    to="/mobile-encodage"
-                                    className="flex items-center gap-2 bg-surface/60 px-3 py-2 rounded-lg border border-white/5 shrink-0"
-                                >
-                                    <div className="w-8 h-8 rounded-lg overflow-hidden border border-white/10 bg-surface-light shrink-0">
-                                        {student.photo_base64 ? (
-                                            <img src={student.photo_base64} alt="" className="w-full h-full object-cover" />
-                                        ) : (
-                                            <div className="w-full h-full flex items-center justify-center text-[10px] font-black text-primary">
-                                                {getInitials(student)}
-                                            </div>
-                                        )}
-                                    </div>
-                                    <div>
-                                        <p className="text-xs font-bold text-white leading-tight">{student.prenom}</p>
-                                        <p className="text-[9px] text-grey-medium">{student.helpCount} aide{student.helpCount > 1 ? 's' : ''}</p>
-                                    </div>
-                                </Link>
-                            ))}
-                        </div>
-                    </section>
-                )}
-
-                {/* Recent Students */}
-                {recentStudents.length > 0 && (
-                    <section>
-                        <h2 className="text-[10px] font-bold uppercase tracking-widest text-grey-medium mb-3">Récents</h2>
-                        <div className="flex gap-3 overflow-x-auto pb-1">
-                            {recentStudents.map(student => (
-                                <Link
-                                    key={student.id}
-                                    to="/mobile-encodage"
-                                    className="flex flex-col items-center gap-2 shrink-0"
-                                >
-                                    <div className="w-14 h-14 rounded-xl overflow-hidden border-2 border-white/10 bg-surface-light">
-                                        {student.photo_base64 ? (
-                                            <img src={student.photo_base64} alt="" className="w-full h-full object-cover" />
-                                        ) : (
-                                            <div className="w-full h-full flex items-center justify-center text-sm font-black text-primary">
-                                                {getInitials(student)}
-                                            </div>
-                                        )}
-                                    </div>
-                                    <span className="text-[10px] font-bold text-grey-light text-center max-w-[60px] truncate">
-                                        {student.prenom}
-                                    </span>
-                                </Link>
-                            ))}
-                        </div>
-                    </section>
-                )}
 
             </main>
 
@@ -365,6 +452,13 @@ const MobileDashboard = () => {
             <footer className="p-3 border-t border-white/5 text-center">
                 <p className="text-[9px] font-bold text-grey-dark uppercase tracking-widest">Gestion Classe • Mobile</p>
             </footer>
+
+            {/* RANDOM PICKER MODAL */}
+            <RandomPickerModal
+                isOpen={isRandomPickerOpen}
+                onClose={() => setIsRandomPickerOpen(false)}
+                students={groupStudents}
+            />
         </div>
     );
 };

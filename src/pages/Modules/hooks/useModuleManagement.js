@@ -95,14 +95,42 @@ export function useModuleManagement() {
 
         setLoading(true);
         try {
+            // Determine next selection BEFORE delete to preserve context
+            let nextSelection = null;
+
+            // Should we update selection? Yes if we are deleting the currently selected one
+            // or if we want to ensure stability (though usually checks selectedModule.id)
+            if (selectedModule?.id === targetModule.id) {
+                const currentIndex = modules.findIndex(m => m.id === targetModule.id);
+                if (currentIndex !== -1) {
+                    // Try next selection (below), or previous (above) if acting on last item
+                    if (currentIndex < modules.length - 1) {
+                        nextSelection = modules[currentIndex + 1];
+                    } else if (currentIndex > 0) {
+                        nextSelection = modules[currentIndex - 1];
+                    }
+                }
+            } else {
+                // If we deleted something other than selected, keep current selection
+                // But wait, if we don't touch setSelectedModule, it stays as is.
+                // However, we need to handle the case where fetchModules runs.
+                nextSelection = selectedModule;
+            }
+
             const { error } = await supabase.from('Module').delete().eq('id', targetModule.id);
             if (error) throw error;
 
-            if (selectedModule?.id === targetModule.id) {
+            // Apply new selection immediately
+            if (nextSelection) {
+                setSelectedModule(nextSelection);
+            } else {
                 setSelectedModule(null);
             }
+
             setModuleToDelete(null);
-            fetchModules();
+
+            // Update local state directly to ensure instant removal without waiting for fetch
+            setModules(prev => prev.filter(m => m.id !== targetModule.id));
         } catch (err) {
             console.error('Error deleting module:', err);
             throw err;
@@ -156,10 +184,93 @@ export function useModuleManagement() {
 
     // Callback after module created/edited
     const handleCreated = async (newModule) => {
-        await fetchModules();
-        if (newModule) {
-            setSelectedModule(newModule);
+        // Reload modules and get fresh list
+        setLoading(true);
+
+        let attempts = 0;
+        const maxRetries = 3;
+        let finalModules = [];
+        let foundModule = null;
+
+        while (attempts < maxRetries) {
+            try {
+                attempts++;
+                const { data, error } = await supabase
+                    .from('Module')
+                    .select(`
+                        *,
+                        SousBranche:sous_branche_id (
+                            id,
+                            nom,
+                            branche_id,
+                            ordre,
+                            Branche:branche_id (
+                                id,
+                                nom,
+                                ordre
+                            )
+                        ),
+                        Activite (
+                            *,
+                            ActiviteNiveau (
+                                *,
+                                Niveau (*)
+                            ),
+                            ActiviteMateriel (
+                                TypeMateriel (
+                                    acronyme
+                                )
+                            ),
+                            Progression (etat)
+                        )
+                    `)
+                    .order('nom')
+                    .order('ordre', { foreignTable: 'Activite', ascending: true });
+
+                if (error) throw error;
+
+                // Calculate progress for each module
+                const modulesWithStats = (data || []).map(m => ({
+                    ...m,
+                    ...calculateModuleProgress(m)
+                }));
+
+                finalModules = modulesWithStats;
+
+                // If we are looking for a specific new module, check if it's there
+                if (newModule) {
+                    foundModule = modulesWithStats.find(m => m.id === newModule.id);
+                    if (foundModule) {
+                        break; // Found it, exit loop
+                    } else {
+                        await new Promise(r => setTimeout(r, 500)); // Wait before retry
+                    }
+                } else {
+                    break; // No specific module to find, just one fetch is enough
+                }
+
+            } catch (error) {
+                console.error('Error fetching modules attempt ' + attempts, error);
+                if (attempts === maxRetries) break;
+                await new Promise(r => setTimeout(r, 500));
+            }
         }
+
+        setModules(finalModules);
+
+        // Select the new module
+        if (foundModule) {
+            setSelectedModule(foundModule);
+            // Reset filters to ensure the new module is visible in the list
+            setSearchTerm('');
+            setStatusFilter('all');
+            setBranchFilter('all');
+            setSubBranchFilter('all');
+        } else if (newModule) {
+            console.warn("Could not find new module after retries:", newModule.id);
+        }
+
+        setLoading(false);
         setModuleToEdit(null);
     };
 

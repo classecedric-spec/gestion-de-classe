@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X, RefreshCw, Trophy } from 'lucide-react';
 
 const RandomPickerModal = ({ isOpen, onClose, students }) => {
@@ -8,6 +8,7 @@ const RandomPickerModal = ({ isOpen, onClose, students }) => {
     const [displayStudent, setDisplayStudent] = useState(null);
     const [pool, setPool] = useState([]);
 
+    // Initialize pool when modal opens
     useEffect(() => {
         if (isOpen && students) {
             setPool(students);
@@ -16,19 +17,26 @@ const RandomPickerModal = ({ isOpen, onClose, students }) => {
         }
     }, [isOpen, students]);
 
-    if (!isOpen) return null;
-
-    const pickRandom = () => {
+    const pickRandom = React.useCallback(() => {
         if (pool.length === 0) return;
 
-        // Instant pick
+        // Instant pick without delay
         const randomIndex = Math.floor(Math.random() * pool.length);
         const winner = pool[randomIndex];
 
         setDisplayStudent(winner);
         setSelectedStudent(winner);
         setIsSpinning(false);
-    };
+    }, [pool]);
+
+    // Auto-start effect
+    useEffect(() => {
+        if (isOpen && pool.length > 0 && !selectedStudent && !isSpinning) {
+            pickRandom();
+        }
+    }, [isOpen, pool, selectedStudent, isSpinning, pickRandom]);
+
+    if (!isOpen) return null;
 
     const removeAndRepick = () => {
         if (!selectedStudent) return;
@@ -37,6 +45,7 @@ const RandomPickerModal = ({ isOpen, onClose, students }) => {
         setPool(newPool);
 
         if (newPool.length > 0) {
+            // Instant repick
             const randomIndex = Math.floor(Math.random() * newPool.length);
             const winner = newPool[randomIndex];
             setDisplayStudent(winner);
@@ -52,6 +61,13 @@ const RandomPickerModal = ({ isOpen, onClose, students }) => {
             setPool(prev => prev.filter(s => s.id !== selectedStudent.id));
             setSelectedStudent(null);
             setDisplayStudent(null);
+            // After removing, since we don't auto-repick here (user clicked "Retirer du jeu" which implies maybe stopping or restarting), 
+            // but since we removed step 1, we should probably auto-pick or show something? 
+            // The user said "remove step 1". If we remove from pool and don't pick, we fall back to... nothing?
+            // Let's assume "Retirer du jeu" just removes and closes or resets.
+            // Actually, "Retirer du jeu" in this context usually means "Remove this student and let me pick another one later or keep picking from remaining".
+            // If we are in "auto-pick" mode always, then when we clear selectedStudent, the useEffect will trigger pickRandom() again!
+            // Perfect.
         }
     };
 
@@ -75,52 +91,43 @@ const RandomPickerModal = ({ isOpen, onClose, students }) => {
                 {/* Content */}
                 <div className="p-8 flex flex-col items-center justify-center min-h-[300px] text-center space-y-8">
 
-                    {!selectedStudent && !isSpinning && (
-                        <div className="text-center space-y-2">
-                            <div className="text-6xl mb-4 animate-bounce">👇</div>
-                            <p className="text-gray-400 font-medium">Prêt à désigner l'élu(e) ?</p>
-                            <p className="text-xs text-gray-600 uppercase tracking-widest font-bold">
-                                {pool.length} élèves en lice
-                            </p>
-                        </div>
-                    )}
+                    {/* Step 1 Removed */}
 
-                    {(isSpinning || selectedStudent) && displayStudent && (
+                    {/* Spinning / Result */}
+                    {(isSpinning || selectedStudent) ? (
                         <div className={`transition-all duration-300 transform ${selectedStudent ? 'scale-110' : 'scale-100'}`}>
                             <div className={`w-40 h-40 rounded-full border-4 p-1 mb-6 mx-auto relative ${selectedStudent ? 'border-primary shadow-[0_0_50px_rgba(var(--primary),0.3)]' : 'border-white/10'}`}>
                                 <div className="w-full h-full rounded-full overflow-hidden bg-gray-800">
-                                    {displayStudent.photo_base64 ? (
+                                    {displayStudent?.photo_base64 ? (
                                         <img src={displayStudent.photo_base64} alt="" className="w-full h-full object-cover" />
                                     ) : (
                                         <div className="w-full h-full flex items-center justify-center bg-gray-700 text-3xl font-black text-gray-500">
-                                            {displayStudent.prenom[0]}
+                                            {displayStudent?.prenom?.[0] || '?'}
                                         </div>
                                     )}
                                 </div>
-                                {selectedStudent && (
+                                {selectedStudent && !isSpinning && (
                                     <div className="absolute -bottom-2 -right-2 bg-yellow-400 text-black p-2 rounded-full shadow-lg animate-in zoom-in duration-300">
                                         <Trophy size={24} strokeWidth={3} />
                                     </div>
                                 )}
                             </div>
                             <h3 className={`text-3xl font-black uppercase tracking-tight ${selectedStudent ? 'text-primary animate-pulse' : 'text-white'}`}>
-                                {displayStudent.prenom} {displayStudent.nom}
+                                {isSpinning ? '...' : `${displayStudent?.prenom} ${displayStudent?.nom}`}
                             </h3>
+                        </div>
+                    ) : (
+                        // Fallback if pool empty or loading initial state
+                        <div className="text-gray-500">
+                            {pool.length === 0 ? "Aucun élève disponible" : "Tirage en cours..."}
                         </div>
                     )}
 
                     {/* Actions */}
                     <div className="w-full space-y-3 pt-4">
-                        {!isSpinning && !selectedStudent && (
-                            <button
-                                onClick={pickRandom}
-                                className="w-full py-4 bg-primary hover:bg-primary-dark text-white rounded-xl font-black text-lg uppercase tracking-widest hover:scale-[1.02] active:scale-[0.98] transition-all shadow-lg shadow-primary/20"
-                            >
-                                Tirer au sort
-                            </button>
-                        )}
+                        {/* Pick button removed */}
 
-                        {selectedStudent && (
+                        {selectedStudent && !isSpinning && (
                             <div className="grid grid-cols-1 gap-2">
                                 <button
                                     onClick={removeAndRepick}
@@ -145,12 +152,21 @@ const RandomPickerModal = ({ isOpen, onClose, students }) => {
                             </div>
                         )}
 
-                        {pool.length < students.length && !isSpinning && (
+                        {pool.length < students.length && !isSpinning && !selectedStudent && (
+                            // Show reset if we are effectively empty/done but waiting
                             <button
                                 onClick={() => { setPool(students); setSelectedStudent(null); }}
                                 className="text-xs text-gray-500 hover:text-white underline decoration-gray-700 underline-offset-4 transition-colors"
                             >
                                 Réinitialiser la liste complète ({pool.length} / {students.length})
+                            </button>
+                        )}
+                        {pool.length < students.length && selectedStudent && (
+                            <button
+                                onClick={() => { setPool(students); pickRandom(); }}
+                                className="text-xs text-gray-500 hover:text-white underline decoration-gray-700 underline-offset-4 transition-colors mt-2"
+                            >
+                                Réinitialiser et Relancer
                             </button>
                         )}
                     </div>

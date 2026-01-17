@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { Sparkles, LayoutDashboard, LineChart, Users, Layers, BookOpen, Settings, Fingerprint, ChevronRight } from 'lucide-react';
 import Footer from '../components/Footer';
+import PublicHeader from '../components/PublicHeader';
 import { Link } from 'react-router-dom';
 import clsx from 'clsx';
 
@@ -139,23 +140,7 @@ const Fonctionnement = () => {
 
     return (
         <div className="min-h-screen bg-background text-text-main font-sans flex flex-col selection:bg-primary/30 selection:text-white transition-colors duration-500">
-            {/* Header */}
-            <header className="fixed top-0 left-0 w-full h-20 flex items-center justify-between px-6 md:px-12 z-50 bg-background/80 backdrop-blur-xl border-b border-border">
-                <Link to="/" className="flex items-center gap-3 group cursor-pointer">
-                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-primary-dark flex items-center justify-center text-text-dark font-black text-xl shadow-lg shadow-primary/20 group-hover:scale-110 transition-transform duration-300">
-                        G
-                    </div>
-                    <span className="text-xl font-black text-white tracking-tighter uppercase italic">
-                        Gestion<span className="text-primary not-italic">Classe</span>
-                    </span>
-                </Link>
-                <Link
-                    to="/login"
-                    className="flex items-center gap-2 bg-white/5 hover:bg-primary text-white hover:text-text-dark border border-white/10 hover:border-primary py-2 px-4 rounded-xl transition-all font-bold text-[10px] uppercase tracking-widest hover:scale-105 active:scale-95"
-                >
-                    Connexion
-                </Link>
-            </header>
+            <PublicHeader />
 
             <main className="w-full pt-32 pb-20 flex-grow px-6 md:px-12 max-w-7xl mx-auto">
                 <div className="text-center mb-16">

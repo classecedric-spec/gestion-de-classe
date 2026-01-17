@@ -7,7 +7,7 @@ import clsx from 'clsx';
  * ModuleHeader
  * Displays module title, status badge, and action buttons
  */
-const ModuleHeader = ({ module, onToggleStatus, onCreateSeries }) => {
+const ModuleHeader = ({ module, onToggleStatus }) => {
     const statusConfig = {
         en_cours: {
             bg: 'bg-success/20',
@@ -65,15 +65,7 @@ const ModuleHeader = ({ module, onToggleStatus, onCreateSeries }) => {
                     </div>
                 </div>
             </div>
-            <div className="flex gap-2 items-center">
-                <button
-                    onClick={onCreateSeries}
-                    className="flex items-center gap-2 px-3 py-1.5 bg-primary/10 text-primary hover:bg-primary hover:text-text-dark text-[11px] font-bold uppercase rounded-lg border border-primary/20 transition-all active:scale-95"
-                >
-                    <Sparkles size={14} />
-                    Créer une série
-                </button>
-            </div>
+            {/* Header Actions - Simplified as 'Create Series' moved to Activities Tab */}
         </div>
     );
 };
@@ -84,8 +76,7 @@ ModuleHeader.propTypes = {
         statut: PropTypes.string,
         SousBranche: PropTypes.object
     }).isRequired,
-    onToggleStatus: PropTypes.func.isRequired,
-    onCreateSeries: PropTypes.func.isRequired
+    onToggleStatus: PropTypes.func.isRequired
 };
 
 export default ModuleHeader;

@@ -3,7 +3,6 @@ import { supabase } from '../lib/supabaseClient';
 import { Loader2, Sparkles, Check, Plus, Trash2 } from 'lucide-react';
 import Modal from './ui/Modal';
 import Button from './ui/Button';
-import clsx from 'clsx';
 
 const CreateActivitySeriesModal = ({ isOpen, onClose, onAdded, moduleId }) => {
     const [baseName, setBaseName] = useState('');
@@ -22,8 +21,11 @@ const CreateActivitySeriesModal = ({ isOpen, onClose, onAdded, moduleId }) => {
             fetchLevels();
             ensurePaperMaterial(); // Check/Create "Fichier papier"
             resetForm();
+            if (moduleId) {
+                fetchNextNumber();
+            }
         }
-    }, [isOpen]);
+    }, [isOpen, moduleId]);
 
     const resetForm = () => {
         setBaseName('');
@@ -38,6 +40,22 @@ const CreateActivitySeriesModal = ({ isOpen, onClose, onAdded, moduleId }) => {
             const { data } = await supabase.from('Niveau').select('*').order('ordre');
             setLevels(data || []);
         } catch (err) {
+            console.error('Error fetching levels:', err);
+        }
+    };
+
+    const fetchNextNumber = async () => {
+        try {
+            const { count, error } = await supabase
+                .from('Activite')
+                .select('*', { count: 'exact', head: true })
+                .eq('module_id', moduleId);
+
+            if (!error) {
+                setStartNumber((count || 0) + 1);
+            }
+        } catch (err) {
+            console.error('Error fetching activity count:', err);
         }
     };
 
@@ -48,7 +66,7 @@ const CreateActivitySeriesModal = ({ isOpen, onClose, onAdded, moduleId }) => {
             setSelectedLevels([...selectedLevels, {
                 id: levelData.id,
                 nom: levelData.nom,
-                nombre_exercices: '',
+                nombre_exercices: 1,
                 nombre_erreurs: 1
             }]);
         }
@@ -93,6 +111,7 @@ const CreateActivitySeriesModal = ({ isOpen, onClose, onAdded, moduleId }) => {
                 }
             }
         } catch (err) {
+            console.error('Error ensuring paper material:', err);
         }
     };
 
@@ -181,6 +200,7 @@ const CreateActivitySeriesModal = ({ isOpen, onClose, onAdded, moduleId }) => {
                         .insert(materialLinks);
 
                     if (matError) {
+                        console.error('Error linking material to activities:', matError);
                     }
                 }
             }

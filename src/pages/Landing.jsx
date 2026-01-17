@@ -1,7 +1,7 @@
 import { Link, Navigate } from 'react-router-dom';
-import { LogIn, Layers, Users, BookOpen, ChevronRight, CheckCircle2, Star, ShieldCheck, Zap, Sparkles } from 'lucide-react';
-import clsx from 'clsx';
+import { Layers, Users, BookOpen, ChevronRight, CheckCircle2, Star, ShieldCheck, Zap, Sparkles } from 'lucide-react';
 import Footer from '../components/Footer';
+import PublicHeader from '../components/PublicHeader';
 import { isMobilePhone } from '../lib/utils';
 
 
@@ -13,49 +13,27 @@ const Landing = () => {
 
     return (
         <div className="min-h-screen bg-background text-text-main font-sans overflow-x-hidden flex flex-col selection:bg-primary/30 selection:text-white transition-colors duration-500">
-            {/* Header */}
-            <header className="fixed top-0 left-0 w-full h-20 flex items-center justify-between px-6 md:px-12 z-50 bg-background/80 backdrop-blur-xl border-b border-border">
-                <div className="flex items-center gap-3 group cursor-pointer">
-                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-primary-dark flex items-center justify-center text-text-dark font-black text-xl shadow-lg shadow-primary/20 group-hover:scale-110 transition-transform duration-300">
-                        G
-                    </div>
-                    <span className="text-xl font-black text-white tracking-tighter uppercase italic">
-                        Gestion<span className="text-primary not-italic">Classe</span>
-                    </span>
-                </div>
-                <Link
-                    to="/login"
-                    className="flex items-center gap-2 bg-white/5 hover:bg-primary text-white hover:text-text-dark border border-white/10 hover:border-primary py-2.5 px-6 rounded-xl transition-all font-bold text-xs uppercase tracking-widest hover:scale-105 active:scale-95 shadow-xl shadow-black/20"
-                >
-                    <LogIn size={16} />
-                    Se connecter
-                </Link>
-            </header>
+            <PublicHeader />
 
             <main className="w-full pt-32 pb-20">
 
-                {/* Hero Section */}
                 <section className="max-w-7xl mx-auto px-6 md:px-12 text-center mb-32 relative pt-20">
 
-                    {/* Badge */}
                     <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-surface/50 border border-white/10 text-[11px] font-bold uppercase tracking-widest text-primary mb-8 animate-in fade-in slide-in-from-bottom-4 duration-700 shadow-xl shadow-black/20 backdrop-blur-md">
                         <Sparkles size={12} />
                         <span>Nouvelle Version 1.2</span>
                     </div>
 
-                    {/* Title */}
                     <h1 className="text-6xl md:text-8xl lg:text-9xl font-semibold text-white mb-8 tracking-tighter leading-[0.95] animate-in fade-in slide-in-from-bottom-8 duration-1000">
                         Gestion de classe. <br />
                         <span className="bg-gradient-to-b from-primary via-primary-light to-primary-dark bg-clip-text text-transparent">Réinventée.</span>
                     </h1>
 
-                    {/* Description */}
                     <p className="text-xl md:text-2xl text-grey-medium mb-12 max-w-2xl mx-auto leading-relaxed animate-in fade-in slide-in-from-bottom-10 duration-1000 delay-100 font-medium tracking-tight">
                         La puissance d'un outil professionnel, la simplicité d'une app quotidienne. <br className="hidden md:block" />
                         Conçu pour les enseignants qui exigent le meilleur.
                     </p>
 
-                    {/* CTA Buttons */}
                     <div className="flex flex-col md:flex-row items-center justify-center gap-4 animate-in fade-in slide-in-from-bottom-12 duration-1000 delay-200">
                         <Link
                             to="/login"
@@ -72,22 +50,17 @@ const Landing = () => {
                         </button>
                     </div>
 
-                    {/* Hero Image (Dashboard) */}
                     <div className="mt-24 relative max-w-5xl mx-auto perspective-1000 animate-in fade-in slide-in-from-bottom-16 duration-1000 delay-300">
                         <div className="relative rounded-[2rem] overflow-hidden border border-white/10 shadow-2xl shadow-primary/20 bg-surface">
                             <img src="/assets/documentation/dashboard.png" alt="Dashboard" className="w-full h-auto opacity-90 hover:opacity-100 transition-opacity duration-700" />
-                            {/* Reflection/Shine */}
                             <div className="absolute inset-0 bg-gradient-to-tr from-white/10 to-transparent pointer-events-none"></div>
                         </div>
-                        {/* Glow behind */}
                         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[120%] h-[120%] bg-primary/10 rounded-full blur-[100px] -z-10"></div>
                     </div>
                 </section>
 
-                {/* Bento Grid - Values */}
                 <section className="max-w-7xl mx-auto px-6 md:px-12 mb-40">
                     <div className="grid md:grid-cols-3 gap-6">
-                        {/* Card 1 */}
                         <div className="bg-surface/30 p-8 rounded-[2rem] border border-white/5 hover:border-primary/20 transition-all group backdrop-blur-sm">
                             <div className="w-12 h-12 bg-primary/10 rounded-2xl flex items-center justify-center text-primary mb-6 group-hover:scale-110 transition-transform">
                                 <ShieldCheck size={24} />
@@ -96,7 +69,6 @@ const Landing = () => {
                             <p className="text-grey-medium leading-relaxed">Vos données et celles de vos élèves sont chiffrées et protégées. Conforme RGPD.</p>
                         </div>
 
-                        {/* Card 2 */}
                         <div className="bg-surface/30 p-8 rounded-[2rem] border border-white/5 hover:border-primary/20 transition-all group backdrop-blur-sm md:col-span-1 bg-gradient-to-b from-surface/50 to-surface/30">
                             <div className="w-12 h-12 bg-blue-500/10 rounded-2xl flex items-center justify-center text-blue-400 mb-6 group-hover:scale-110 transition-transform">
                                 <Zap size={24} />
@@ -105,7 +77,6 @@ const Landing = () => {
                             <p className="text-grey-medium leading-relaxed">Une interface fluide qui répond instantanément. Zéro temps de chargement.</p>
                         </div>
 
-                        {/* Card 3 */}
                         <div className="bg-surface/30 p-8 rounded-[2rem] border border-white/5 hover:border-primary/20 transition-all group backdrop-blur-sm">
                             <div className="w-12 h-12 bg-green-500/10 rounded-2xl flex items-center justify-center text-green-400 mb-6 group-hover:scale-110 transition-transform">
                                 <Layers size={24} />
@@ -116,7 +87,6 @@ const Landing = () => {
                     </div>
                 </section>
 
-                {/* Feature Showcase 1: Students (Text Left, Image Right) */}
                 <section id="features" className="max-w-7xl mx-auto px-6 md:px-12 mb-40 flex flex-col md:flex-row items-center gap-16">
                     <div className="flex-1 space-y-8">
                         <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/5 border border-white/10 text-[11px] font-bold uppercase tracking-widest text-grey-light">
@@ -146,7 +116,6 @@ const Landing = () => {
                     </div>
                 </section>
 
-                {/* Feature Showcase 2: Suivi (Image Left, Text Right) */}
                 <section className="max-w-7xl mx-auto px-6 md:px-12 mb-40 flex flex-col md:flex-row-reverse items-center gap-16">
                     <div className="flex-1 space-y-8">
                         <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/5 border border-white/10 text-[11px] font-bold uppercase tracking-widest text-grey-light">
@@ -171,7 +140,6 @@ const Landing = () => {
                     </div>
                 </section>
 
-                {/* Feature Showcase 3: Activities (Centered) */}
                 <section className="max-w-5xl mx-auto px-6 md:px-12 mb-40 text-center">
                     <div className="mb-16 space-y-6">
                         <h2 className="text-4xl md:text-6xl font-semibold text-white tracking-tight">
@@ -189,7 +157,6 @@ const Landing = () => {
                     </div>
                 </section>
 
-                {/* Trust / Reviews (Apple style quotes) */}
                 <section className="mb-40 py-20 border-y border-white/5 bg-white/[0.02]">
                     <div className="max-w-7xl mx-auto px-6 text-center">
                         <div className="grid md:grid-cols-3 gap-12">
@@ -210,11 +177,9 @@ const Landing = () => {
                     </div>
                 </section>
 
-                {/* CTA Section */}
                 <section className="max-w-6xl mx-auto px-6 mb-20">
                     <div className="bg-gradient-to-br from-surface to-background p-16 md:p-28 rounded-[4rem] border border-border text-center relative overflow-hidden group shadow-[0_0_100px_rgba(0,0,0,0.5)]">
 
-                        {/* Interactive blobs */}
                         <div className="absolute top-0 left-0 w-full h-full opacity-30 group-hover:opacity-60 transition-opacity duration-1000">
                             <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-primary/20 rounded-full blur-[120px] animate-pulse-slow"></div>
                             <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-primary/30 rounded-full blur-[120px] animate-pulse-slow delay-1000"></div>

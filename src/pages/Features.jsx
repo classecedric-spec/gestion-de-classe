@@ -6,6 +6,7 @@ import {
     ChevronLeft, Sparkles, Activity
 } from 'lucide-react';
 import Footer from '../components/Footer';
+import PublicHeader from '../components/PublicHeader';
 
 const Features = () => {
     const featuresList = [
@@ -49,16 +50,7 @@ const Features = () => {
 
     return (
         <div className="min-h-screen bg-background text-text-main font-sans selection:bg-primary/30">
-            {/* Header / Nav */}
-            <header className="h-20 flex items-center justify-between px-6 md:px-12 border-b border-border bg-background/50 backdrop-blur-md sticky top-0 z-50">
-                <Link to="/" className="flex items-center gap-3 hover:scale-105 transition-transform">
-                    <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center text-text-dark font-black">G</div>
-                    <span className="text-sm font-black uppercase tracking-widest text-white italic">Gestion<span className="text-primary not-italic">Classe</span></span>
-                </Link>
-                <Link to="/login" className="px-5 py-2 bg-primary text-text-dark rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-white transition-all shadow-lg shadow-primary/10">
-                    Se Connecter
-                </Link>
-            </header>
+            <PublicHeader solidBackground />
 
             <main className="max-w-7xl mx-auto px-6 py-24">
                 {/* Hero */}

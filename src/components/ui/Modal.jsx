@@ -28,7 +28,14 @@ const Modal = ({ isOpen, onClose, title, icon, children, footer, className, noPa
                     <h2 className="text-2xl font-bold text-text-main flex items-center gap-3">
                         {icon && (
                             <div className="p-2 rounded-lg bg-primary/20 text-primary">
-                                {icon}
+                                {React.isValidElement(icon) ? (
+                                    icon
+                                ) : (
+                                    (() => {
+                                        const Icon = icon;
+                                        return <Icon size={24} />;
+                                    })()
+                                )}
                             </div>
                         )}
                         {title}

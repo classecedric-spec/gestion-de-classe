@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import PropTypes from 'prop-types';
 import { Folder, Search, Plus, Edit, X, ChevronDown, Loader2 } from 'lucide-react';
 import clsx from 'clsx';
@@ -44,6 +44,18 @@ const ModuleListSidebar = ({
     onAddModule,
     loading
 }) => {
+    const itemRefs = useRef({});
+
+    // Auto-scroll to selected module
+    useEffect(() => {
+        if (selectedModule && itemRefs.current[selectedModule.id]) {
+            itemRefs.current[selectedModule.id].scrollIntoView({
+                behavior: 'smooth',
+                block: 'nearest'
+            });
+        }
+    }, [selectedModule, filteredModules]);
+
     return (
         <div className="w-1/3 flex flex-col bg-surface/30 backdrop-blur-md rounded-2xl border border-white/5 overflow-hidden shadow-xl min-w-[300px]">
             {/* Header & Search */}
@@ -132,113 +144,120 @@ const ModuleListSidebar = ({
             </div>
 
             {/* List */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-2 custom-scrollbar">
-                {loading ? (
+            <div className="flex-1 overflow-y-auto p-4 space-y-2 custom-scrollbar relative">
+                {loading && filteredModules.length === 0 && (
                     <div className="flex justify-center p-8"><Loader2 className="animate-spin text-primary" /></div>
-                ) : filteredModules.length === 0 ? (
+                )}
+
+                {!loading && filteredModules.length === 0 && (
                     <div className="text-center p-8 text-grey-medium italic">Aucun module trouvé.</div>
-                ) : (
-                    filteredModules.map((module) => {
-                        const isExpired = module.date_fin && new Date(module.date_fin) < new Date();
-                        return (
-                            <div
-                                key={module.id}
-                                onClick={() => onModuleSelect(module)}
-                                className={clsx(
-                                    "w-full flex items-center gap-4 p-3 rounded-xl transition-all border text-left group relative hover:z-50 cursor-pointer overflow-hidden backdrop-blur-sm",
-                                    selectedModule?.id === module.id
-                                        ? clsx("selected-state", isExpired && "!border-danger")
-                                        : (isExpired ? "bg-surface/50 border-danger/40 hover:border-danger/60" : "bg-surface/50 border-transparent hover:border-white/10 hover:bg-surface")
-                                )}
-                                role="button"
-                                tabIndex={0}
-                                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') onModuleSelect(module); }}
-                            >
-                                <div className={clsx(
-                                    "w-10 h-10 rounded-lg flex items-center justify-center text-lg font-bold shadow-inner overflow-hidden shrink-0",
-                                    selectedModule?.id === module.id
-                                        ? "bg-white/20 text-inherit"
-                                        : "bg-background text-primary"
-                                )}>
-                                    <Folder size={20} />
-                                </div>
-                                <div className="flex-1 min-w-0 flex flex-col gap-1">
-                                    {/* Line 1: Module Name + Date */}
-                                    <div className="flex items-center justify-between gap-2 overflow-hidden">
-                                        <h3 className={clsx(
-                                            "font-bold truncate text-[13px] leading-tight flex-1",
-                                            selectedModule?.id === module.id ? "text-text-dark" : "text-text-main"
-                                        )}>
-                                            {module.nom}
-                                        </h3>
-                                        {module.date_fin && (
-                                            <span className={clsx(
-                                                "font-bold text-[10px] shrink-0",
-                                                isExpired
-                                                    ? (selectedModule?.id === module.id ? "text-white" : "text-danger")
-                                                    : (selectedModule?.id === module.id ? "text-text-dark/70" : "text-white/60")
-                                            )}>
-                                                {new Date(module.date_fin).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' })}
-                                            </span>
-                                        )}
-                                    </div>
+                )}
 
-                                    {/* Line 2: Progress Bar + Branch Info */}
-                                    <div className="flex flex-col gap-1.5">
-                                        <div className="w-full h-1.5 rounded-full bg-black/20 overflow-hidden">
-                                            <div
-                                                className={clsx(
-                                                    "h-full transition-all duration-500 ease-out",
-                                                    isExpired ? (selectedModule?.id === module.id ? "bg-white" : "bg-danger") : "bg-success"
-                                                )}
-                                                style={{ width: `${module.percent || 0}%` }}
-                                            />
-                                        </div>
-                                        <div className={clsx(
-                                            "flex items-center gap-2 text-[10px] truncate",
-                                            selectedModule?.id === module.id ? "text-text-dark/70" : "text-grey-medium"
-                                        )}>
-                                            <span className="truncate opacity-80" title={`${module.SousBranche?.Branche?.nom} > ${module.SousBranche?.nom}`}>
-                                                {module.SousBranche?.Branche?.nom} - {module.SousBranche?.nom}
-                                            </span>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div className={clsx(
-                                    "flex gap-1 transition-opacity",
-                                    selectedModule?.id === module.id ? "opacity-100" : "opacity-0 group-hover:opacity-100"
-                                )}>
-                                    <div
-                                        onClick={(e) => { e.stopPropagation(); onEdit(module); }}
-                                        className={clsx(
-                                            "p-1.5 rounded-lg transition-colors cursor-pointer",
-                                            selectedModule?.id === module.id
-                                                ? "text-text-dark/70 hover:text-text-dark hover:bg-text-dark/10"
-                                                : "text-grey-medium hover:text-white hover:bg-white/10"
-                                        )}
-                                        title="Modifier"
-                                    >
-                                        <Edit size={14} />
-                                    </div>
-                                </div>
-
-                                {/* Delete Button */}
-                                <button
-                                    onClick={(e) => { e.stopPropagation(); onDelete(module); }}
-                                    className="absolute -top-2 -right-2 z-10 p-2 bg-danger/10 hover:bg-danger text-danger hover:text-white rounded-full border border-danger/20 opacity-0 group-hover:opacity-100 transition-all shadow-lg scale-90 hover:scale-100"
-                                    title="Supprimer le module"
+                {filteredModules.length > 0 && (
+                    <div className={clsx("space-y-2", loading && "opacity-50 pointer-events-none")}>
+                        {filteredModules.map((module) => {
+                            const isExpired = module.date_fin && new Date(module.date_fin) < new Date();
+                            return (
+                                <div
+                                    key={module.id}
+                                    ref={el => itemRefs.current[module.id] = el}
+                                    onClick={() => onModuleSelect(module)}
+                                    className={clsx(
+                                        "w-full flex items-center gap-4 p-3 rounded-xl transition-all border text-left group relative hover:z-50 cursor-pointer overflow-hidden backdrop-blur-sm",
+                                        selectedModule?.id === module.id
+                                            ? clsx("selected-state", isExpired && "!border-danger")
+                                            : (isExpired ? "bg-surface/50 border-danger/40 hover:border-danger/60" : "bg-surface/50 border-transparent hover:border-white/10 hover:bg-surface")
+                                    )}
+                                    role="button"
+                                    tabIndex={0}
+                                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') onModuleSelect(module); }}
                                 >
-                                    <X size={14} strokeWidth={3} />
-                                </button>
+                                    <div className={clsx(
+                                        "w-10 h-10 rounded-lg flex items-center justify-center text-lg font-bold shadow-inner overflow-hidden shrink-0",
+                                        selectedModule?.id === module.id
+                                            ? "bg-white/20 text-inherit"
+                                            : "bg-background text-primary"
+                                    )}>
+                                        <Folder size={20} />
+                                    </div>
+                                    <div className="flex-1 min-w-0 flex flex-col gap-1">
+                                        {/* Line 1: Module Name + Date */}
+                                        <div className="flex items-center justify-between gap-2 overflow-hidden">
+                                            <h3 className={clsx(
+                                                "font-bold truncate text-[13px] leading-tight flex-1",
+                                                selectedModule?.id === module.id ? "text-text-dark" : "text-text-main"
+                                            )}>
+                                                {module.nom}
+                                            </h3>
+                                            {module.date_fin && (
+                                                <span className={clsx(
+                                                    "font-bold text-[10px] shrink-0",
+                                                    isExpired
+                                                        ? (selectedModule?.id === module.id ? "text-white" : "text-danger")
+                                                        : (selectedModule?.id === module.id ? "text-text-dark/70" : "text-white/60")
+                                                )}>
+                                                    {new Date(module.date_fin).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' })}
+                                                </span>
+                                            )}
+                                        </div>
 
-                                <ChevronRight size={16} className={clsx(
-                                    "transition-transform",
-                                    selectedModule?.id === module.id ? "text-text-dark translate-x-1" : "text-grey-dark group-hover:translate-x-1"
-                                )} />
-                            </div>
-                        );
-                    })
+                                        {/* Line 2: Progress Bar + Branch Info */}
+                                        <div className="flex flex-col gap-1.5">
+                                            <div className="w-full h-1.5 rounded-full bg-black/20 overflow-hidden">
+                                                <div
+                                                    className={clsx(
+                                                        "h-full transition-all duration-500 ease-out",
+                                                        isExpired ? (selectedModule?.id === module.id ? "bg-white" : "bg-danger") : "bg-success"
+                                                    )}
+                                                    style={{ width: `${module.percent || 0}%` }}
+                                                />
+                                            </div>
+                                            <div className={clsx(
+                                                "flex items-center gap-2 text-[10px] truncate",
+                                                selectedModule?.id === module.id ? "text-text-dark/70" : "text-grey-medium"
+                                            )}>
+                                                <span className="truncate opacity-80" title={`${module.SousBranche?.Branche?.nom} > ${module.SousBranche?.nom}`}>
+                                                    {module.SousBranche?.Branche?.nom} - {module.SousBranche?.nom}
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div className={clsx(
+                                        "flex gap-1 transition-opacity",
+                                        selectedModule?.id === module.id ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+                                    )}>
+                                        <div
+                                            onClick={(e) => { e.stopPropagation(); onEdit(module); }}
+                                            className={clsx(
+                                                "p-1.5 rounded-lg transition-colors cursor-pointer",
+                                                selectedModule?.id === module.id
+                                                    ? "text-text-dark/70 hover:text-text-dark hover:bg-text-dark/10"
+                                                    : "text-grey-medium hover:text-white hover:bg-white/10"
+                                            )}
+                                            title="Modifier"
+                                        >
+                                            <Edit size={14} />
+                                        </div>
+                                    </div>
+
+                                    {/* Delete Button */}
+                                    <button
+                                        onClick={(e) => { e.stopPropagation(); onDelete(module); }}
+                                        className="absolute -top-2 -right-2 z-10 p-2 bg-danger/10 hover:bg-danger text-danger hover:text-white rounded-full border border-danger/20 opacity-0 group-hover:opacity-100 transition-all shadow-lg scale-90 hover:scale-100"
+                                        title="Supprimer le module"
+                                    >
+                                        <X size={14} strokeWidth={3} />
+                                    </button>
+
+                                    <ChevronRight size={16} className={clsx(
+                                        "transition-transform",
+                                        selectedModule?.id === module.id ? "text-text-dark translate-x-1" : "text-grey-dark group-hover:translate-x-1"
+                                    )} />
+                                </div>
+                            );
+                        })}
+                    </div>
                 )}
             </div>
 

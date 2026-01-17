@@ -4,7 +4,7 @@ import clsx from 'clsx';
 
 // Modals
 import AddModuleModal from '../../components/AddModuleModal';
-import AddActivityModal from '../../components/AddActivityModal';
+import AddActivityModal from '../../features/activities/components/AddActivityModal';
 import CreateActivitySeriesModal from '../../components/CreateActivitySeriesModal';
 
 // Hooks
@@ -122,7 +122,6 @@ const Modules = () => {
                         <ModuleHeader
                             module={moduleHook.states.selectedModule}
                             onToggleStatus={moduleHook.actions.toggleStatus}
-                            onCreateSeries={() => setIsCreateSeriesModalOpen(true)}
                         />
 
                         {/* Content Section - Tabs */}
@@ -137,6 +136,7 @@ const Modules = () => {
                                     onDragEnd={activityHook.actions.handleDragEnd}
                                     onEditActivity={handleEditActivity}
                                     onAddActivity={handleAddActivity}
+                                    onCreateSeries={() => setIsCreateSeriesModalOpen(true)}
                                 />
                             ) : detailTab === 'groups' ? (
                                 <GroupsTab
