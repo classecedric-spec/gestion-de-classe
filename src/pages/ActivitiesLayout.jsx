@@ -1,20 +1,14 @@
 import React from 'react';
 import { Outlet, NavLink, useLocation } from 'react-router-dom';
-import { Folder, FileText, Settings, Layers, GitBranch, Globe, Package } from 'lucide-react';
 import clsx from 'clsx';
+import { ACTIVITIES_TABS } from '../config/navigation';
 
 const ActivitiesLayout = () => {
     const location = useLocation();
 
     // The user requested buttons for "Module" and "Activité".
     // I am adding placeholders for potential future tabs as well to match the 'User' layout style.
-    const tabs = [
-        { id: 'modules', label: 'Modules', path: '/dashboard/activities/modules', icon: Folder },
-        { id: 'activities', label: 'Activités', path: '/dashboard/activities/list', icon: FileText },
-        { id: 'branches', label: 'Branches', path: '/dashboard/activities/branches', icon: GitBranch },
-        { id: 'sub-branches', label: 'Sous-branches', path: '/dashboard/activities/sub-branches', icon: Layers },
-        { id: 'materiels', label: 'Matériel', path: '/dashboard/activities/materiels', icon: Package },
-    ];
+    const tabs = ACTIVITIES_TABS;
 
     return (
         <div className="h-full flex flex-col overflow-hidden">

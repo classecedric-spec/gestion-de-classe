@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabaseClient';
 import { useNavigate } from 'react-router-dom';
+import { ROUTES } from '../routes';
 import { Mail, Lock, User, ArrowRight, Loader2, Database, Copy, Check, Eye, EyeOff } from 'lucide-react';
 import { checkDatabaseSetup, SETUP_SQL } from '../lib/databaseSetup';
 import { isMobilePhone } from '../lib/utils';
+import { toast } from 'react-hot-toast';
 
 const Auth = () => {
     const [isSignUp, setIsSignUp] = useState(false);
@@ -17,7 +19,7 @@ const Auth = () => {
     const [message, setMessage] = useState(null);
     const [isForgotPassword, setIsForgotPassword] = useState(false);
     const [dbStatus, setDbStatus] = useState({ checked: false, exists: true, errorType: null, rawError: null });
-    const [copied, setCopied] = useState(false);
+
     const navigate = useNavigate();
 
 
@@ -41,8 +43,7 @@ const Auth = () => {
 
     const copySQL = () => {
         navigator.clipboard.writeText(SETUP_SQL);
-        setCopied(true);
-        setTimeout(() => setCopied(false), 2000);
+        toast.success("SQL copié !");
     };
 
     const handleAuth = async (e) => {
@@ -57,9 +58,11 @@ const Auth = () => {
                     redirectTo: `${window.location.origin}/dashboard/settings?tab=profil`,
                 });
                 if (resetError) throw resetError;
-                setMessage('Un lien de réinitialisation a été envoyé à votre adresse email.');
+                const msg = 'Un lien de réinitialisation a été envoyé à votre adresse email.';
+                setMessage(msg);
+                toast.success(msg);
             } else if (isSignUp) {
-                const { data, error: signUpError } = await supabase.auth.signUp({
+                const { error: signUpError } = await supabase.auth.signUp({
                     email,
                     password,
                     options: {
@@ -69,16 +72,20 @@ const Auth = () => {
                     },
                 });
                 if (signUpError) throw signUpError;
-                setMessage('Vérifiez votre boîte mail pour confirmer votre inscription !');
+                const msg = 'Vérifiez votre boîte mail pour confirmer votre inscription !';
+                setMessage(msg);
+                toast.success(msg);
             } else {
                 // Set the remember me flag for our custom storage handler in supabaseClient.js
                 localStorage.setItem('sb-remember-me', rememberMe ? 'true' : 'false');
 
-                const { data, error: signInError } = await supabase.auth.signInWithPassword({
+                const { error: signInError } = await supabase.auth.signInWithPassword({
                     email,
                     password,
                 });
                 if (signInError) throw signInError;
+
+                toast.success("Connexion réussie");
 
                 // Redirect based on device type
                 if (isMobilePhone()) {
@@ -89,6 +96,7 @@ const Auth = () => {
             }
         } catch (err) {
             setError(err.message);
+            toast.error(err.message || "Erreur d'authentification");
         } finally {
             setLoading(false);
         }

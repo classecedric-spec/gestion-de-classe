@@ -1,19 +1,13 @@
 import React from 'react';
 import { Outlet, NavLink, useLocation, useOutletContext } from 'react-router-dom';
-import { GraduationCap, Layers, BookOpen, User, Activity } from 'lucide-react';
 import clsx from 'clsx';
+import { USER_MANAGEMENT_TABS } from '../config/navigation';
 
 const UserManagement = () => {
     const location = useLocation();
     const { pendingValidation } = useOutletContext() || {};
 
-    const tabs = [
-        { id: 'groups', label: 'Groupes', path: '/dashboard/user/groups', icon: Layers },
-        { id: 'classes', label: 'Classes', path: '/dashboard/user/classes', icon: BookOpen },
-        { id: 'students', label: 'Élèves', path: '/dashboard/user/students', icon: GraduationCap },
-        { id: 'niveaux', label: 'Niveaux', path: '/dashboard/user/niveaux', icon: Layers },
-        { id: 'adults', label: 'Adultes', path: '/dashboard/user/adults', icon: User },
-    ];
+    const tabs = USER_MANAGEMENT_TABS;
 
     return (
         <div className="h-full flex flex-col overflow-hidden">

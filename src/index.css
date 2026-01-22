@@ -175,8 +175,8 @@
   [data-theme="glass"] .bg-surface,
   [data-theme="glass"] .neu-surface {
     background: rgba(255, 255, 255, 0.12);
-    backdrop-filter: blur(40px) saturate(150%);
     -webkit-backdrop-filter: blur(40px) saturate(150%);
+    backdrop-filter: blur(40px) saturate(150%);
     border: 1px solid rgba(255, 255, 255, 0.2);
     box-shadow:
       0 10px 40px -10px rgba(0, 0, 0, 0.5),
@@ -188,6 +188,7 @@
   [data-theme="glass"] select,
   [data-theme="glass"] textarea {
     background: rgba(0, 0, 0, 0.3);
+    -webkit-backdrop-filter: blur(10px);
     backdrop-filter: blur(10px);
     border: 1px solid rgba(255, 255, 255, 0.1);
     color: #ffffff;
@@ -196,6 +197,7 @@
 
   [data-theme="glass"] .neu-selector-container {
     background: rgba(0, 0, 0, 0.3);
+    -webkit-backdrop-filter: blur(20px);
     backdrop-filter: blur(20px);
     border: 1px solid rgba(255, 255, 255, 0.1);
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
@@ -340,6 +342,7 @@
   [data-theme="light"] .neu-selector-container,
   [data-theme="glass"] .neu-selector-container {
     background: rgba(255, 255, 255, 0.3);
+    -webkit-backdrop-filter: blur(8px);
     backdrop-filter: blur(8px);
     border: 1px solid rgba(255, 255, 255, 0.2);
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
@@ -402,4 +405,15 @@
       var(--neu-distance) var(--neu-distance) var(--neu-blur) var(--neu-shadow-dark),
       calc(-1 * var(--neu-distance)) calc(-1 * var(--neu-distance)) var(--neu-blur) var(--neu-shadow-light);
   }
+}
+
+/* Global focus-visible style for keyboard navigation */
+:focus-visible {
+  outline: 3px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+a:focus-visible {
+  outline: 3px solid var(--color-primary);
+  outline-offset: 2px;
 }

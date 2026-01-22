@@ -1,16 +1,44 @@
-# React + Vite
+# Gestion de Classe - Application Enseignant
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Application web pour aider les enseignants à gérer leur classe, suivre les activités des élèves et gérer les présences.
 
-Currently, two official plugins are available:
+## 🚀 Démarrage Rapide
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+### Prérequis
 
-## React Compiler
+- Node.js (v18+)
+- npm
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+### Installation
 
-## Expanding the ESLint configuration
+1. Cloner le dépôt (si applicable)
+2. Installer les dépendances :
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+   ```bash
+   npm install
+   ```
+
+### Lancer le serveur de développement
+
+```bash
+npm run dev
+```
+
+L'application sera accessible sur `http://localhost:5173`.
+
+## 🛠 Technologies
+
+- **Frontend** : React, Vite, Tailwind CSS v4
+- **Backend** : Supabase (PostgreSQL, Auth)
+- **Tests** : Vitest
+
+## 🏗 Architecture
+
+Pour une vue détaillée de l'architecture technique et des flux de données, consultez le fichier [ARCHITECTURE.md](./ARCHITECTURE.md).
+
+## 📂 Structure du Projet
+
+- **`src/pages`** : Contient les vues principales (Dashboard, Suivi, Auth...).
+- **`src/components`** : Composants UI réutilisables (Boutons, Modales, Layout...).
+- **`src/hooks`** : Logique métier encapsulée (gestion des modules, élèves...).
+- **`src/lib`** : Configuration Supabase et utilitaires.

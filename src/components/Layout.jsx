@@ -6,28 +6,24 @@ import { cleanupOrphanProgressions } from '../lib/cleanupUtils';
 import { toast } from 'react-hot-toast';
 import {
     LayoutDashboard,
-    Users,
-    GraduationCap,
-    Puzzle,
     Settings,
     LogOut,
     ChevronLeft,
     Menu,
     Loader2,
     Calendar as CalendarIcon,
-    Home,
     User,
-    Clock,
-    Flame,
-    Smartphone,
-    ShieldCheck, UserCheck,
-    Monitor,
+    ShieldCheck,
     Download
 } from 'lucide-react';
 import clsx from 'clsx';
+import { ROUTES } from '../routes';
+import { MAIN_NAV_ITEMS } from '../config/navigation';
+
 
 const Layout = () => {
-    const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+
+    const [isSidebarOpen, setIsSidebarOpen] = useState(window.innerWidth >= 768);
     const [session, setSession] = useState(null);
     const [loading, setLoading] = useState(true);
     const [profileIncomplete, setProfileIncomplete] = useState(false);
@@ -43,6 +39,20 @@ const Layout = () => {
         };
         window.addEventListener('beforeinstallprompt', handler);
         return () => window.removeEventListener('beforeinstallprompt', handler);
+    }, []);
+
+    // Handle window resize
+    useEffect(() => {
+        const handleResize = () => {
+            if (window.innerWidth < 768) {
+                setIsSidebarOpen(false);
+            } else {
+                setIsSidebarOpen(true);
+            }
+        };
+
+        window.addEventListener('resize', handleResize);
+        return () => window.removeEventListener('resize', handleResize);
     }, []);
 
     const handleInstallClick = async () => {
@@ -129,19 +139,7 @@ const Layout = () => {
         navigate('/login');
     };
 
-    const navItems = [
-        { icon: Home, label: 'Accueil', path: '/dashboard' },
-        { type: 'separator' },
-        { icon: UserCheck, label: 'Présence', path: '/dashboard/presence' },
-        { icon: GraduationCap, label: 'Suivi Global', path: '/dashboard/suivi' },
-        { type: 'separator' },
-        { icon: Users, label: 'Utilisateurs', path: '/dashboard/user' },
-        { icon: Puzzle, label: 'Activités', path: '/dashboard/activities' },
-        { type: 'separator' },
-        { icon: Smartphone, label: 'Suivi Mobile', path: '/mobile-suivi', isExternal: true },
-        { type: 'separator' },
-        { icon: Settings, label: 'Paramètres', path: '/dashboard/settings' },
-    ];
+    const navItems = MAIN_NAV_ITEMS;
 
     // Filter nav items if not logged in OR if pending admin validation
     const displayedNavItems = session
