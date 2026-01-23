@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Folder, Trash2, Check, AlertCircle, X } from 'lucide-react';
 import clsx from 'clsx';
-import { ModuleWithRelations } from './utils/moduleHelpers';
+
 
 // Modals
 import AddModuleModal from '../../components/AddModuleModal';
@@ -24,56 +24,52 @@ import ActivitiesTab from './components/ActivitiesTab';
 import GroupsTab from './components/GroupsTab';
 import ProgressionKanban from './components/ProgressionKanban';
 
-// Define explicit types for untyped hooks to avoid implicit any errors during strict mode
-// In a full migration, these hooks would be converted to TS first.
 const Modules: React.FC = () => {
     // Notifications
-    const { notification, showNotification, dismissNotification } = useNotifications() as any;
+    const { notification, showNotification, dismissNotification } = useNotifications();
 
     // Module Management
-    // Explicitly typed return from the TS hook
     const moduleHook = useModuleManagement();
 
     // Tabs & Modals
-    const [detailTab, setDetailTab] = useState<string>('activities');
+    const [detailTab, setDetailTab] = useState<'activities' | 'groups' | 'progression'>('activities');
     const [isAddModalOpen, setIsAddModalOpen] = useState<boolean>(false);
     const [isAddActivityModalOpen, setIsAddActivityModalOpen] = useState<boolean>(false);
     const [isCreateSeriesModalOpen, setIsCreateSeriesModalOpen] = useState<boolean>(false);
 
     // Activity Management
-    // Cast to expected interface since file is JS
     const activityHook = useActivityManagement(
-        (moduleHook.states.selectedModule || {}) as any,
-        moduleHook.actions.setModules as any,
-        moduleHook.actions.setSelectedModule as any
-    ) as any;
+        moduleHook.states.selectedModule,
+        moduleHook.actions.setModules,
+        moduleHook.actions.setSelectedModule
+    );
 
     // Group Selection
-    const groupHook = useGroupSelection(detailTab) as any;
+    const groupHook = useGroupSelection(detailTab);
 
     // Progression Generation
     const progressionGenHook = useProgressionGeneration(
         showNotification,
         groupHook.actions.setSelectedGroups,
-        setDetailTab
-    ) as any;
+        setDetailTab as any
+    );
 
     // Progression Tracking
     const progressionHook = useProgressionTracking(
         detailTab,
         activityHook.states.moduleActivities,
-        (moduleHook.states.selectedModule || {}) as any,
-        moduleHook.actions.setModules as any,
+        moduleHook.states.selectedModule,
+        moduleHook.actions.setModules,
         activityHook.actions.setStats
-    ) as any;
+    );
 
     // Handlers
-    const handleModuleSelect = (module: ModuleWithRelations) => {
+    const handleModuleSelect = (module: any) => {
         moduleHook.actions.setSelectedModule(module);
         setDetailTab('activities');
     };
 
-    const handleEdit = (module: ModuleWithRelations) => {
+    const handleEdit = (module: any) => {
         moduleHook.actions.setModuleToEdit(module);
         setIsAddModalOpen(true);
     };
@@ -92,7 +88,7 @@ const Modules: React.FC = () => {
         await moduleHook.actions.fetchModules();
         if (moduleHook.states.selectedModule) {
             const updated = moduleHook.states.modules.find(m => m.id === moduleHook.states.selectedModule?.id);
-            if (updated) moduleHook.actions.setSelectedModule(updated);
+            if (updated) moduleHook.actions.setSelectedModule(updated as any);
         }
     };
 
@@ -113,7 +109,6 @@ const Modules: React.FC = () => {
                 availableBranches={moduleHook.states.availableBranches}
                 availableSubBranches={moduleHook.states.availableSubBranches}
                 onModuleSelect={handleModuleSelect}
-                // @ts-ignore - Component might expect different type during transition
                 onEdit={handleEdit}
                 onDelete={moduleHook.actions.setModuleToDelete}
                 onAddModule={() => setIsAddModalOpen(true)}
@@ -140,7 +135,6 @@ const Modules: React.FC = () => {
                                 <ActivitiesTab
                                     activities={activityHook.states.moduleActivities}
                                     onDragEnd={activityHook.actions.handleDragEnd}
-                                    // @ts-ignore
                                     onEditActivity={handleEditActivity}
                                     onAddActivity={handleAddActivity}
                                     onCreateSeries={() => setIsCreateSeriesModalOpen(true)}
@@ -184,7 +178,7 @@ const Modules: React.FC = () => {
                 isOpen={isAddModalOpen}
                 onClose={() => { setIsAddModalOpen(false); moduleHook.actions.setModuleToEdit(null); }}
                 onAdded={moduleHook.actions.handleCreated}
-                moduleToEdit={moduleHook.states.moduleToEdit}
+                moduleToEdit={moduleHook.states.moduleToEdit as any}
             />
 
             {/* Add Activity Modal */}
@@ -192,9 +186,9 @@ const Modules: React.FC = () => {
                 isOpen={isAddActivityModalOpen}
                 onClose={() => setIsAddActivityModalOpen(false)}
                 onAdded={handleActivityAdded}
-                activityToEdit={activityHook.states.activityToEdit}
-                defaultModuleId={moduleHook.states.selectedModule?.id}
-                defaultModuleName={moduleHook.states.selectedModule?.titre || moduleHook.states.selectedModule?.['nom'] || ''}
+                activityToEdit={activityHook.states.activityToEdit as any}
+                defaultModuleId={moduleHook.states.selectedModule?.id || ''}
+                defaultModuleName={moduleHook.states.selectedModule?.titre || ''}
                 nextOrder={activityHook.states.moduleActivities?.length > 0
                     ? Math.max(...activityHook.states.moduleActivities.map((a: any) => a.ordre || 0)) + 1
                     : 0}
@@ -247,7 +241,7 @@ const Modules: React.FC = () => {
                         </div>
                         <h2 className="text-xl font-bold text-text-main mb-2">Supprimer le module ?</h2>
                         <p className="text-sm text-grey-medium mb-6">
-                            Êtes-vous sûr de vouloir supprimer le module <span className="text-white font-bold">"{moduleHook.states.moduleToDelete.titre || moduleHook.states.moduleToDelete['nom']}"</span> ?
+                            Êtes-vous sûr de vouloir supprimer le module <span className="text-white font-bold">"{moduleHook.states.moduleToDelete.titre}"</span> ?
                             <br />Cette action est irréversible.
                         </p>
                         <div className="flex gap-3">

@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
 import { Camera, X, LucideIcon, Layers } from 'lucide-react';
 import clsx from 'clsx';
-import { resizeAndConvertToBase64 } from '../../lib/imageUtils';
-import { compressImage } from '../../lib/imageCompression';
-import { uploadImageToStorage } from '../../lib/storageUtils';
+import { resizeAndConvertToBase64 } from '../../lib/storage';
+import { compressImage } from '../../lib/storage';
+import { uploadImageToStorage } from '../../lib/storage';
 import { toast } from 'sonner';
 
 export interface ImageUploadProps {

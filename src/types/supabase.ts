@@ -18,7 +18,7 @@ export interface Database {
                     nombre_erreurs: number | null
                     nombre_exercices: number | null
                     ordre: number | null
-                    photo_base64: string | null
+
                     statut_exigence: string | null
                     titre: string
                     updated_at: string | null
@@ -32,7 +32,7 @@ export interface Database {
                     nombre_erreurs?: number | null
                     nombre_exercices?: number | null
                     ordre?: number | null
-                    photo_base64?: string | null
+
                     statut_exigence?: string | null
                     titre: string
                     updated_at?: string | null
@@ -46,7 +46,7 @@ export interface Database {
                     nombre_erreurs?: number | null
                     nombre_exercices?: number | null
                     ordre?: number | null
-                    photo_base64?: string | null
+
                     statut_exigence?: string | null
                     titre?: string
                     updated_at?: string | null
@@ -184,7 +184,7 @@ export interface Database {
                     id: string
                     logo_url: string | null
                     nom: string
-                    photo_base64: string | null
+
                     updated_at: string | null
                     user_id: string | null
                 }
@@ -194,7 +194,7 @@ export interface Database {
                     id?: string
                     logo_url?: string | null
                     nom: string
-                    photo_base64?: string | null
+
                     updated_at?: string | null
                     user_id?: string | null
                 }
@@ -203,7 +203,7 @@ export interface Database {
                     created_at?: string
                     id?: string
                     nom?: string
-                    photo_base64?: string | null
+
                     updated_at?: string | null
                     user_id?: string | null
                 }
@@ -242,7 +242,7 @@ export interface Database {
                     groupe_id: string | null
                     id: string
                     nom: string
-                    photo_base64: string | null
+
                     prenom: string
                     sex: string | null
                     updated_at: string | null
@@ -266,7 +266,7 @@ export interface Database {
                     groupe_id?: string | null
                     id?: string
                     nom: string
-                    photo_base64?: string | null
+
                     prenom: string
                     sex?: string | null
                     updated_at?: string | null
@@ -290,7 +290,7 @@ export interface Database {
                     groupe_id?: string | null
                     id?: string
                     nom?: string
-                    photo_base64?: string | null
+
                     prenom?: string
                     sex?: string | null
                     updated_at?: string | null
@@ -367,6 +367,9 @@ export interface Database {
                     created_at: string
                     id: string
                     nom: string
+                    acronyme: string | null
+                    photo_url: string | null
+                    ordre: number | null
                     updated_at: string | null
                     user_id: string | null
                 }
@@ -374,6 +377,9 @@ export interface Database {
                     created_at?: string
                     id?: string
                     nom: string
+                    acronyme?: string | null
+                    photo_url?: string | null
+                    ordre?: number | null
                     updated_at?: string | null
                     user_id?: string | null
                 }
@@ -381,6 +387,9 @@ export interface Database {
                     created_at?: string
                     id?: string
                     nom?: string
+                    acronyme?: string | null
+                    photo_url?: string | null
+                    ordre?: number | null
                     updated_at?: string | null
                     user_id?: string | null
                 }
@@ -522,7 +531,7 @@ export interface Database {
                     id: string
                     nom: string
                     ordre: number | null
-                    photo_base64: string | null
+
                     photo_url: string | null
                     updated_at: string | null
                     user_id: string | null
@@ -533,7 +542,7 @@ export interface Database {
                     id?: string
                     nom: string
                     ordre?: number | null
-                    photo_base64?: string | null
+
                     photo_url?: string | null
                     updated_at?: string | null
                     user_id?: string | null
@@ -544,7 +553,7 @@ export interface Database {
                     id?: string
                     nom?: string
                     ordre?: number | null
-                    photo_base64?: string | null
+
                     photo_url?: string | null
                     updated_at?: string | null
                     user_id?: string | null
@@ -555,18 +564,21 @@ export interface Database {
                 Row: {
                     id: string
                     nom: string
+                    acronyme: string | null
                     created_at: string
                     user_id: string | null
                 }
                 Insert: {
                     id?: string
                     nom: string
+                    acronyme?: string | null
                     created_at?: string
                     user_id?: string | null
                 }
                 Update: {
                     id?: string
                     nom?: string
+                    acronyme?: string | null
                     created_at?: string
                     user_id?: string | null
                 }
@@ -689,6 +701,10 @@ export interface Database {
                     email: string | null
                     nom: string | null
                     prenom: string | null
+                    nom_ecole: string | null
+                    photo_base64: string | null
+                    photo_url: string | null
+                    validation_admin: boolean | null
                     last_selected_group_id: string | null
                     created_at: string
                     updated_at: string | null
@@ -698,6 +714,10 @@ export interface Database {
                     email?: string | null
                     nom?: string | null
                     prenom?: string | null
+                    nom_ecole?: string | null
+                    photo_base64?: string | null
+                    photo_url?: string | null
+                    validation_admin?: boolean | null
                     last_selected_group_id?: string | null
                     created_at?: string
                     updated_at?: string | null
@@ -707,6 +727,10 @@ export interface Database {
                     email?: string | null
                     nom?: string | null
                     prenom?: string | null
+                    nom_ecole?: string | null
+                    photo_base64?: string | null
+                    photo_url?: string | null
+                    validation_admin?: boolean | null
                     last_selected_group_id?: string | null
                     created_at?: string
                     updated_at?: string | null
@@ -720,6 +744,13 @@ export interface Database {
                     week_start_date: string
                     day_of_week: string
                     activity_id: string
+                    activity_title?: string | null
+                    color_code?: string | null
+                    duration?: number | null
+                    period_index?: number | null
+                    matiere_principale?: string | null
+                    date_fin?: string | null
+                    niveaux?: string[] | null
                     created_at: string
                 }
                 Insert: {
@@ -727,7 +758,14 @@ export interface Database {
                     user_id: string
                     week_start_date: string
                     day_of_week: string
-                    activity_id: string
+                    activity_id?: string
+                    activity_title?: string | null
+                    color_code?: string | null
+                    duration?: number | null
+                    period_index?: number | null
+                    matiere_principale?: string | null
+                    date_fin?: string | null
+                    niveaux?: string[] | null
                     created_at?: string
                 }
                 Update: {
@@ -736,7 +774,95 @@ export interface Database {
                     week_start_date?: string
                     day_of_week?: string
                     activity_id?: string
+                    activity_title?: string | null
+                    color_code?: string | null
+                    duration?: number | null
+                    period_index?: number | null
+                    matiere_principale?: string | null
+                    date_fin?: string | null
+                    niveaux?: string[] | null
                     created_at?: string
+                }
+                Relationships: []
+            }
+            SuiviAdulte: {
+                Row: {
+                    id: string
+                    adulte_id: string
+                    activite_id: string
+                    user_id: string | null
+                    created_at: string
+                }
+                Insert: {
+                    id?: string
+                    adulte_id: string
+                    activite_id: string
+                    user_id?: string | null
+                    created_at?: string
+                }
+                Update: {
+                    id?: string
+                    adulte_id?: string
+                    activite_id?: string
+                    user_id?: string | null
+                    created_at?: string
+                }
+                Relationships: [
+                    {
+                        foreignKeyName: "SuiviAdulte_adulte_id_fkey"
+                        columns: ["adulte_id"]
+                        isOneToOne: false
+                        referencedRelation: "Adulte"
+                        referencedColumns: ["id"]
+                    },
+                    {
+                        foreignKeyName: "SuiviAdulte_activite_id_fkey"
+                        columns: ["activite_id"]
+                        isOneToOne: false
+                        referencedRelation: "TypeActiviteAdulte"
+                        referencedColumns: ["id"]
+                    }
+                ]
+            }
+            custom_activities: {
+                Row: {
+                    id: string
+                    title: string
+                    user_id: string
+                    created_at: string
+                }
+                Insert: {
+                    id?: string
+                    title: string
+                    user_id: string
+                    created_at?: string
+                }
+                Update: {
+                    id?: string
+                    title?: string
+                    user_id?: string
+                    created_at?: string
+                }
+                Relationships: []
+            }
+            TypeActiviteAdulte: {
+                Row: {
+                    id: string
+                    label: string
+                    created_at: string
+                    user_id: string | null
+                }
+                Insert: {
+                    id?: string
+                    label: string
+                    created_at?: string
+                    user_id?: string | null
+                }
+                Update: {
+                    id?: string
+                    label?: string
+                    created_at?: string
+                    user_id?: string | null
                 }
                 Relationships: []
             }

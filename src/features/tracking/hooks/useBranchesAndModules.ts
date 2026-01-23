@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
-import { supabase } from '../../../lib/supabaseClient';
-import { fetchWithCache } from '../../../lib/offline';
+import { fetchWithCache } from '../../../lib/sync';
 import { Student } from '../../attendance/services/attendanceService';
+import { branchService } from '../../branches/services/branchService';
+import { trackingService } from '../services/trackingService';
 
 export interface Branch {
     id: string;
@@ -82,13 +83,14 @@ export function useBranchesAndModules(
     const [activities, setActivities] = useState<Activity[]>([]);
     const [loadingActivities, setLoadingActivities] = useState(false);
 
+
+
     // Fetch branches
     const fetchBranches = async () => {
         await fetchWithCache(
             'branches',
             async () => {
-                const { data } = await supabase.from('Branche').select('id, nom, ordre').order('ordre');
-                return data || [];
+                return await branchService.fetchBranches();
             },
             setBranches
         );
@@ -99,21 +101,9 @@ export function useBranchesAndModules(
         await fetchWithCache(
             `group_progressions_${groupId}`,
             async () => {
-                const { data: rawData, error } = await supabase
-                    .from('Progression')
-                    .select(`
-                        eleve_id,
-                        etat,
-                        Activite (
-                            Module (
-                                SousBranche (
-                                    branche_id
-                                )
-                            )
-                        )
-                    `);
-                if (error) throw error;
-                return rawData || [];
+                const allStudents = await trackingService.fetchStudentsInGroup(groupId);
+                const result = await trackingService.fetchGroupProgressions(allStudents.ids);
+                return result || [];
             },
             (rawData: any[]) => {
                 const map: Record<string, Record<string, { total: number; done: number }>> = {};
@@ -143,24 +133,9 @@ export function useBranchesAndModules(
         await fetchWithCache(
             `modules_pedago_${studentId}`,
             async () => {
-                const { data, error } = await supabase
-                    .from('Module')
-                    .select(`
-                        id, nom, date_fin, sous_branche_id, statut,
-                        SousBranche:sous_branche_id (
-                            nom,
-                            ordre,
-                            Branche:branche_id (nom, ordre)
-                        ),
-                        Activite (
-                            id, titre, nombre_exercices, nombre_erreurs, statut_exigence,
-                            ActiviteNiveau (niveau_id),
-                            Progression (etat, eleve_id)
-                        )
-                    `)
-                    .eq('statut', 'en_cours');
-                if (error) throw error;
-                return data || [];
+                // Pass null for levelId as service now fetches all active modules
+                const modules = await trackingService.fetchModulesForStudent(null);
+                return modules || [];
             },
             (data: any[]) => {
                 const modulesWithStats: ModuleWithStats[] = (data || []).map(m => {
@@ -225,30 +200,7 @@ export function useBranchesAndModules(
         await fetchWithCache(
             `activities_pedago_${moduleId}`,
             async () => {
-                const { data, error } = await supabase
-                    .from('Activite')
-                    .select(`
-                        *,
-                        ActiviteNiveau (niveau_id),
-                        Module (
-                            id,
-                            SousBranche (
-                                id,
-                                Branche (
-                                    id
-                                )
-                            )
-                        ),
-                        ActiviteMateriel (
-                            TypeMateriel (
-                                acronyme
-                            )
-                        )
-                    `)
-                    .eq('module_id', moduleId)
-                    .order('ordre', { ascending: true });
-                if (error) throw error;
-                return data || [];
+                return await trackingService.fetchActivitiesForModule(moduleId);
             },
             (data: any[]) => {
                 setActivities(data as Activity[]);

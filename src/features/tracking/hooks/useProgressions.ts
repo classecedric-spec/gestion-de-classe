@@ -1,11 +1,12 @@
-import { useState } from 'react';
-import { supabase } from '../../../lib/supabaseClient';
-import { fetchWithCache } from '../../../lib/offline';
+import { useState, useCallback } from 'react';
+import { supabase } from '../../../lib/database';
+import { fetchWithCache } from '../../../lib/sync';
 import { useOfflineSync } from '../../../context/OfflineSyncContext';
 import { useUpdateProgression } from '../../../hooks/useUpdateProgression';
 import { toast } from 'sonner';
 import { Student } from '../../attendance/services/attendanceService';
 import { Activity } from './useBranchesAndModules';
+import { trackingService } from '../services/trackingService';
 
 /**
  * useProgressions
@@ -35,39 +36,43 @@ export function useProgressions(
     selectedBranchForSuivi: string,
     fetchHelpRequests?: () => void
 ) {
-    const { isOnline, addToQueue } = useOfflineSync();
+    // const { isOnline, addToQueue } = useOfflineSync();
+
     const { updateProgression } = useUpdateProgression();
 
     const [progressions, setProgressions] = useState<Record<string, string>>({});
     const [itemToDelete, setItemToDelete] = useState<any | null>(null);
+
+
 
     // Fetch student progressions
     const fetchStudentProgressions = async (studentId: string) => {
         await fetchWithCache(
             `progressions_pedago_${studentId}`,
             async () => {
-                const { data, error } = await supabase
-                    .from('Progression')
-                    .select('activite_id, etat')
-                    .eq('eleve_id', studentId);
-                if (error) throw error;
-                return data || [];
+                const progMap = await trackingService.fetchStudentProgressionsMap(studentId);
+                // Normalize back to array for cache consistency if cache expects array? 
+                // Wait, hook logic maps array to map. 
+                // trackingService returns map. 
+                // Let's adapt logic.
+                return progMap;
             },
-            (data: any[]) => {
-                const progMap: Record<string, string> = {};
-                data?.forEach(p => {
-                    if (p.activite_id) {
-                        progMap[p.activite_id] = p.etat;
-                    }
-                });
-                setProgressions(progMap);
+            (data: any) => {
+                // If service returns map directly
+                setProgressions(data);
             },
             (_err) => { }
         );
     };
 
-    // Handle status click (update progression)
-    const handleStatusClick = async (activityId: string, newStatus: string, specificStudentId: string | null = null, explicitBranchId: string | null = null) => {
+    // Handle status click
+    const handleStatusClick = useCallback(async (
+        activityId: string,
+        newStatus: string,
+        currentStatus: string, // PASSED explicitly to avoid 'progressions' dependency
+        specificStudentId: string | null = null,
+        explicitBranchId: string | null = null
+    ) => {
         const targetStudentId = specificStudentId || selectedStudent?.id;
         if (!targetStudentId) return;
 
@@ -79,7 +84,7 @@ export function useProgressions(
 
             if (!branchId) {
                 const act = activities.find(a => a.id === activityId);
-                if (act) branchId = act.Module?.SousBranche?.Branche?.id;
+                if (act) branchId = act.Module?.SousBranche?.Branche?.id || null;
             }
 
             if (branchId) {
@@ -91,9 +96,9 @@ export function useProgressions(
             }
         }
 
-        const currentStatus = progressions[activityId] || 'a_commencer';
+        const effectiveCurrentStatus = currentStatus || 'a_commencer';
 
-        await updateProgression(targetStudentId, activityId, currentStatus, {
+        await updateProgression(targetStudentId, activityId, effectiveCurrentStatus, {
             explicitNextStatus: finalStatus,
             onOptimisticUpdate: (status) => {
                 if (targetStudentId === selectedStudent?.id) {
@@ -105,27 +110,12 @@ export function useProgressions(
             },
             onRevert: async () => {
                 if (targetStudentId === selectedStudent?.id) {
-                    try {
-                        const { data: revertedProg } = await supabase
-                            .from('Progression')
-                            .select('etat')
-                            .eq('eleve_id', targetStudentId)
-                            .eq('activite_id', activityId)
-                            .single();
-
-                        setProgressions(prev => ({
-                            ...prev,
-                            [activityId]: revertedProg?.etat || 'a_commencer'
-                        }));
-                    } catch (e) {
-                        // Fallback if fetch fails
-                        setProgressions(prev => ({ ...prev, [activityId]: 'a_commencer' }));
-                    }
+                    fetchStudentProgressions(targetStudentId);
                 }
             },
             onSuccess: fetchHelpRequests
         });
-    };
+    }, [selectedStudent, activities, manualIndices, updateProgression, fetchHelpRequests]);
 
     // Add students for suivi (rotation logic)
     const handleAddStudentsForSuivi = async () => {
@@ -158,7 +148,7 @@ export function useProgressions(
                 }
             }
 
-            const baseImp = s.importance_suivi !== null ? s.importance_suivi : 50;
+            const baseImp = (s as any).importance_suivi !== null ? (s as any).importance_suivi : 50;
             const weight = baseImp * (1 + (2 * performanceMultiplier));
 
             return {
@@ -176,7 +166,8 @@ export function useProgressions(
 
         students.forEach(s => {
             if (selectedIds.has(s.id)) {
-                const theirGroups = (s as any).EleveGroupe?.map((eg: any) => eg.groupe_id) || [selectedGroupId];
+                // @ts-ignore
+                const theirGroups = s.EleveGroupe?.map((eg: any) => eg.groupe_id) || [selectedGroupId];
                 theirGroups.forEach((gId: string) => {
                     newRotationSkips[gId] = {
                         ...(newRotationSkips[gId] || {}),
@@ -198,24 +189,20 @@ export function useProgressions(
 
         // Persist skips
         if (user) {
-            await supabase.from('UserPreference').upsert({
-                user_id: user.id,
-                key: 'suivi_rotation_skips',
-                value: newRotationSkips,
-                updated_at: new Date().toISOString()
-            }, { onConflict: 'user_id, key' });
+            await trackingService.saveUserPreference(user.id, 'suivi_rotation_skips', newRotationSkips);
         }
 
-        for (const student of candidates) {
-            await supabase.from('Progression').insert({
-                eleve_id: student.id,
-                activite_id: null,
-                etat: 'besoin_d_aide',
-                is_suivi: true,
-                user_id: user?.id,
-                updated_at: new Date().toISOString()
-            });
-        }
+        // Create progressions
+        const newProgs = candidates.map(student => ({
+            eleve_id: student.id,
+            activite_id: null as unknown as string,
+            etat: 'besoin_d_aide',
+            is_suivi: true,
+            user_id: user?.id,
+            updated_at: new Date().toISOString()
+        }));
+
+        await trackingService.createProgressions(newProgs);
 
         toast.success("3 élèves ajoutés au suivi personnalisé");
         if (fetchHelpRequests) fetchHelpRequests();
@@ -226,12 +213,7 @@ export function useProgressions(
         if (!itemToDelete) return;
 
         try {
-            const { error } = await supabase
-                .from('Progression')
-                .delete()
-                .eq('id', itemToDelete.id);
-
-            if (error) throw error;
+            await trackingService.deleteProgression(itemToDelete.id);
 
             toast.success("Élève retiré du suivi");
             setItemToDelete(null);

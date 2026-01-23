@@ -1,5 +1,6 @@
 import { useState, useEffect, Dispatch, SetStateAction } from 'react';
-import { supabase } from '../../../lib/supabaseClient';
+import { activityService } from '../../../features/activities/services/activityService';
+import { trackingService } from '../../../features/tracking/services/trackingService';
 import { arrayMove } from '@dnd-kit/sortable';
 import { toast } from 'react-hot-toast';
 import { ModuleWithRelations, Activite } from '../utils/moduleHelpers';
@@ -57,12 +58,7 @@ export function useActivityManagement(
             if (activityIds.length === 0) return;
 
             try {
-                const { data, error } = await supabase
-                    .from('Progression')
-                    .select('activite_id, etat')
-                    .in('activite_id', activityIds);
-
-                if (error) throw error;
+                const data = await trackingService.getProgressionStatsForActivities(activityIds);
 
                 const newStats: Record<string, ActivityStats> = {};
                 activityIds.forEach(id => {
@@ -128,12 +124,7 @@ export function useActivityManagement(
     // Update activities order in database
     const updateActivitiesOrder = async (updates: any[]) => {
         try {
-            // Using implicit typing for upsert updates for now as it's partial
-            const { error } = await supabase
-                .from('Activite')
-                .upsert(updates as TablesInsert<'Activite'>[], { onConflict: 'id' });
-
-            if (error) throw error;
+            await activityService.upsertActivities(updates as TablesInsert<'Activite'>[]);
         } catch (err) {
             console.error('Error updating activities order:', err);
             toast.error("Erreur lors de la mise à jour de l'ordre");

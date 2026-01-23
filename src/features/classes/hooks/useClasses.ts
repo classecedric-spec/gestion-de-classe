@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { classService, ClassWithAdults, StudentWithRelations } from '../services/classService';
-import { getCachedPhoto, setCachedPhoto, isCacheEnabled } from '../../../lib/photoCache';
+import { getCachedPhoto, setCachedPhoto, isCacheEnabled } from '../../../lib/storage';
 
 export interface ClassesState {
     classes: ClassWithAdults[];

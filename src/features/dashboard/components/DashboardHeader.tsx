@@ -59,20 +59,26 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({
                 )}
             </div>
 
-            <div className="neu-selector-container p-1 rounded-xl md:absolute md:left-1/2 md:-translate-x-1/2 z-10 transition-all">
-                {tabs.map(tab => (
-                    <button
-                        key={tab.id}
-                        onClick={() => setCurrentTab(tab.id)}
-                        className={clsx(
-                            "rounded-lg font-black uppercase tracking-widest transition-all p-2",
-                            currentTab === tab.id ? "bg-primary text-text-dark shadow-lg shadow-primary/20" : "text-grey-medium hover:text-white"
-                        )}
-                    >
-                        <tab.icon size={14} />
-                        <span className="tab-label">{tab.label}</span>
-                    </button>
-                ))}
+            {/* Center: Tabs (Absolute on Desktop for perfect centering) */}
+            <div className="w-full md:w-[60%] overflow-x-auto no-scrollbar md:overflow-visible md:absolute md:left-1/2 md:-translate-x-1/2 md:z-10">
+                <div className="neu-selector-container p-1 rounded-xl flex items-center justify-between md:justify-center min-w-max md:min-w-0 mx-auto w-full">
+                    {tabs.map(tab => (
+                        <button
+                            key={tab.id}
+                            onClick={() => setCurrentTab(tab.id)}
+                            className={clsx(
+                                "rounded-lg font-black uppercase tracking-widest transition-all p-2 flex items-center gap-2",
+                                "text-[8px] sm:text-[9px] md:text-[0.55rem] lg:text-[10px]", // Reduced responsive text size
+                                currentTab === tab.id
+                                    ? "bg-primary text-text-dark shadow-lg shadow-primary/20"
+                                    : "text-grey-medium hover:text-white"
+                            )}
+                        >
+                            <tab.icon size={14} className="shrink-0" />
+                            <span className="whitespace-nowrap">{tab.label}</span>
+                        </button>
+                    ))}
+                </div>
             </div>
 
             <div className="hidden md:block flex-1"></div>

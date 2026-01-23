@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
-import { supabase } from '../lib/supabaseClient';
-import { uploadImageToStorage } from '../lib/storageUtils';
+import { supabase } from '../lib/database';
+import { uploadImageToStorage } from '../lib/storage';
 
 export interface MigratableRecord {
     id: string;
@@ -27,7 +27,6 @@ export function useInAppMigration(data: MigratableRecord[] | undefined, tableNam
 
             if (pending.length === 0) return;
 
-            console.log(`[Migration] Scanning ${pending.length} potential records in ${tableName}`);
 
             for (const item of pending) {
                 try {
@@ -37,7 +36,7 @@ export function useInAppMigration(data: MigratableRecord[] | undefined, tableNam
                     if (!base64) {
                         const { data: dbData, error: dbError } = await supabase
                             .from(tableName as any)
-                            .select('photo_base64')
+                            .select('id')
                             .eq('id', item.id)
                             .single();
 
@@ -50,14 +49,10 @@ export function useInAppMigration(data: MigratableRecord[] | undefined, tableNam
                         const publicUrl = await uploadImageToStorage(base64, filePath);
 
                         if (publicUrl) {
-                            const { error } = await supabase
+                            await supabase
                                 .from(tableName as any)
                                 .update({ photo_url: publicUrl } as any)
                                 .eq('id', item.id);
-
-                            if (!error) {
-                                console.log(`[Migration] Successfully migrated ${entityType} ${item.id}`);
-                            }
                         }
                     }
                 } catch (error) {

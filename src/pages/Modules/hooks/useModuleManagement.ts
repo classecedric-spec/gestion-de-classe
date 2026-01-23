@@ -1,8 +1,8 @@
 import { useState, useMemo } from 'react';
-import { supabase } from '../../../lib/supabaseClient';
-import { calculateModuleProgress, filterModules, sortModules, extractBranches, extractSubBranches, ModuleWithRelations } from '../utils/moduleHelpers';
+import { filterModules, sortModules, extractBranches, extractSubBranches, ModuleWithRelations } from '../utils/moduleHelpers';
 import { toast } from 'react-hot-toast';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { moduleService } from '../../../features/modules/services/moduleService';
 
 /**
  * useModuleManagement
@@ -29,47 +29,7 @@ export function useModuleManagement() {
         isLoading: loading
     } = useQuery<ModuleWithRelations[]>({
         queryKey: ['modules'],
-        queryFn: async () => {
-            const { data, error } = await supabase
-                .from('Module')
-                .select(`
-                    *,
-                    SousBranche:sous_branche_id (
-                        id,
-                        nom,
-                        branche_id,
-                        ordre,
-                        Branche:branche_id (
-                            id,
-                            nom,
-                            ordre
-                        )
-                    ),
-                    Activite (
-                        *,
-                        ActiviteNiveau (
-                            *,
-                            Niveau (*)
-                        ),
-                        ActiviteMateriel (
-                            TypeMateriel (
-                                acronyme
-                            )
-                        ),
-                        Progression (etat)
-                    )
-                `)
-                .order('nom') // Note: Using 'nom' logic from original, though types say 'titre'.
-                .order('ordre', { foreignTable: 'Activite', ascending: true });
-
-            if (error) throw error;
-
-            // Calculate progress for each module
-            return (data || []).map((m: any) => ({
-                ...m,
-                ...calculateModuleProgress(m)
-            }));
-        },
+        queryFn: () => moduleService.getAllModules(),
     });
 
     // Handle initial selection
@@ -91,8 +51,7 @@ export function useModuleManagement() {
     // 2. Delete Mutation
     const deleteMutation = useMutation({
         mutationFn: async (moduleId: string) => {
-            const { error } = await supabase.from('Module').delete().eq('id', moduleId);
-            if (error) throw error;
+            await moduleService.deleteModule(moduleId);
             return moduleId;
         },
         onSuccess: (deletedId) => {
@@ -127,15 +86,7 @@ export function useModuleManagement() {
     // 3. Status Toggle Mutation
     const toggleStatusMutation = useMutation({
         mutationFn: async (module: ModuleWithRelations) => {
-            const currentStatus = module['statut'] || 'en_preparation';
-            let newStatus = 'en_cours';
-            if (currentStatus === 'en_preparation') newStatus = 'en_cours';
-            else if (currentStatus === 'en_cours') newStatus = 'archive';
-            else if (currentStatus === 'archive') newStatus = 'en_cours';
-
-            const { error } = await supabase.from('Module').update({ statut: newStatus }).eq('id', module.id);
-            if (error) throw error;
-            return { ...module, statut: newStatus };
+            return await moduleService.toggleModuleStatus(module);
         },
         onMutate: async (newModule) => {
             await queryClient.cancelQueries({ queryKey: ['modules'] });

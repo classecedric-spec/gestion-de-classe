@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import { Users, ChevronRight } from 'lucide-react';
-import { getInitials } from '../../../lib/utils';
+import { getInitials } from '../../../lib/helpers';
 import { Student } from '../../attendance/services/attendanceService';
 
 interface DashboardStudentListProps {
@@ -74,8 +74,8 @@ const DashboardStudentList: React.FC<DashboardStudentListProps> = ({ students, s
                                 >
                                     <div className="relative shrink-0 w-12 h-12">
                                         <div className="w-full h-full rounded-full bg-background border-2 border-white/5 p-0.5 overflow-hidden group-hover:border-primary/50 transition-colors">
-                                            {student.photo_base64 ? (
-                                                <img src={student.photo_base64} alt="" className="w-full h-full object-cover rounded-full" />
+                                            {student.photo_url ? (
+                                                <img src={student.photo_url} alt="" className="w-full h-full object-cover rounded-full" />
                                             ) : (
                                                 <div className="w-full h-full flex items-center justify-center bg-white/5 text-primary">
                                                     <span className="text-xs font-black">{getInitials(student as any)}</span>

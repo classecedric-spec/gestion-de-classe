@@ -1,5 +1,5 @@
 import { useState, useEffect, Dispatch, SetStateAction } from 'react';
-import { supabase } from '../../../lib/supabaseClient';
+import { supabase } from '../../../lib/database';
 import { activityService, ActivityWithRelations } from '../services/activityService';
 import { Tables } from '../../../types/supabase';
 

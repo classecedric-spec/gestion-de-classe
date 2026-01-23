@@ -1,12 +1,11 @@
 import { useState, useEffect, ChangeEvent } from 'react';
-import { supabase } from '../../../lib/supabaseClient';
-import { Tables, TablesInsert } from '../../../types/supabase';
-import { ClassWithAdults } from '../services/classService';
+import { Tables } from '../../../types/supabase';
+import { ClassWithAdults, classService } from '../services/classService';
+import { adultService } from '../../adults/services/adultService';
 
 export interface ClassFormData {
     nom: string;
     acronyme: string;
-    photo_base64: string;
     logo_url: string;
     principaux: string[]; // IDs of principal adults
     complementaires: string[]; // IDs of complementary adults
@@ -23,7 +22,6 @@ export const useClassForm = ({ isEditing, classToEdit, onSaved, onClose }: UseCl
     const initialClassState: ClassFormData = {
         nom: '',
         acronyme: '',
-        photo_base64: '',
         logo_url: '',
         principaux: [],
         complementaires: []
@@ -36,7 +34,7 @@ export const useClassForm = ({ isEditing, classToEdit, onSaved, onClose }: UseCl
     // Load Adults for selection
     useEffect(() => {
         const fetchAdults = async () => {
-            const { data } = await supabase.from('Adulte').select('*').order('nom');
+            const data = await adultService.fetchAdults();
             if (data) setAdultsList(data);
         };
         fetchAdults();
@@ -59,7 +57,6 @@ export const useClassForm = ({ isEditing, classToEdit, onSaved, onClose }: UseCl
             setClassData({
                 nom: classToEdit.nom || '',
                 acronyme: classToEdit.acronyme || '',
-                photo_base64: classToEdit.photo_base64 || '',
                 logo_url: classToEdit.logo_url || '',
                 principaux,
                 complementaires
@@ -94,50 +91,35 @@ export const useClassForm = ({ isEditing, classToEdit, onSaved, onClose }: UseCl
         setLoading(true);
 
         try {
-            // 1. Save Class
-            const payload: TablesInsert<'Classe'> = {
+            let savedClassId = classToEdit?.id;
+
+            const payload: any = {
                 nom: classData.nom,
                 acronyme: classData.acronyme,
-                photo_base64: classData.photo_base64,
                 logo_url: classData.logo_url
             };
 
-            let savedClassId = classToEdit?.id;
-
+            // 1. Create/Update Record
             if (isEditing && savedClassId) {
-                const { error } = await supabase
-                    .from('Classe')
-                    .update(payload)
-                    .eq('id', savedClassId);
-                if (error) throw error;
+                await classService.updateClass(savedClassId, payload);
             } else {
-                const { data, error } = await supabase
-                    .from('Classe')
-                    .insert(payload)
-                    .select()
-                    .single();
-                if (error) throw error;
-                savedClassId = data.id;
+                // Insert
+                const { id } = await classService.createClass(payload);
+                savedClassId = id;
             }
 
             if (!savedClassId) throw new Error("Could not determine Class ID");
 
-            // 2. Manage Links
+            // 3. Manage Links
             // Delete existing links
-            await supabase.from('ClasseAdulte').delete().eq('classe_id', savedClassId);
+            await classService.unlinkAllAdults(savedClassId);
 
             // Insert new links
-            const linksToInsert: TablesInsert<'ClasseAdulte'>[] = [];
-            classData.principaux.forEach(adultId => {
-                linksToInsert.push({ classe_id: savedClassId as string, adulte_id: adultId, role: 'principal' });
-            });
-            classData.complementaires.forEach(adultId => {
-                linksToInsert.push({ classe_id: savedClassId as string, adulte_id: adultId, role: 'complementaire' });
-            });
-
-            if (linksToInsert.length > 0) {
-                const { error: linkError } = await supabase.from('ClasseAdulte').insert(linksToInsert);
-                if (linkError) throw linkError;
+            for (const adultId of classData.principaux) {
+                await classService.linkAdult(savedClassId, adultId, 'principal');
+            }
+            for (const adultId of classData.complementaires) {
+                await classService.linkAdult(savedClassId, adultId, 'complementaire');
             }
 
             onSaved();

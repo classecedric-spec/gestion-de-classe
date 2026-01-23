@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { supabase } from '../../../lib/supabaseClient';
+import { supabase } from '../../../lib/database';
 import { Student } from '../../attendance/services/attendanceService';
 
 export interface HelpRequest {

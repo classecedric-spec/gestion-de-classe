@@ -106,7 +106,7 @@ async function fetchAndCache(request, cache) {
         if (response.ok) {
             await cacheResponse(cache, request, response);
         }
-    } catch (error) {
+    } catch (_error) {
         // Silently fail background updates
     }
 }

@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { toast } from 'sonner';
-import { supabase } from '../lib/supabaseClient';
+import { supabase } from '../lib/database';
 
 export interface OfflineAction {
     id: string;

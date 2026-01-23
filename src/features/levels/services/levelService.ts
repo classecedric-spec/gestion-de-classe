@@ -1,99 +1,81 @@
-import { supabase } from '../../../lib/supabaseClient';
+import { supabase } from '../../../lib/database'; // Keep supabase for auth for now, or use auth service if available
 import { Tables, TablesInsert, TablesUpdate } from '../../../types/supabase';
+import { LevelWithStudentCount } from '../../../types';
+import { ILevelRepository } from '../repositories/ILevelRepository';
+import { SupabaseLevelRepository } from '../repositories/SupabaseLevelRepository';
 
-export interface LevelWithStudentCount extends Tables<'Niveau'> {
-    Eleve: { count: number }[];
-}
+export class LevelService {
+    constructor(private repository: ILevelRepository) { }
 
-export const levelService = {
     /**
      * Fetch all levels with student count
+     * @returns {Promise<LevelWithStudentCount[]>} List of levels with associated student count
+     * @throws {PostgrestError} If query fails
      */
-    fetchLevels: async (): Promise<LevelWithStudentCount[]> => {
-        const { data, error } = await supabase
-            .from('Niveau')
-            .select('*, Eleve(count)')
-            .order('ordre', { ascending: true });
-
-        if (error) throw error;
-        return (data as any) || [];
-    },
+    fetchLevels = async (): Promise<LevelWithStudentCount[]> => {
+        return await this.repository.getLevels();
+    }
 
     /**
      * Fetch students for a specific level
+     * @param {string} levelId - The ID of the level
+     * @returns {Promise<Tables<'Eleve'>[]>} List of students in that level
+     * @throws {PostgrestError} If query fails
      */
-    fetchStudents: async (levelId: string): Promise<Tables<'Eleve'>[]> => {
-        const { data, error } = await supabase
-            .from('Eleve')
-            .select('*')
-            .eq('niveau_id', levelId)
-            .order('nom', { ascending: true });
-
-        if (error) throw error;
-        return data || [];
-    },
+    fetchStudents = async (levelId: string): Promise<Tables<'Eleve'>[]> => {
+        return await this.repository.getStudentsByLevel(levelId);
+    }
 
     /**
      * Create a new level
+     * @param {TablesInsert<'Niveau'>} levelData - The level data to insert
+     * @returns {Promise<LevelWithStudentCount>} The created level with student count (0)
+     * @throws {Error} If no user logged in or query fails
      */
-    createLevel: async (levelData: TablesInsert<'Niveau'>): Promise<LevelWithStudentCount> => {
+    createLevel = async (levelData: TablesInsert<'Niveau'>): Promise<LevelWithStudentCount> => {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) throw new Error("No user logged in");
 
-        // Get max order to append at the end
-        const { data: maxOrderData } = await supabase
-            .from('Niveau')
-            .select('ordre')
-            .order('ordre', { ascending: false })
-            .limit(1);
+        const maxOrder = await this.repository.getMaxOrder();
+        const nextOrder = maxOrder + 1;
 
-        const nextOrder = (maxOrderData && maxOrderData.length > 0) ? (maxOrderData[0].ordre || 0) + 1 : 1;
-
-        const { data, error } = await supabase
-            .from('Niveau')
-            .insert([{ ...levelData, user_id: user.id, ordre: nextOrder }])
-            .select('*, Eleve(count)')
-            .single();
-
-        if (error) throw error;
-        return data as any;
-    },
+        return await this.repository.createLevel({
+            ...levelData,
+            user_id: user.id,
+            ordre: nextOrder
+        });
+    }
 
     /**
      * Update an existing level
+     * @param {string} id - Level ID
+     * @param {TablesUpdate<'Niveau'>} levelData - Data to update
+     * @returns {Promise<LevelWithStudentCount>} The updated level
+     * @throws {PostgrestError} If query fails
      */
-    updateLevel: async (id: string, levelData: TablesUpdate<'Niveau'>): Promise<LevelWithStudentCount> => {
-        const { data, error } = await supabase
-            .from('Niveau')
-            .update(levelData)
-            .eq('id', id)
-            .select('*, Eleve(count)')
-            .single();
-
-        if (error) throw error;
-        return data as any;
-    },
+    updateLevel = async (id: string, levelData: TablesUpdate<'Niveau'>): Promise<LevelWithStudentCount> => {
+        return await this.repository.updateLevel(id, levelData);
+    }
 
     /**
      * Delete a level
+     * @param {string} id - Level ID
+     * @returns {Promise<void>}
+     * @throws {PostgrestError} If query fails
      */
-    deleteLevel: async (id: string): Promise<void> => {
-        const { error } = await supabase
-            .from('Niveau')
-            .delete()
-            .eq('id', id);
-
-        if (error) throw error;
-    },
+    deleteLevel = async (id: string): Promise<void> => {
+        return await this.repository.deleteLevel(id);
+    }
 
     /**
      * Update levels order
+     * @param {TablesUpdate<'Niveau'>[]} updates - List of updates with new order
+     * @returns {Promise<void>}
+     * @throws {PostgrestError} If query fails
      */
-    updateOrder: async (updates: TablesUpdate<'Niveau'>[]): Promise<void> => {
-        const { error } = await supabase
-            .from('Niveau')
-            .upsert(updates as any, { onConflict: 'id' });
-
-        if (error) throw error;
+    updateOrder = async (updates: TablesUpdate<'Niveau'>[]): Promise<void> => {
+        return await this.repository.updateOrders(updates);
     }
-};
+}
+
+export const levelService = new LevelService(new SupabaseLevelRepository());

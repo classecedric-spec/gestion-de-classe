@@ -8,7 +8,7 @@ import { Tables } from '../../../types/supabase';
 export interface StudentGeneralInfoProps {
     student: StudentFormState;
     handleInputChange: (e: ChangeEvent<HTMLInputElement | HTMLSelectElement>) => void;
-    updateField: (name: keyof StudentFormState, value: any) => void;
+    updateField: (name: keyof StudentFormState, value: string | string[]) => void;
     handleClassChange: (e: ChangeEvent<HTMLSelectElement>) => void;
     handleNiveauChange: (e: ChangeEvent<HTMLSelectElement>) => void;
     handleToggleGroup: (groupId: string) => void;
@@ -86,8 +86,8 @@ const StudentGeneralInfo: React.FC<StudentGeneralInfoProps> = ({
                     placeholder="Date de naissance"
                     value={student.date_naissance}
                     onChange={handleInputChange}
-                    onClick={(e) => { try { (e.target as any).showPicker(); } catch (err) { } }}
-                    onFocus={(e) => { try { (e.target as any).showPicker(); } catch (err) { } }}
+                    onClick={(e) => { try { (e.target as HTMLInputElement).showPicker(); } catch (err) { } }}
+                    onFocus={(e) => { try { (e.target as HTMLInputElement).showPicker(); } catch (err) { } }}
                     className="w-full bg-input border border-border/10 rounded-xl p-3 text-text-main focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all [&::-webkit-calendar-picker-indicator]:hidden cursor-pointer"
                 />
             </div>

@@ -5,7 +5,6 @@ import Modal from '../../../components/ui/Modal';
 import Button from '../../../components/ui/Button';
 import { TablesInsert } from '../../../types/supabase';
 
-// External Modals (casting as any for now since they are logic-heavy or not yet migrated)
 import AddClassModal from '../../classes/components/AddClassModal';
 import AddGroupModal from '../../../components/AddGroupModal';
 import AddLevelModal from '../../levels/components/AddLevelModal';
@@ -56,7 +55,7 @@ const StudentModal: React.FC<StudentModalProps> = (props) => {
     } = useStudentForm(props);
 
     const handleSubmit = async (e?: React.FormEvent | React.MouseEvent) => {
-        if (e && (e as any).preventDefault) (e as any).preventDefault();
+        if (e) e.preventDefault();
 
         // Basic HTML5 validation trigger
         const form = document.getElementById('student-form') as HTMLFormElement | null;
@@ -147,7 +146,7 @@ const StudentModal: React.FC<StudentModalProps> = (props) => {
                         {(activeTab === 'parent1' || activeTab === 'parent2') && (
                             <StudentParentsInfo
                                 student={student}
-                                handleInputChange={handleInputChange as any}
+                                handleInputChange={handleInputChange}
                                 activeTab={activeTab}
                             />
                         )}

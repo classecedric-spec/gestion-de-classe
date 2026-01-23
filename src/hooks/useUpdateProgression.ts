@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import { supabase } from '../lib/supabaseClient';
+import { trackingService } from '../features/tracking/services/trackingService';
 import { useOfflineSync } from '../context/OfflineSyncContext';
-import { getNextStatus } from '../lib/statusHelpers';
+import { getNextStatus } from '../lib/helpers';
 import { toast } from 'sonner';
 
 export interface UpdateProgressionOptions {
@@ -88,11 +88,7 @@ export const useUpdateProgression = () => {
 
         // 4. Online update
         try {
-            const { error } = await supabase
-                .from('Progression')
-                .upsert(payload, { onConflict: 'eleve_id,activite_id' });
-
-            if (error) throw error;
+            await trackingService.upsertProgression(payload);
 
             if (successCallback) successCallback();
             return nextStatus;

@@ -1,9 +1,12 @@
 import { useState, useEffect, useRef } from 'react';
 import { useLocation } from 'react-router-dom';
-import { supabase } from '../../../lib/supabaseClient';
-import { fetchWithCache } from '../../../lib/offline';
+import { supabase } from '../../../lib/database';
+import { fetchWithCache } from '../../../lib/sync';
 import { useInAppMigration } from '../../../hooks/useInAppMigration';
 import { Student, Group } from '../../attendance/services/attendanceService';
+import { groupService } from '../../groups/services/groupService';
+import { trackingService } from '../services/trackingService';
+import { userService } from '../../users/services/userService';
 
 /**
  * useGroupsAndStudents
@@ -31,14 +34,16 @@ export function useGroupsAndStudents() {
     // Pending student selection (from Home navigation)
     const pendingStudentSelection = useRef<string | null>(null);
 
+
+
+    // ... (imports)
+
     // Fetch groups
     const fetchGroups = async () => {
         await fetchWithCache(
             'groups',
             async () => {
-                const { data, error } = await supabase.from('Groupe').select('*').order('nom');
-                if (error) throw error;
-                return data || [];
+                return await groupService.getGroups();
             },
             setGroups
         );
@@ -51,28 +56,7 @@ export function useGroupsAndStudents() {
             await fetchWithCache(
                 `students_pedago_${groupId}`,
                 async () => {
-                    const { data, error } = await supabase
-                        .from('Eleve')
-                        .select(`
-                            *,
-                            importance_suivi,
-                            Classe (
-                                nom,
-                                ClasseAdulte (
-                                    role,
-                                    Adulte (id, nom, prenom)
-                                )
-                            ),
-                            Niveau (id, nom),
-                            EleveGroupe!inner(
-                                groupe_id,
-                                Groupe(id, nom)
-                            )
-                        `)
-                        .eq('EleveGroupe.groupe_id', groupId)
-                        .order('prenom');
-
-                    if (error) throw error;
+                    const data = await trackingService.getStudentsForPedago(groupId);
                     return data || [];
                 },
                 (data) => setStudents(data as Student[]),
@@ -90,15 +74,9 @@ export function useGroupsAndStudents() {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) return;
 
-        const { data } = await supabase
-            .from('UserPreference')
-            .select('value')
-            .eq('user_id', user.id)
-            .eq('key', 'eleve_profil_competences')
-            .maybeSingle();
-
-        if (data?.value) {
-            setManualIndices(data.value as Record<string, any>);
+        const value = await trackingService.loadUserPreference(user.id, 'eleve_profil_competences');
+        if (value) {
+            setManualIndices(value as Record<string, any>);
         }
     };
 
@@ -107,15 +85,9 @@ export function useGroupsAndStudents() {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) return;
 
-        const { data } = await supabase
-            .from('UserPreference')
-            .select('value')
-            .eq('user_id', user.id)
-            .eq('key', 'suivi_rotation_skips')
-            .maybeSingle();
-
-        if (data?.value) {
-            setRotationSkips(data.value as Record<string, any>);
+        const value = await trackingService.loadUserPreference(user.id, 'suivi_rotation_skips');
+        if (value) {
+            setRotationSkips(value as Record<string, any>);
         }
     };
 
@@ -134,7 +106,7 @@ export function useGroupsAndStudents() {
                 }
             }
 
-            // Otherwise find student's group
+            // Otherwise find student's group (keeping direct supabase query for specific lookup for now)
             const findStudentGroup = async () => {
                 const { data } = await supabase
                     .from('EleveGroupe')
@@ -153,18 +125,6 @@ export function useGroupsAndStudents() {
             findStudentGroup();
         }
     }, [location.state, groups, selectedStudent, students]);
-
-    // Select student once students are loaded (after navigation)
-    useEffect(() => {
-        if (pendingStudentSelection.current && students.length > 0) {
-            const found = students.find(s => s.id === pendingStudentSelection.current);
-            if (found) {
-                setSelectedStudent(found);
-                pendingStudentSelection.current = null;
-                window.history.replaceState({}, document.title);
-            }
-        }
-    }, [students]);
 
     // Load groups and preferences on mount
     useEffect(() => {
@@ -194,10 +154,7 @@ export function useGroupsAndStudents() {
         try {
             const { data: { user } } = await supabase.auth.getUser();
             if (user) {
-                await supabase
-                    .from('CompteUtilisateur')
-                    .update({ last_selected_group_id: groupId })
-                    .eq('id', user.id);
+                await userService.updateLastSelectedGroup(user.id, groupId);
             }
         } catch (error) {
             console.error('Error saving selected group:', error);

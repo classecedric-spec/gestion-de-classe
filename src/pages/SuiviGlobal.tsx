@@ -7,7 +7,7 @@ import SuiviPedagogique from './SuiviPedagogique';
 import AvancementAteliers from './AvancementAteliers';
 import TimerModal from '../components/TimerModal';
 
-import { cleanupOrphanProgressions } from '../lib/cleanupUtils';
+import { cleanupOrphanProgressions } from '../lib/database';
 import { Timer } from '../features/tracking/hooks/useTimerIntegration';
 
 const SuiviGlobal: React.FC = () => {

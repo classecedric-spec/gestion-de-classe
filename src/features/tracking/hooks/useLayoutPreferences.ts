@@ -1,5 +1,6 @@
-import { useState, useEffect, useRef, MutableRefObject } from 'react';
-import { supabase } from '../../../lib/supabaseClient';
+import { useState, useEffect, useRef } from 'react';
+import { supabase } from '../../../lib/database';
+import { trackingService } from '../services/trackingService';
 
 export interface LayoutValue {
     columnWidths: number[];
@@ -152,22 +153,21 @@ export function useLayoutPreferences(selectedGroupId: string | null, showPending
         };
     }, [columnWidths, rowHeights, isEditMode]);
 
+
+
+    // ...
+
     // Load preferences from Supabase
     const loadLayoutPreferences = async (): Promise<string | false> => {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) return false;
 
-        const { data } = await supabase
-            .from('UserPreference')
-            .select('value')
-            .eq('user_id', user.id)
-            .eq('key', 'suivi_pedagogique_layout')
-            .maybeSingle();
+        const value = await trackingService.loadUserPreference(user.id, 'suivi_pedagogique_layout');
 
         let foundGroup: string | false = false;
 
-        if (data?.value) {
-            const val = data.value as any;
+        if (value) {
+            const val = value as any;
 
             // Check for legacy pixel values (if any width > 100, it's pixels)
             const isLegacy = (val.columnWidths && val.columnWidths.some((w: number) => w > 100)) ||
@@ -200,22 +200,20 @@ export function useLayoutPreferences(selectedGroupId: string | null, showPending
             if (!user) return;
 
             setIsSaving(true);
-            const { error } = await supabase.from('UserPreference').upsert({
-                user_id: user.id,
-                key: 'suivi_pedagogique_layout',
-                value: {
-                    columnWidths,
-                    rowHeights,
-                    selectedGroupId,
-                    showPendingOnly
-                },
-                updated_at: new Date().toISOString()
-            }, { onConflict: 'user_id, key' });
-
-            if (!error) {
+            try {
+                await trackingService.saveUserPreference(
+                    user.id,
+                    'suivi_pedagogique_layout',
+                    {
+                        columnWidths,
+                        rowHeights,
+                        selectedGroupId,
+                        showPendingOnly
+                    }
+                );
                 setLastSaved(new Date());
                 setTimeout(() => setIsSaving(false), 2000);
-            } else {
+            } catch (error) {
                 setIsSaving(false);
             }
         }, 3000);

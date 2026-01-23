@@ -1,7 +1,7 @@
 import React from 'react';
 import { AlertCircle } from 'lucide-react';
 import clsx from 'clsx';
-import { getInitials } from '../../../lib/utils';
+import { getInitials } from '../../../lib/helpers';
 import { Student } from '../../attendance/services/attendanceService';
 import { DashboardData } from '../hooks/useDashboardData';
 

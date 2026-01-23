@@ -5,9 +5,11 @@ import Button from '../../../components/ui/Button';
 import ImageUpload from '../../../components/ui/ImageUpload';
 import { useClassForm } from '../hooks/useClassForm';
 import ImportStudentsSection, { ImportedStudent } from './ImportStudentsSection';
-import { supabase } from '../../../lib/supabaseClient';
 import { Tables } from '../../../types/supabase';
 import { ClassWithAdults } from '../services/classService';
+import { SupabaseLevelRepository } from '../../levels/repositories/SupabaseLevelRepository';
+
+const levelRepository = new SupabaseLevelRepository();
 
 export interface AddClassModalProps {
     isOpen: boolean;
@@ -28,8 +30,12 @@ const AddClassModal: React.FC<AddClassModalProps> = ({ isOpen, onClose, onAdded,
 
     useEffect(() => {
         const fetchLevels = async () => {
-            const { data } = await supabase.from('Niveau').select('*').order('ordre');
-            if (data) setLevels(data);
+            try {
+                const data = await levelRepository.getLevels();
+                setLevels(data);
+            } catch (error) {
+                console.error("Error fetching levels:", error);
+            }
         };
         if (isOpen) fetchLevels();
     }, [isOpen]);
@@ -181,7 +187,7 @@ const AddClassModal: React.FC<AddClassModalProps> = ({ isOpen, onClose, onAdded,
                                 >
                                     <option value="">Sélectionner...</option>
                                     {adultsList.map(a => (
-                                        <option key={a.id} value={a.id}>{a.prenom} {a.nom}</option>
+                                        <option key={a.id}>{a.prenom} {a.nom}</option>
                                     ))}
                                 </select>
                                 <select

@@ -1,7 +1,9 @@
 import { useState, useEffect, ChangeEvent } from 'react';
-import { supabase } from '../../../lib/supabaseClient';
+import { supabase } from '../../../lib/database';
 import { studentService } from '../services/studentService';
 import { levelService } from '../../levels/services/levelService';
+import { classService } from '../../classes/services/classService';
+import { groupService } from '../../groups/services/groupService';
 import { Tables, TablesInsert } from '../../../types/supabase';
 
 export interface StudentFormState {
@@ -77,9 +79,9 @@ export const useStudentForm = ({ isEditing, editId, onSaved, onClose }: UseStude
     const loadDependencies = async () => {
         try {
             const [classes, groups, niveaux] = await Promise.all([
-                studentService.getClasses(),
-                studentService.getGroups(),
-                studentService.getLevels()
+                classService.getClasses(),
+                groupService.getGroups(),
+                levelService.fetchLevels()
             ]);
             setClassesList(classes);
             setGroupsList(groups);
@@ -109,7 +111,7 @@ export const useStudentForm = ({ isEditing, editId, onSaved, onClose }: UseStude
                     parent2_prenom: data.parent2_prenom || '',
                     parent2_email: data.parent2_email || '',
                     nom_parents: data.nom_parents || '',
-                    photo_base64: data.photo_base64 || '',
+                    photo_base64: '', // No longer stored in DB
                     photo_url: data.photo_url || '',
                     sex: data.sex || ''
                 });
@@ -125,7 +127,7 @@ export const useStudentForm = ({ isEditing, editId, onSaved, onClose }: UseStude
         setStudent(prev => ({ ...prev, [name]: value }));
     };
 
-    const updateField = (name: keyof StudentFormState, value: any) => {
+    const updateField = (name: keyof StudentFormState, value: string | string[]) => {
         setStudent(prev => ({ ...prev, [name]: value }));
     };
 
@@ -215,7 +217,7 @@ export const useStudentForm = ({ isEditing, editId, onSaved, onClose }: UseStude
                 parent2_prenom: student.parent2_prenom,
                 parent2_email: student.parent2_email,
                 nom_parents: student.nom_parents,
-                photo_base64: student.photo_base64,
+                // photo_base64 removed from here
                 photo_url: student.photo_url,
                 sex: student.sex
             };
@@ -225,15 +227,17 @@ export const useStudentForm = ({ isEditing, editId, onSaved, onClose }: UseStude
                 student.groupe_ids,
                 user.id,
                 isEditing,
-                editId
+                editId,
+                student.photo_base64 // Pass it here
             );
 
             onSaved(savedId);
             onClose();
             return true;
-        } catch (err: any) {
+        } catch (err: unknown) {
+            const errorMessage = err instanceof Error ? err.message : 'Une erreur inconnue est survenue';
             console.error("Error submitting form:", err);
-            alert("Erreur: " + err.message);
+            alert("Erreur: " + errorMessage);
             return false;
         } finally {
             setLoading(false);

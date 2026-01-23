@@ -1,6 +1,6 @@
 import React from 'react';
 import { Check, Users, Loader2, X } from 'lucide-react';
-import { getInitials } from '../../../../lib/utils';
+import { getInitials } from '../../../../lib/helpers';
 import clsx from 'clsx';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
@@ -14,7 +14,7 @@ interface HelpRequestsPanelProps {
     helpersCache: Record<string, Helper[]>;
     itemToDelete: any | null; // Detailed typing can be added if itemToDelete structure is known
     onExpand: (requestId: string, activityId: string) => void;
-    onStatusClick: (activityId: string, status: ProgressionStatus, studentId: string) => void;
+    onStatusClick: (activityId: string, status: ProgressionStatus, currentStatus: string, studentId?: string) => void;
     onSetItemToDelete: (item: any) => void;
 }
 
@@ -34,8 +34,7 @@ const HelpRequestsPanel: React.FC<HelpRequestsPanelProps> = ({
     return (
         <>
             <div
-                className="flex-1 overflow-y-auto p-3 space-y-3 custom-scrollbar"
-                style={{ containerType: 'inline-size' } as React.CSSProperties}
+                className="flex-1 overflow-y-auto p-3 space-y-3 custom-scrollbar [container-type:inline-size]"
             >
                 {helpRequests.length === 0 ? (
                     <div className="flex flex-col items-center justify-center h-40 text-grey-medium opacity-50 space-y-2">
@@ -54,13 +53,14 @@ const HelpRequestsPanel: React.FC<HelpRequestsPanelProps> = ({
                                             onSetItemToDelete(req);
                                         } else {
                                             if (req.activite && req.eleve) {
-                                                onStatusClick(req.activite.id, 'a_commencer', req.eleve.id);
+                                                onStatusClick(req.activite.id, 'a_commencer', req.etat, req.eleve.id);
                                             }
                                             toast("Retiré de la liste");
                                         }
                                     }}
                                     className="absolute -top-2 -right-2 z-10 p-1.5 bg-danger/10 hover:bg-danger text-danger hover:text-white rounded-full border border-danger/20 opacity-100 sm:opacity-0 group-hover/card:opacity-100 transition-all shadow-lg scale-90 hover:scale-100"
                                     title="Retirer"
+                                    aria-label="Retirer"
                                 >
                                     <X size={12} strokeWidth={3} />
                                 </button>
@@ -79,19 +79,19 @@ const HelpRequestsPanel: React.FC<HelpRequestsPanelProps> = ({
                                     <div className="w-[80%] flex flex-col justify-center px-3 relative shrink-0">
                                         {/* Line 1: Student Name & Date */}
                                         <div className="flex items-center justify-between w-full">
-                                            <h4 className="font-bold text-white truncate max-w-[70%]" style={{ fontSize: 'clamp(12px, 4.5cqw, 24px)' }}>
+                                            <h4 className="font-bold text-white truncate max-w-[70%] text-[clamp(12px,4.5cqw,24px)]">
                                                 {req.eleve?.prenom} {req.eleve?.nom?.charAt(0).toUpperCase()}
                                             </h4>
 
                                             {req.activite?.Module?.date_fin && (
-                                                <span className="text-primary font-black shrink-0" style={{ fontSize: 'clamp(10px, 3cqw, 18px)' }}>
+                                                <span className="text-primary font-black shrink-0 text-[clamp(10px,3cqw,18px)]">
                                                     {format(new Date(req.activite.Module.date_fin), 'dd/MM', { locale: fr })}
                                                 </span>
                                             )}
                                         </div>
 
                                         {/* Line 2: Module & Activity Name */}
-                                        <p className="font-medium text-primary/80 truncate w-full" style={{ fontSize: 'clamp(10px, 3.5cqw, 20px)' }}>
+                                        <p className="font-medium text-primary/80 truncate w-full text-[clamp(10px,3.5cqw,20px)]">
                                             <span className="text-primary/90 font-bold">{req.activite?.Module?.nom || 'Module'}</span>
                                             <span className="mx-2 text-white/20">•</span>
                                             <span className="text-grey-light">{req.activite?.titre || 'Activité'}</span>
@@ -102,7 +102,7 @@ const HelpRequestsPanel: React.FC<HelpRequestsPanelProps> = ({
                                     <div className="w-[20%] flex items-center justify-end pr-[5px] shrink-0">
                                         <div
                                             className={clsx(
-                                                "px-2 py-1 rounded-md font-black uppercase tracking-wider transition-colors shadow-sm whitespace-nowrap",
+                                                "px-2 py-1 rounded-md font-black uppercase tracking-wider transition-colors shadow-sm whitespace-nowrap text-[clamp(8px,2.5cqw,16px)]",
                                                 req.is_suivi
                                                     ? "bg-primary text-black border border-primary"
                                                     : req.etat === 'a_verifier'
@@ -111,7 +111,6 @@ const HelpRequestsPanel: React.FC<HelpRequestsPanelProps> = ({
                                                             ? "bg-[#F59E0B] text-black border border-[#F59E0B]"
                                                             : "bg-[#A0A8AD] text-white border border-[#A0A8AD]"
                                             )}
-                                            style={{ fontSize: 'clamp(8px, 2.5cqw, 16px)' }}
                                         >
                                             {req.is_suivi ? 'Suivi' :
                                                 req.etat === 'a_verifier' ? 'Vérif' :

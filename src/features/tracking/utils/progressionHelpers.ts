@@ -1,3 +1,5 @@
+import { normalizeStatus as normalize } from '../../../lib/helpers';
+
 /**
  * calculateBubbleSize
  * Calculates optimal sizing for student bubbles in the grid
@@ -50,4 +52,32 @@ export const calculateBubbleSize = (
         cols: bestCols,
         bubbleSize: finalSize
     };
+};
+
+/**
+ * Re-export normalizeStatus from statusHelpers
+ */
+export const normalizeStatus = normalize;
+
+/**
+ * Check if a progression is overdue
+ * A progression is overdue if:
+ * - It's not finished (etat !== 'termine')
+ * - The module has a deadline (date_fin exists)
+ * - The deadline has passed
+ * - The module is active (etat_module === 'en_cours')
+ * 
+ * @param {object} progression - Progression object with Activite.Module
+ * @param {Date} now - Current date
+ * @returns {boolean} true if overdue
+ */
+export const isOverdue = (progression: any, now: Date): boolean => {
+    const module = progression?.Activite?.Module;
+    if (!module || !module.date_fin) return false;
+    
+    const isNotFinished = progression.etat !== 'termine';
+    const deadlinePassed = new Date(module.date_fin) < now;
+    const moduleActive = module.etat_module === 'en_cours';
+    
+    return isNotFinished && deadlinePassed && moduleActive;
 };

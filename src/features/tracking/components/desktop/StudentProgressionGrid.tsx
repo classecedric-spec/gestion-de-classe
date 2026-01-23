@@ -1,6 +1,6 @@
 import React, { useLayoutEffect, useRef, useState } from 'react';
 import { Loader2 } from 'lucide-react';
-import { getInitials } from '../../../../lib/utils';
+import { getInitials } from '../../../../lib/helpers';
 import { calculateBubbleSize } from '../../utils/progressionHelpers';
 import { Student } from '../../attendance/services/attendanceService';
 
@@ -86,8 +86,8 @@ const StudentProgressionGrid: React.FC<StudentProgressionGridProps> = ({
                     style={{ width: bubbleSize, height: bubbleSize }}
                     title={`${student.prenom} ${student.nom}`}
                 >
-                    {student.photo_base64 ? (
-                        <img src={student.photo_base64} alt="" className="w-full h-full object-cover" />
+                    {(student.photo_url || student.photo_base64) ? (
+                        <img src={student.photo_url || student.photo_base64 || ''} alt="" className="w-full h-full object-cover" />
                     ) : (
                         <span
                             className="font-bold text-primary"

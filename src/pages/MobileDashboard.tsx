@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { supabase } from '../lib/supabaseClient';
+import { supabase, getCurrentUser } from '../lib/database';
 import RandomPickerModal from '../components/RandomPickerModal';
 import { Session } from '@supabase/supabase-js';
 
@@ -13,7 +13,21 @@ import {
     Zap
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
-import { Student, Group } from '../features/attendance/services/attendanceService';
+import { SupabaseAttendanceRepository } from '../features/attendance/repositories/SupabaseAttendanceRepository';
+import { SupabaseGroupRepository } from '../features/groups/repositories/SupabaseGroupRepository';
+import { SupabaseTrackingRepository } from '../features/tracking/repositories/SupabaseTrackingRepository';
+import { SupabaseUserRepository } from '../features/users/repositories/SupabaseUserRepository';
+import { SupabaseStudentRepository } from '../features/students/repositories/SupabaseStudentRepository';
+// Using generic tables types for state where specific service types aren't available/matching perfectly yet, or keeping existing types if compatible
+import { Tables } from '../types/supabase';
+import { StatCard } from '../components/ui';
+
+// Instantiate repositories
+const attendanceRepository = new SupabaseAttendanceRepository();
+const groupRepository = new SupabaseGroupRepository();
+const trackingRepository = new SupabaseTrackingRepository();
+const userRepository = new SupabaseUserRepository();
+// const studentRepository = new SupabaseStudentRepository(); // For random picker students if needed, or use attendance repo
 
 interface DashboardStats {
     helpPending: number;
@@ -33,11 +47,11 @@ const MobileDashboard: React.FC = () => {
     const [session, setSession] = useState<Session | null>(null);
     const [loading, setLoading] = useState(true);
     const [userName, setUserName] = useState('');
-    const [activeGroup, setActiveGroup] = useState<Group | null>(null);
+    const [activeGroup, setActiveGroup] = useState<Tables<'Groupe'> | null>(null);
 
     // Random Picker State
     const [isRandomPickerOpen, setIsRandomPickerOpen] = useState(false);
-    const [groupStudents, setGroupStudents] = useState<Student[]>([]);
+    const [groupStudents, setGroupStudents] = useState<any[]>([]); // Using any for compatibility with RandomPickerModal props for now
 
     // Stats state
     const [stats, setStats] = useState<DashboardStats>({
@@ -75,36 +89,23 @@ const MobileDashboard: React.FC = () => {
 
     const fetchUserInfo = useCallback(async (userId: string) => {
         try {
-            const { data: user } = await supabase
-                .from('CompteUtilisateur')
-                .select('prenom, nom, last_selected_group_id')
-                .eq('id', userId)
-                .maybeSingle();
+            const user = await userRepository.getProfile(userId);
 
             if (user) {
                 setUserName(`${user.prenom || ''} ${user.nom || ''}`.trim());
 
-                let groupToSet: Group | null = null;
+                let groupToSet: Tables<'Groupe'> | null = null;
                 // Try to get last selected group
                 if (user.last_selected_group_id) {
-                    const { data: group } = await supabase
-                        .from('Groupe')
-                        .select('id, nom')
-                        .eq('id', user.last_selected_group_id)
-                        .single();
-                    if (group) groupToSet = group as unknown as Group;
+                    groupToSet = await groupRepository.getGroup(user.last_selected_group_id);
                 }
 
                 // Fallback: get first group if no last selection
                 if (!groupToSet) {
-                    const { data: firstGroup } = await supabase
-                        .from('Groupe')
-                        .select('id, nom')
-                        .eq('user_id', userId)
-                        .order('nom')
-                        .limit(1)
-                        .maybeSingle();
-                    if (firstGroup) groupToSet = firstGroup as unknown as Group;
+                    const groups = await groupRepository.getUserGroups(userId);
+                    if (groups.length > 0) {
+                        groupToSet = groups[0];
+                    }
                 }
 
                 if (groupToSet) setActiveGroup(groupToSet);
@@ -119,52 +120,15 @@ const MobileDashboard: React.FC = () => {
         try {
             let filterStudentIds: string[] | null = null;
             if (groupId) {
-                const { data: s } = await supabase.from('EleveGroupe').select('eleve_id').eq('groupe_id', groupId);
-                filterStudentIds = s ? s.map(x => x.eleve_id) : [];
+                const students = await attendanceRepository.getStudentsByGroup(groupId);
+                filterStudentIds = students.map(s => s.id);
             }
 
-            // Optimization: If filtering by group but no students found, return 0 immediately
-            if (filterStudentIds !== null && filterStudentIds.length === 0) {
-                setStats({
-                    helpPending: 0,
-                    validationsToday: 0,
-                    studentsToFollow: []
-                });
-                setLoadingStats(false);
-                return;
-            }
-
-            // Get help pending count
-            let queryHelp = supabase
-                .from('Progression')
-                .select('*', { count: 'exact', head: true })
-                .in('etat', ['besoin_d_aide', 'a_verifier', 'ajustement']);
-
-            if (filterStudentIds) {
-                queryHelp = queryHelp.in('eleve_id', filterStudentIds);
-            }
-
-            const { count: helpCount } = await queryHelp;
-
-            // Get validations today
-            const today = new Date();
-            today.setHours(0, 0, 0, 0);
-
-            let queryVal = supabase
-                .from('Progression')
-                .select('*', { count: 'exact', head: true })
-                .eq('etat', 'valide')
-                .gte('updated_at', today.toISOString());
-
-            if (filterStudentIds) {
-                queryVal = queryVal.in('eleve_id', filterStudentIds);
-            }
-
-            const { count: valCount } = await queryVal;
+            const statsData = await trackingRepository.getDashboardStats(filterStudentIds);
 
             setStats({
-                helpPending: helpCount || 0,
-                validationsToday: valCount || 0,
+                helpPending: statsData.helpPending,
+                validationsToday: statsData.validationsToday,
                 studentsToFollow: []
             });
         } catch (error) {
@@ -177,56 +141,18 @@ const MobileDashboard: React.FC = () => {
     const fetchDailyAttendance = useCallback(async () => {
         setLoadingAttendance(true);
         try {
-            const { data: { user } } = await supabase.auth.getUser();
+            const user = await getCurrentUser();
             if (!user) return;
 
-            // 1. Get user's groups
-            const { data: groups } = await supabase.from('Groupe').select('id').eq('user_id', user.id);
-            const groupIds = groups?.map(g => g.id) || [];
-
-            if (groupIds.length === 0) return;
-
-            // 2. Get students ids for these groups
-            const { data: students } = await supabase
-                .from('Eleve')
-                .select('id, EleveGroupe!inner(groupe_id)')
-                .in('EleveGroupe.groupe_id', groupIds);
-
-            if (!students) return;
-
-            const studentIds = students.map(s => s.id);
-            const targetDateStr = selectedDate; // Today
             const currentPeriod = getPeriodFromTime();
+            const summary = await attendanceRepository.getDailySummary(user.id, selectedDate, currentPeriod);
 
-            // 3. Get attendance for today AND current period only
-            const { data: attendances } = await supabase
-                .from('Attendance')
-                .select('status, eleve_id')
-                .eq('date', targetDateStr)
-                .eq('periode', currentPeriod)
-                .in('eleve_id', studentIds);
-
-            const hasData = attendances && attendances.length > 0;
-
-            if (!hasData) {
-                setAttendanceSummary({
-                    present: 0,
-                    absent: 0,
-                    hasEncoding: false,
-                    period: currentPeriod
-                });
-            } else {
-                const totalStudents = studentIds.length;
-                const absentCount = attendances.filter(a => a.status === 'absent').length;
-                const presentCount = totalStudents - absentCount;
-
-                setAttendanceSummary({
-                    present: presentCount,
-                    absent: absentCount,
-                    hasEncoding: true,
-                    period: currentPeriod
-                });
-            }
+            setAttendanceSummary({
+                present: summary.present,
+                absent: summary.absent,
+                hasEncoding: summary.hasEncoding,
+                period: currentPeriod
+            });
 
         } catch (error) {
             console.error('Error fetching attendance summary:', error);
@@ -260,12 +186,8 @@ const MobileDashboard: React.FC = () => {
             fetchStats(activeGroup.id);
             // Fetch students for random picker
             const fetchGroupStudents = async () => {
-                const { data } = await supabase
-                    .from('Eleve')
-                    .select('*, EleveGroupe!inner(groupe_id), Classe(nom), Niveau(nom, ordre)')
-                    .eq('EleveGroupe.groupe_id', activeGroup.id)
-                    .order('nom');
-                setGroupStudents((data || []) as Student[]);
+                const students = await attendanceRepository.getStudentsByGroup(activeGroup.id);
+                setGroupStudents(students);
             };
             fetchGroupStudents();
         } else if (session) {
@@ -289,28 +211,19 @@ const MobileDashboard: React.FC = () => {
 
     const handleGoToSuivi = async () => {
         try {
-            const { data: { user } } = await supabase.auth.getUser();
+            const user = await getCurrentUser();
             if (!user) {
                 toast.error('Non connecté');
                 return;
             }
 
-            // Try to get the last selected group from Supabase
-            const { data: userData } = await supabase
-                .from('CompteUtilisateur')
-                .select('last_selected_group_id')
-                .eq('id', user.id)
-                .single();
-
-            const savedGroupId = userData?.last_selected_group_id;
+            // Try to get the last selected group
+            const userProfile = await userRepository.getProfile(user.id);
+            const savedGroupId = userProfile?.last_selected_group_id;
 
             if (savedGroupId) {
                 // Verify the group still exists
-                const { data: group } = await supabase
-                    .from('Groupe')
-                    .select('id')
-                    .eq('id', savedGroupId)
-                    .single();
+                const group = await groupRepository.getGroup(savedGroupId);
 
                 if (group) {
                     navigate(`/mobile-suivi/${savedGroupId}`);
@@ -319,11 +232,7 @@ const MobileDashboard: React.FC = () => {
             }
 
             // Fallback: fetch first group available
-            const { data: groups } = await supabase
-                .from('Groupe')
-                .select('id')
-                .order('nom')
-                .limit(1);
+            const groups = await groupRepository.getUserGroups(user.id);
 
             if (groups && groups.length > 0) {
                 navigate(`/mobile-suivi/${groups[0].id}`);
@@ -392,77 +301,55 @@ const MobileDashboard: React.FC = () => {
 
                 {/* Stats Cards */}
                 <section className="grid grid-cols-2 gap-3">
-                    <div
+                    <StatCard
+                        icon={AlertCircle}
+                        variant="warning"
+                        title={`En attente ${activeGroup ? `(${activeGroup.nom})` : ''}`}
+                        value={stats.helpPending}
+                        subtitle="demandes d'aide • cliquez pour voir"
+                        loading={loadingStats}
                         onClick={handleGoToSuivi}
-                        className="bg-surface/50 border border-border rounded-xl p-4 hover:bg-surface hover:border-primary/30 transition-all group cursor-pointer"
-                    >
-                        <div className="flex items-center gap-2 mb-2">
-                            <AlertCircle size={14} className="text-grey-medium group-hover:text-primary transition-colors" />
-                            <span className="text-[9px] font-bold uppercase tracking-widest text-grey-medium">En attente {activeGroup ? `(${activeGroup.nom})` : ''}</span>
-                        </div>
-                        <div className="text-2xl font-black text-white">
-                            {loadingStats ? <Loader2 size={20} className="animate-spin" /> : stats.helpPending}
-                        </div>
-                        <p className="text-[10px] text-grey-medium mt-1 group-hover:text-primary transition-colors">demandes d'aide • cliquez pour voir</p>
-                    </div>
+                    />
 
-                    <Link
-                        to="/mobile-encodage"
-                        className="bg-surface/50 border border-border rounded-xl p-4 hover:bg-surface hover:border-success/30 transition-all group cursor-pointer"
-                    >
-                        <div className="flex items-center gap-2 mb-2">
-                            <Check size={14} className="text-success" />
-                            <span className="text-[9px] font-bold uppercase tracking-widest text-grey-medium">Aujourd'hui</span>
-                        </div>
-                        <div className="text-2xl font-black text-white">
-                            {loadingStats ? <Loader2 size={20} className="animate-spin" /> : stats.validationsToday}
-                        </div>
-                        <p className="text-[10px] text-grey-medium mt-1 group-hover:text-success transition-colors">validations • cliquez pour encoder</p>
-                    </Link>
+                    <StatCard
+                        icon={Check}
+                        variant="success"
+                        title="Aujourd'hui"
+                        value={stats.validationsToday}
+                        subtitle="validations • cliquez pour encoder"
+                        loading={loadingStats}
+                        href="/mobile-encodage"
+                    />
 
-                    {/* Random Picker */}
-                    <div
+                    <StatCard
+                        icon={Zap}
+                        variant="purple"
+                        title="Main Innocente"
+                        value={<span className="text-2xl">🎲</span>}
+                        subtitle="Tirage au sort"
                         onClick={() => setIsRandomPickerOpen(true)}
-                        className="bg-surface/50 border border-border rounded-xl p-4 hover:bg-surface hover:border-purple-500/30 transition-all group cursor-pointer"
-                    >
-                        <div className="flex items-center gap-2 mb-2">
-                            <Zap size={14} className="text-purple-500" />
-                            <span className="text-[9px] font-bold uppercase tracking-widest text-grey-medium">Main Innocente</span>
-                        </div>
-                        <div className="text-2xl font-black text-white flex items-center gap-2">
-                            <span className="text-2xl">🎲</span>
-                        </div>
-                        <p className="text-[10px] text-grey-medium mt-1 group-hover:text-purple-500 transition-colors">
-                            Tirage au sort
-                        </p>
-                    </div>
+                    />
 
-                    <Link
-                        to="/mobile-presence"
-                        state={{ period: attendanceSummary.period }}
-                        className="bg-surface/50 border border-border rounded-xl p-4 hover:bg-surface hover:border-primary/30 transition-all group cursor-pointer"
-                    >
-                        <div className="flex items-center gap-2 mb-2">
-                            <User size={14} className="text-grey-medium group-hover:text-primary transition-colors" />
-                            <span className="text-[9px] font-bold uppercase tracking-widest text-grey-medium">
-                                Présences ({attendanceSummary.period === 'matin' ? 'Matin' : 'Apr-Midi'})
-                            </span>
-                        </div>
-                        <div className="text-2xl font-black text-white flex items-center gap-2">
-                            {loadingAttendance ? (
-                                <Loader2 size={20} className="animate-spin" />
-                            ) : !attendanceSummary.hasEncoding ? (
+                    <StatCard
+                        icon={User}
+                        variant="primary"
+                        title={`Présences (${attendanceSummary.period === 'matin' ? 'Matin' : 'Apr-Midi'})`}
+                        value={
+                            !attendanceSummary.hasEncoding ? (
                                 <span className="text-xl text-grey-light italic">-</span>
                             ) : (
-                                <span>{attendanceSummary.present}</span>
-                            )}
-                        </div>
-                        <p className="text-[10px] text-grey-medium mt-1 group-hover:text-primary transition-colors">
-                            {!attendanceSummary.hasEncoding
+                                attendanceSummary.present
+                            )
+                        }
+                        subtitle={
+                            !attendanceSummary.hasEncoding
                                 ? "Pas d'encodage • cliquez pour voir"
-                                : `${attendanceSummary.absent} ${attendanceSummary.absent > 1 ? 'absents' : 'absent'} • cliquez pour voir`}
-                        </p>
-                    </Link>
+                                : `${attendanceSummary.absent} ${attendanceSummary.absent > 1 ? 'absents' : 'absent'} • cliquez pour voir`
+                        }
+                        loading={loadingAttendance}
+                        href="/mobile-presence"
+                        linkState={{ period: attendanceSummary.period }}
+                    />
                 </section>
 
             </main>

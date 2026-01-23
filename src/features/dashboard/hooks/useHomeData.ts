@@ -1,9 +1,12 @@
 import { useState, useCallback } from 'react';
-import { supabase } from '../../../lib/supabaseClient';
+import { getCurrentUser } from '../../../lib/database';
 import { User } from '@supabase/supabase-js';
-import { getCachedPhoto, setCachedPhoto, isCacheEnabled } from '../../../lib/photoCache';
-import { fetchDelta, mergeDelta } from '../../../lib/deltaSync';
+import { getCachedPhoto, setCachedPhoto, isCacheEnabled } from '../../../lib/storage';
+import { mergeDelta } from '../../../lib/sync';
 import { Student, Group } from '../../attendance/services/attendanceService';
+import { studentService } from '../../students/services/studentService';
+import { groupService } from '../../groups/services/groupService';
+import { userService } from '../../users/services/userService';
 
 export interface HomeData {
     user: User | null;
@@ -26,51 +29,26 @@ export const useHomeData = () => {
     const [groups, setGroups] = useState<Group[]>([]);
     const [selectedGroup, setSelectedGroup] = useState<Group | null>(null);
     const [loading, setLoading] = useState(true);
-    const [isFirstLoad, setIsFirstLoad] = useState(true);
 
     const fetchInitialData = useCallback(async () => {
         try {
-            const { data: { user } } = await supabase.auth.getUser();
+            const user = await getCurrentUser();
             setUser(user);
 
             if (user) {
                 // Fetch User Profile
-                const { data: profile } = await supabase
-                    .from('CompteUtilisateur')
-                    .select('prenom')
-                    .eq('id', user.id)
-                    .single();
+                const profile = await userService.getProfile(user.id);
                 if (profile?.prenom) setUserName(profile.prenom);
 
                 // Fetch Students with Delta Sync (incremental loading)
                 let studentsData: Student[] | undefined;
 
-                if (isFirstLoad) {
-                    const { data, error: studentsError } = await supabase
-                        .from('Eleve')
-                        .select('id, nom, prenom, photo_base64, photo_hash, sex, date_naissance, niveau_id, classe_id, updated_at, Niveau(nom, ordre), Classe(nom)')
-                        .eq('titulaire_id', user.id);
+                const { delta, isFirstSync } = await studentService.getStudentsDelta(user.id);
 
-                    if (!studentsError) {
-                        studentsData = data as unknown as Student[];
-                        setIsFirstLoad(false);
-                    }
+                if (isFirstSync) {
+                    studentsData = delta as unknown as Student[];
                 } else {
-                    const { delta, isFirstSync } = await fetchDelta(
-                        'Eleve',
-                        'id, nom, prenom, photo_base64, photo_hash, sex, date_naissance, niveau_id, classe_id, updated_at, Niveau(nom, ordre), Classe(nom)',
-                        { titulaire_id: user.id }
-                    );
-
-                    if (isFirstSync) {
-                        const { data } = await supabase
-                            .from('Eleve')
-                            .select('id, nom, prenom, photo_base64, photo_hash, sex, date_naissance, niveau_id, classe_id, updated_at, Niveau(nom, ordre), Classe(nom)')
-                            .eq('titulaire_id', user.id);
-                        studentsData = data as unknown as Student[];
-                    } else {
-                        studentsData = mergeDelta(students, delta);
-                    }
+                    studentsData = mergeDelta(students, delta) as unknown as Student[];
                 }
 
                 if (studentsData) {
@@ -82,8 +60,8 @@ export const useHomeData = () => {
                                     const cachedPhoto = await getCachedPhoto(student.id!, student.photo_hash);
                                     if (cachedPhoto) {
                                         return { ...student, photo_base64: cachedPhoto };
-                                    } else if (student.photo_base64) {
-                                        await setCachedPhoto(student.id!, student.photo_base64, student.photo_hash);
+                                    } else if ((student as any).photo_base64) {
+                                        await setCachedPhoto(student.id!, (student as any).photo_base64, student.photo_hash);
                                     }
                                 }
                                 return student;
@@ -96,18 +74,12 @@ export const useHomeData = () => {
                 }
 
                 // Fetch Groups
-                const { data: groupsData, error: groupsError } = await supabase
-                    .from('Groupe')
-                    .select('*')
-                    .order('nom');
-
-                if (!groupsError) {
-                    const typedGroups = groupsData as unknown as Group[];
-                    setGroups(typedGroups || []);
-                    // Only set first group as default if no group is currently selected
-                    if (typedGroups?.length > 0 && !selectedGroup) {
-                        setSelectedGroup(typedGroups[0]);
-                    }
+                const groupsData = await groupService.getGroups();
+                const typedGroups = groupsData as unknown as Group[];
+                setGroups(typedGroups || []);
+                // Only set first group as default if no group is currently selected
+                if (typedGroups?.length > 0 && !selectedGroup) {
+                    setSelectedGroup(typedGroups[0]);
                 }
 
                 return { user, studentsData: studentsData || [] };
@@ -119,7 +91,7 @@ export const useHomeData = () => {
         } finally {
             setLoading(false);
         }
-    }, [isFirstLoad, students, selectedGroup]);
+    }, [students, selectedGroup]);
 
     return {
         user,

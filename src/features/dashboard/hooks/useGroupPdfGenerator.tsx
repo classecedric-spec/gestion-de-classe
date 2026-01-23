@@ -1,6 +1,6 @@
 import React, { useState, useRef, useCallback } from 'react';
-import { supabase } from '../../../lib/supabaseClient';
-import { fetchStudentPdfData } from '../../../lib/pdfUtils';
+import { supabase } from '../../../lib/database';
+import { fetchStudentPdfData } from '../../../lib/pdf';
 import StudentTrackingPDFModern, { PDFStudentData } from '../../../components/StudentTrackingPDFModern';
 import { Group } from '../../attendance/services/attendanceService';
 

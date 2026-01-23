@@ -1,0 +1,63 @@
+import {
+    Check,
+    ShieldCheck,
+    Play,
+    AlertCircle
+} from 'lucide-react';
+
+/**
+ * Get status display information
+ */
+export const getStatusInfo = (status: string) => {
+    switch (status) {
+        case 'termine':
+            return { color: 'bg-success', text: 'Terminé', icon: Check };
+        case 'a_verifier':
+            return { color: 'bg-[#8B5CF6]', text: 'À vérifier', icon: ShieldCheck };
+        case 'en_cours':
+            return { color: 'bg-primary', text: 'En cours', icon: Play };
+        case 'besoin_d_aide':
+            return { color: 'bg-[#A0A8AD]', text: 'Aide', icon: AlertCircle };
+        default:
+            return { color: 'bg-white/10', text: 'À faire', icon: null };
+    }
+};
+
+/**
+ * Process modules - filter activities by level and calculate stats
+ */
+export const processModules = (modulesData: any[], levelId: string, progMap: Record<string, string>) => {
+    const processedModules = modulesData.map((m: any) => {
+        const validActivities = (m.Activite || []).filter((act: any) => {
+            const levels = act.ActiviteNiveau?.map((an: any) => an.niveau_id) || [];
+            // STRICT: Activity must have level defined AND match student level
+            if (!levelId) return levels.length > 0;
+            return levels.length > 0 && levels.includes(levelId);
+        }).sort((a: any, b: any) => (a.ordre || 0) - (b.ordre || 0));
+
+        const totalActivities = validActivities.length;
+        const completedActivities = validActivities.filter((act: any) =>
+            progMap[act.id] === 'termine' || progMap[act.id] === 'a_verifier'
+        ).length;
+
+        return {
+            ...m,
+            filteredActivities: validActivities,
+            totalActivities,
+            completedActivities,
+            percent: totalActivities > 0 ? Math.round((completedActivities / totalActivities) * 100) : 0
+        };
+    }).filter((m: any) => m.totalActivities > 0);
+
+    // Sort by branch then sub-branch
+    processedModules.sort((a: any, b: any) => {
+        const aB = a.SousBranche?.Branche?.nom || '';
+        const bB = b.SousBranche?.Branche?.nom || '';
+        if (aB !== bB) return aB.localeCompare(bB);
+        const aSB = a.SousBranche?.nom || '';
+        const bSB = b.SousBranche?.nom || '';
+        return aSB.localeCompare(bSB);
+    });
+
+    return processedModules;
+};

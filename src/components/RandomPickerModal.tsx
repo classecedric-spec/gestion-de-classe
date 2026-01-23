@@ -95,8 +95,8 @@ const RandomPickerModal: React.FC<RandomPickerModalProps> = ({ isOpen, onClose, 
                         <div className={`transition-all duration-300 transform ${selectedStudent ? 'scale-110' : 'scale-100'}`}>
                             <div className={`w-40 h-40 rounded-full border-4 p-1 mb-6 mx-auto relative ${selectedStudent ? 'border-primary shadow-[0_0_50px_rgba(var(--primary),0.3)]' : 'border-white/10'}`}>
                                 <div className="w-full h-full rounded-full overflow-hidden bg-gray-800">
-                                    {(displayStudent as any)?.photo_base64 ? (
-                                        <img src={(displayStudent as any).photo_base64} alt="" className="w-full h-full object-cover" />
+                                    {(displayStudent as any)?.photo_url ? (
+                                        <img src={(displayStudent as any).photo_url} alt="" className="w-full h-full object-cover" />
                                     ) : (
                                         <div className="w-full h-full flex items-center justify-center bg-gray-700 text-3xl font-black text-gray-500">
                                             {displayStudent?.prenom?.[0] || '?'}

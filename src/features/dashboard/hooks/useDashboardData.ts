@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { supabase } from '../../../lib/supabaseClient';
+import { supabase } from '../../../lib/database';
 import { Student } from '../../attendance/services/attendanceService';
 
 // Level Colors for Charts
@@ -104,7 +104,7 @@ export const useDashboardData = () => {
     const [dashboardData, setDashboardData] = useState<DashboardData>(initialDashboardData);
     const [loading, setLoading] = useState(true);
 
-    const fetchDashboardDetails = useCallback(async (userId: string, allStudents: Student[]) => {
+    const fetchDashboardDetails = useCallback(async (_userId: string, allStudents: Student[]) => {
         if (!allStudents || allStudents.length === 0) {
             setLoading(false);
             return;
@@ -188,7 +188,7 @@ export const useDashboardData = () => {
             // 2. Recent Activity (last 5)
             const { data: recentActivity } = await supabase
                 .from('Progression')
-                .select('*, Eleve(prenom, nom, photo_base64), Activite(titre)')
+                .select('*, Eleve(prenom, nom, photo_url), Activite(titre)')
                 .in('eleve_id', allStudents.map(s => s.id))
                 .order('updated_at', { ascending: false })
                 .limit(5);

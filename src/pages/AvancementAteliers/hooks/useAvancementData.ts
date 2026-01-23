@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
-import { supabase } from '../../../lib/supabaseClient';
+import { groupService } from '../../../features/groups/services/groupService';
+import { moduleService } from '../../../features/modules/services/moduleService';
 
 export interface AvancementGroup {
     id: string;
@@ -47,15 +48,13 @@ export const useAvancementData = () => {
     const [dateOperator, setDateOperator] = useState<string>('eq');
 
     const fetchGroups = useCallback(async () => {
-        const { data } = await supabase.from('Groupe').select('id, nom, acronyme, photo_url').order('nom');
-        setGroups(data || []);
+        // Casting as AvancementGroup[] because service returns Tables<'Groupe'> which is compatible
+        const data = await groupService.getGroups();
+        setGroups(data as unknown as AvancementGroup[]);
     }, []);
 
     const fetchModules = useCallback(async () => {
-        const { data } = await supabase
-            .from('Module')
-            .select('*, SousBranche(id, nom, ordre, Branche(id, nom, ordre))')
-            .eq('statut', 'en_cours');
+        const data = await moduleService.getActiveModules();
 
         const sorted = (data as AvancementModule[] || []).sort((a, b) => {
             if (a.date_fin !== b.date_fin) {
@@ -81,13 +80,8 @@ export const useAvancementData = () => {
     }, []);
 
     const fetchBranches = useCallback(async () => {
-        const { data, error } = await supabase.from('Branche').select('id, nom, ordre, photo_url').order('ordre', { ascending: true });
-        if (error) {
-            console.error('Error fetching branches:', error);
-            setBranches([]);
-        } else {
-            setBranches(data || []);
-        }
+        const data = await moduleService.getBranches();
+        setBranches(data as unknown as AvancementBranch[]);
     }, []);
 
     const isModuleInDateRange = useCallback((m: AvancementModule) => {

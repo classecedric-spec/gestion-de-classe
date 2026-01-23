@@ -41,11 +41,11 @@ const AttendanceStudentCard: React.FC<AttendanceStudentCardProps> = ({ student, 
             {/* Avatar */}
             <div className={clsx(
                 "w-10 h-10 rounded-lg flex items-center justify-center text-sm font-bold shadow-inner overflow-hidden shrink-0",
-                student.photo_base64 ? "bg-[#D9B981]" : "bg-background text-primary",
+                (student.photo_url || student.photo_base64) ? "bg-[#D9B981]" : "bg-background text-primary",
                 disabled && "grayscale opacity-70"
             )}>
-                {student.photo_base64 ? (
-                    <img src={student.photo_base64} alt="" className="w-full h-full object-cover" />
+                {(student.photo_url || student.photo_base64) ? (
+                    <img src={student.photo_url || student.photo_base64 || ''} alt="" className="w-full h-full object-cover" />
                 ) : (
                     <>{student.prenom[0]}</>
                 )}

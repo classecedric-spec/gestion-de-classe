@@ -25,7 +25,7 @@ export interface Activity {
 interface ProgressionCellProps {
     activity: Activity;
     currentStatus?: ProgressionStatus | string;
-    onStatusClick: (activityId: string, status: ProgressionStatus) => void;
+    onStatusClick: (activityId: string, status: ProgressionStatus, currentStatus: string) => void;
     studentLevelId?: string;
 }
 
@@ -51,10 +51,11 @@ const ProgressionCell: React.FC<ProgressionCellProps> = ({
 
     const handleToggleStatus = (newStatus: ProgressionStatus) => {
         if (isLocked) return;
+        const statusStr = typeof currentStatus === 'string' ? currentStatus : 'a_commencer';
         if (currentStatus === newStatus) {
-            onStatusClick(activity.id, 'a_commencer');
+            onStatusClick(activity.id, 'a_commencer', statusStr);
         } else {
-            onStatusClick(activity.id, newStatus);
+            onStatusClick(activity.id, newStatus, statusStr);
         }
     };
 
@@ -148,4 +149,4 @@ const ProgressionCell: React.FC<ProgressionCellProps> = ({
     );
 };
 
-export default ProgressionCell;
+export default React.memo(ProgressionCell);

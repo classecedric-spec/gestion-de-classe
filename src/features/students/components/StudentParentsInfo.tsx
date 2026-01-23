@@ -4,7 +4,7 @@ import { StudentFormState } from '../hooks/useStudentForm';
 
 export interface StudentParentsInfoProps {
     student: StudentFormState;
-    handleInputChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+    handleInputChange: (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => void;
     activeTab: string;
 }
 

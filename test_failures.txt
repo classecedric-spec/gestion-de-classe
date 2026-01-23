@@ -1,0 +1,23 @@
+
+> gestion-de-classe@0.0.0 test
+> vitest --run
+
+
+[1m[46m RUN [49m[22m [36mv4.0.17 [39m[90m/Users/a/Documents/Sites webs/SAAS/Gestion_De_Classe/gestion-de-classe[39m
+
+ [32m✓[39m src/features/sub-branches/services/subBranchService.test.js [2m([22m[2m5 tests[22m[2m)[22m[32m 26[2mms[22m[39m
+ [32m✓[39m src/features/branches/services/branchService.test.js [2m([22m[2m5 tests[22m[2m)[22m[32m 26[2mms[22m[39m
+ [32m✓[39m src/features/levels/services/levelService.test.js [2m([22m[2m4 tests[22m[2m)[22m[32m 31[2mms[22m[39m
+ [32m✓[39m src/features/attendance/services/attendanceService.test.js [2m([22m[2m7 tests[22m[2m)[22m[32m 29[2mms[22m[39m
+ [32m✓[39m src/components/__tests__/Layout.test.jsx [2m([22m[2m1 test[22m[2m)[22m[32m 90[2mms[22m[39m
+ [31m❯[39m src/pages/Modules/hooks/__tests__/useModuleManagement.test.jsx [2m([22m[2m2 tests[22m[2m | [22m[31m2 failed[39m[2m)[22m[33m 1257[2mms[22m[39m
+[31m     [31m×[31m loads modules initially[39m[32m 177[2mms[22m[39m
+[31m     [31m×[31m deletes a module and updates selection[39m[33m 1077[2mms[22m[39m
+ [32m✓[39m src/features/tracking/utils/__tests__/progressionHelpers.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 16[2mms[22m[39m
+ [31m❯[39m e2e/example.spec.js [2m([22m[2m0 test[22m[2m)[22m
+
+[2m Test Files [22m [1m[31m2 failed[39m[22m[2m | [22m[1m[32m6 passed[39m[22m[90m (8)[39m
+[2m      Tests [22m [1m[31m2 failed[39m[22m[2m | [22m[1m[32m29 passed[39m[22m[90m (31)[39m
+[2m   Start at [22m 12:30:45
+[2m   Duration [22m 7.50s[2m (transform 1.57s, setup 5.14s, import 2.40s, tests 1.47s, environment 18.68s)[22m
+

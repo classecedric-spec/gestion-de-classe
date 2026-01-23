@@ -1,116 +1,81 @@
-import { supabase } from '../../../lib/supabaseClient';
-import { Tables, TablesInsert, TablesUpdate } from '../../../types/supabase';
+import { TablesInsert, TablesUpdate } from '../../../types/supabase';
+import { IMaterialRepository, TypeMateriel, MaterialActivity } from '../repositories/IMaterialRepository';
+import { SupabaseMaterialRepository } from '../repositories/SupabaseMaterialRepository';
 
-export type TypeMateriel = Tables<'TypeMateriel'>;
-export type TypeMaterielInsert = TablesInsert<'TypeMateriel'>;
-export type TypeMaterielUpdate = TablesUpdate<'TypeMateriel'>;
+// Re-export types for backward compatibility
+export type { TypeMateriel, MaterialActivity };
 
-export interface MaterialActivity {
-    id: string;
-    titre: string;
-    Module: { nom: string } | null;
-    ActiviteMateriel: {
-        TypeMateriel: {
-            id: string;
-            nom: string;
-            acronyme: string | null;
-        } | null;
-    }[];
-}
+/**
+ * Service for Material management
+ * Handles business logic for managing material types
+ */
+export class MaterialService {
+    constructor(private repository: IMaterialRepository) { }
 
-export const materialService = {
     /**
-     * Fetch all materials (TypeMateriel)
+     * Fetch all materials ordered by name
      */
-    fetchAll: async (): Promise<TypeMateriel[]> => {
-        const { data, error } = await supabase
-            .from('TypeMateriel')
-            .select('*')
-            .order('nom');
-
-        if (error) throw error;
-        return data || [];
-    },
+    async fetchAll(): Promise<TypeMateriel[]> {
+        return await this.repository.getAll();
+    }
 
     /**
      * Fetch linked activities for a material
+     * Business logic: Sorts activities alphabetically by title
      */
-    fetchLinkedActivities: async (materialId: string): Promise<MaterialActivity[]> => {
-        const { data, error } = await supabase
-            .from('ActiviteMateriel')
-            .select(`
-                activite_id,
-                Activite:activite_id (
-                    id,
-                    titre,
-                    Module:module_id (nom),
-                    ActiviteMateriel (
-                        TypeMateriel (
-                            id,
-                            nom,
-                            acronyme
-                        )
-                    )
-                )
-            `)
-            .eq('type_materiel_id', materialId);
+    async fetchLinkedActivities(materialId: string): Promise<MaterialActivity[]> {
+        const activities = await this.repository.getLinkedActivities(materialId);
 
-        if (error) throw error;
-
-        // Extract activities from the join and filter nulls
-        // We cast to any first to handle the complex join type, then map to our interface
-        const activities = (data as any[])?.map(item => item.Activite).filter(Boolean) || [];
-
-        // Sort by title
-        return activities.sort((a: MaterialActivity, b: MaterialActivity) =>
+        // Business logic: Sort activities alphabetically by title
+        return activities.sort((a, b) =>
             (a.titre || '').localeCompare(b.titre || '')
         );
-    },
+    }
 
     /**
      * Create a new material
+     * Business logic: Ensures user_id is provided and validates name
      */
-    create: async (materialData: Omit<TypeMaterielInsert, 'user_id'>): Promise<TypeMateriel> => {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) throw new Error("User not authenticated");
+    async create(materialData: Omit<TablesInsert<'TypeMateriel'>, 'user_id'>, userId: string): Promise<TypeMateriel> {
+        // Validation
+        if (!materialData.nom || materialData.nom.trim().length === 0) {
+            throw new Error('Le nom du matériel est requis');
+        }
 
-        const { data, error } = await supabase
-            .from('TypeMateriel')
-            .insert([{ ...materialData, user_id: user.id }])
-            .select()
-            .single();
-
-        if (error) throw error;
-        return data;
-    },
+        return await this.repository.create({
+            ...materialData,
+            nom: materialData.nom.trim(),
+            user_id: userId
+        });
+    }
 
     /**
      * Update an existing material
+     * Business logic: Validates name if provided
      */
-    update: async (id: string, materialData: TypeMaterielUpdate): Promise<TypeMateriel> => {
-        const { data, error } = await supabase
-            .from('TypeMateriel')
-            .update(materialData)
-            .eq('id', id)
-            .select()
-            .single();
+    async update(id: string, materialData: TablesUpdate<'TypeMateriel'>): Promise<TypeMateriel> {
+        // Validation if name is being updated
+        if (materialData.nom !== undefined) {
+            if (!materialData.nom || materialData.nom.trim().length === 0) {
+                throw new Error('Le nom du matériel est requis');
+            }
+            materialData.nom = materialData.nom.trim();
+        }
 
-        if (error) throw error;
-        return data;
-    },
+        return await this.repository.update(id, materialData);
+    }
 
     /**
      * Delete a material
      */
-    delete: async (id: string): Promise<boolean> => {
-        const { error } = await supabase
-            .from('TypeMateriel')
-            .delete()
-            .eq('id', id);
-
-        if (error) throw error;
+    async delete(id: string): Promise<boolean> {
+        await this.repository.delete(id);
         return true;
-    },
-};
+    }
+}
 
+// Export singleton instance
+export const materialService = new MaterialService(new SupabaseMaterialRepository());
+
+// Export default for backward compatibility
 export default materialService;

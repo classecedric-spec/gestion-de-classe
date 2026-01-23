@@ -1,6 +1,6 @@
 import React from 'react';
 import { Users, CheckCircle2, Calendar } from 'lucide-react';
-import { getInitials } from '../../../lib/utils';
+import { getInitials } from '../../../lib/helpers';
 import { Student } from '../../attendance/services/attendanceService';
 import { DashboardStats } from '../hooks/useDashboardData';
 

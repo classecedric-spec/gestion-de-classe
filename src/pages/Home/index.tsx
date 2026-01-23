@@ -375,9 +375,9 @@ const Home: React.FC = () => {
                                                 {/* Student Info */}
                                                 <div className="col-span-6 md:col-span-5 flex items-center gap-3">
                                                     <div className="relative">
-                                                        {student.photo_base64 ? (
+                                                        {student.photo_url ? (
                                                             <img
-                                                                src={student.photo_base64}
+                                                                src={student.photo_url}
                                                                 alt={student.prenom || ''}
                                                                 className="w-10 h-10 rounded-full object-cover border-2 border-surface shadow-sm"
                                                             />

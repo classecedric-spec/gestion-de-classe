@@ -1,31 +1,13 @@
 import { useState, useEffect } from 'react';
-import { supabase } from '../../../lib/supabaseClient';
-import { fetchWithCache } from '../../../lib/offline';
+import { supabase } from '../../../lib/database';
+import { fetchWithCache } from '../../../lib/sync';
 import { useOfflineSync } from '../../../context/OfflineSyncContext';
 import { toast } from 'sonner';
 
-export interface Adult {
-    id: string;
-    nom: string;
-    prenom: string;
-}
+import { adultService, Adult, ActivityType, AdultActivity } from '../../adults/services/adultService';
 
-export interface ActivityType {
-    id: string;
-    label: string;
-    user_id?: string;
-    created_at?: string;
-}
-
-export interface AdultActivity {
-    id: string;
-    adulte_id: string;
-    activite_id: string;
-    user_id: string | null;
-    created_at: string;
-    Adulte?: Adult | null;
-    TypeActiviteAdulte?: ActivityType | null;
-}
+// Remove local interfaces as they are imported
+// ...
 
 /**
  * useAdultTracking
@@ -50,18 +32,7 @@ export function useAdultTracking() {
             'adult_tracking_today',
             async () => {
                 const today = new Date().toISOString().split('T')[0];
-                const { data, error } = await supabase
-                    .from('SuiviAdulte')
-                    .select(`
-                        *,
-                        Adulte (id, nom, prenom),
-                        TypeActiviteAdulte (id, label)
-                    `)
-                    .gte('created_at', today)
-                    .order('created_at', { ascending: false });
-
-                if (error) throw error;
-                return data || [];
+                return await adultService.fetchAdultActivities(today);
             },
             (data) => setAdultActivities(data as AdultActivity[]),
             (_err) => { }
@@ -73,9 +44,7 @@ export function useAdultTracking() {
         await fetchWithCache(
             'all_adults',
             async () => {
-                const { data, error } = await supabase.from('Adulte').select('*').order('nom');
-                if (error) throw error;
-                return data || [];
+                return await adultService.fetchAllAdults();
             },
             (data) => setAllAdults(data as Adult[]),
             (_err) => { }
@@ -87,9 +56,7 @@ export function useAdultTracking() {
         await fetchWithCache(
             'activity_types_adult',
             async () => {
-                const { data, error } = await supabase.from('TypeActiviteAdulte').select('*').order('label');
-                if (error) throw error;
-                return data || [];
+                return await adultService.fetchActivityTypes();
             },
             (data) => setAvailableActivityTypes(data as ActivityType[]),
             (_err) => { }
@@ -120,15 +87,8 @@ export function useAdultTracking() {
                 return;
             }
 
-            const { error } = await supabase
-                .from('SuiviAdulte')
-                .insert([{
-                    adulte_id: adulteId,
-                    activite_id: activiteId,
-                    user_id: userId
-                }]);
+            await adultService.addActivity(adulteId, activiteId, userId || '');
 
-            if (error) throw error;
             setShowAdultModal(false);
             fetchAdultTracking();
             toast.success("Action enregistrée");
@@ -156,11 +116,7 @@ export function useAdultTracking() {
                 return;
             }
 
-            const { error } = await supabase
-                .from('SuiviAdulte')
-                .delete()
-                .eq('id', id);
-            if (error) throw error;
+            await adultService.deleteSuivi(id);
             fetchAdultTracking();
             toast.success("Retiré");
         } catch (error) {

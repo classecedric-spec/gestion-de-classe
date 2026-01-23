@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
-import { supabase } from '../../../lib/supabaseClient';
+import { studentService } from '../../../features/students/services/studentService';
+import { trackingService } from '../../../features/tracking/services/trackingService';
 import { Student } from '../../../features/attendance/services/attendanceService';
 import { AvancementModule } from './useAvancementData';
 
@@ -34,35 +35,20 @@ export const useStudentsAndActivities = (
     const fetchStudents = useCallback(async (groupId: string) => {
         setLoading(true);
         try {
-            const { data: eleveIdsData } = await supabase
-                .from('EleveGroupe')
-                .select('eleve_id')
-                .eq('groupe_id', groupId);
+            const data = await studentService.getStudentsByGroup(groupId);
+            const sortedStudents = (data as Student[] || []).sort((a, b) => {
+                const levelA = a.Niveau?.ordre || 0;
+                const levelB = b.Niveau?.ordre || 0;
+                if (levelA !== levelB) return levelA - levelB;
 
-            const eleveIds = eleveIdsData?.map(e => e.eleve_id) || [];
+                const prenomA = (a.prenom || '').toLowerCase();
+                const prenomB = (b.prenom || '').toLowerCase();
+                if (prenomA !== prenomB) return prenomA.localeCompare(prenomB);
 
-            if (eleveIds.length > 0) {
-                const { data } = await supabase
-                    .from('Eleve')
-                    .select('*, Niveau(ordre, nom)')
-                    .in('id', eleveIds);
+                return (a.nom || '').localeCompare(b.nom || '');
+            });
 
-                const sortedStudents = (data as Student[] || []).sort((a, b) => {
-                    const levelA = a.Niveau?.ordre || 0;
-                    const levelB = b.Niveau?.ordre || 0;
-                    if (levelA !== levelB) return levelA - levelB;
-
-                    const prenomA = (a.prenom || '').toLowerCase();
-                    const prenomB = (b.prenom || '').toLowerCase();
-                    if (prenomA !== prenomB) return prenomA.localeCompare(prenomB);
-
-                    return (a.nom || '').localeCompare(b.nom || '');
-                });
-
-                setStudents(sortedStudents);
-            } else {
-                setStudents([]);
-            }
+            setStudents(sortedStudents);
         } catch (error) {
             console.error('Error fetching students:', error);
         } finally {
@@ -73,28 +59,7 @@ export const useStudentsAndActivities = (
     const fetchActivitiesAndProgress = useCallback(async (moduleIds: string[]) => {
         setLoading(true);
         try {
-            const { data: acts } = await supabase
-                .from('Activite')
-                .select(`
-                    *,
-                    Module(
-                        id,
-                        nom,
-                        date_fin,
-                        SousBranche(
-                            id,
-                            nom,
-                            ordre,
-                            Branche(
-                                id,
-                                nom,
-                                ordre
-                            )
-                        )
-                    ),
-                    ActiviteNiveau(niveau_id)
-                `)
-                .in('module_id', moduleIds);
+            const acts = await trackingService.getActivitiesByModules(moduleIds);
 
             const sortedActs = (acts as AvancementActivity[] || []).sort((a, b) => {
                 const modA = a.Module;
@@ -129,21 +94,7 @@ export const useStudentsAndActivities = (
                 const studentIds = students.map(s => s.id);
                 const actIds = sortedActs.map(a => a.id);
 
-                const CHUNK_SIZE = 50;
-                let allProgs: any[] = [];
-
-                for (let i = 0; i < actIds.length; i += CHUNK_SIZE) {
-                    const chunk = actIds.slice(i, i + CHUNK_SIZE);
-                    const { data: chunkProgs } = await supabase
-                        .from('Progression')
-                        .select('eleve_id, activite_id, etat')
-                        .in('eleve_id', studentIds)
-                        .in('activite_id', chunk);
-
-                    if (chunkProgs) {
-                        allProgs = allProgs.concat(chunkProgs);
-                    }
-                }
+                const allProgs = await trackingService.getProgressionsForStudentsAndActivities(studentIds, actIds);
 
                 const groupLevelIds = new Set(students.map(s => s.niveau_id).filter(Boolean));
 

@@ -4,7 +4,7 @@ import {
     Minimize, ChevronDown, Filter, Check, Loader2, Activity, Trash2, Zap
 } from 'lucide-react';
 import clsx from 'clsx';
-import { getInitials } from '../../../lib/utils';
+import { getInitials } from '../../../lib/helpers';
 import TimerModal from '../../../components/TimerModal';
 import RandomPickerModal from '../../../components/RandomPickerModal';
 import { format } from 'date-fns';

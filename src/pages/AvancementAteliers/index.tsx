@@ -1,8 +1,8 @@
 import React, { useEffect } from 'react';
-import { supabase } from '../../lib/supabaseClient';
-import { checkOverdueActivities } from '../../lib/overdueLogic';
-import { getInitials } from '../../lib/utils';
-import { getStatusStyle, getStatusIcon } from '../../lib/statusHelpers';
+import { supabase } from '../../lib/database';
+import { checkOverdueActivities } from '../../lib/helpers';
+import { getInitials } from '../../lib/helpers';
+import { getStatusStyle, getStatusIcon } from '../../lib/helpers';
 import { BookOpen, Calendar, ChevronDown, Search, Users, Check, AlertCircle, Home, GitBranch, ShieldCheck, Settings2 } from 'lucide-react';
 import clsx from 'clsx';
 import { format } from 'date-fns';

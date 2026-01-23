@@ -1,29 +1,6 @@
-import React from 'react';
-import { Page, Text, View, Document, StyleSheet } from '@react-pdf/renderer';
-
-interface PDFActivity {
-    name: string;
-    material?: string;
-    level?: string;
-}
-
-interface PDFModule {
-    title: string;
-    dueDate?: string;
-    activities: PDFActivity[];
-}
-
-export interface PDFStudentData {
-    studentName: string;
-    modules: PDFModule[];
-    printDate: string;
-}
-
-interface StudentTrackingPDFModernProps {
-    data?: PDFStudentData;
-    bulkData?: PDFStudentData[];
-}
-
+import { Page, Text, View, Document, StyleSheet, Image } from '@react-pdf/renderer';
+import { PdfData, PdfModule } from '../lib/pdf';
+import logo from '../assets/logo_tbi.png';
 // Modern Styles - Condensed & Optimized
 const styles = StyleSheet.create({
     page: {
@@ -216,6 +193,11 @@ const styles = StyleSheet.create({
         marginRight: 8,
     }
 });
+
+interface StudentTrackingPDFModernProps {
+    data?: PdfData;
+    bulkData?: PdfData[];
+}
 
 const StudentTrackingPDFModern: React.FC<StudentTrackingPDFModernProps> = ({ data, bulkData }) => {
     const items = bulkData || (data ? [data] : []);
