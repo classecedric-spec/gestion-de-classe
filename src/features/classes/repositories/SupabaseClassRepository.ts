@@ -62,9 +62,27 @@ export class SupabaseClassRepository implements IClassRepository {
     }
 
     async createClass(data: any): Promise<{ id: string }> {
+        // Get the authenticated user's ID
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) throw new Error('User not authenticated');
+
+        // Fetch the Adulte record for the current user
+        const { data: adulte, error: adulteError } = await supabase
+            .from('Adulte')
+            .select('id')
+            .eq('user_id', user.id)
+            .single();
+
+        if (adulteError || !adulte) {
+            throw new Error('No Adulte record found for current user. Please create an adult profile first.');
+        }
+
         const { data: newClass, error } = await supabase
             .from('Classe')
-            .insert(data)
+            .insert({
+                ...data,
+                titulaire_id: adulte.id  // Use Adulte.id instead of auth.uid()
+            })
             .select()
             .single();
         if (error) throw error;

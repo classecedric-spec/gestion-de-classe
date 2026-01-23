@@ -276,19 +276,24 @@ const Students: React.FC = () => {
                                         <h4 className="text-sm text-grey-light font-medium group-hover:text-white transition-colors">{p.Activite?.titre}</h4>
                                         <div className="flex items-center gap-3">
                                             <span className="text-[10px] text-grey-dark font-mono">{new Date(p.updated_at).toLocaleDateString()}</span>
-                                            <div className={clsx(
-                                                "px-2 py-1 rounded text-[10px] font-black uppercase tracking-wider flex items-center gap-1.5",
-                                                p.etat === 'termine' ? "bg-success/20 text-success" :
-                                                    p.etat === 'besoin_d_aide' ? "bg-danger/20 text-danger animate-pulse" :
-                                                        "bg-primary/20 text-primary"
-                                            )}>
-                                                {p.etat === 'termine' ? <CheckCircle2 size={10} /> :
-                                                    p.etat === 'besoin_d_aide' ? <AlertCircle size={10} /> :
-                                                        <Clock size={10} />}
+                                            <Badge
+                                                variant={
+                                                    p.etat === 'termine' ? 'success' :
+                                                        p.etat === 'besoin_d_aide' ? 'danger' :
+                                                            'primary'
+                                                }
+                                                size="xs"
+                                                icon={
+                                                    p.etat === 'termine' ? CheckCircle2 :
+                                                        p.etat === 'besoin_d_aide' ? AlertCircle :
+                                                            Clock
+                                                }
+                                                className={p.etat === 'besoin_d_aide' ? 'animate-pulse' : ''}
+                                            >
                                                 {p.etat === 'termine' ? 'Terminé' :
                                                     p.etat === 'besoin_d_aide' ? "Besoin d'aide" :
                                                         'En cours'}
-                                            </div>
+                                            </Badge>
                                         </div>
                                     </div>
                                 ))}
@@ -559,12 +564,13 @@ const Students: React.FC = () => {
                                                             selectedStudent.Classe?.ClasseAdulte?.map((ca, idx) => (
                                                                 <div key={idx} className="flex items-center gap-2 text-sm">
                                                                     <p className="text-text-main font-bold truncate">{ca.Adulte.prenom} {ca.Adulte.nom}</p>
-                                                                    <span className={clsx(
-                                                                        "px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-tighter shrink-0",
-                                                                        ca.role === 'principal' ? "bg-primary/20 text-primary" : "bg-white/10 text-grey-medium"
-                                                                    )}>
+                                                                    <Badge
+                                                                        variant={ca.role === 'principal' ? 'primary' : 'default'}
+                                                                        size="xs"
+                                                                        style="outline"
+                                                                    >
                                                                         {ca.role === 'principal' ? 'Titulaire' : ca.role === 'coenseignant' ? 'Co-Ens.' : 'Support'}
-                                                                    </span>
+                                                                    </Badge>
                                                                 </div>
                                                             ))
                                                         ) : (
