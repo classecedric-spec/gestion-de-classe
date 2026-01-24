@@ -495,15 +495,23 @@ export const useDashboardData = () => {
                 .neq('day_of_week', 'DOCK');
 
             // 12. Overdue Students Logic (via Secure View)
-            const { data: overdueSummary } = await supabase
-                .from('view_retards_count' as any)
-                .select('eleve_id, nombre_retards');
+            // 12. Overdue Students Logic (Direct Query)
+            const { data: overdueItems } = await supabase
+                .from('Progression')
+                .select('eleve_id')
+                .lt('date_limite', today)
+                .neq('etat', 'termine')
+                .neq('etat', 'a_verifier');
 
-            const sortedOverdueStudents = (overdueSummary as any[])
-                ?.map(item => {
-                    const student = allStudents.find(s => s.id === item.eleve_id);
-                    // Ensure we return a number for overdueCount
-                    return student ? { ...student, overdueCount: item.nombre_retards || 0 } : null;
+            const overdueCounts: Record<string, number> = {};
+            (overdueItems || []).forEach(item => {
+                overdueCounts[item.eleve_id] = (overdueCounts[item.eleve_id] || 0) + 1;
+            });
+
+            const sortedOverdueStudents = Object.entries(overdueCounts)
+                .map(([eleveId, count]) => {
+                    const student = allStudents.find(s => s.id === eleveId);
+                    return student ? { ...student, overdueCount: count } : null;
                 })
                 .filter(Boolean)
                 .sort((a: any, b: any) => b.overdueCount - a.overdueCount);
