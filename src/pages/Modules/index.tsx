@@ -131,7 +131,7 @@ const Modules: React.FC = () => {
                     contentClassName="space-y-5"
                 >
                     <div className="flex items-center justify-between">
-                        <h2 className="text-xl font-bold text-text-main flex items-center gap-2">
+                        <h2 className="text-cq-xl font-bold text-text-main flex items-center gap-2">
                             <Folder className="text-primary" size={24} />
                             Liste des Modules
                         </h2>

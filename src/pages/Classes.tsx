@@ -1,8 +1,8 @@
 import React, { ChangeEvent } from 'react';
 import clsx from 'clsx';
-import { BookOpen, GraduationCap, Plus, Search, LayoutGrid, Table as TableIcon, ArrowUp, ArrowDown, ArrowUpDown, Edit, Trash2, Tag } from 'lucide-react';
-import { Badge, Button, EmptyState, Avatar, SmartTabs, ListItem, CardInfo, CardList, CardTabs, Input, ConfirmModal, InfoSection, InfoRow } from '../components/ui';
-import { User, ShieldCheck } from 'lucide-react';
+import { BookOpen, GraduationCap, Plus, LayoutGrid, Table as TableIcon, ArrowUp, ArrowDown, ArrowUpDown, Edit, Trash2, Tag } from 'lucide-react';
+import { Badge, Button, EmptyState, Avatar, SmartTabs, ListItem, CardInfo, CardList, CardTabs, SearchBar, ConfirmModal, InfoSection, InfoRow } from '../components/ui';
+import { Users, ShieldCheck } from 'lucide-react';
 
 // Feature Hooks & Services
 import { useClasses } from '../features/classes/hooks/useClasses';
@@ -240,24 +240,28 @@ const Classes: React.FC = () => {
                 <CardInfo
                     ref={leftHeaderRef}
                     height={headerHeight}
-                    contentClassName="space-y-4"
+                    contentClassName="space-y-5"
                 >
                     <div className="flex items-center justify-between">
                         <h2 className="text-cq-xl font-bold text-text-main flex items-center gap-2">
                             <BookOpen className="text-primary" size={24} />
                             Liste des Classes
                         </h2>
-                        <Badge variant="primary" size="sm">
+                        <Badge variant="primary" size="xs">
                             {filteredClasses.length} Total
                         </Badge>
                     </div>
-                    <Input
-                        placeholder="Rechercher une classe..."
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        icon={Search}
-                        className="bg-background/50"
-                    />
+
+                    <div className="border-t border-white/10" />
+
+                    <div className="space-y-4">
+                        <SearchBar
+                            placeholder="Rechercher une classe..."
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            iconColor="text-primary"
+                        />
+                    </div>
                 </CardInfo>
 
                 <CardList
@@ -425,7 +429,7 @@ const Classes: React.FC = () => {
                                             selectedClass.ClasseAdulte.map((ca, idx) => (
                                                 <InfoRow
                                                     key={idx}
-                                                    icon={ca.role === 'principal' ? ShieldCheck : User}
+                                                    icon={ca.role === 'principal' ? ShieldCheck : Users}
                                                     label={ca.role === 'principal' ? 'Titulaire' : ca.role === 'coenseignant' ? 'Co-Enseignant' : 'Intervenant'}
                                                     value={ca.Adulte ? `${ca.Adulte.prenom} ${ca.Adulte.nom}` : 'Enseignant inconnu'}
                                                 />

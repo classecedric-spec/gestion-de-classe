@@ -9,6 +9,7 @@ interface SmartTabsProps {
     className?: string;
     fullWidth?: boolean;
     level?: 1 | 2 | 3; // 1 = engraved, 2 = flat, 3 = outline
+    disableCompact?: boolean;
 }
 
 
@@ -23,7 +24,8 @@ const SmartTabs: React.FC<SmartTabsProps> = ({
     onChange,
     className,
     fullWidth = false,
-    level = 1
+    level = 1,
+    disableCompact = false
 }) => {
     const [isCompact, setIsCompact] = useState(false);
     const containerRef = useRef<HTMLDivElement>(null);
@@ -42,6 +44,11 @@ const SmartTabs: React.FC<SmartTabsProps> = ({
     // STEP 2: On resize, compare available width to threshold
     useEffect(() => {
         if (!containerRef.current || threshold === null) return;
+
+        if (disableCompact) {
+            setIsCompact(false);
+            return;
+        }
 
         // Observe the PARENT element which actually resizes with the window
         const parentElement = containerRef.current.parentElement;

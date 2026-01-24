@@ -1,12 +1,11 @@
 import React, { useState, useRef, useLayoutEffect } from 'react';
-import { GitBranch, Plus, Search, SlidersHorizontal } from 'lucide-react';
+import { GitBranch } from 'lucide-react';
 import { useBranches } from '../features/branches/hooks/useBranches';
 import BranchList from '../features/branches/components/BranchList';
 import BranchDetails from '../features/branches/components/BranchDetails';
 import AddBranchModal from '../features/branches/components/AddBranchModal';
 import { useInAppMigration } from '../hooks/useInAppMigration';
-import { ConfirmModal, CardInfo, CardList, ListItem, SearchBar, Badge } from '../components/ui';
-import clsx from 'clsx';
+import { ConfirmModal, CardInfo, SearchBar, Badge } from '../components/ui';
 
 const Branches: React.FC = () => {
     const {
@@ -114,12 +113,14 @@ const Branches: React.FC = () => {
 
                     <div className="border-t border-white/10" />
 
-                    <SearchBar
-                        placeholder="Rechercher une branche..."
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        iconColor="text-primary"
-                    />
+                    <div className="space-y-4">
+                        <SearchBar
+                            placeholder="Rechercher une branche..."
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            iconColor="text-primary"
+                        />
+                    </div>
                 </CardInfo>
 
                 <BranchList

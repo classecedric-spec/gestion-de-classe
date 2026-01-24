@@ -46,25 +46,16 @@ const ActivityLevelExceptions: React.FC<ActivityLevelExceptionsProps> = ({
 
     return (
         <div className="space-y-4 mb-6">
-            <div className="relative py-4">
-                <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-white/10"></div></div>
-                <div className="relative flex justify-center">
-                    <span className="px-6 bg-input text-[10px] font-black uppercase tracking-[0.4em] text-primary/60 border border-white/10 rounded-full py-1">
-                        Exceptions par Niveau
-                    </span>
-                </div>
-            </div>
-
-            <div className="flex items-center justify-between mb-4">
-                <h5 className="text-xs font-bold text-white uppercase tracking-wide opacity-50">Personnalisation</h5>
+            <div className="flex items-center justify-between border-b border-white/10 pb-2 mb-4">
+                <h4 className="text-sm font-bold text-white uppercase tracking-wider">Objectifs par Niveau</h4>
                 <div className="relative">
                     <select
                         onChange={(e) => handleAddClick(e.target.value)}
                         value={selectedLevelId}
                         className="bg-white/5 text-[10px] font-black uppercase tracking-wider text-primary border border-primary/20 rounded-lg py-1.5 px-3 outline-none focus:ring-1 focus:ring-primary/50 cursor-pointer hover:bg-white/10 transition-colors"
-                        title="Ajouter une exception pour un niveau"
+                        title="Ajouter un objectif pour un niveau"
                     >
-                        <option value="" disabled>+ Ajouter une exception</option>
+                        <option value="" disabled>+ Ajouter un objectif</option>
                         {allLevels
                             .filter(l => !activityLevels.find(al => al.niveau_id === l.id))
                             .map(level => (
@@ -77,70 +68,72 @@ const ActivityLevelExceptions: React.FC<ActivityLevelExceptionsProps> = ({
 
             {activityLevels.length === 0 ? (
                 <div className="bg-black/10 border border-dashed border-white/5 rounded-2xl py-10 text-center">
-                    <p className="text-xs text-gray-500 italic">Aucune exigence spécifique configurée.</p>
-                    <p className="text-[10px] text-gray-600 mt-1 uppercase tracking-tight">Utilise les exigences de base par défaut</p>
+                    <p className="text-xs text-gray-500 italic">Aucun objectif défini pour le moment.</p>
+                    <p className="text-[10px] text-gray-600 mt-1 uppercase tracking-tight">Veuillez ajouter au moins un objectif pour cette activité</p>
                 </div>
             ) : (
                 <div className="space-y-3">
                     {activityLevels.map((al, index) => (
-                        <div key={al.niveau_id} className="bg-white/5 p-4 rounded-2xl border border-white/5 relative group animate-in slide-in-from-bottom-2 duration-300">
+                        <div key={al.niveau_id} className="bg-white/5 p-3 rounded-2xl border border-white/5 relative group animate-in slide-in-from-right-2 duration-300">
                             <button
                                 type="button"
                                 onClick={() => onRemove(al.niveau_id)}
-                                className="absolute top-4 right-4 text-gray-600 hover:text-danger p-1 rounded transition-colors"
-                                aria-label={`Supprimer l'exception pour le niveau ${al.nom_niveau}`}
+                                className="absolute top-3 right-3 text-gray-600 hover:text-danger p-1 rounded transition-colors opacity-0 group-hover:opacity-100"
+                                aria-label={`Supprimer l'objectif pour le niveau ${al.nom_niveau}`}
                             >
                                 <X size={14} />
                             </button>
 
-                            <h6 className="text-[11px] font-black text-primary mb-4 flex items-center gap-2 uppercase tracking-widest">
-                                <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse"></span>
-                                Niveau {al.nom_niveau}
-                            </h6>
-
-                            <div className="grid grid-cols-2 gap-4 mb-4">
-                                <div className="space-y-1.5">
-                                    <label htmlFor={`ex_count_${index}`} className="text-[10px] font-bold text-gray-500 uppercase tracking-tighter">Exercices</label>
-                                    <input
-                                        id={`ex_count_${index}`}
-                                        type="number"
-                                        value={al.nombre_exercices}
-                                        onChange={(e) => onUpdate(index, 'nombre_exercices', e.target.value)}
-                                        className="w-full bg-black/20 border border-white/10 rounded-lg px-3 py-2 text-xs text-white focus:border-primary outline-none"
-                                        min="1"
-                                        title="Nombre d'exercices"
-                                    />
+                            <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+                                <div className="sm:w-32 shrink-0">
+                                    <h6 className="text-[11px] font-black text-primary flex items-center gap-2 uppercase tracking-widest">
+                                        <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse"></span>
+                                        {al.nom_niveau}
+                                    </h6>
                                 </div>
-                                <div className="space-y-1.5">
-                                    <label htmlFor={`err_count_${index}`} className="text-[10px] font-bold text-gray-500 uppercase tracking-tighter">Erreurs Max</label>
-                                    <input
-                                        id={`err_count_${index}`}
-                                        type="number"
-                                        value={al.nombre_erreurs}
-                                        onChange={(e) => onUpdate(index, 'nombre_erreurs', e.target.value)}
-                                        className="w-full bg-black/20 border border-white/10 rounded-lg px-3 py-2 text-xs text-white focus:border-primary outline-none"
-                                        min="0"
-                                        title="Nombre d'erreurs maximum"
-                                    />
-                                </div>
-                            </div>
 
-                            <div className="flex gap-2">
-                                {(['obligatoire', 'facultatif'] as const).map(status => (
-                                    <button
-                                        key={status}
-                                        type="button"
-                                        onClick={() => onUpdate(index, 'statut_exigence', status)}
-                                        className={clsx(
-                                            "flex-1 py-1.5 text-[10px] font-black uppercase rounded-lg border transition-all tracking-wider",
-                                            al.statut_exigence === status
-                                                ? (status === 'obligatoire' ? "bg-success text-text-dark border-success" : "bg-danger text-white border-danger")
-                                                : "border-white/5 text-gray-600 hover:border-white/10"
-                                        )}
-                                    >
-                                        {status}
-                                    </button>
-                                ))}
+                                <div className="flex-1 grid grid-cols-2 sm:grid-cols-2 gap-3">
+                                    <div className="flex items-center gap-2">
+                                        <label htmlFor={`ex_count_${index}`} className="text-[9px] font-bold text-gray-500 uppercase tracking-tighter shrink-0">Exercices</label>
+                                        <input
+                                            id={`ex_count_${index}`}
+                                            type="number"
+                                            value={al.nombre_exercices}
+                                            onChange={(e) => onUpdate(index, 'nombre_exercices', e.target.value)}
+                                            className="w-full max-w-[60px] bg-black/20 border border-white/10 rounded-lg px-2 py-1 text-xs text-white focus:border-primary outline-none"
+                                            min="1"
+                                        />
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <label htmlFor={`err_count_${index}`} className="text-[9px] font-bold text-gray-500 uppercase tracking-tighter shrink-0">Erreurs</label>
+                                        <input
+                                            id={`err_count_${index}`}
+                                            type="number"
+                                            value={al.nombre_erreurs}
+                                            onChange={(e) => onUpdate(index, 'nombre_erreurs', e.target.value)}
+                                            className="w-full max-w-[60px] bg-black/20 border border-white/10 rounded-lg px-2 py-1 text-xs text-white focus:border-primary outline-none"
+                                            min="0"
+                                        />
+                                    </div>
+                                </div>
+
+                                <div className="flex sm:w-48 bg-black/20 rounded-lg p-0.5 border border-white/5 h-8">
+                                    {(['obligatoire', 'facultatif'] as const).map(status => (
+                                        <button
+                                            key={status}
+                                            type="button"
+                                            onClick={() => onUpdate(index, 'statut_exigence', status)}
+                                            className={clsx(
+                                                "flex-1 px-3 text-[9px] font-black uppercase rounded-md transition-all tracking-wider",
+                                                al.statut_exigence === status
+                                                    ? (status === 'obligatoire' ? "bg-success text-text-dark" : "bg-danger text-white")
+                                                    : "text-gray-600 hover:text-white"
+                                            )}
+                                        >
+                                            {status}
+                                        </button>
+                                    ))}
+                                </div>
                             </div>
                         </div>
                     ))}

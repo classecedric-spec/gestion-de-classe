@@ -26,7 +26,7 @@ interface BranchDetailsProps {
     selectedBranch: BrancheRow | null;
     subBranches: SousBrancheRow[];
     onReorderSub: (subBranches: SousBrancheRow[]) => void;
-    rightContentRef: React.RefObject<HTMLDivElement>;
+    rightContentRef: React.RefObject<HTMLDivElement | null>;
     headerHeight?: number;
 }
 

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { LogIn, Menu, X } from 'lucide-react';
 import clsx from 'clsx';
+import { Button } from './ui';
 
 interface PublicHeaderProps {
     solidBackground?: boolean;

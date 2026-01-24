@@ -117,12 +117,14 @@ const SubBranches: React.FC = () => {
 
                     <div className="border-t border-white/10" />
 
-                    <SearchBar
-                        placeholder="Rechercher une sous-branche..."
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        iconColor="text-primary"
-                    />
+                    <div className="space-y-4">
+                        <SearchBar
+                            placeholder="Rechercher une sous-branche..."
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            iconColor="text-primary"
+                        />
+                    </div>
                 </CardInfo>
 
                 <SubBranchList

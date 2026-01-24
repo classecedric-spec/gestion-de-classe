@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { DndContext, DragOverlay, useSensor, useSensors, MouseSensor, TouchSensor, DragStartEvent, DragEndEvent } from '@dnd-kit/core';
 import { Settings } from 'lucide-react';
 import { toast } from 'sonner';
-import { Tabs, Button, EmptyState } from '../components/ui';
+import { SmartTabs, Button, EmptyState } from '../components/ui';
 
 import useAttendance from '../features/attendance/hooks/useAttendance';
 import AttendanceStudentCard from '../features/attendance/components/AttendanceStudentCard';
@@ -93,15 +93,16 @@ const Presence: React.FC = () => {
 
                 {/* CENTER: Period Selector */}
                 <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-0 hidden md:block">
-                    <Tabs
+                    <SmartTabs
                         tabs={[
                             { id: 'matin', label: 'Matin' },
                             { id: 'apres_midi', label: 'Après-midi' }
                         ]}
                         activeTab={currentPeriod}
                         onChange={(id) => setCurrentPeriod(id as 'matin' | 'apres_midi')}
-                        variant="capsule"
+                        level={3}
                         className="min-w-[200px]"
+                        disableCompact={true}
                     />
                 </div>
 
@@ -139,14 +140,14 @@ const Presence: React.FC = () => {
 
             {/* Mobile Period Selector (visible only on small screens) */}
             <div className="md:hidden flex justify-center mb-6">
-                <Tabs
+                <SmartTabs
                     tabs={[
                         { id: 'matin', label: 'Matin' },
                         { id: 'apres_midi', label: 'Après-midi' }
                     ]}
                     activeTab={currentPeriod}
                     onChange={(id) => setCurrentPeriod(id as 'matin' | 'apres_midi')}
-                    variant="capsule"
+                    level={3}
                     fullWidth
                 />
             </div>

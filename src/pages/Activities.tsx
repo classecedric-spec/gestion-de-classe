@@ -72,10 +72,17 @@ const Activities: React.FC = () => {
             setActivities(prev => {
                 const exists = prev.find(a => a.id === newActivity.id);
                 if (exists) {
-                    return prev.map(a => a.id === newActivity.id ? { ...exists, ...newActivity } : a);
+                    const updated = prev.map(a => a.id === newActivity.id ? { ...exists, ...newActivity } : a);
+                    return updated;
                 }
                 return [newActivity, ...prev];
             });
+
+            // CRITICAL: Update selected activity if it was modified
+            if (selectedActivity?.id === newActivity.id) {
+                // Merge with existing to preserve any joined data not present in newActivity
+                setSelectedActivity((prev: any) => ({ ...prev, ...newActivity }));
+            }
         } else {
             fetchActivities();
         }
@@ -264,7 +271,7 @@ const Activities: React.FC = () => {
 
                         <CardTabs
                             tabs={[
-                                { id: 'exigences', label: 'Exigences', icon: LayoutList },
+                                { id: 'exigences', label: 'Objectifs', icon: LayoutList },
                                 { id: 'infos', label: 'Infos Complémentaires', icon: FileText }
                             ]}
                             activeTab={currentTab}

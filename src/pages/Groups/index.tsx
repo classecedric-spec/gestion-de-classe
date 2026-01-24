@@ -28,9 +28,9 @@ import { useGroupPdfGenerator } from '../../features/dashboard/hooks/useGroupPdf
 // @ts-ignore
 import { useInAppMigration } from '../../hooks/useInAppMigration';
 import { Tables } from '../../types/supabase';
-import { Badge, EmptyState, ConfirmModal, Avatar, Input, ListItem, CardInfo, CardList, CardTabs, ActionItem } from '../../components/ui';
+import { Badge, SearchBar, EmptyState, ConfirmModal, Avatar, ListItem, CardInfo, CardList, CardTabs, ActionItem } from '../../components/ui';
 import PdfProgress from '../../components/ui/PdfProgress';
-import { GraduationCap, LayoutList, Plus, Search, FileText, Layers } from 'lucide-react';
+import { GraduationCap, LayoutList, Plus, Users, FileText, Layers } from 'lucide-react';
 
 const Groups: React.FC = () => {
     const navigate = useNavigate();
@@ -170,31 +170,32 @@ const Groups: React.FC = () => {
 
     return (
         <div className="h-full flex gap-6 animate-in fade-in duration-500 relative">
-            {/* List Column (Groups) */}
-            <div className="w-80 flex flex-col gap-6 h-full">
+            {/* List Column (Groups) - 1/4 weight */}
+            <div className="w-1/4 flex flex-col gap-6 h-full">
                 <CardInfo
                     ref={leftContentRef}
                     height={headerHeight}
+                    contentClassName="space-y-5"
                 >
-                    <div className="flex flex-col gap-4">
-                        <div className="flex items-center justify-between">
-                            <h2 className="text-xl font-black text-text-main flex items-center gap-2">
-                                <Layers size={24} className="text-secondary" />
-                                Groupes
-                            </h2>
-                            <Badge variant="primary" size="sm" className="bg-secondary/20 text-secondary border-none">
-                                {groups.length}
-                            </Badge>
-                        </div>
-                        <div className="relative group">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-grey-medium group-focus-within:text-secondary transition-colors" size={18} />
-                            <Input
-                                placeholder="Rechercher..."
-                                value={searchQuery}
-                                onChange={(e) => setSearchQuery(e.target.value)}
-                                className="pl-10 bg-white/5 border-white/5 focus:bg-white/10"
-                            />
-                        </div>
+                    <div className="flex items-center justify-between">
+                        <h2 className="text-cq-xl font-bold text-text-main flex items-center gap-2">
+                            <Users size={24} className="text-primary" />
+                            Groupes
+                        </h2>
+                        <Badge variant="primary" size="xs">
+                            {groups.length} Total
+                        </Badge>
+                    </div>
+
+                    <div className="border-t border-white/10" />
+
+                    <div className="space-y-4">
+                        <SearchBar
+                            placeholder="Rechercher un groupe..."
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            iconColor="text-primary"
+                        />
                     </div>
                 </CardInfo>
 

@@ -5,7 +5,7 @@ import { ROUTES } from '../routes';
 import SuiviPedagogique from './SuiviPedagogique';
 import AvancementAteliers from './AvancementAteliers';
 import TimerModal from '../components/TimerModal';
-import { Tabs, Button } from '../components/ui';
+import { SmartTabs, Button } from '../components/ui';
 
 import { cleanupOrphanProgressions } from '../lib/database';
 import { Timer } from '../features/tracking/hooks/useTimerIntegration';
@@ -80,22 +80,7 @@ const SuiviGlobal: React.FC = () => {
         <div className="flex flex-col h-full w-full overflow-hidden bg-background">
             {/* View Toggle Header */}
             <div className="bg-surface/50 border-b border-white/5 px-6 py-4 flex items-center sticky top-0 z-40 backdrop-blur-md shrink-0">
-                <div className="flex-1 hidden lg:block" />
-
-                <div className="flex items-center gap-4">
-                    <Tabs
-                        tabs={[
-                            { id: 'suivi', label: 'Encodage', icon: Users },
-                            { id: 'avancement', label: 'Suivi des groupes', icon: Table }
-                        ]}
-                        activeTab={activeView}
-                        onChange={(id) => {
-                            if (id === 'suivi') navigate(ROUTES.DASHBOARD_SUIVI);
-                            else navigate(`${ROUTES.DASHBOARD_SUIVI}?tab=groups`);
-                        }}
-                        variant="capsule"
-                    />
-
+                <div className="flex-1 flex items-center justify-start">
                     <Button
                         variant="ghost"
                         onClick={() => window.open('/suivi-tbi', '_blank')}
@@ -105,6 +90,22 @@ const SuiviGlobal: React.FC = () => {
                     >
                         TBI
                     </Button>
+                </div>
+
+                <div className="flex items-center gap-4">
+                    <SmartTabs
+                        tabs={[
+                            { id: 'suivi', label: 'Encodage', icon: Users },
+                            { id: 'avancement', label: 'Suivi des groupes', icon: Table }
+                        ]}
+                        activeTab={activeView}
+                        onChange={(id) => {
+                            if (id === 'suivi') navigate(ROUTES.DASHBOARD_SUIVI);
+                            else navigate(`${ROUTES.DASHBOARD_SUIVI}?tab=groups`);
+                        }}
+                        level={1}
+                        disableCompact={true}
+                    />
                 </div>
 
                 {/* Right side content */}

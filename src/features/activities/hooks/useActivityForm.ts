@@ -103,23 +103,36 @@ export const useActivityForm = ({
                     const materials = await activityService.getActivityMaterials(activityToEdit.id);
                     setSelectedMaterialTypes(materials.map(m => m.type_materiel_id).filter((id): id is string => id !== null));
 
-                    const actLevels = await activityService.getActivityLevels(activityToEdit.id);
-                    if (actLevels) {
-                        setActivityLevels(actLevels.map(item => ({
+                    // Use existing relations from prop if available (faster & cleaner)
+                    if (activityToEdit.ActiviteNiveau && activityToEdit.ActiviteNiveau.length > 0) {
+                        setActivityLevels(activityToEdit.ActiviteNiveau.map(item => ({
                             id: item.id,
                             niveau_id: item.niveau_id!,
-                            nom_niveau: (item as any).Niveau?.nom,
+                            nom_niveau: item.Niveau?.nom,
                             nombre_exercices: item.nombre_exercices!,
                             nombre_erreurs: item.nombre_erreurs!,
                             statut_exigence: item.statut_exigence!
                         })));
+                    } else {
+                        // Fallback fetch
+                        const actLevels = await activityService.getActivityLevels(activityToEdit.id);
+                        if (actLevels) {
+                            setActivityLevels(actLevels.map(item => ({
+                                id: item.id,
+                                niveau_id: item.niveau_id!,
+                                nom_niveau: (item as any).Niveau?.nom,
+                                nombre_exercices: item.nombre_exercices!,
+                                nombre_erreurs: item.nombre_erreurs!,
+                                statut_exigence: item.statut_exigence!
+                            })));
+                        }
                     }
                 } else {
                     // Reset / Defaults
                     setTitle('');
                     setModuleId(defaultModuleId || '');
                     setModuleName(defaultModuleName || '');
-                    setNbExercises('');
+                    setNbExercises(1);
                     setNbErrors(1);
                     setRequirementStatus('obligatoire');
                     setSelectedMaterialTypes([]);
@@ -204,12 +217,29 @@ export const useActivityForm = ({
                 ...activityData,
                 created_at: activityToEdit ? activityToEdit.created_at : new Date().toISOString(),
                 Module: {
+                    id: moduleId,
                     nom: moduleName || '...', // Best effort
                     statut: 'en_cours'
                 },
-                // Include empty relation arrays to avoid crashes if UI maps over them
-                ActiviteNiveau: [],
-                ActiviteMateriel: []
+                // Include real data in optimistic object to avoid empty UI after save
+                ActiviteNiveau: activityLevels.map(al => ({
+                    id: al.id || Math.random().toString(),
+                    niveau_id: al.niveau_id,
+                    activite_id: activityId!,
+                    nombre_exercices: typeof al.nombre_exercices === 'string' ? parseInt(al.nombre_exercices) || 0 : al.nombre_exercices,
+                    nombre_erreurs: typeof al.nombre_erreurs === 'string' ? parseInt(al.nombre_erreurs) || 0 : al.nombre_erreurs,
+                    statut_exigence: al.statut_exigence,
+                    user_id: user.id,
+                    created_at: new Date().toISOString(),
+                    Niveau: {
+                        nom: al.nom_niveau || levels.find(l => l.id === al.niveau_id)?.nom || '...',
+                        ordre: levels.find(l => l.id === al.niveau_id)?.ordre || 0
+                    }
+                })),
+                ActiviteMateriel: selectedMaterialTypes.map(mId => ({
+                    activite_id: activityId!,
+                    type_materiel_id: mId
+                }))
             };
 
             onAdded(optimisticActivity);

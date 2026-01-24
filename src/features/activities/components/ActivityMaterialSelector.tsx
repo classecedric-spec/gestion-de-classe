@@ -69,7 +69,7 @@ const ActivityMaterialSelector: React.FC<ActivityMaterialSelectorProps> = ({ sel
     };
 
     return (
-        <div className="space-y-6">
+        <div className="space-y-4">
             <div className="flex items-center justify-between border-b border-white/10 pb-2 mb-4">
                 <h4 className="text-sm font-bold text-white uppercase tracking-wider">Matériel Requis</h4>
                 {!isAdding && (
@@ -105,9 +105,9 @@ const ActivityMaterialSelector: React.FC<ActivityMaterialSelectorProps> = ({ sel
                 </div>
             )}
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-[200px] overflow-y-auto custom-scrollbar pr-2">
+            <div className="grid grid-cols-[repeat(auto-fill,minmax(140px,1fr))] gap-2 max-h-[300px] overflow-y-auto custom-scrollbar pr-2">
                 {materialTypes.length === 0 ? (
-                    <p className="col-span-2 text-xs text-gray-500 italic text-center py-2">Aucun type de matériel défini.</p>
+                    <p className="col-span-3 text-xs text-gray-500 italic text-center py-2">Aucun type de matériel défini.</p>
                 ) : (
                     materialTypes.map(mt => (
                         <div

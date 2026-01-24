@@ -1,8 +1,8 @@
 import React, { useState, useRef, useLayoutEffect } from 'react';
 import { useAdults } from '../features/adults/hooks/useAdults';
 import { useActivityTypes } from '../features/adults/hooks/useActivityTypes';
-import { Badge, EmptyState, Avatar, ListItem, CardInfo, CardList, CardTabs, ConfirmModal, Input, InfoSection, InfoRow } from '../components/ui';
-import { User, Activity, Plus, Search, BookOpen, Clock, ChevronDown, Save, X, ShieldCheck } from 'lucide-react';
+import { Badge, EmptyState, Avatar, ListItem, CardInfo, CardList, CardTabs, ConfirmModal, Input, SearchBar, InfoSection, InfoRow } from '../components/ui';
+import { Users, Activity, Plus, BookOpen, Clock, ChevronDown, Save, X, ShieldCheck } from 'lucide-react';
 import type { Database } from '../types/supabase';
 
 type AdultRow = Database['public']['Tables']['Adulte']['Row'];
@@ -136,28 +136,28 @@ const Adults: React.FC = () => {
 
     return (
         <div className="h-full flex gap-6 animate-in fade-in duration-500 relative">
-            {/* Left Column: List */}
-            <div className="w-80 flex flex-col gap-6 h-full">
-                <CardInfo ref={leftContentRef} height={headerHeight}>
-                    <div className="flex flex-col gap-4">
-                        <div className="flex items-center justify-between">
-                            <h2 className="text-xl font-black text-text-main flex items-center gap-2">
-                                <User size={24} className="text-secondary" />
-                                Adultes
-                            </h2>
-                            <Badge variant="primary" size="sm" className="bg-secondary/20 text-secondary border-none">
-                                {filteredAdults.length}
-                            </Badge>
-                        </div>
-                        <div className="relative group">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-grey-medium group-focus-within:text-secondary transition-colors" size={18} />
-                            <Input
-                                placeholder="Rechercher..."
-                                value={searchTerm}
-                                onChange={(e) => setSearchTerm(e.target.value)}
-                                className="pl-10 bg-white/5 border-white/5 focus:bg-white/10"
-                            />
-                        </div>
+            {/* Left Column: List - 1/4 weight */}
+            <div className="w-1/4 flex flex-col gap-6 h-full">
+                <CardInfo ref={leftContentRef} height={headerHeight} contentClassName="space-y-5">
+                    <div className="flex items-center justify-between">
+                        <h2 className="text-cq-xl font-bold text-text-main flex items-center gap-2">
+                            <Users size={24} className="text-primary" />
+                            Adultes
+                        </h2>
+                        <Badge variant="primary" size="xs">
+                            {filteredAdults.length} Total
+                        </Badge>
+                    </div>
+
+                    <div className="border-t border-white/10" />
+
+                    <div className="space-y-4">
+                        <SearchBar
+                            placeholder="Rechercher un adulte..."
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            iconColor="text-primary"
+                        />
                     </div>
                 </CardInfo>
 
@@ -173,7 +173,7 @@ const Adults: React.FC = () => {
                         </div>
                     ) : filteredAdults.length === 0 ? (
                         <EmptyState
-                            icon={User}
+                            icon={Users}
                             title="Aucun adulte"
                             description={searchTerm ? "Aucun adulte ne correspond." : "Commencez par ajouter un adulte."}
                             size="sm"
@@ -206,7 +206,7 @@ const Adults: React.FC = () => {
                 {!selectedAdult ? (
                     <div className="flex-1 card-flat overflow-hidden">
                         <EmptyState
-                            icon={User}
+                            icon={Users}
                             title="Sélectionnez un adulte"
                             description="Choisissez un adulte dans la liste pour voir les détails et types d'actions."
                             size="lg"
@@ -285,7 +285,7 @@ const Adults: React.FC = () => {
                                 <div className="space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-300">
                                     <InfoSection title="Profil de l'Adulte">
                                         <InfoRow
-                                            icon={User}
+                                            icon={Users}
                                             label="Nom complet"
                                             value={`${selectedAdult.prenom} ${selectedAdult.nom}`}
                                         />

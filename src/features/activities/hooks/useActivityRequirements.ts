@@ -26,17 +26,6 @@ export const useActivityRequirements = (
     const getRequirementsList = useCallback((): Requirement[] => {
         if (!selectedActivity) return [];
 
-        // Base Requirement
-        const baseReq: Requirement = {
-            id: 'base',
-            targetId: selectedActivity.id,
-            label: 'Exigence de base',
-            nbExercises: selectedActivity.nombre_exercices || 0,
-            nbErrors: selectedActivity.nombre_erreurs || 0,
-            status: selectedActivity.statut_exigence || 'obligatoire',
-            isBase: true
-        };
-
         // Level Specific Requirements
         const levelReqs: Requirement[] = (selectedActivity.ActiviteNiveau || [])
             .map(an => ({
@@ -51,7 +40,7 @@ export const useActivityRequirements = (
             }))
             .sort((a, b) => (a.order || 999) - (b.order || 999));
 
-        return [baseReq, ...levelReqs];
+        return levelReqs;
     }, [selectedActivity]);
 
     const updateRequirement = async (req: Requirement, field: string, value: any) => {
