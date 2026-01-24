@@ -33,9 +33,9 @@ export const downloadFile = async (
             return;
         }
     } catch (err: any) {
-        // L'utilisateur a annulé la fenêtre de dialogue ou erreur d'API
-        if (err.name === 'AbortError') return;
-        console.warn("Erreur avec showSaveFilePicker, utilisation du fallback:", err);
+        // L'utilisateur a annulé la fenêtre de dialogue ou erreur de geste utilisateur (si le délai est trop long)
+        if (err.name === 'AbortError' || err.name === 'SecurityError') return;
+        console.warn("Erreur inattendue avec showSaveFilePicker, utilisation du fallback:", err);
     }
 
     // Fallback standard

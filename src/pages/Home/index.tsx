@@ -11,6 +11,7 @@ import { useGroupPdfGenerator } from '../../features/dashboard/hooks/useGroupPdf
 import DashboardHeader from '../../features/dashboard/components/DashboardHeader';
 import DashboardTools from '../../features/dashboard/components/DashboardTools';
 import DashboardStudentList from '../../features/dashboard/components/DashboardStudentList';
+import PdfProgress from '../../components/ui/PdfProgress';
 
 // Modals (Keep existing for now, future refactor)
 import RandomPickerModal from '../../components/RandomPickerModal';
@@ -42,8 +43,11 @@ const Home: React.FC = () => {
         generateGroupTodoList,
         cancelGeneration,
         isGenerating,
+        progress: pdfProgress,
         progressText
     } = useGroupPdfGenerator();
+
+    const progress = pdfProgress; // Keep progress as an alias if needed, or just use pdfProgress
 
     // Local state
     const [searchParams, setSearchParams] = useSearchParams();
@@ -265,32 +269,13 @@ const Home: React.FC = () => {
                                 </button>
                             </div>
 
-                            {/* Progress Indicator (if generating) */}
-                            {isGenerating && (
-                                <div className="p-4 bg-primary/10 border border-primary/20 rounded-xl space-y-2">
-                                    <div className="flex items-center gap-2">
-                                        <Loader2 className="animate-spin text-primary" size={16} />
-                                        <p className="text-sm font-bold text-primary">Génération en cours...</p>
-                                    </div>
-
-                                    {progressText && (
-                                        <div className="p-2 bg-background/50 rounded-lg border border-primary/30">
-                                            <p className="text-xs font-bold text-white">
-                                                ✏️ {progressText}
-                                            </p>
-                                        </div>
-                                    )}
-
-                                    <div className="text-xs text-grey-light leading-relaxed">
-                                        📄 Création des fiches individuelles pour chaque élève du groupe.<br />
-                                        ⏱️ Cette opération peut prendre quelques instants selon le nombre d'élèves.<br />
-                                        ✨ Le PDF se téléchargera automatiquement une fois prêt.
-                                    </div>
-                                    <p className="text-[10px] text-grey-medium italic mt-2">
-                                        💡 Astuce : Appuyez sur <kbd className="px-1 py-0.5 bg-background rounded text-primary font-mono">ESC</kbd> pour annuler
-                                    </p>
-                                </div>
-                            )}
+                            {/* Progress Indicator (shared component) */}
+                            <PdfProgress
+                                isGenerating={isGenerating}
+                                progressText={progressText}
+                                progressPercentage={progress}
+                                className="max-w-2xl"
+                            />
 
                             {/* LIGNE 3: Weekly Planner */}
                             <div className="p-6 bg-surface/50 border border-white/5 rounded-3xl">

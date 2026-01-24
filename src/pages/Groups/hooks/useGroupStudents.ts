@@ -41,7 +41,7 @@ export const useGroupStudents = (selectedGroup: Tables<'Groupe'> | null) => {
             // 2. Fetch Students
             const { data, error } = await supabase
                 .from('Eleve')
-                .select('*, Classe(nom)')
+                .select('*, Classe(nom), niveau_id')
                 .in('id', studentIds)
                 .order('nom');
 

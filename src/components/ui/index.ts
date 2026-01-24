@@ -48,3 +48,6 @@ export { InfoRowEditable } from './InfoRowEditable';
 export { InfoSectionEditable } from './InfoSectionEditable';
 export { default as ListItem } from './ListItem';
 export type { ListItemProps } from './ListItem';
+export { default as ActionItem } from './ActionItem';
+export type { ActionItemProps } from './ActionItem';
+export { default as PdfProgress } from './PdfProgress';

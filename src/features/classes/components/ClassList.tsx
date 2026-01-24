@@ -49,7 +49,7 @@ const ClassList: React.FC<ClassListProps> = ({
             </div>
 
             {/* List */}
-            <div className="flex-1 overflow-y-auto custom-scrollbar p-4 space-y-2">
+            <div className="flex-1 overflow-y-auto custom-scrollbar p-4 space-y-1">
                 {loading ? (
                     <div className="flex justify-center py-8">
                         <Avatar size="md" loading={true} initials="" />

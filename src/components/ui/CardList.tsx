@@ -44,11 +44,11 @@ export const CardList: React.FC<CardListProps> = ({
 
             {/* Pied de page action (conditionnel) */}
             {(actionLabel && onAction) && (
-                <div className="p-4 border-t border-white/5">
+                <div className="p-4 border-t border-white/5 bg-surface/30">
                     <Button
                         onClick={onAction}
-                        variant="raised"
-                        className="w-full"
+                        variant="secondary"
+                        className="w-full border-dashed"
                         icon={actionIcon}
                     >
                         {actionLabel}

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Plus, GripVertical, Sparkles } from 'lucide-react';
+import { GripVertical } from 'lucide-react';
 import { DndContext, closestCenter, PointerSensor, KeyboardSensor, useSensor, useSensors, DragEndEvent } from '@dnd-kit/core';
 import { SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
@@ -81,11 +81,9 @@ interface ActivitiesTabProps {
     activities: Activity[];
     onDragEnd: (event: DragEndEvent) => void;
     onEditActivity: (activity: Activity) => void;
-    onAddActivity: () => void;
-    onCreateSeries: () => void;
 }
 
-const ActivitiesTab: React.FC<ActivitiesTabProps> = ({ activities, onDragEnd, onEditActivity, onAddActivity, onCreateSeries }) => {
+const ActivitiesTab: React.FC<ActivitiesTabProps> = ({ activities, onDragEnd, onEditActivity }) => {
     const sensors = useSensors(
         useSensor(PointerSensor, {
             activationConstraint: {
@@ -99,24 +97,8 @@ const ActivitiesTab: React.FC<ActivitiesTabProps> = ({ activities, onDragEnd, on
 
     if (!activities || activities.length === 0) {
         return (
-            <div className="space-y-1 animate-in fade-in duration-300">
-                <div className="pt-4 space-y-3">
-                    <button
-                        onClick={onAddActivity}
-                        className="w-full h-12 bg-white/5 hover:bg-primary/20 hover:text-primary text-grey-light rounded-xl border border-dashed border-white/20 hover:border-primary/50 transition-all flex items-center justify-center gap-2 group"
-                    >
-                        <Plus size={18} className="group-hover:scale-110 transition-transform" />
-                        <span className="font-medium">Ajouter une activité</span>
-                    </button>
-
-                    <button
-                        onClick={onCreateSeries}
-                        className="w-full h-10 bg-yellow-500/10 hover:bg-yellow-500 text-yellow-500 hover:text-white rounded-xl border border-dashed border-yellow-500/30 hover:border-yellow-500 transition-all flex items-center justify-center gap-2 group"
-                    >
-                        <Sparkles size={16} className="group-hover:scale-110 transition-transform" />
-                        <span className="font-medium text-sm">Créer une série</span>
-                    </button>
-                </div>
+            <div className="flex-1 flex flex-col items-center justify-center py-12">
+                <p className="text-grey-medium italic">Aucune activité dans ce module.</p>
             </div>
         );
     }
@@ -140,25 +122,6 @@ const ActivitiesTab: React.FC<ActivitiesTabProps> = ({ activities, onDragEnd, on
                         />
                     ))}
                 </SortableContext>
-
-                {/* Bottom Buttons */}
-                <div className="pt-4 space-y-3">
-                    <button
-                        onClick={onAddActivity}
-                        className="w-full h-12 bg-white/5 hover:bg-primary/20 hover:text-primary text-grey-light rounded-xl border border-dashed border-white/20 hover:border-primary/50 transition-all flex items-center justify-center gap-2 group"
-                    >
-                        <Plus size={18} className="group-hover:scale-110 transition-transform" />
-                        <span className="font-medium">Ajouter une activité</span>
-                    </button>
-
-                    <button
-                        onClick={onCreateSeries}
-                        className="w-full h-10 bg-yellow-500/10 hover:bg-yellow-500 text-yellow-500 hover:text-white rounded-xl border border-dashed border-yellow-500/30 hover:border-yellow-500 transition-all flex items-center justify-center gap-2 group"
-                    >
-                        <Sparkles size={16} className="group-hover:scale-110 transition-transform" />
-                        <span className="font-medium text-sm">Créer une série</span>
-                    </button>
-                </div>
             </DndContext>
         </div>
     );

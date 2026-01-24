@@ -1,6 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Layers, Plus, Search, GraduationCap, LayoutList } from 'lucide-react';
 import {
     DndContext,
     closestCenter,
@@ -24,13 +23,14 @@ import AddStudentToGroupModal from '../../components/AddStudentToGroupModal';
 import AddGroupModal from '../../components/AddGroupModal';
 
 import { useGroupsData } from './hooks/useGroupsData';
-import { useGroupStudents } from './hooks/useGroupStudents';
-import { useGroupPDF } from './hooks/useGroupPDF';
+import { useGroupStudents, StudentWithClass } from './hooks/useGroupStudents';
+import { useGroupPdfGenerator } from '../../features/dashboard/hooks/useGroupPdfGenerator';
 // @ts-ignore
 import { useInAppMigration } from '../../hooks/useInAppMigration';
 import { Tables } from '../../types/supabase';
-import { StudentWithClass } from './hooks/useGroupStudents';
-import { Badge, Button, EmptyState, ConfirmModal, Avatar, Input, ListItem, CardInfo, CardList, CardTabs } from '../../components/ui';
+import { Badge, EmptyState, ConfirmModal, Avatar, Input, ListItem, CardInfo, CardList, CardTabs, ActionItem } from '../../components/ui';
+import PdfProgress from '../../components/ui/PdfProgress';
+import { GraduationCap, LayoutList, Plus, Search, FileText, Layers } from 'lucide-react';
 
 const Groups: React.FC = () => {
     const navigate = useNavigate();
@@ -77,33 +77,7 @@ const Groups: React.FC = () => {
         fetchStudentsInGroup
     } = useGroupStudents(selectedGroup);
 
-    // Patch for generic onDelete which doesn't provide event
-    const handleRemoveStudentClick = (student: StudentWithClass) => {
-        handleRemoveClick({ stopPropagation: () => { } } as any, student);
-    };
-
-    const {
-        loading: pdfLoading,
-        handleCancelGeneration
-    } = useGroupPDF();
-
-    // In-app migration
-    useInAppMigration(filteredGroups, 'Groupe', 'groupe');
-    useInAppMigration(studentsInGroup, 'Eleve', 'eleve');
-
-    // DnD Sensors
-    const sensors = useSensors(
-        useSensor(PointerSensor, {
-            activationConstraint: {
-                distance: 8,
-            },
-        }),
-        useSensor(KeyboardSensor, {
-            coordinateGetter: sortableKeyboardCoordinates,
-        })
-    );
-
-    // --- Height Measure Effect ---
+    // --- Height Measure Effect (Inner Content Strategy) ---
     React.useLayoutEffect(() => {
         const syncHeight = () => {
             const leftEl = leftContentRef.current;
@@ -126,23 +100,48 @@ const Groups: React.FC = () => {
         const t = setTimeout(syncHeight, 50);
         const t2 = setTimeout(syncHeight, 300);
         return () => { clearTimeout(t); clearTimeout(t2); };
-    }, [groups.length, selectedGroup, searchQuery]);
+    }, [groups.length, selectedGroup, studentsInGroup.length]);
 
-    // Escape to cancel PDF generation
-    useEffect(() => {
-        const handleEsc = (e: KeyboardEvent) => {
-            if (pdfLoading && e.key === 'Escape') {
-                handleCancelGeneration();
-            }
-        };
-        window.addEventListener('keydown', handleEsc);
-        return () => window.removeEventListener('keydown', handleEsc);
-    }, [pdfLoading, handleCancelGeneration]);
+    // Sensors for DND
+    const sensors = useSensors(
+        useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+        useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+    );
 
-    const handleEditGroup = (group: Tables<'Groupe'>) => {
-        setGroupToEdit(group);
-        setIsEditingGroup(true);
+    // Actions
+    const handleAddClick = () => {
+        setIsEditingGroup(false);
+        setGroupToEdit(null);
         setShowModal(true);
+    };
+
+    const handleEditGroupClick = (e: React.MouseEvent, group: Tables<'Groupe'>) => {
+        e.stopPropagation();
+        setIsEditingGroup(true);
+        setGroupToEdit(group);
+        setShowModal(true);
+    };
+
+    const handleDeleteClick = (e: React.MouseEvent, group: Tables<'Groupe'>) => {
+        e.stopPropagation();
+        setGroupToDelete(group);
+    };
+
+    const confirmDeleteGroup = async () => {
+        if (!groupToDelete) return;
+        await handleDeleteGroup(groupToDelete.id);
+        setGroupToDelete(null);
+    };
+
+    const handleEditStudent = (student: StudentWithClass) => {
+        setEditStudentId(student.id);
+        setIsEditingStudent(true);
+        setShowStudentModal(true);
+    };
+
+    const handleStudentSaved = () => {
+        if (selectedGroup) fetchStudentsInGroup(selectedGroup.id);
+        setShowStudentModal(false);
     };
 
     const handleCloseGroupModal = () => {
@@ -151,66 +150,72 @@ const Groups: React.FC = () => {
         setGroupToEdit(null);
     };
 
-    const handleEditStudent = (student: StudentWithClass) => {
-        setIsEditingStudent(true);
-        setEditStudentId(student.id);
-        setShowStudentModal(true);
-    };
+    // --- Actions ---
+    const {
+        generateGroupTodoList,
+        cancelGeneration,
+        isGenerating: isGeneratingPDF,
+        progressText,
+        progress: pdfProgress
+    } = useGroupPdfGenerator();
 
-    const handleStudentSaved = async () => {
-        if (selectedGroup) {
-            fetchStudentsInGroup(selectedGroup.id);
-        }
-    };
-
-    const confirmDeleteGroup = async () => {
-        if (!groupToDelete) return;
-        try {
-            await handleDeleteGroup(groupToDelete.id);
-            setGroupToDelete(null);
-        } catch (error: any) {
-            alert('Erreur: ' + error.message);
-        }
-    };
+    // --- Cancellation ---
+    React.useEffect(() => {
+        const handleEsc = (e: KeyboardEvent) => {
+            if (isGeneratingPDF && e.key === 'Escape') cancelGeneration();
+        };
+        window.addEventListener('keydown', handleEsc);
+        return () => window.removeEventListener('keydown', handleEsc);
+    }, [isGeneratingPDF, cancelGeneration]);
 
     return (
         <div className="h-full flex gap-6 animate-in fade-in duration-500 relative">
             {/* List Column (Groups) */}
-            <div className="w-1/4 flex flex-col gap-6 overflow-hidden">
+            <div className="w-80 flex flex-col gap-6 h-full">
                 <CardInfo
                     ref={leftContentRef}
                     height={headerHeight}
-                    contentClassName="space-y-4"
                 >
-                    <div className="flex items-center justify-between">
-                        <h2 className="text-cq-xl font-bold text-text-main flex items-center gap-2">
-                            <Layers className="text-primary" size={24} />
-                            Liste des Groupes
-                        </h2>
-                        <Badge variant="primary" size="sm">
-                            {groups.length} Total
-                        </Badge>
+                    <div className="flex flex-col gap-4">
+                        <div className="flex items-center justify-between">
+                            <h2 className="text-xl font-black text-text-main flex items-center gap-2">
+                                <Layers size={24} className="text-secondary" />
+                                Groupes
+                            </h2>
+                            <Badge variant="primary" size="sm" className="bg-secondary/20 text-secondary border-none">
+                                {groups.length}
+                            </Badge>
+                        </div>
+                        <div className="relative group">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-grey-medium group-focus-within:text-secondary transition-colors" size={18} />
+                            <Input
+                                placeholder="Rechercher..."
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                                className="pl-10 bg-white/5 border-white/5 focus:bg-white/10"
+                            />
+                        </div>
                     </div>
-
-                    <Input
-                        placeholder="Rechercher un groupe..."
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        icon={Search}
-                        className="bg-background/50"
-                    />
                 </CardInfo>
 
                 <CardList
                     actionLabel="Nouveau Groupe"
-                    onAction={() => setShowModal(true)}
+                    onAction={handleAddClick}
                     actionIcon={Plus}
                 >
                     {loading ? (
-                        <div className="flex items-center justify-center py-12">
+                        <div className="flex-1 flex flex-col items-center justify-center py-12 gap-3">
                             <Avatar size="lg" loading initials="" />
+                            <p className="text-grey-medium animate-pulse text-sm">Chargement...</p>
                         </div>
-                    ) : filteredGroups.length > 0 ? (
+                    ) : filteredGroups.length === 0 ? (
+                        <EmptyState
+                            icon={Layers}
+                            title="Aucun groupe"
+                            description={searchQuery ? "Aucun groupe ne correspond à votre recherche." : "Commencez par créer votre premier groupe d'élèves."}
+                            size="sm"
+                        />
+                    ) : (
                         <DndContext
                             sensors={sensors}
                             collisionDetection={closestCenter}
@@ -220,44 +225,37 @@ const Groups: React.FC = () => {
                                 items={filteredGroups.map(g => g.id)}
                                 strategy={verticalListSortingStrategy}
                             >
-                                {filteredGroups.map(group => (
-                                    <div key={group.id} className="relative group/item">
+                                <div className="space-y-1 flex-1">
+                                    {filteredGroups.map((group) => (
                                         <SortableGroupItem
+                                            key={group.id}
                                             group={group}
                                             selectedGroup={selectedGroup}
-                                            onClick={setSelectedGroup}
-                                            onEdit={handleEditGroup}
-                                            onDelete={(g) => { setGroupToDelete(g); }}
+                                            onClick={() => setSelectedGroup(group)}
+                                            onEdit={(g) => handleEditGroupClick({ stopPropagation: () => { } } as any, g)}
+                                            onDelete={(g) => handleDeleteClick({ stopPropagation: () => { } } as any, g)}
                                         />
-                                    </div>
-                                ))}
+                                    ))}
+                                </div>
                             </SortableContext>
                         </DndContext>
-                    ) : (
-                        <EmptyState
-                            icon={Layers}
-                            title="Aucun groupe"
-                            description="Commencez par créer un nouveau groupe pour organiser vos élèves."
-                            size="sm"
-                        />
                     )}
                 </CardList>
             </div>
 
-            {/* Detail Column (Students in group) */}
-            <div className="flex-1 flex flex-col gap-6 overflow-hidden relative">
+            {/* Main Content Column */}
+            <div className="flex-1 flex flex-col gap-6 h-full min-w-0">
                 {!selectedGroup ? (
                     <div className="flex-1 card-flat overflow-hidden">
                         <EmptyState
                             icon={Layers}
                             title="Sélectionnez un groupe"
-                            description="Cliquez sur un groupe dans la liste à gauche pour voir les détails et les élèves associés."
+                            description="Choisissez un groupe dans la liste pour voir les élèves et les actions."
                             size="lg"
                         />
                     </div>
                 ) : (
                     <>
-                        {/* Header Section */}
                         <CardInfo
                             ref={rightContentRef}
                             height={headerHeight}
@@ -266,7 +264,7 @@ const Groups: React.FC = () => {
                                 <Avatar
                                     size="xl"
                                     src={selectedGroup.photo_url}
-                                    initials={selectedGroup.acronyme || (selectedGroup.nom && selectedGroup.nom[0])}
+                                    initials={selectedGroup.acronyme || (selectedGroup.nom ? selectedGroup.nom[0] : '?')}
                                     className={selectedGroup.photo_url ? "bg-[#D9B981]" : "bg-surface"}
                                 />
                                 <div className="min-w-0">
@@ -291,11 +289,14 @@ const Groups: React.FC = () => {
                             ]}
                             activeTab={activeTab}
                             onChange={(id) => setActiveTab(id as 'students' | 'actions')}
+                            actionLabel={activeTab === 'students' ? "Ajouter des enfants" : undefined}
+                            onAction={activeTab === 'students' ? () => setShowAddToGroupModal(true) : undefined}
+                            actionIcon={activeTab === 'students' ? Plus : undefined}
                         >
                             {/* Students List Tab */}
                             {activeTab === 'students' && (
                                 <div className="flex flex-col h-full">
-                                    <div className="flex-1 overflow-y-auto px-2 pt-2 pb-24 custom-scrollbar">
+                                    <div className="flex-1 overflow-y-auto px-2 pt-2 custom-scrollbar">
                                         <h3 className="text-sm font-bold uppercase tracking-widest text-grey-dark border-b border-white/5 pb-4 mb-6 flex items-center gap-2">
                                             <GraduationCap size={18} className="text-primary" />
                                             Les enfants de ce groupe
@@ -322,7 +323,7 @@ const Groups: React.FC = () => {
                                                         title={`${student.prenom} ${student.nom}`}
                                                         subtitle={student.Classe?.nom || 'Sans classe'}
                                                         onClick={() => navigate('/dashboard/user/students', { state: { selectedStudentId: student.id } })}
-                                                        onDelete={() => handleRemoveStudentClick(student)}
+                                                        onDelete={() => handleRemoveClick({ stopPropagation: () => { } } as any, student)}
                                                         deleteTitle="Retirer du groupe"
                                                         onEdit={() => handleEditStudent(student)}
                                                         avatar={{
@@ -335,28 +336,36 @@ const Groups: React.FC = () => {
                                             </div>
                                         )}
                                     </div>
-
-                                    <div className="absolute bottom-6 left-6 right-6">
-                                        <Button
-                                            onClick={() => setShowAddToGroupModal(true)}
-                                            variant="secondary"
-                                            className="w-full border-dashed"
-                                            icon={Plus}
-                                        >
-                                            Ajouter des enfants
-                                        </Button>
-                                    </div>
                                 </div>
                             )}
 
                             {/* Actions Tab */}
                             {activeTab === 'actions' && (
-                                <EmptyState
-                                    icon={LayoutList}
-                                    title="Aucune action disponible"
-                                    description="Il n'y a actuellement aucune action rapide pour ce groupe."
-                                    size="lg"
-                                />
+                                <div className="space-y-8 p-2">
+                                    <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+                                        <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-grey-medium border-b border-white/5 pb-2 mb-4">
+                                            Impression des documents
+                                        </h3>
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                                            <ActionItem
+                                                icon={FileText}
+                                                label={isGeneratingPDF ? "Génération..." : "To do list"}
+                                                subtitle={isGeneratingPDF ? (progressText || "Préparation...") : "Génération PDF"}
+                                                progress={pdfProgress}
+                                                onClick={() => generateGroupTodoList(selectedGroup as any)}
+                                                loading={isGeneratingPDF}
+                                            />
+                                        </div>
+
+                                        {/* Progress Indicator (shared component) */}
+                                        <PdfProgress
+                                            isGenerating={isGeneratingPDF}
+                                            progressText={progressText}
+                                            progressPercentage={pdfProgress}
+                                            className="mt-8"
+                                        />
+                                    </div>
+                                </div>
                             )}
                         </CardTabs>
                     </>

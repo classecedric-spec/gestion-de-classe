@@ -16,7 +16,7 @@ import StudentTrackingPDFModern from '../../components/StudentTrackingPDFModern'
 import { downloadFile } from '../../lib/helpers/download';
 
 // Nouveaux composants UI
-import { Badge, Avatar, EmptyState, Button, ConfirmModal, SearchBar, FilterSelect, CardInfo, CardList, CardTabs, SmartTabs, InfoSection, InfoRow, InfoSectionEditable, InfoRowEditable, ListItem } from '../../components/ui';
+import { Badge, Avatar, EmptyState, ConfirmModal, SearchBar, FilterSelect, CardInfo, CardList, CardTabs, SmartTabs, InfoSection, InfoRow, InfoSectionEditable, InfoRowEditable, ListItem } from '../../components/ui';
 
 // Hooks extraits
 import { useStudentsData } from './hooks/useStudentsData';
@@ -525,6 +525,9 @@ const Students: React.FC = () => {
                             ]}
                             activeTab={currentTab}
                             onChange={setCurrentTab}
+                            actionLabel={currentTab === 'todo' ? "Créer le PDF" : undefined}
+                            onAction={currentTab === 'todo' ? generatePDF : undefined}
+                            actionIcon={FileText}
                         >
                             {currentTab === 'infos' && (
                                 <div className="grid md:grid-cols-2 gap-8 animate-in fade-in slide-in-from-bottom-2 duration-300">
@@ -697,7 +700,7 @@ const Students: React.FC = () => {
                                         return (subBranchA?.ordre ?? 999) - (subBranchB?.ordre ?? 999);
                                     }
 
-                                    // 5. SubBranch Name
+                                    // 3. SubBranch Name
                                     if (subBranchA?.nom !== subBranchB?.nom) {
                                         return (subBranchA?.nom || '').localeCompare(subBranchB?.nom || '');
                                     }
@@ -778,16 +781,10 @@ const Students: React.FC = () => {
                             })()}
 
                             {currentTab === 'todo' && (
-                                <div className="h-full flex flex-col items-center justify-center gap-4 text-grey-medium">
-                                    <Button
-                                        onClick={generatePDF}
-                                        variant="secondary"
-                                        size="lg"
-                                        icon={FileText}
-                                    >
-                                        Créer le PDF
-                                    </Button>
-                                    <p className="text-sm italic opacity-60">Le contenu sera généré automatiquement.</p>
+                                <div className="h-full flex flex-col items-center justify-center p-12 text-center text-grey-medium opacity-60">
+                                    <FileText size={48} className="mb-4 text-primary opacity-40" />
+                                    <p className="text-lg font-medium">Prêt pour l'impression</p>
+                                    <p className="text-sm italic">Cliquez sur le bouton ci-dessous pour générer la liste des activités à faire pour {selectedStudent.prenom}.</p>
                                 </div>
                             )}
                         </CardTabs>

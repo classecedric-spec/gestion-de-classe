@@ -1,7 +1,8 @@
 import React, { ChangeEvent } from 'react';
 import clsx from 'clsx';
-import { BookOpen, GraduationCap, Plus, Search, LayoutGrid, Table as TableIcon, ArrowUp, ArrowDown, ArrowUpDown, Edit, Trash2 } from 'lucide-react';
-import { Badge, Button, EmptyState, Avatar, SmartTabs, ListItem, CardInfo, CardList, CardTabs, Input, ConfirmModal } from '../components/ui';
+import { BookOpen, GraduationCap, Plus, Search, LayoutGrid, Table as TableIcon, ArrowUp, ArrowDown, ArrowUpDown, Edit, Trash2, Tag } from 'lucide-react';
+import { Badge, Button, EmptyState, Avatar, SmartTabs, ListItem, CardInfo, CardList, CardTabs, Input, ConfirmModal, InfoSection, InfoRow } from '../components/ui';
+import { User, ShieldCheck } from 'lucide-react';
 
 // Feature Hooks & Services
 import { useClasses } from '../features/classes/hooks/useClasses';
@@ -120,7 +121,7 @@ interface GridViewProps {
 
 const GridView: React.FC<GridViewProps> = ({ students, onEditStudent, onRemoveStudent }) => {
     return (
-        <div className="grid gap-4 grid-cols-2 md:grid-cols-3 xl:grid-cols-4 auto-rows-fr">
+        <div className="grid gap-2 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 auto-rows-fr">
             {students.map(student => (
                 <ListItem
                     key={student.id}
@@ -131,10 +132,12 @@ const GridView: React.FC<GridViewProps> = ({ students, onEditStudent, onRemoveSt
                     onDelete={() => onRemoveStudent({ stopPropagation: () => { } } as any, student.id)}
                     onEdit={() => onEditStudent(student)}
                     deleteTitle="Retirer de la classe"
+                    noTruncate={true}
+                    className="pr-5"
                     avatar={{
                         src: student.photo_base64,
                         initials: (student.prenom || '?')[0] + (student.nom || '?')[0],
-                        className: student.photo_base64 ? "bg-[#D9B981] p-1" : "bg-input"
+                        className: student.photo_base64 ? "bg-[#D9B981]" : "bg-input"
                     }}
                 />
             ))}
@@ -192,6 +195,8 @@ const Classes: React.FC = () => {
         activeItem,
         toggleModal
     } = useClasses();
+
+    const [activeDetailTab, setActiveDetailTab] = React.useState('students');
 
     // --- Height Synchronization ---
     const leftHeaderRef = React.useRef<HTMLDivElement>(null);
@@ -339,73 +344,98 @@ const Classes: React.FC = () => {
 
                         <CardTabs
                             tabs={[
-                                { id: 'students', label: 'Liste des Élèves', icon: GraduationCap },
+                                { id: 'students', label: 'Liste des élèves', icon: GraduationCap },
                                 { id: 'details', label: 'Détails', icon: BookOpen }
                             ]}
-                            activeTab="students"
-                            onChange={() => { }}
+                            activeTab={activeDetailTab}
+                            onChange={setActiveDetailTab}
+                            contentClassName="flex flex-col h-full bg-background/5"
+                            actionLabel={activeDetailTab === 'students' ? "Ajouter un enfant" : undefined}
+                            onAction={activeDetailTab === 'students' ? () => toggleModal('addStudentToClass', true) : undefined}
+                            actionIcon={Plus}
                         >
-                            <div className="flex flex-col h-full">
-                                <div className="px-6 py-4 border-b border-border/5 bg-surface/5 flex items-center gap-4">
-                                    <SmartTabs
-                                        tabs={[
-                                            { id: 'grid', label: 'Grille', icon: LayoutGrid },
-                                            { id: 'table', label: 'Tableau', icon: TableIcon }
-                                        ]}
-                                        activeTab={viewMode}
-                                        onChange={(id) => setViewMode(id as 'grid' | 'table')}
-                                        level={3}
-                                    />
-                                </div>
+                            {activeDetailTab === 'students' ? (
+                                <div className="flex flex-col h-full">
+                                    <div className="px-6 py-2 border-b border-white/5 flex items-center gap-4">
+                                        <SmartTabs
+                                            tabs={[
+                                                { id: 'grid', label: 'Grille', icon: LayoutGrid },
+                                                { id: 'table', label: 'Tableau', icon: TableIcon }
+                                            ]}
+                                            activeTab={viewMode}
+                                            onChange={(id) => setViewMode(id as 'grid' | 'table')}
+                                            level={3}
+                                        />
+                                    </div>
 
-                                <div className="flex-1 overflow-y-auto px-6 py-6 pb-24 custom-scrollbar relative">
-                                    {loadingStudents ? (
-                                        <div className="flex flex-col items-center justify-center py-12 gap-3">
-                                            <Avatar size="lg" loading={true} initials="" />
-                                            <p className="text-grey-medium animate-pulse text-xs uppercase tracking-widest">Chargement...</p>
-                                        </div>
-                                    ) : studentsInClass.length === 0 ? (
-                                        <EmptyState
-                                            icon={GraduationCap}
-                                            title="Aucun enfant"
-                                            description="Aucun enfant dans cette classe. Commencez par ajouter des élèves."
-                                            size="md"
-                                        />
-                                    ) : viewMode === 'table' ? (
-                                        <TableView
-                                            students={studentsInClass}
-                                            sortConfig={sortConfig as any}
-                                            onSort={handleSort}
-                                            onUpdateStudent={handleUpdateStudent}
-                                            onEditStudent={(student: any) => toggleModal('studentDetails', true, student)}
-                                            onRemoveStudent={(e: any, id: string) => {
-                                                e.stopPropagation();
-                                                setStudentToRemove(id);
-                                            }}
-                                        />
-                                    ) : (
-                                        <GridView
-                                            students={studentsInClass}
-                                            onEditStudent={(student: any) => toggleModal('studentDetails', true, student)}
-                                            onRemoveStudent={(e: any, id: string) => {
-                                                e.stopPropagation();
-                                                setStudentToRemove(id);
-                                            }}
-                                        />
-                                    )}
+                                    <div className="flex-1 overflow-y-auto px-6 py-4 custom-scrollbar relative">
+                                        {loadingStudents ? (
+                                            <div className="flex flex-col items-center justify-center py-12 gap-3">
+                                                <Avatar size="lg" loading={true} initials="" />
+                                                <p className="text-grey-medium animate-pulse text-[10px] uppercase tracking-widest font-bold">Chargement...</p>
+                                            </div>
+                                        ) : studentsInClass.length === 0 ? (
+                                            <EmptyState
+                                                icon={GraduationCap}
+                                                title="Aucun enfant"
+                                                description="Aucun enfant dans cette classe. Commencez par ajouter des élèves."
+                                                size="md"
+                                            />
+                                        ) : viewMode === 'table' ? (
+                                            <TableView
+                                                students={studentsInClass}
+                                                sortConfig={sortConfig as any}
+                                                onSort={handleSort}
+                                                onUpdateStudent={handleUpdateStudent}
+                                                onEditStudent={(student: any) => toggleModal('studentDetails', true, student)}
+                                                onRemoveStudent={(e: any, id: string) => {
+                                                    e.stopPropagation();
+                                                    setStudentToRemove(id);
+                                                }}
+                                            />
+                                        ) : (
+                                            <GridView
+                                                students={studentsInClass}
+                                                onEditStudent={(student: any) => toggleModal('studentDetails', true, student)}
+                                                onRemoveStudent={(e: any, id: string) => {
+                                                    e.stopPropagation();
+                                                    setStudentToRemove(id);
+                                                }}
+                                            />
+                                        )}
+                                    </div>
                                 </div>
+                            ) : (
+                                <div className="p-8 space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                                    <InfoSection title="Informations de la Classe">
+                                        <InfoRow
+                                            icon={BookOpen}
+                                            label="Nom de la classe"
+                                            value={selectedClass.nom}
+                                        />
+                                        <InfoRow
+                                            icon={Tag}
+                                            label="Acronyme"
+                                            value={selectedClass.acronyme || 'N/A'}
+                                        />
+                                    </InfoSection>
 
-                                <div className="absolute bottom-6 left-6 right-6">
-                                    <Button
-                                        onClick={() => toggleModal('addStudentToClass', true)}
-                                        variant="secondary"
-                                        className="w-full border-dashed"
-                                        icon={Plus}
-                                    >
-                                        Ajouter un enfant
-                                    </Button>
+                                    <InfoSection title="Équipe Pédagogique">
+                                        {selectedClass.ClasseAdulte && selectedClass.ClasseAdulte.length > 0 ? (
+                                            selectedClass.ClasseAdulte.map((ca, idx) => (
+                                                <InfoRow
+                                                    key={idx}
+                                                    icon={ca.role === 'principal' ? ShieldCheck : User}
+                                                    label={ca.role === 'principal' ? 'Titulaire' : ca.role === 'coenseignant' ? 'Co-Enseignant' : 'Intervenant'}
+                                                    value={ca.Adulte ? `${ca.Adulte.prenom} ${ca.Adulte.nom}` : 'Enseignant inconnu'}
+                                                />
+                                            ))
+                                        ) : (
+                                            <p className="text-grey-medium italic opacity-60">Aucun enseignant assigné.</p>
+                                        )}
+                                    </InfoSection>
                                 </div>
-                            </div>
+                            )}
                         </CardTabs>
                     </>
                 )}

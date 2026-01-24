@@ -2,6 +2,8 @@ import React from 'react';
 import clsx from 'clsx';
 import SmartTabs from './SmartTabs';
 import { Tab } from './Tabs';
+import Button from './Button';
+import { LucideIcon } from 'lucide-react';
 
 export interface CardTabsProps extends Omit<React.HTMLAttributes<HTMLDivElement>, 'onChange'> {
     /**
@@ -26,6 +28,34 @@ export interface CardTabsProps extends Omit<React.HTMLAttributes<HTMLDivElement>
      * Par défaut: "p-8 bg-background/20"
      */
     contentClassName?: string;
+    /**
+     * Texte du bouton d'action en bas de carte.
+     * Si non fourni, le pied de page ne s'affiche pas.
+     */
+    actionLabel?: string;
+    /**
+     * Fonction appelée au clic sur le bouton d'action.
+     */
+    onAction?: () => void;
+    /**
+     * Icône optionnelle pour le bouton d'action.
+     */
+    /**
+     * Icône optionnelle pour le bouton d'action.
+     */
+    actionIcon?: LucideIcon;
+    /**
+     * Texte du bouton d'action secondaire (au dessus de l'action principale).
+     */
+    secondaryActionLabel?: string;
+    /**
+     * Fonction appelée au clic sur le bouton d'action secondaire.
+     */
+    onSecondaryAction?: () => void;
+    /**
+     * Icône optionnelle pour le bouton d'action secondaire.
+     */
+    secondaryActionIcon?: LucideIcon;
 }
 
 /**
@@ -41,6 +71,12 @@ export const CardTabs: React.FC<CardTabsProps> = ({
     children,
     className,
     contentClassName,
+    actionLabel,
+    onAction,
+    actionIcon,
+    secondaryActionLabel,
+    onSecondaryAction,
+    secondaryActionIcon,
     ...props
 }) => {
     return (
@@ -65,6 +101,32 @@ export const CardTabs: React.FC<CardTabsProps> = ({
             )}>
                 {children}
             </div>
+
+            {/* Pied de page action (conditionnel) */}
+            {((actionLabel && onAction) || (secondaryActionLabel && onSecondaryAction)) && (
+                <div className="p-4 border-t border-white/5 bg-surface/30 space-y-3">
+                    {secondaryActionLabel && onSecondaryAction && (
+                        <Button
+                            onClick={onSecondaryAction}
+                            variant="secondary"
+                            className="w-full border-dashed bg-yellow-500/5 hover:bg-yellow-500/10 text-yellow-500 border-yellow-500/20 hover:border-yellow-500/40"
+                            icon={secondaryActionIcon}
+                        >
+                            {secondaryActionLabel}
+                        </Button>
+                    )}
+                    {actionLabel && onAction && (
+                        <Button
+                            onClick={onAction}
+                            variant="secondary"
+                            className="w-full border-dashed"
+                            icon={actionIcon}
+                        >
+                            {actionLabel}
+                        </Button>
+                    )}
+                </div>
+            )}
         </div>
     );
 };

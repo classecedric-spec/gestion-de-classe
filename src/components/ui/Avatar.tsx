@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Camera, Loader2, User } from 'lucide-react';
+import { Camera, Loader2, User, LucideIcon } from 'lucide-react';
 import clsx from 'clsx';
 
 export type AvatarSize = 'xs' | 'sm' | 'md' | 'lg' | 'xl' | '2xl';
@@ -8,6 +8,7 @@ export interface AvatarProps {
     src?: string | null;
     alt?: string;
     initials?: string;
+    icon?: LucideIcon;
     size?: AvatarSize;
     className?: string;
     editable?: boolean;
@@ -47,6 +48,7 @@ const Avatar: React.FC<AvatarProps> = ({
     src,
     alt = 'Avatar',
     initials,
+    icon: Icon,
     size = 'md',
     className,
     editable = false,
@@ -148,10 +150,12 @@ const Avatar: React.FC<AvatarProps> = ({
                 <img
                     src={src}
                     alt={alt}
-                    className="w-[90%] h-[90%] object-contain"
+                    className="w-full h-full object-cover"
                 />
             ) : initials ? (
                 <span className="text-primary select-none">{initials}</span>
+            ) : Icon ? (
+                <Icon className="text-primary" size={iconSizes[size]} />
             ) : (
                 <User className="text-grey-medium" size={iconSizes[size]} />
             )}
@@ -173,6 +177,7 @@ const Avatar: React.FC<AvatarProps> = ({
                         accept="image/*"
                         className="hidden"
                         onChange={handleFileChange}
+                        title="Changer l'image"
                     />
                 </>
             )}

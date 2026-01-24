@@ -17,6 +17,7 @@ export interface ListItemProps {
     rightIcon?: LucideIcon;
     className?: string;
     deleteTitle?: string;
+    noTruncate?: boolean;
 }
 
 /**
@@ -35,13 +36,14 @@ const ListItem: React.FC<ListItemProps> = ({
     left,
     rightIcon: RightIcon = ChevronRight,
     className,
-    deleteTitle = "Supprimer"
+    deleteTitle = "Supprimer",
+    noTruncate = false
 }) => {
     return (
         <div
             onClick={onClick}
             className={clsx(
-                "w-full flex items-center gap-4 py-2.5 px-4 rounded-xl transition-all border text-left group relative hover:z-50 cursor-pointer",
+                "w-full flex items-center gap-4 py-1.5 px-4 rounded-xl transition-all border text-left group relative hover:z-50 cursor-pointer",
                 isSelected
                     ? "selected-state shadow-lg ring-1 ring-primary/20"
                     : "bg-surface/50 border-white/5 hover:border-white/10 hover:bg-surface",
@@ -72,14 +74,16 @@ const ListItem: React.FC<ListItemProps> = ({
             {/* Content Section */}
             <div className="flex-1 min-w-0">
                 <p className={clsx(
-                    "font-semibold truncate",
+                    "font-semibold",
+                    noTruncate ? "whitespace-normal overflow-visible" : "truncate",
                     isSelected ? "text-text-dark" : "text-text-main"
                 )}>
                     {title}
                 </p>
                 {subtitle && (
                     <p className={clsx(
-                        "text-xs mt-0.5 truncate",
+                        "text-xs mt-0.5",
+                        noTruncate ? "whitespace-normal overflow-visible" : "truncate",
                         isSelected ? "text-text-dark/60 font-medium" : "text-grey-medium"
                     )}>
                         {subtitle}
