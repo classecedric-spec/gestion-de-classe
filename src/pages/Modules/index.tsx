@@ -124,7 +124,7 @@ const Modules: React.FC = () => {
     return (
         <div className="flex h-full gap-6 animate-in fade-in duration-500 relative">
             {/* Left Sidebar Column */}
-            <div className="w-1/3 flex flex-col gap-6 overflow-hidden">
+            <div className="w-1/4 flex flex-col gap-6 overflow-hidden">
                 <CardInfo
                     ref={leftContentRef}
                     height={headerHeight}
@@ -410,7 +410,7 @@ const Modules: React.FC = () => {
                 isOpen={isCreateSeriesModalOpen}
                 onClose={() => setIsCreateSeriesModalOpen(false)}
                 onAdded={moduleHook.actions.fetchModules}
-                moduleId={moduleHook.states.selectedModule?.id}
+                moduleId={moduleHook.states.selectedModule?.id || ''}
             />
 
             {/* Floating Notification */}

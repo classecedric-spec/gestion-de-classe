@@ -15,7 +15,7 @@ const Activities: React.FC = () => {
     const [showFilters, setShowFilters] = useState(false);
 
     // Notifications
-    const { notification, showNotification, dismissNotification } = useNotifications();
+    const { notification, dismissNotification } = useNotifications();
 
     // Hook Logic
     const {
@@ -251,11 +251,11 @@ const Activities: React.FC = () => {
                                             {selectedActivity.Module?.nom}
                                         </Badge>
                                         <Badge
-                                            variant={selectedActivity.statut === 'en_cours' ? 'primary' : 'secondary'}
+                                            variant={selectedActivity.Module?.statut === 'en_cours' ? 'primary' : 'secondary'}
                                             size="sm"
                                             className="uppercase tracking-widest text-[10px]"
                                         >
-                                            {selectedActivity.statut.replace('_', ' ')}
+                                            {(selectedActivity.Module?.statut || 'en_preparation').replace('_', ' ')}
                                         </Badge>
                                     </div>
                                 </div>
@@ -322,7 +322,11 @@ const Activities: React.FC = () => {
                         </p>
                         <p className="text-xs font-medium opacity-90">{notification.message || ''}</p>
                     </div>
-                    <button onClick={dismissNotification} className="ml-4 p-1.5 rounded-lg hover:bg-black/10 transition-colors opacity-50 hover:opacity-100">
+                    <button
+                        onClick={dismissNotification}
+                        className="ml-4 p-1.5 rounded-lg hover:bg-black/10 transition-colors opacity-50 hover:opacity-100"
+                        title="Fermer la notification"
+                    >
                         <X size={16} />
                     </button>
                 </div>

@@ -1,5 +1,5 @@
-import React from 'react';
-import { GitBranch } from 'lucide-react';
+import React, { useState } from 'react';
+import { GitBranch, ListTree, Info } from 'lucide-react';
 import {
     DndContext,
     closestCenter,
@@ -17,7 +17,7 @@ import {
 } from '@dnd-kit/sortable';
 import SortableSubBranchItem from './SortableSubBranchItem';
 import type { Database } from '../../../types/supabase';
-import { Avatar, EmptyState, Badge } from '../../../components/ui';
+import { Avatar, EmptyState, Badge, CardInfo, CardTabs } from '../../../components/ui';
 
 type BrancheRow = Database['public']['Tables']['Branche']['Row'];
 type SousBrancheRow = Database['public']['Tables']['SousBranche']['Row'];
@@ -26,9 +26,19 @@ interface BranchDetailsProps {
     selectedBranch: BrancheRow | null;
     subBranches: SousBrancheRow[];
     onReorderSub: (subBranches: SousBrancheRow[]) => void;
+    rightContentRef: React.RefObject<HTMLDivElement>;
+    headerHeight?: number;
 }
 
-const BranchDetails: React.FC<BranchDetailsProps> = ({ selectedBranch, subBranches, onReorderSub }) => {
+const BranchDetails: React.FC<BranchDetailsProps> = ({
+    selectedBranch,
+    subBranches,
+    onReorderSub,
+    rightContentRef,
+    headerHeight
+}) => {
+    const [activeTab, setActiveTab] = useState('subbranches');
+
     // Drag and Drop Logic
     const sensors = useSensors(
         useSensor(PointerSensor, {
@@ -54,73 +64,92 @@ const BranchDetails: React.FC<BranchDetailsProps> = ({ selectedBranch, subBranch
 
     if (!selectedBranch) {
         return (
-            <EmptyState
-                icon={GitBranch}
-                title="Sélectionnez une branche"
-                description="Choisissez une branche dans la liste pour voir ses détails et les sous-branches associées."
-                size="lg"
-                className="flex-1 bg-surface/30 backdrop-blur-md rounded-2xl border border-white/5 shadow-xl"
-            />
+            <div className="flex-1 card-flat overflow-hidden">
+                <EmptyState
+                    icon={GitBranch}
+                    title="Sélectionnez une branche"
+                    description="Choisissez une branche dans la liste pour voir ses détails et les sous-branches associées."
+                    size="md"
+                />
+            </div>
         );
     }
 
     const photo = selectedBranch.photo_url || (selectedBranch as any).photo_base64;
 
     return (
-        <div className="flex-1 bg-surface/30 backdrop-blur-md rounded-2xl border border-white/5 shadow-xl flex flex-col overflow-hidden relative">
-            {/* Header */}
-            <div className="p-8 border-b border-white/5 flex items-start justify-between bg-surface/20">
-                <div className="flex gap-6 items-center">
+        <>
+            <CardInfo
+                ref={rightContentRef}
+                height={headerHeight}
+            >
+                <div className="flex gap-5 items-center">
                     <Avatar
-                        size="xl"
+                        size="lg"
                         src={photo}
                         icon={GitBranch}
                         className="bg-surface border-4 border-background"
                     />
-                    <div>
-                        <h1 className="text-4xl font-bold text-text-main mb-2">{selectedBranch.nom}</h1>
+                    <div className="flex-1 min-w-0">
+                        <h2 className="text-cq-xl font-bold text-text-main truncate">
+                            {selectedBranch.nom}
+                        </h2>
+                        <div className="flex items-center gap-3 mt-1">
+                            <Badge variant="primary" size="xs">Branche Pédagogique</Badge>
+                            <Badge variant="secondary" size="xs" className="bg-white/5">
+                                {subBranches.length} Sous-branches
+                            </Badge>
+                        </div>
                     </div>
                 </div>
-            </div>
+            </CardInfo>
 
-            {/* Content */}
-            <div className="flex-1 overflow-y-auto p-8 custom-scrollbar bg-background/20">
-                <h3 className="text-lg font-bold text-text-main mb-6 flex items-center gap-3 border-b border-white/5 pb-2 uppercase tracking-wide">
-                    <GitBranch className="text-primary" size={24} />
-                    Sous-branches liées
-                    <Badge variant="secondary" size="sm" className="ml-auto bg-white/10 text-grey-light">
-                        {subBranches.length}
-                    </Badge>
-                </h3>
-
-                {subBranches.length === 0 ? (
-                    <EmptyState
-                        icon={GitBranch}
-                        title="Aucune sous-branche"
-                        description="Aucune sous-branche liée à cette branche."
-                        size="md"
-                        className="border-2 border-dashed border-white/5 rounded-xl"
-                    />
-                ) : (
-                    <DndContext
-                        sensors={sensors}
-                        collisionDetection={closestCenter}
-                        onDragEnd={handleDragEnd}
-                    >
-                        <SortableContext
-                            items={subBranches.map(s => s.id)}
-                            strategy={verticalListSortingStrategy}
-                        >
-                            <div className="space-y-2">
-                                {subBranches.map((sub) => (
-                                    <SortableSubBranchItem key={sub.id} sub={sub} />
-                                ))}
-                            </div>
-                        </SortableContext>
-                    </DndContext>
+            <CardTabs
+                tabs={[
+                    { id: 'subbranches', label: 'Sous-branches', icon: ListTree },
+                    { id: 'infos', label: 'Informations', icon: Info }
+                ]}
+                activeTab={activeTab}
+                onChange={setActiveTab}
+            >
+                {activeTab === 'subbranches' && (
+                    <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
+                        {subBranches.length === 0 ? (
+                            <EmptyState
+                                icon={GitBranch}
+                                title="Aucune sous-branche"
+                                description="Aucune sous-branche liée à cette branche."
+                                size="md"
+                                className="border-2 border-dashed border-white/5 rounded-xl"
+                            />
+                        ) : (
+                            <DndContext
+                                sensors={sensors}
+                                collisionDetection={closestCenter}
+                                onDragEnd={handleDragEnd}
+                            >
+                                <SortableContext
+                                    items={subBranches.map(s => s.id)}
+                                    strategy={verticalListSortingStrategy}
+                                >
+                                    <div className="space-y-2">
+                                        {subBranches.map((sub) => (
+                                            <SortableSubBranchItem key={sub.id} sub={sub} />
+                                        ))}
+                                    </div>
+                                </SortableContext>
+                            </DndContext>
+                        )}
+                    </div>
                 )}
-            </div>
-        </div>
+
+                {activeTab === 'infos' && (
+                    <div className="p-8 text-center text-grey-medium italic opacity-60 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                        Aucune information supplémentaire disponible pour cette branche.
+                    </div>
+                )}
+            </CardTabs>
+        </>
     );
 };
 

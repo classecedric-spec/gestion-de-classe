@@ -1,11 +1,12 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useLayoutEffect } from 'react';
+import { Layers } from 'lucide-react';
 import { useSubBranches } from '../features/sub-branches/hooks/useSubBranches';
 import { useBranches } from '../features/branches/hooks/useBranches';
 import SubBranchList from '../features/sub-branches/components/SubBranchList';
 import SubBranchDetails from '../features/sub-branches/components/SubBranchDetails';
 import AddSubBranchModal from '../features/branches/components/AddSubBranchModal';
-import { Trash2, Loader2 } from 'lucide-react';
 import { useInAppMigration } from '../hooks/useInAppMigration';
+import { ConfirmModal, CardInfo, Badge, SearchBar } from '../components/ui';
 
 const SubBranches: React.FC = () => {
     const {
@@ -18,7 +19,6 @@ const SubBranches: React.FC = () => {
         createSubBranch,
         updateSubBranch,
         deleteSubBranch,
-        subBranches,
     } = useSubBranches();
 
     // Fetch branches for the modal dropdown
@@ -31,6 +31,35 @@ const SubBranches: React.FC = () => {
     const [subBranchToEdit, setSubBranchToEdit] = useState<any>(null);
     const [subBranchToDelete, setSubBranchToDelete] = useState<any>(null);
     const [isDeleting, setIsDeleting] = useState(false);
+
+    // --- Height Synchronization ---
+    const leftContentRef = useRef<HTMLDivElement>(null);
+    const rightContentRef = useRef<HTMLDivElement>(null);
+    const [headerHeight, setHeaderHeight] = useState<number | undefined>(undefined);
+
+    useLayoutEffect(() => {
+        const syncHeight = () => {
+            const leftEl = leftContentRef.current;
+            const rightEl = rightContentRef.current;
+
+            if (leftEl) {
+                const h1 = leftEl.getBoundingClientRect().height;
+                const h2 = rightEl ? rightEl.getBoundingClientRect().height : 0;
+
+                if (h2 > 0) {
+                    const max = Math.max(h1, h2);
+                    setHeaderHeight(max);
+                } else {
+                    setHeaderHeight(undefined);
+                }
+            }
+        };
+
+        syncHeight();
+        const t = setTimeout(syncHeight, 50);
+        const t2 = setTimeout(syncHeight, 300);
+        return () => { clearTimeout(t); clearTimeout(t2); };
+    }, [filteredSubBranches.length, selectedSubBranch, searchTerm]);
 
     // Handlers
     const handleOpenCreate = () => {
@@ -62,56 +91,72 @@ const SubBranches: React.FC = () => {
         const success = await deleteSubBranch(subBranchToDelete.id);
         setIsDeleting(false);
         if (success) {
+            if (selectedSubBranch?.id === subBranchToDelete.id) {
+                setSelectedSubBranch(null);
+            }
             setSubBranchToDelete(null);
         }
     };
 
     return (
-        <div className="flex h-full gap-6">
-            <SubBranchList
-                subBranches={filteredSubBranches}
-                loading={loading}
-                searchTerm={searchTerm}
-                onSearchChange={setSearchTerm}
-                selectedSubBranch={selectedSubBranch}
-                onSelect={setSelectedSubBranch}
-                onOpenAdd={handleOpenCreate}
-                onEdit={handleEdit}
-                onDelete={setSubBranchToDelete}
-            />
+        <div className="h-full flex gap-6 animate-in fade-in duration-500 relative">
+            {/* Sidebar Column - 25% like Students/Activities */}
+            <div className="w-1/4 flex flex-col gap-6 overflow-hidden">
+                <CardInfo
+                    ref={leftContentRef}
+                    height={headerHeight}
+                    contentClassName="space-y-5"
+                >
+                    <div className="flex items-center justify-between">
+                        <h2 className="text-cq-xl font-bold text-text-main flex items-center gap-2">
+                            <Layers className="text-primary" size={24} />
+                            Sous-branches
+                        </h2>
+                        <Badge variant="primary" size="xs">{filteredSubBranches.length} Total</Badge>
+                    </div>
 
-            <SubBranchDetails selectedSubBranch={selectedSubBranch} />
+                    <div className="border-t border-white/10" />
+
+                    <SearchBar
+                        placeholder="Rechercher une sous-branche..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        iconColor="text-primary"
+                    />
+                </CardInfo>
+
+                <SubBranchList
+                    subBranches={filteredSubBranches}
+                    loading={loading}
+                    selectedSubBranch={selectedSubBranch}
+                    onSelect={setSelectedSubBranch}
+                    onOpenAdd={handleOpenCreate}
+                    onEdit={handleEdit}
+                    onDelete={setSubBranchToDelete}
+                />
+            </div>
+
+            {/* Detail Column */}
+            <div className="flex-1 flex flex-col gap-6 overflow-hidden relative">
+                <SubBranchDetails
+                    selectedSubBranch={selectedSubBranch}
+                    rightContentRef={rightContentRef}
+                    headerHeight={headerHeight}
+                />
+            </div>
 
             {/* Delete Confirmation Modal */}
-            {subBranchToDelete && (
-                <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-                    <div className="w-full max-w-sm bg-surface border border-white/10 rounded-2xl shadow-2xl p-6 text-center animate-in zoom-in-95 duration-200">
-                        <div className="w-16 h-16 bg-danger/10 text-danger rounded-full flex items-center justify-center mx-auto mb-4">
-                            <Trash2 size={32} />
-                        </div>
-                        <h2 className="text-xl font-bold text-text-main mb-2">Supprimer la sous-branche ?</h2>
-                        <p className="text-sm text-grey-medium mb-6">
-                            Êtes-vous sûr de vouloir supprimer la sous-branche <span className="text-white font-bold">"{subBranchToDelete.nom}"</span> ?
-                            <br />Cette action est irréversible.
-                        </p>
-                        <div className="flex gap-3">
-                            <button
-                                onClick={() => setSubBranchToDelete(null)}
-                                className="flex-1 py-3 bg-white/5 hover:bg-white/10 text-grey-light rounded-xl font-medium transition-colors"
-                            >
-                                Annuler
-                            </button>
-                            <button
-                                onClick={handleDeleteConfirm}
-                                disabled={isDeleting}
-                                className="flex-1 py-3 bg-danger hover:bg-danger/90 text-white rounded-xl font-bold shadow-lg shadow-danger/20 flex items-center justify-center gap-2"
-                            >
-                                {isDeleting ? <Loader2 className="animate-spin" size={20} /> : "Supprimer"}
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
+            <ConfirmModal
+                isOpen={!!subBranchToDelete}
+                onClose={() => setSubBranchToDelete(null)}
+                onConfirm={handleDeleteConfirm}
+                title="Supprimer la sous-branche ?"
+                message={`Êtes-vous sûr de vouloir supprimer la sous-branche "${subBranchToDelete?.nom}" ? Cette action est irréversible.`}
+                confirmText="Supprimer"
+                cancelText="Annuler"
+                variant="danger"
+                isLoading={isDeleting}
+            />
 
             <AddSubBranchModal
                 isOpen={isAddModalOpen}
