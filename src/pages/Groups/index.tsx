@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Layers, Plus, X, Search, ChevronRight, GraduationCap, Edit, LayoutList } from 'lucide-react';
+import { Layers, Plus, Search, GraduationCap, LayoutList } from 'lucide-react';
 import {
     DndContext,
     closestCenter,
@@ -30,7 +30,7 @@ import { useGroupPDF } from './hooks/useGroupPDF';
 import { useInAppMigration } from '../../hooks/useInAppMigration';
 import { Tables } from '../../types/supabase';
 import { StudentWithClass } from './hooks/useGroupStudents';
-import { Badge, Button, SmartTabs, EmptyState, ConfirmModal, Avatar, Input } from '../../components/ui';
+import { Badge, Button, SmartTabs, EmptyState, ConfirmModal, Avatar, Input, ListItem } from '../../components/ui';
 
 const Groups: React.FC = () => {
     const navigate = useNavigate();
@@ -71,6 +71,11 @@ const Groups: React.FC = () => {
         confirmRemoveStudent,
         fetchStudentsInGroup
     } = useGroupStudents(selectedGroup);
+
+    // Patch for generic onDelete which doesn't provide event
+    const handleRemoveStudentClick = (student: StudentWithClass) => {
+        handleRemoveClick({ stopPropagation: () => { } } as any, student);
+    };
 
     const {
         loading: pdfLoading,
@@ -285,46 +290,21 @@ const Groups: React.FC = () => {
                                     ) : (
                                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                                             {studentsInGroup.map(student => (
-                                                <div key={student.id} className="relative group/card">
-                                                    <Button
-                                                        variant="danger"
-                                                        size="sm"
-                                                        onClick={(e) => handleRemoveClick(e, student)}
-                                                        className="absolute -top-2 -right-2 z-10 h-8 w-8 p-0 rounded-full opacity-0 group-hover/card:opacity-100 transition-all shadow-lg"
-                                                        title="Retirer du groupe"
-                                                        icon={X}
-                                                    />
-                                                    <div
-                                                        onClick={() => navigate('/dashboard/user/students', { state: { selectedStudentId: student.id } })}
-                                                        className="w-full flex items-center gap-4 p-4 rounded-xl bg-white/5 border border-white/5 hover:border-primary/30 hover:bg-white/10 transition-all text-left group cursor-pointer"
-                                                    >
-                                                        <Avatar
-                                                            size="md"
-                                                            src={student.photo_url}
-                                                            initials={`${student.prenom[0]}${student.nom[0]}`}
-                                                            className={student.photo_url ? "bg-[#D9B981]" : "bg-background"}
-                                                        />
-                                                        <div className="flex-1 min-w-0">
-                                                            <p className="font-semibold text-text-main group-hover:text-primary transition-colors">
-                                                                {student.prenom} {student.nom}
-                                                            </p>
-                                                            <p className="text-xs text-grey-medium">
-                                                                {student.Classe?.nom || 'Sans classe'}
-                                                            </p>
-                                                        </div>
-
-                                                        <Button
-                                                            variant="ghost"
-                                                            size="sm"
-                                                            onClick={(e) => { e.stopPropagation(); handleEditStudent(student); }}
-                                                            className="h-8 w-8 p-0 opacity-0 group-hover:opacity-100 mr-2"
-                                                            title="Modifier"
-                                                            icon={Edit}
-                                                        />
-
-                                                        <ChevronRight size={16} className="text-grey-dark group-hover:text-primary group-hover:translate-x-1 transition-all" />
-                                                    </div>
-                                                </div>
+                                                <ListItem
+                                                    key={student.id}
+                                                    id={student.id}
+                                                    title={`${student.prenom} ${student.nom}`}
+                                                    subtitle={student.Classe?.nom || 'Sans classe'}
+                                                    onClick={() => navigate('/dashboard/user/students', { state: { selectedStudentId: student.id } })}
+                                                    onDelete={() => handleRemoveStudentClick(student)}
+                                                    deleteTitle="Retirer du groupe"
+                                                    onEdit={() => handleEditStudent(student)}
+                                                    avatar={{
+                                                        src: student.photo_url,
+                                                        initials: `${student.prenom[0]}${student.nom[0]}`,
+                                                        className: student.photo_url ? "bg-[#D9B981]" : "bg-background"
+                                                    }}
+                                                />
                                             ))}
                                         </div>
                                     )}

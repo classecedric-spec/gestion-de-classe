@@ -25,7 +25,7 @@ const UserManagement: React.FC = () => {
 
             {/* Content Area */}
             <div className="flex-1 overflow-hidden p-8 relative animate-in fade-in duration-300">
-                <Outlet context={{ pendingValidation }} />
+                <Outlet key={location.pathname} context={{ pendingValidation }} />
             </div>
         </div>
     );

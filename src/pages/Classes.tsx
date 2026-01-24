@@ -44,7 +44,7 @@ const Classes: React.FC = () => {
     const [studentToRemove, setStudentToRemove] = React.useState<string | null>(null);
 
     return (
-        <div className="h-full flex gap-8 animate-in fade-in duration-500 relative">
+        <div className="h-full flex gap-6 animate-in fade-in duration-500 relative">
 
             {/* Sidebar */}
             <ClassList

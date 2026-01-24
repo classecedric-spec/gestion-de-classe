@@ -5,29 +5,19 @@ import { StudentFormState } from '../hooks/useStudentForm';
 export interface StudentParentsInfoProps {
     student: StudentFormState;
     handleInputChange: (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => void;
-    activeTab: string;
 }
 
-const StudentParentsInfo: React.FC<StudentParentsInfoProps> = ({ student, handleInputChange, activeTab }) => {
-    if (activeTab === 'parent1') {
-        return (
-            <div className="space-y-4 animate-in slide-in-from-right-4 duration-300">
+const StudentParentsInfo: React.FC<StudentParentsInfoProps> = ({ student, handleInputChange }) => {
+    return (
+        <div className="space-y-6 animate-in slide-in-from-right-4 duration-300">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Parent 1 */}
                 <div className="p-4 rounded-xl bg-white/5 border border-white/5 space-y-4">
                     <h3 className="text-sm font-bold text-text-main flex items-center gap-2">
                         <User size={16} className="text-primary" />
                         Parent 1 (Principal)
                     </h3>
-                    <div className="space-y-1">
-                        <label className="text-xs font-semibold text-gray-400 uppercase">Nom Global des Parents (ex: M. & Mme Dupont)</label>
-                        <input
-                            type="text"
-                            name="nom_parents"
-                            value={student.nom_parents}
-                            onChange={handleInputChange}
-                            className="w-full bg-black/20 border border-white/10 rounded-xl p-3 text-white focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all placeholder:text-gray-600"
-                            placeholder="Laissez vide pour utiliser les prénoms/noms ci-dessous"
-                        />
-                    </div>
+
                     <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-1">
                             <label className="text-xs font-semibold text-gray-400 uppercase">Prénom</label>
@@ -67,18 +57,14 @@ const StudentParentsInfo: React.FC<StudentParentsInfoProps> = ({ student, handle
                         />
                     </div>
                 </div>
-            </div>
-        );
-    }
 
-    if (activeTab === 'parent2') {
-        return (
-            <div className="space-y-4 animate-in slide-in-from-right-4 duration-300">
+                {/* Parent 2 */}
                 <div className="p-4 rounded-xl bg-white/5 border border-white/5 space-y-4">
                     <h3 className="text-sm font-bold text-text-main flex items-center gap-2">
                         <User size={16} className="text-primary" />
                         Parent 2 (Optionnel)
                     </h3>
+
                     <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-1">
                             <label className="text-xs font-semibold text-gray-400 uppercase">Prénom</label>
@@ -119,8 +105,8 @@ const StudentParentsInfo: React.FC<StudentParentsInfoProps> = ({ student, handle
                     </div>
                 </div>
             </div>
-        );
-    }
+        </div>
+    );
 
     return null;
 };

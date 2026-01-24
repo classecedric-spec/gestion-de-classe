@@ -1,8 +1,8 @@
 import React, { ChangeEvent } from 'react';
-import { BookOpen, GraduationCap, LayoutGrid, Table as TableIcon, ArrowUp, ArrowDown, ArrowUpDown, Edit, Trash2, X, Plus } from 'lucide-react';
+import { BookOpen, GraduationCap, LayoutGrid, Table as TableIcon, ArrowUp, ArrowDown, ArrowUpDown, Edit, Trash2, Plus } from 'lucide-react';
 import clsx from 'clsx';
 import { ClassWithAdults, StudentWithRelations } from '../services/classService';
-import { Badge, Button, EmptyState, Avatar, Tabs } from '../../../components/ui';
+import { Badge, Button, EmptyState, Avatar, Tabs, ListItem } from '../../../components/ui';
 
 export interface ClassDetailsProps {
     selectedClass: ClassWithAdults | null;
@@ -253,40 +253,21 @@ const GridView: React.FC<GridViewProps> = ({ students, onEditStudent, onRemoveSt
     return (
         <div className="grid gap-4 grid-cols-2 md:grid-cols-3 xl:grid-cols-4 auto-rows-fr">
             {students.map(student => (
-                <div key={student.id} className="relative group/card h-full">
-                    <Button
-                        variant="danger"
-                        size="sm"
-                        onClick={(e) => onRemoveStudent(e, student.id)}
-                        className="absolute top-2 right-2 z-10 h-8 w-8 p-0 rounded-full opacity-0 group-hover/card:opacity-100 transition-all shadow-lg"
-                        title="Retirer"
-                        icon={X}
-                    />
-
-                    <button
-                        onClick={() => onEditStudent(student)}
-                        className="w-full h-full flex flex-col items-center justify-center text-center p-4 rounded-2xl bg-surface/40 backdrop-blur-sm border border-white/5 hover:border-primary/40 hover:bg-surface/60 transition-all duration-300 group shadow-sm hover:shadow-md overflow-hidden"
-                    >
-                        <Avatar
-                            size="lg"
-                            src={student.photo_base64}
-                            initials={(student.prenom || '?')[0] + (student.nom || '?')[0]}
-                            className={clsx(
-                                "mb-3 shrink-0",
-                                student.photo_base64 ? "bg-[#D9B981] p-1" : "bg-input"
-                            )}
-                        />
-
-                        <div className="w-full px-1">
-                            <p className="font-bold text-text-main group-hover:text-primary transition-colors text-sm truncate">
-                                {student.prenom} {student.nom}
-                            </p>
-                            <p className="text-[10px] uppercase font-bold text-grey-medium opacity-60 truncate mt-1">
-                                {student.EleveGroupe && student.EleveGroupe.length > 0 ? (student.EleveGroupe[0] as any).Groupe?.nom : 'Sans groupe'}
-                            </p>
-                        </div>
-                    </button>
-                </div>
+                <ListItem
+                    key={student.id}
+                    id={student.id}
+                    title={`${student.prenom} ${student.nom}`}
+                    subtitle={student.EleveGroupe && student.EleveGroupe.length > 0 ? (student.EleveGroupe[0] as any).Groupe?.nom : 'Sans groupe'}
+                    onClick={() => onEditStudent(student)}
+                    onDelete={() => onRemoveStudent({ stopPropagation: () => { } } as any, student.id)}
+                    onEdit={() => onEditStudent(student)}
+                    deleteTitle="Retirer de la classe"
+                    avatar={{
+                        src: student.photo_base64,
+                        initials: (student.prenom || '?')[0] + (student.nom || '?')[0],
+                        className: student.photo_base64 ? "bg-[#D9B981] p-1" : "bg-input"
+                    }}
+                />
             ))}
         </div>
     );

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { FileSpreadsheet, Download, Upload, Trash2 } from 'lucide-react';
 import ExcelJS from 'exceljs';
-import { saveAs } from 'file-saver';
+import { downloadFile } from '../../../lib/helpers/download';
 import { Tables } from '../../../types/supabase';
 
 export interface ImportedStudent {
@@ -70,7 +70,7 @@ const ImportStudentsSection: React.FC<ImportStudentsSectionProps> = ({ levels, o
 
         const buffer = await workbook.xlsx.writeBuffer();
         const blob = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
-        saveAs(blob, "modele_classe_complet.xlsx");
+        await downloadFile(blob, "modele_classe_complet.xlsx", "Fichier Excel");
     };
 
     const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {

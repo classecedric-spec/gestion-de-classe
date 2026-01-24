@@ -1,8 +1,7 @@
 import React, { ChangeEvent } from 'react';
-import { Search, Edit, X, ChevronRight, BookOpen, Plus } from 'lucide-react';
-import clsx from 'clsx';
+import { Search, BookOpen, Plus } from 'lucide-react';
 import { ClassWithAdults } from '../services/classService';
-import { Badge, Button, EmptyState, Avatar, Input } from '../../../components/ui';
+import { Badge, Button, EmptyState, Avatar, Input, ListItem } from '../../../components/ui';
 
 export interface ClassListProps {
     classes: ClassWithAdults[];
@@ -63,77 +62,28 @@ const ClassList: React.FC<ClassListProps> = ({
                         size="sm"
                     />
                 ) : (
-                    classes.map((classe) => (
-                        <div
-                            key={classe.id}
-                            onClick={() => onSelect(classe)}
-                            className={clsx(
-                                "group relative w-full flex items-center gap-4 p-4 rounded-xl border transition-all text-left cursor-pointer",
-                                selectedClass?.id === classe.id
-                                    ? "bg-white/10 border-primary/30 shadow-sm"
-                                    : "bg-white/5 border-white/5 hover:border-primary/30 hover:bg-white/10"
-                            )}
-                            tabIndex={0}
-                            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') onSelect(classe); }}
-                        >
-                            <Avatar
-                                size="md"
-                                src={(classe as any).photo_base64 || classe.logo_url}
-                                initials={classe.acronyme || (classe.nom ? classe.nom[0] : '?')}
-                                className={clsx(
-                                    selectedClass?.id === classe.id ? "bg-background" : "bg-background",
-                                    ((classe as any).photo_base64 || classe.logo_url) && "bg-[#D9B981]"
-                                )}
+                    classes.map((classe) => {
+                        const principalAdult = classe.ClasseAdulte?.find(ca => ca.role === 'principal')?.Adulte?.nom;
+
+                        return (
+                            <ListItem
+                                key={classe.id}
+                                id={classe.id}
+                                title={classe.nom}
+                                subtitle={principalAdult ? `Pr. ${principalAdult}` : (classe.acronyme || 'Sans acronyme')}
+                                isSelected={selectedClass?.id === classe.id}
+                                onClick={() => onSelect(classe)}
+                                onEdit={() => onEdit(classe)}
+                                onDelete={() => onDelete(classe)}
+                                deleteTitle="Supprimer la classe"
+                                avatar={{
+                                    src: (classe as any).photo_base64 || classe.logo_url,
+                                    initials: classe.acronyme || (classe.nom ? classe.nom[0] : '?'),
+                                    className: ((classe as any).photo_base64 || classe.logo_url) ? "bg-[#D9B981]" : "bg-background"
+                                }}
                             />
-
-                            {/* Info */}
-                            <div className="flex-1 min-w-0">
-                                <p className={clsx("font-semibold truncate text-base", selectedClass?.id === classe.id ? "text-primary" : "text-text-main group-hover:text-primary transition-colors")}>
-                                    {classe.nom}
-                                </p>
-                                <div className="flex flex-wrap gap-1 mt-1">
-                                    {classe.acronyme && (
-                                        <Badge variant="default" size="xs">
-                                            {classe.acronyme}
-                                        </Badge>
-                                    )}
-                                    {classe.ClasseAdulte && classe.ClasseAdulte.length > 0 && (
-                                        <Badge variant="default" size="xs" className="max-w-[120px] truncate">
-                                            {classe.ClasseAdulte.filter(ca => ca.role === 'principal').map(ca => ca.Adulte?.nom).join(', ')}
-                                        </Badge>
-                                    )}
-                                </div>
-                            </div>
-
-                            {/* Actions (Hover) */}
-                            <div className={clsx(
-                                "flex gap-1 transition-opacity",
-                                selectedClass?.id === classe.id ? "opacity-100" : "opacity-0 group-hover:opacity-100"
-                            )}>
-                                <button
-                                    onClick={(e) => { e.stopPropagation(); onEdit(classe); }}
-                                    className="p-2 rounded-full text-grey-medium hover:text-white hover:bg-white/10 transition-colors"
-                                    title="Modifier"
-                                >
-                                    <Edit size={14} />
-                                </button>
-                            </div>
-
-                            {/* Delete Button (Corner) */}
-                            <button
-                                onClick={(e) => { e.stopPropagation(); onDelete(classe); }}
-                                className="absolute -top-2 -right-2 z-10 p-2 bg-danger/10 hover:bg-danger text-danger hover:text-white rounded-full border border-danger/20 opacity-0 group-hover:opacity-100 transition-all shadow-lg scale-90 hover:scale-100"
-                                title="Supprimer"
-                            >
-                                <X size={14} strokeWidth={3} />
-                            </button>
-
-                            <ChevronRight size={16} className={clsx(
-                                "transition-all text-grey-dark group-hover:text-primary",
-                                selectedClass?.id === classe.id ? "opacity-100 translate-x-1" : "opacity-0 group-hover:opacity-100 group-hover:translate-x-1"
-                            )} />
-                        </div>
-                    ))
+                        );
+                    })
                 )}
             </div>
 

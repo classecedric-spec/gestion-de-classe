@@ -4,8 +4,11 @@ import { Modal, Button, Input, Select } from '../../../components/ui';
 import ImageUpload from '../../../components/ui/ImageUpload';
 import { useClassForm } from '../hooks/useClassForm';
 import ImportStudentsSection, { ImportedStudent } from './ImportStudentsSection';
-import { Tables } from '../../../types/supabase';
+import { Tables, TablesInsert } from '../../../types/supabase';
 import { ClassWithAdults } from '../services/classService';
+import { studentService } from '../../students/services/studentService';
+import { supabase } from '../../../lib/database';
+import { resetSync } from '../../../lib/sync';
 import { SupabaseLevelRepository } from '../../levels/repositories/SupabaseLevelRepository';
 
 const levelRepository = new SupabaseLevelRepository();
@@ -49,8 +52,8 @@ const AddClassModal: React.FC<AddClassModalProps> = ({ isOpen, onClose, onAdded,
     } = useClassForm({
         isEditing: !!classToEdit,
         classToEdit,
-        onSaved: onAdded,
-        onClose
+        onSaved: () => { }, // Dummy since we handle it in handleFullSubmit
+        onClose: () => { }  // Dummy since we handle it in handleFullSubmit
     });
 
     const [adultRows, setAdultRows] = useState<AdultRow[]>([]);
@@ -95,11 +98,60 @@ const AddClassModal: React.FC<AddClassModalProps> = ({ isOpen, onClose, onAdded,
         updateField('complementaires', c);
     };
 
+    const [savingStudents, setSavingStudents] = useState(false);
+
     // Wrapper submit to also handle students
     const handleFullSubmit = async () => {
-        // NOTE: In the future, we could pass importedStudents to useClassForm or handle them here after success.
-        // For now, we follow the current hook logic.
-        await submitClass();
+        try {
+            const savedClass = await submitClass();
+            if (!savedClass) return;
+
+            // 1. Handle Students Import if any
+            if (!classToEdit && importedStudents.length > 0) {
+                setSavingStudents(true);
+                const { data: { user } } = await supabase.auth.getUser();
+                if (user) {
+                    // Create students one by one using existing service
+                    for (const student of importedStudents) {
+                        const studentData: TablesInsert<'Eleve'> = {
+                            nom: student.nom,
+                            prenom: student.prenom,
+                            date_naissance: student.date_naissance,
+                            classe_id: savedClass.id,
+                            niveau_id: student.niveau_id,
+                            parent1_nom: student.parent1_nom,
+                            parent1_prenom: student.parent1_prenom,
+                            parent1_email: student.parent1_email,
+                            parent2_nom: student.parent2_nom,
+                            parent2_prenom: student.parent2_prenom,
+                            parent2_email: student.parent2_email,
+                            sex: '', // Default or could be added to excel
+                            photo_url: '',
+                            // @ts-ignore - types sync
+                            titulaire_id: user.id
+                        };
+
+                        await studentService.saveStudent(
+                            studentData,
+                            [], // No initial groups for bulk import
+                            user.id,
+                            false
+                        );
+                    }
+                    // Reset sync after bulk student creation to force fresh delta fetch
+                    await resetSync('Eleve');
+                }
+                setSavingStudents(false);
+            }
+
+            // 2. Finalize
+            onAdded(savedClass);
+            onClose();
+        } catch (err) {
+            setSavingStudents(false);
+            console.error("Critical error during full class/students submit:", err);
+            alert("Une erreur est survenue lors de la création de la classe et de ses élèves.");
+        }
     };
 
     return (
@@ -110,16 +162,16 @@ const AddClassModal: React.FC<AddClassModalProps> = ({ isOpen, onClose, onAdded,
             icon={classToEdit ? <Edit size={24} /> : <Plus size={24} />}
             footer={
                 <>
-                    <Button onClick={onClose} variant="secondary" className="flex-1">
+                    <Button onClick={onClose} variant="secondary" className="flex-1" disabled={savingStudents}>
                         Annuler
                     </Button>
                     <Button
                         onClick={handleFullSubmit}
-                        loading={loading}
+                        loading={loading || savingStudents}
                         className="flex-1"
                         icon={classToEdit ? undefined : Plus}
                     >
-                        {classToEdit ? "Enregistrer" : "Créer la classe"}
+                        {savingStudents ? "Création des élèves..." : (classToEdit ? "Enregistrer" : "Créer la classe")}
                     </Button>
                 </>
             }

@@ -4,7 +4,7 @@ import { fetchStudentPdfData } from '../../lib/pdf';
 import { calculateAge } from '../../lib/helpers';
 import {
     Search, User as UserIcon, Calendar, GraduationCap, ShieldCheck, Loader2, ChevronRight, ChevronDown,
-    Filter, Plus, X, BookOpen, Layers, Edit, Users, CheckCircle2, Clock, AlertCircle,
+    Filter, Plus, BookOpen, Layers, Users, CheckCircle2, Clock, AlertCircle,
     LayoutList, GitGraph, FileText, Activity, GitBranch, SlidersHorizontal
 } from 'lucide-react';
 import { isOverdue } from '../../features/tracking/utils/progressionHelpers';
@@ -13,9 +13,10 @@ import StudentModal from '../../features/students/components/StudentModal';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import StudentTrackingPDFModern from '../../components/StudentTrackingPDFModern';
+import { downloadFile } from '../../lib/helpers/download';
 
 // Nouveaux composants UI
-import { Badge, Avatar, EmptyState, Button, ConfirmModal, SearchBar, FilterSelect, CardInfo, CardList, CardTabs, SmartTabs, InfoSection, InfoRow, InfoSectionEditable, InfoRowEditable } from '../../components/ui';
+import { Badge, Avatar, EmptyState, Button, ConfirmModal, SearchBar, FilterSelect, CardInfo, CardList, CardTabs, SmartTabs, InfoSection, InfoRow, InfoSectionEditable, InfoRowEditable, ListItem } from '../../components/ui';
 
 // Hooks extraits
 import { useStudentsData } from './hooks/useStudentsData';
@@ -197,25 +198,10 @@ const Students: React.FC = () => {
             };
 
             const { pdf } = await import('@react-pdf/renderer');
-            const { saveAs } = await import('file-saver');
-
             const blob = await pdf(React.createElement(StudentTrackingPDFModern, { data: pdfData }) as any).toBlob();
-            const fileName = `ToDoList_Suivi_${selectedStudent.prenom}_${selectedStudent.nom}.pdf`;
+            const fileName = `ToDoList_Suivi_${selectedStudent.prenom} _${selectedStudent.nom}.pdf`;
 
-            try {
-                if ('showSaveFilePicker' in window) {
-                    const handle = await (window as any).showSaveFilePicker({
-                        suggestedName: fileName,
-                        types: [{ description: 'PDF Document', accept: { 'application/pdf': ['.pdf'] } }],
-                    });
-                    const writable = await handle.createWritable();
-                    await writable.write(blob);
-                    await writable.close();
-                    return;
-                }
-            } catch (err) { }
-
-            saveAs(blob, fileName);
+            await downloadFile(blob, fileName, "Document PDF");
         } catch (error) {
             console.error(error);
             alert("Erreur lors de la génération du PDF.");
@@ -342,7 +328,7 @@ const Students: React.FC = () => {
     };
 
     return (
-        <div className="h-full flex gap-8 animate-in fade-in duration-500 relative">
+        <div className="h-full flex gap-6 animate-in fade-in duration-500 relative">
             {/* List Column - Split into 2 cards */}
             <div className="w-1/4 flex flex-col gap-6 overflow-hidden">
                 {/* Card 1: Title & Controls */}
@@ -433,81 +419,35 @@ const Students: React.FC = () => {
                         </div>
                     ) : filteredStudents.length > 0 ? (
                         filteredStudents.map(student => (
-                            <div
+                            <ListItem
                                 key={student.id}
+                                id={student.id}
+                                title={`${student.prenom} ${student.nom}`}
+                                // Subtitle removed as requested
+                                isSelected={selectedStudent?.id === student.id}
                                 onClick={() => setSelectedStudent(student)}
-                                className={clsx(
-                                    "w-full flex items-center gap-4 py-2.5 px-4 rounded-xl transition-all border text-left group relative hover:z-50 cursor-pointer",
-                                    selectedStudent?.id === student.id
-                                        ? "selected-state"
-                                        : "bg-surface/50 border-transparent hover:border-white/10 hover:bg-surface"
-                                )}
-                                role="button"
-                                tabIndex={0}
-                                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setSelectedStudent(student); }}
-                            >
-                                <div onClick={(e) => e.stopPropagation()}>
-                                    <Avatar
-                                        size="sm"
-                                        src={student.photo_url}
-                                        initials={`${student.prenom[0]}${student.nom[0]}`}
-                                        editable
-                                        onImageChange={(file) => processAndSavePhoto(file, student)}
-                                        loading={updatingPhotoId === student.id}
-                                        onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); setDraggingPhotoId(student.id); }}
-                                        onDragLeave={(e) => { e.preventDefault(); e.stopPropagation(); setDraggingPhotoId(null); }}
-                                        onDrop={(e, file) => {
-                                            e.preventDefault();
-                                            e.stopPropagation();
-                                            setDraggingPhotoId(null);
-                                            processAndSavePhoto(file, student);
-                                        }}
-                                        className={clsx(
-                                            selectedStudent?.id === student.id ? "bg-white/20" : "",
-                                            draggingPhotoId === student.id && "ring-2 ring-primary scale-110 bg-primary/20"
-                                        )}
-                                    />
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                    <p className={clsx(
-                                        "font-semibold truncate",
-                                        selectedStudent?.id === student.id ? "text-text-dark" : "text-text-main"
-                                    )}>
-                                        {student.prenom} {student.nom}
-                                    </p>
-                                </div>
-
-                                <div className={clsx(
-                                    "flex gap-1 transition-opacity",
-                                    selectedStudent?.id === student.id ? "opacity-100" : "opacity-0 group-hover:opacity-100"
-                                )}>
-                                    <div
-                                        onClick={(e) => { e.stopPropagation(); handleEdit(student); }}
-                                        className={clsx(
-                                            "p-1.5 rounded-lg transition-colors cursor-pointer",
-                                            selectedStudent?.id === student.id
-                                                ? "text-text-dark/70 hover:text-text-dark hover:bg-text-dark/10"
-                                                : "text-grey-medium hover:text-white hover:bg-white/10"
-                                        )}
-                                        title="Modifier"
-                                    >
-                                        <Edit size={14} />
-                                    </div>
-                                </div>
-
-                                <button
-                                    onClick={(e) => { e.stopPropagation(); setStudentToDelete(student); }}
-                                    className="absolute -top-2 -right-2 z-10 p-2 bg-danger/10 hover:bg-danger text-danger hover:text-white rounded-full border border-danger/20 opacity-0 group-hover:opacity-100 transition-all shadow-lg scale-90 hover:scale-100"
-                                    title="Supprimer l'élève"
-                                >
-                                    <X size={14} strokeWidth={3} />
-                                </button>
-
-                                <ChevronRight size={16} className={clsx(
-                                    "transition-transform",
-                                    selectedStudent?.id === student.id ? "text-text-dark translate-x-1" : "text-grey-dark group-hover:translate-x-1"
-                                )} />
-                            </div>
+                                onEdit={() => handleEdit(student)}
+                                onDelete={() => setStudentToDelete(student)}
+                                deleteTitle="Supprimer l'élève"
+                                avatar={{
+                                    src: student.photo_url,
+                                    initials: `${student.prenom[0]}${student.nom[0]}`,
+                                    editable: true,
+                                    loading: updatingPhotoId === student.id,
+                                    onImageChange: (file) => processAndSavePhoto(file, student),
+                                    onDragOver: (e) => { e.preventDefault(); e.stopPropagation(); setDraggingPhotoId(student.id); },
+                                    onDragLeave: (e) => { e.preventDefault(); e.stopPropagation(); setDraggingPhotoId(null); },
+                                    onDrop: (e, file) => {
+                                        e.preventDefault();
+                                        e.stopPropagation();
+                                        setDraggingPhotoId(null);
+                                        processAndSavePhoto(file, student);
+                                    },
+                                    className: clsx(
+                                        draggingPhotoId === student.id && "ring-2 ring-primary scale-110 bg-primary/20"
+                                    )
+                                }}
+                            />
                         ))
                     ) : (
                         <EmptyState

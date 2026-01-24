@@ -45,28 +45,27 @@ export const useGroupsData = () => {
     }, []);
 
     const handleDeleteGroup = useCallback(async (groupId: string) => {
-        setLoading(true);
+        // Optimistic UI Update: remove group from local state immediately
+        const previousGroups = [...groups];
+        const previousSelected = selectedGroup;
+        const remainingGroups = groups.filter(g => g.id !== groupId);
+
+        setGroups(remainingGroups);
+
+        // If the deleted group was selected, select first remaining group
+        if (selectedGroup?.id === groupId) {
+            setSelectedGroup(remainingGroups.length > 0 ? remainingGroups[0] : null);
+        }
+
         try {
             await groupService.deleteGroup(groupId);
-
-            // Calculate remaining groups BEFORE updating state
-            const remainingGroups = groups.filter(g => g.id !== groupId);
-
-            // Optimistic update: remove group from local state immediately
-            setGroups(remainingGroups);
-
-            // If the deleted group was selected, select first remaining group
-            if (selectedGroup?.id === groupId) {
-                setSelectedGroup(remainingGroups.length > 0 ? remainingGroups[0] : null);
-            }
         } catch (error) {
-            // On error, refetch to ensure consistency
-            await fetchGroups();
+            // Revert on error
+            setGroups(previousGroups);
+            setSelectedGroup(previousSelected);
             throw error;
-        } finally {
-            setLoading(false);
         }
-    }, [selectedGroup, groups, fetchGroups]);
+    }, [selectedGroup, groups]);
 
     const handleAddGroup = useCallback((newGroup: Tables<'Groupe'>) => {
         // Optimistic update: add new group to local state immediately

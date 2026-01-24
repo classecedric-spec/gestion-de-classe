@@ -106,22 +106,13 @@ const StudentModal: React.FC<StudentModalProps> = (props) => {
                         Enfant
                     </button>
                     <button
-                        onClick={() => setActiveTab('parent1')}
+                        onClick={() => setActiveTab('parents')}
                         className={clsx(
                             "px-4 py-3 text-sm font-medium border-b-2 transition-colors",
-                            activeTab === 'parent1' ? "border-primary text-primary" : "border-transparent text-grey-medium hover:text-text-main"
+                            activeTab === 'parents' ? "border-primary text-primary" : "border-transparent text-grey-medium hover:text-text-main"
                         )}
                     >
-                        Parent 1
-                    </button>
-                    <button
-                        onClick={() => setActiveTab('parent2')}
-                        className={clsx(
-                            "px-4 py-3 text-sm font-medium border-b-2 transition-colors",
-                            activeTab === 'parent2' ? "border-primary text-primary" : "border-transparent text-grey-medium hover:text-text-main"
-                        )}
-                    >
-                        Parent 2
+                        Parents
                     </button>
                 </div>
 
@@ -143,11 +134,10 @@ const StudentModal: React.FC<StudentModalProps> = (props) => {
                             />
                         )}
 
-                        {(activeTab === 'parent1' || activeTab === 'parent2') && (
+                        {activeTab === 'parents' && (
                             <StudentParentsInfo
                                 student={student}
                                 handleInputChange={handleInputChange}
-                                activeTab={activeTab}
                             />
                         )}
                     </form>

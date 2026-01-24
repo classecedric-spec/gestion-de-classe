@@ -19,7 +19,7 @@ export interface UseClassFormProps {
     onClose: () => void;
 }
 
-export const useClassForm = ({ isEditing, classToEdit, onSaved, onClose }: UseClassFormProps) => {
+export const useClassForm = ({ isEditing, classToEdit }: UseClassFormProps) => {
     const initialClassState: ClassFormData = {
         nom: '',
         acronyme: '',
@@ -169,12 +169,11 @@ export const useClassForm = ({ isEditing, classToEdit, onSaved, onClose }: UseCl
                 } as any;
             }
 
-            onSaved(updatedClass || undefined);
-            onClose();
-
+            return updatedClass || null;
         } catch (error: any) {
             console.error("Error saving class:", error);
             alert("Erreur: " + error.message);
+            return null;
         } finally {
             setLoading(false);
         }

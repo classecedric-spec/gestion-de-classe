@@ -180,9 +180,9 @@ export const useStudentsData = (initialStudentId: string | null = null) => {
             setSelectedStudent(previousSelected);
             toast.error('Erreur lors de la suppression: ' + error.message);
         } finally {
-            fetchStudents(); // Re-fetch to be safe and consistent with joined fields
+            // No need to re-fetch if optimistic update succeeded and we are handling rollback on error
         }
-    }, [studentToDelete, students, selectedStudent, fetchStudents]);
+    }, [studentToDelete, students, selectedStudent]);
 
     // Filtre les élèves
     const filteredStudents = students.filter(s =>
