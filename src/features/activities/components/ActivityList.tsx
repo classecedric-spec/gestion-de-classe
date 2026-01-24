@@ -1,4 +1,6 @@
-import { Search, Plus, Edit2, Trash2, Folder, ChevronRight, Loader2, ChevronDown } from 'lucide-react';
+import React from 'react';
+import { Badge, Button, Avatar, EmptyState } from '../../../components/ui';
+import { Search, Plus, Edit2, Trash2, Folder, ChevronRight, ChevronDown } from 'lucide-react';
 import clsx from 'clsx';
 import { Puzzle, FileText } from 'lucide-react';
 import { ActivityWithRelations } from '../services/activityService';
@@ -52,9 +54,9 @@ const ActivityList: React.FC<ActivityListProps> = ({
                         <FileText className="text-primary" size={24} />
                         Liste des Activités
                     </h2>
-                    <span className="px-2 py-1 bg-primary/10 text-primary text-[10px] font-bold rounded-md uppercase tracking-wider">
+                    <Badge variant="primary" size="sm">
                         {totalCount} Total
-                    </span>
+                    </Badge>
                 </div>
 
                 <div className="relative group">
@@ -111,9 +113,16 @@ const ActivityList: React.FC<ActivityListProps> = ({
             {/* List Items */}
             <div className="flex-1 overflow-y-auto p-4 space-y-2 custom-scrollbar">
                 {loading ? (
-                    <div className="flex justify-center p-8"><Loader2 className="animate-spin text-primary" /></div>
+                    <div className="flex justify-center p-8">
+                        <Avatar loading size="md" initials="" />
+                    </div>
                 ) : activities.length === 0 ? (
-                    <div className="text-center p-8 text-grey-medium italic">Aucune activité trouvée.</div>
+                    <EmptyState
+                        icon={Puzzle}
+                        title="Aucune activité"
+                        description="Aucune activité trouvée."
+                        size="sm"
+                    />
                 ) : (
                     activities.map((activity) => (
                         <div
@@ -132,12 +141,11 @@ const ActivityList: React.FC<ActivityListProps> = ({
                                 tabIndex={0}
                                 onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') onSelect(activity); }}
                             >
-                                <div className={clsx(
-                                    "w-10 h-10 rounded-lg flex items-center justify-center text-lg font-bold shadow-inner overflow-hidden shrink-0",
-                                    selectedActivity?.id === activity.id ? "bg-white/20 text-text-dark" : "bg-background text-primary"
-                                )}>
-                                    <Puzzle size={20} />
-                                </div>
+                                <Avatar
+                                    size="md"
+                                    icon={Puzzle}
+                                    className={selectedActivity?.id === activity.id ? "bg-white/20" : "bg-background"}
+                                />
                                 <div className="flex-1 min-w-0">
                                     <h3 className={clsx(
                                         "font-semibold truncate",
@@ -152,7 +160,7 @@ const ActivityList: React.FC<ActivityListProps> = ({
                                             selectedActivity?.id === activity.id ? "text-text-dark/70" : "text-grey-medium"
                                         )}>
                                             <Folder size={10} />
-                                            {activity.Module.titre}
+                                            {activity.Module.nom}
                                         </p>
                                     )}
                                 </div>
@@ -200,13 +208,14 @@ const ActivityList: React.FC<ActivityListProps> = ({
 
             {/* Add Button */}
             <div className="p-4 border-t border-white/5 bg-surface/30">
-                <button
+                <Button
                     onClick={onOpenCreate}
-                    className="w-full py-3 bg-white/5 hover:bg-primary/20 hover:text-primary text-grey-light rounded-xl border border-dashed border-white/20 hover:border-primary/50 transition-all flex items-center justify-center gap-2 group"
+                    variant="secondary"
+                    className="w-full border-dashed"
+                    icon={Plus}
                 >
-                    <Plus size={18} className="group-hover:scale-110 transition-transform" />
-                    <span className="font-medium">Nouvelle Activité</span>
-                </button>
+                    Nouvelle Activité
+                </Button>
             </div>
         </div>
     );

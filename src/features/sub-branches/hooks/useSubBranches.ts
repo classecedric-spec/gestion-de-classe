@@ -15,19 +15,21 @@ export const useSubBranches = () => {
             const data = await subBranchService.fetchAll();
             setSubBranches(data);
 
-            // Auto-select first if none selected
-            if (data.length > 0 && !selectedSubBranch) {
-                // Determine if we should really auto-select. Original code says yes.
-                // Keeping original behavior.
-                setSelectedSubBranch(data[0]);
-            }
+            // Auto-select logic moved to effect
         } catch (error) {
             console.error('Error fetching sub-branches:', error);
             toast.error('Erreur lors du chargement des sous-branches');
         } finally {
             setLoading(false);
         }
-    }, [selectedSubBranch]);
+    }, []);
+
+    // Initial selection effect
+    useEffect(() => {
+        if (subBranches.length > 0 && !selectedSubBranch) {
+            setSelectedSubBranch(subBranches[0]);
+        }
+    }, [subBranches, selectedSubBranch]);
 
     // Create sub-branch
     const createSubBranch = useCallback(async (subBranchData: SousBrancheInsert): Promise<boolean> => {

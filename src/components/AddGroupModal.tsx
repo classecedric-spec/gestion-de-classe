@@ -5,6 +5,7 @@ import { Plus, Layers } from 'lucide-react';
 import Modal from './ui/Modal';
 import Button from './ui/Button';
 import ImageUpload from './ui/ImageUpload';
+import Input from './ui/Input';
 import { Tables } from '../types/supabase';
 
 interface AddGroupModalProps {
@@ -105,27 +106,19 @@ const AddGroupModal: React.FC<AddGroupModalProps> = ({ isOpen, onClose, onAdded,
                     storagePath={`groupe/${newGroup.tempId}.jpg`}
                 />
 
-                <div className="space-y-1">
-                    <label className="text-xs font-semibold text-grey-light uppercase">Nom du groupe</label>
-                    <input
-                        type="text"
-                        placeholder="Ex: Groupe A"
-                        required
-                        value={newGroup.nom}
-                        onChange={e => setNewGroup({ ...newGroup, nom: e.target.value })}
-                        className="w-full bg-input border border-border/10 rounded-xl p-3 text-text-main focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all"
-                    />
-                </div>
-                <div className="space-y-1">
-                    <label className="text-xs font-semibold text-grey-light uppercase">Acronyme</label>
-                    <input
-                        type="text"
-                        placeholder="Ex: GR A"
-                        value={newGroup.acronyme}
-                        onChange={e => setNewGroup({ ...newGroup, acronyme: e.target.value })}
-                        className="w-full bg-input border border-border/10 rounded-xl p-3 text-text-main focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all"
-                    />
-                </div>
+                <Input
+                    label="Nom du groupe"
+                    placeholder="Ex: Groupe A"
+                    required
+                    value={newGroup.nom}
+                    onChange={e => setNewGroup({ ...newGroup, nom: e.target.value })}
+                />
+                <Input
+                    label="Acronyme"
+                    placeholder="Ex: GR A"
+                    value={newGroup.acronyme}
+                    onChange={e => setNewGroup({ ...newGroup, acronyme: e.target.value })}
+                />
             </form>
         </Modal>
     );

@@ -8,7 +8,8 @@ export type BadgeVariant =
     | 'danger'
     | 'warning'
     | 'info'
-    | 'purple';
+    | 'purple'
+    | 'secondary';
 
 export type BadgeSize = 'xs' | 'sm' | 'md';
 
@@ -94,6 +95,11 @@ const Badge: React.FC<BadgeProps> = ({
             solid: 'bg-purple-accent/20 text-purple-accent border-purple-accent/20',
             outline: 'bg-transparent text-purple-accent border-purple-accent/50',
             ghost: 'bg-transparent text-purple-accent'
+        },
+        secondary: {
+            solid: 'bg-white/10 text-grey-light border-white/10',
+            outline: 'bg-transparent text-grey-light border-white/20',
+            ghost: 'bg-transparent text-grey-light'
         }
     };
 

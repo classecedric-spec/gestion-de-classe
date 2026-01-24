@@ -8,22 +8,20 @@ type BrancheInsert = Database['public']['Tables']['Branche']['Insert'];
 type BrancheUpdate = Database['public']['Tables']['Branche']['Update'];
 
 type SousBrancheRow = Database['public']['Tables']['SousBranche']['Row'];
-type SousBrancheInsert = Database['public']['Tables']['SousBranche']['Insert'];
-type SousBrancheUpdate = Database['public']['Tables']['SousBranche']['Update'];
 
 // Extended Update types matching what reorder functions expect (containing just enough info)
-interface BranchReorderItem extends BrancheUpdate {
-    id: string;
-    nom: string;
-    ordre: number;
-}
+// interface BranchReorderItem extends BrancheUpdate {
+//     id: string;
+//     nom: string;
+//     ordre: number;
+// }
 
-interface SubBranchReorderItem extends SousBrancheUpdate {
-    id: string;
-    nom: string;
-    branche_id: string;
-    ordre: number;
-}
+// interface SubBranchReorderItem extends SousBrancheUpdate {
+//     id: string;
+//     nom: string;
+//     branche_id: string;
+//     ordre: number;
+// }
 
 export const useBranches = () => {
     const [branches, setBranches] = useState<BrancheRow[]>([]);
@@ -40,8 +38,22 @@ export const useBranches = () => {
             const data = await branchService.fetchBranches();
             setBranches(data);
 
-            if (data.length > 0 && !selectedBranch) {
-                setSelectedBranch(data[0]);
+            // Set initial selection only if none exists and we have data
+            // We use a functional update check or just trust current state
+            // But here inside callback, we can't see current 'selectedBranch' effectively if we remove it from deps without a ref
+            // Actually, best practice: do this logic in useEffect, not in fetchBranches
+            // But since I'm minimally changing:
+            // I'll leave the logic but remove the dep. It will use the stale closure 'selectedBranch' which is likely null on first run, which is fine.
+            // On subsequent runs (manual refetch), strict linting would complain, but for this bug fix it's crucial
+            // properly, I should move the selection logic out.
+
+            // Let's refine:
+            // The goal is just to populate data. Selection logic can handle itself.
+
+            if (data.length > 0) {
+                // Check if we need to select default.
+                // We can't easily check 'selectedBranch' here without adding it to deps.
+                // So we'll dispatch a separate action or just rely on the effect that calls this.
             }
         } catch (error) {
             console.error("Error fetching branches:", error);
@@ -49,11 +61,23 @@ export const useBranches = () => {
         } finally {
             setLoading(false);
         }
-    }, [selectedBranch]);
+    }, []);
 
     useEffect(() => {
-        fetchBranches();
+        fetchBranches().then(() => {
+            // We can check if we need to select a default here if we had access to the data just fetched.
+            // But fetchBranches doesn't return data.
+            // Let's modify fetchBranches to return data if possible, or just rely on 'branches' state effect?
+            // Actually, 'branches' state changes will trigger re-renders.
+        });
     }, [fetchBranches]);
+
+    // Effect to select first branch if none selected and branches exist
+    useEffect(() => {
+        if (branches.length > 0 && !selectedBranch) {
+            setSelectedBranch(branches[0]);
+        }
+    }, [branches, selectedBranch]);
 
     // Fetch SubBranches
     const fetchSubBranches = useCallback(async (branchId: string) => {
@@ -91,21 +115,42 @@ export const useBranches = () => {
     // Actions
     const createBranch = async (branchData: BrancheInsert): Promise<boolean> => {
         try {
+            // 1. Service Call (Should return full object)
             const newBranch = await branchService.createBranch(branchData);
-            setBranches(prev => [...prev, newBranch]);
+
+            // 2. Optimistic Update (Trust the result)
+            setBranches(prev => {
+                // Sort alphabetically or by order if needed, assuming name sort for now as per Groups
+                const updated = [...prev, newBranch];
+                return updated.sort((a, b) => (a.nom || '').localeCompare(b.nom || ''));
+            });
+
+            // 3. Selection
             setSelectedBranch(newBranch);
+
             toast.success("Branche créée");
             return true;
         } catch (error) {
             console.error("Error creating branch:", error);
             toast.error("Erreur lors de la création");
+            // No rollback needed as we strictly additive here and didn't touch state before success
             return false;
         }
     };
 
     const updateBranch = async (id: string, branchData: BrancheUpdate): Promise<boolean> => {
+        const previousBranches = [...branches];
+        const previousSelected = selectedBranch;
+
+        // Optimistic UI Update
+        setBranches(prev => prev.map(b => b.id === id ? { ...b, ...branchData } as BrancheRow : b));
+        if (selectedBranch && selectedBranch.id === id) {
+            setSelectedBranch(prev => prev ? ({ ...prev, ...branchData } as BrancheRow) : null);
+        }
+
         try {
             const updated = await branchService.updateBranch(id, branchData);
+            // Update with actual server data for consistency
             setBranches(prev => prev.map(b => b.id === id ? updated : b));
             if (selectedBranch && selectedBranch.id === id) {
                 setSelectedBranch(updated);
@@ -114,24 +159,35 @@ export const useBranches = () => {
             return true;
         } catch (error) {
             console.error("Error updating branch:", error);
+            // Revert on error
+            setBranches(previousBranches);
+            setSelectedBranch(previousSelected);
             toast.error("Erreur lors de la mise à jour");
             return false;
         }
     };
 
     const deleteBranch = async (id: string): Promise<boolean> => {
+        const previousBranches = [...branches];
+        const previousSelected = selectedBranch;
+
+        // Optimistic UI Update
+        const newBranches = branches.filter(b => b.id !== id);
+        setBranches(newBranches);
+
+        if (selectedBranch && selectedBranch.id === id) {
+            setSelectedBranch(newBranches.length > 0 ? newBranches[0] : null);
+        }
+
         try {
             await branchService.deleteBranch(id);
-            const newBranches = branches.filter(b => b.id !== id);
-            setBranches(newBranches);
-
-            if (selectedBranch && selectedBranch.id === id) {
-                setSelectedBranch(newBranches.length > 0 ? newBranches[0] : null);
-            }
             toast.success("Branche supprimée");
             return true;
         } catch (error: any) {
             console.error("Error deleting branch:", error);
+            // Revert on error
+            setBranches(previousBranches);
+            setSelectedBranch(previousSelected);
             toast.error(error.message || "Erreur lors de la suppression");
             return false;
         }
@@ -144,7 +200,7 @@ export const useBranches = () => {
                 id: item.id,
                 nom: item.nom,
                 user_id: item.user_id,
-                photo_base64: item.photo_base64,
+                photo_url: item.photo_url,
                 ordre: index + 1
             }));
             await branchService.updateOrder(updates);
@@ -163,7 +219,7 @@ export const useBranches = () => {
                 nom: item.nom,
                 branche_id: item.branche_id,
                 user_id: item.user_id,
-                photo_base64: item.photo_base64,
+                photo_url: item.photo_url,
                 ordre: index + 1
             }));
             await branchService.updateSubBranchOrder(updates);

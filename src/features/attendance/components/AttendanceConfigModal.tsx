@@ -3,10 +3,7 @@ import { supabase } from '../../../lib/database';
 import { attendanceService, Group, Student, SetupPresence, CategoriePresence, Attendance } from '../services/attendanceService';
 import { Settings, Plus, Trash2, Save, X, Layers, FileText, LayoutGrid, Download, Check, ChevronLeft, ChevronRight, LucideIcon } from 'lucide-react';
 import { PDFViewer, PDFDownloadLink } from '@react-pdf/renderer';
-import Modal from '../../../components/ui/Modal';
-import Button from '../../../components/ui/Button';
-import ConfirmModal from '../../../components/ui/ConfirmModal';
-import AttendancePDF from './AttendancePDF';
+import { Modal, Button, ConfirmModal, Tabs, Input, Select } from '../../../components/ui';
 import clsx from 'clsx';
 import { toast } from 'sonner';
 
@@ -337,20 +334,6 @@ const AttendanceConfigModal: React.FC<AttendanceConfigModalProps> = ({
         }
     };
 
-    const TabButton = ({ id, label, icon: Icon }: { id: typeof activeTab; label: string; icon: LucideIcon }) => (
-        <button
-            onClick={() => { setActiveTab(id); if (id !== 'config') setView('list'); }}
-            className={clsx(
-                "flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all flex-1 justify-center",
-                activeTab === id
-                    ? "bg-primary text-text-dark shadow-lg shadow-primary/20"
-                    : "bg-surface/50 text-grey-medium hover:text-white hover:bg-white/5"
-            )}
-        >
-            <Icon size={16} />
-            {label}
-        </button>
-    );
 
     return (
         <Modal
@@ -360,28 +343,33 @@ const AttendanceConfigModal: React.FC<AttendanceConfigModalProps> = ({
             icon={<Settings size={24} />}
             footer={null}
         >
-            <div className="flex items-center gap-2 mb-6 p-1 bg-black/20 rounded-xl">
-                <TabButton id="general" label="Général" icon={LayoutGrid} />
-                <TabButton id="config" label="Configuration" icon={Layers} />
-                <TabButton id="export" label="Export" icon={FileText} />
-            </div>
+            <Tabs
+                tabs={[
+                    { id: 'general', label: 'Général', icon: LayoutGrid },
+                    { id: 'config', label: 'Configuration', icon: Layers },
+                    { id: 'export', label: 'Export', icon: FileText }
+                ]}
+                activeTab={activeTab}
+                onChange={(id) => {
+                    setActiveTab(id as 'general' | 'config' | 'export');
+                    if (id !== 'config') setView('list');
+                }}
+                variant="capsule"
+                fullWidth
+                className="mb-8"
+            />
 
             <div className="min-h-[300px]">
                 {activeTab === 'general' && (
                     <div className="space-y-6 animate-in fade-in zoom-in-95 duration-200">
-                        <div className="space-y-2">
-                            <label className="text-xs font-bold text-grey-light uppercase tracking-wider">Groupe Actif</label>
-                            <div className="p-4 bg-surface border border-white/10 rounded-xl">
-                                <select
-                                    value={selectedGroup?.id || ''}
-                                    onChange={e => onSelectGroup && onSelectGroup(groups.find(g => g.id === e.target.value))}
-                                    className="w-full bg-input border border-border/10 rounded-lg p-3 text-text-main focus:border-primary outline-none font-medium"
-                                >
-                                    <option value="" disabled>Sélectionner un groupe</option>
-                                    {groups.map(g => <option key={g.id} value={g.id}>{g.nom}</option>)}
-                                </select>
-                            </div>
-                        </div>
+                        <Select
+                            label="Groupe Actif"
+                            options={groups.map(g => ({ value: g.id, label: g.nom }))}
+                            value={selectedGroup?.id || ''}
+                            onChange={e => onSelectGroup && onSelectGroup(groups.find(g => g.id === e.target.value))}
+                            placeholder="Sélectionner un groupe"
+                            fullWidth
+                        />
 
                         <div className="space-y-2">
                             <label className="text-xs font-bold text-grey-light uppercase tracking-wider">Configuration de Présence</label>
@@ -445,12 +433,22 @@ const AttendanceConfigModal: React.FC<AttendanceConfigModalProps> = ({
                                                 {set.description && <p className="text-xs text-grey-medium">{set.description}</p>}
                                             </div>
                                             <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                <button onClick={() => handleEdit(set)} className="p-2 hover:bg-white/10 rounded-lg text-primary">
-                                                    <Settings size={16} />
-                                                </button>
-                                                <button onClick={() => handleDeleteSet(set.id)} className="p-2 hover:bg-danger/10 rounded-lg text-danger">
-                                                    <Trash2 size={16} />
-                                                </button>
+                                                <Button
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    onClick={() => handleEdit(set)}
+                                                    className="h-8 w-8 p-0 text-primary"
+                                                    title="Modifier"
+                                                    icon={Settings}
+                                                />
+                                                <Button
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    onClick={() => handleDeleteSet(set.id)}
+                                                    className="h-8 w-8 p-0 text-danger hover:bg-danger/10"
+                                                    title="Supprimer"
+                                                    icon={Trash2}
+                                                />
                                             </div>
                                         </div>
                                     ))}
@@ -459,15 +457,13 @@ const AttendanceConfigModal: React.FC<AttendanceConfigModalProps> = ({
                         ) : currentSet && (
                             <div className="space-y-6">
                                 <div className="space-y-3">
-                                    <div className="space-y-1">
-                                        <label className="text-xs font-semibold text-grey-light uppercase">Nom du Set</label>
-                                        <input
-                                            value={currentSet.nom}
-                                            onChange={e => setCurrentSet({ ...currentSet, nom: e.target.value })}
-                                            placeholder="ex: Cantine, Ateliers..."
-                                            className="w-full bg-input border border-border/10 rounded-xl p-3 text-text-main focus:border-primary outline-none"
-                                        />
-                                    </div>
+                                    <Input
+                                        label="Nom du Set"
+                                        placeholder="ex: Cantine, Ateliers..."
+                                        value={currentSet.nom}
+                                        onChange={e => setCurrentSet({ ...currentSet, nom: e.target.value })}
+                                        fullWidth
+                                    />
                                 </div>
                                 <div className="space-y-3">
                                     <div className="flex items-center justify-between">
@@ -491,13 +487,19 @@ const AttendanceConfigModal: React.FC<AttendanceConfigModalProps> = ({
                                                         ))}
                                                     </div>
                                                 </div>
-                                                <input
+                                                <Input
+                                                    placeholder="Nom de la catégorie"
                                                     value={cat.nom}
                                                     onChange={e => { const newCats = [...categories]; newCats[idx].nom = e.target.value; setCategories(newCats); }}
-                                                    placeholder="Nom de la catégorie"
-                                                    className="flex-1 bg-input border border-border/10 rounded-lg p-2 text-sm text-text-main focus:border-primary outline-none"
+                                                    className="flex-1"
                                                 />
-                                                <button onClick={() => removeCategory(idx)} className="p-2 text-grey-dark hover:text-danger transition-colors"><X size={16} /></button>
+                                                <Button
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    onClick={() => removeCategory(idx)}
+                                                    className="text-grey-dark hover:text-danger"
+                                                    icon={X}
+                                                />
                                             </div>
                                         ))}
                                     </div>
@@ -543,17 +545,17 @@ const AttendanceConfigModal: React.FC<AttendanceConfigModalProps> = ({
 
                                 {exportMode === 'day' && (
                                     <div className="w-full space-y-3">
-                                        <label className="text-xs font-semibold text-grey-light uppercase block">Date</label>
-                                        <input
+                                        <Input
                                             type="date"
+                                            label="Date"
                                             value={selectedDay}
                                             onClick={(e: any) => e.target.showPicker && e.target.showPicker()}
                                             onChange={e => setSelectedDay(e.target.value)}
-                                            className="w-full bg-input border border-border/10 rounded-lg p-2 text-text-main focus:border-primary outline-none cursor-pointer [&::-webkit-calendar-picker-indicator]:hidden"
+                                            fullWidth
                                         />
-
                                         <div className="flex gap-2">
-                                            <button
+                                            <Button
+                                                variant="secondary"
                                                 onClick={() => {
                                                     const [y, m, d] = selectedDay.split('-').map(Number);
                                                     const curr = new Date(y, m - 1, d, 12, 0, 0);
@@ -563,12 +565,13 @@ const AttendanceConfigModal: React.FC<AttendanceConfigModalProps> = ({
                                                     const day = String(curr.getDate()).padStart(2, '0');
                                                     setSelectedDay(`${year}-${month}-${day}`);
                                                 }}
-                                                className="flex-1 py-2 px-3 bg-white/5 hover:bg-white/10 border border-white/10 hover:border-primary/30 rounded-lg text-grey-light hover:text-primary transition-all flex items-center justify-center gap-2 text-sm font-medium"
+                                                className="flex-1"
+                                                icon={ChevronLeft}
                                             >
-                                                <ChevronLeft size={16} />
-                                                Jour précédent
-                                            </button>
-                                            <button
+                                                Précédent
+                                            </Button>
+                                            <Button
+                                                variant="secondary"
                                                 onClick={() => {
                                                     const [y, m, d] = selectedDay.split('-').map(Number);
                                                     const curr = new Date(y, m - 1, d, 12, 0, 0);
@@ -578,29 +581,23 @@ const AttendanceConfigModal: React.FC<AttendanceConfigModalProps> = ({
                                                     const day = String(curr.getDate()).padStart(2, '0');
                                                     setSelectedDay(`${year}-${month}-${day}`);
                                                 }}
-                                                className="flex-1 py-2 px-3 bg-white/5 hover:bg-white/10 border border-white/10 hover:border-primary/30 rounded-lg text-grey-light hover:text-primary transition-all flex items-center justify-center gap-2 text-sm font-medium"
+                                                className="flex-1"
+                                                iconRight={ChevronRight}
                                             >
-                                                Jour suivant
-                                                <ChevronRight size={16} />
-                                            </button>
+                                                Suivant
+                                            </Button>
                                         </div>
                                     </div>
                                 )}
 
                                 {exportMode !== 'day' && (
-                                    <div className="w-full space-y-1">
-                                        <label className="text-xs font-semibold text-grey-light uppercase block">Période</label>
-                                        <select
-                                            value={selectedPeriod}
-                                            onChange={e => setSelectedPeriod(e.target.value)}
-                                            className="w-full bg-input border border-border/10 rounded-lg p-2 text-text-main focus:border-primary outline-none"
-                                        >
-                                            {availablePeriods.map(p => (
-                                                <option key={p.value} value={p.value}>{p.label}</option>
-                                            ))}
-                                            {availablePeriods.length === 0 && <option disabled>Aucune donnée</option>}
-                                        </select>
-                                    </div>
+                                    <Select
+                                        label="Période"
+                                        options={availablePeriods}
+                                        value={selectedPeriod}
+                                        onChange={e => setSelectedPeriod(e.target.value)}
+                                        fullWidth
+                                    />
                                 )}
                             </div>
 
@@ -659,7 +656,8 @@ const AttendanceConfigModal: React.FC<AttendanceConfigModalProps> = ({
             {activeTab === 'general' && (
                 <div className="sticky bottom-0 left-0 right-0 p-4 bg-surface/95 backdrop-blur-sm border-t border-white/10 mt-6">
                     <div className="grid grid-cols-2 gap-3">
-                        <button
+                        <Button
+                            variant="ghost"
                             onClick={() => {
                                 if (!selectedGroup || !selectedSetup) {
                                     toast.error("Sélectionnez un groupe et une configuration");
@@ -685,13 +683,14 @@ const AttendanceConfigModal: React.FC<AttendanceConfigModalProps> = ({
                                     }
                                 });
                             }}
-                            className="py-3 bg-surface/50 hover:bg-white/5 text-grey-light hover:text-white rounded-xl border border-white/10 hover:border-white/20 transition-all flex items-center justify-center gap-2 text-sm font-medium"
+                            className="bg-surface/50 border-white/10 hover:border-white/20"
+                            icon={ChevronRight}
                         >
-                            <ChevronRight size={16} />
-                            <span>Matin → AM</span>
-                        </button>
+                            Matin → AM
+                        </Button>
 
-                        <button
+                        <Button
+                            variant="ghost"
                             onClick={() => {
                                 if (!selectedGroup || !selectedSetup) {
                                     toast.error("Sélectionnez un groupe et une configuration");
@@ -717,11 +716,11 @@ const AttendanceConfigModal: React.FC<AttendanceConfigModalProps> = ({
                                     }
                                 });
                             }}
-                            className="py-3 bg-surface/50 hover:bg-white/5 text-grey-light hover:text-white rounded-xl border border-white/10 hover:border-white/20 transition-all flex items-center justify-center gap-2 text-sm font-medium"
+                            className="bg-surface/50 border-white/10 hover:border-white/20"
+                            icon={ChevronLeft}
                         >
-                            <ChevronLeft size={16} />
-                            <span>AM → Matin</span>
-                        </button>
+                            AM → Matin
+                        </Button>
                     </div>
                 </div>
             )}

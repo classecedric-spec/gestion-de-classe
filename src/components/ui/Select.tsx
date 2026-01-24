@@ -12,9 +12,11 @@ export interface SelectProps extends Omit<React.SelectHTMLAttributes<HTMLSelectE
     label?: string;
     error?: string;
     icon?: React.ElementType;
-    variant?: 'default' | 'neu';
+    variant?: 'default' | 'neu' | 'inset';
     fullWidth?: boolean;
+    iconClassName?: string;
 }
+
 
 /**
  * Select component with consistent styling
@@ -55,6 +57,7 @@ const Select: React.FC<SelectProps> = ({
     variant = 'default',
     fullWidth = false,
     className,
+    iconClassName,
     ...props
 }) => {
     const selectId = React.useId();
@@ -79,10 +82,48 @@ const Select: React.FC<SelectProps> = ({
                     ))}
                 </select>
                 {Icon && (
-                    <div className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none text-grey-medium group-hover:text-primary transition-colors">
+                    <div className={clsx("absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none group-hover:text-primary transition-colors", iconClassName || "text-grey-medium")}>
                         <Icon size={12} />
                     </div>
                 )}
+            </div>
+        );
+    }
+
+    if (variant === 'inset') {
+        return (
+            <div className={clsx('relative group', fullWidth ? 'w-full' : 'min-w-[140px]', className)}>
+                {Icon && (
+                    <div className={clsx("absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none group-focus-within:text-primary transition-colors z-10", iconClassName || "text-grey-medium")}>
+                        <Icon size={16} />
+                    </div>
+                )}
+                <select
+                    id={selectId}
+                    className={clsx(
+                        'w-full input-inset rounded-xl py-2.5 pr-8 text-sm text-text-main',
+                        'focus:outline-none appearance-none cursor-pointer',
+                        Icon && 'pl-9',
+                        !Icon && 'pl-3'
+                    )}
+                    {...props}
+                >
+                    {options.map((option) => (
+                        <option
+                            key={option.value}
+                            value={option.value}
+                            disabled={option.disabled}
+                            className="bg-background text-text-main"
+                        >
+                            {option.label}
+                        </option>
+                    ))}
+                </select>
+                <div className="absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none text-grey-medium group-focus-within:text-primary transition-colors">
+                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                        <path d="M3 5L6 8L9 5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                </div>
             </div>
         );
     }
@@ -100,7 +141,7 @@ const Select: React.FC<SelectProps> = ({
 
             <div className="relative group">
                 {Icon && (
-                    <div className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none text-grey-medium group-focus-within:text-primary transition-colors z-10">
+                    <div className={clsx("absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none group-focus-within:text-primary transition-colors z-10", iconClassName || "text-grey-medium")}>
                         <Icon size={18} />
                     </div>
                 )}

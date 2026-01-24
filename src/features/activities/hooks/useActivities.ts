@@ -53,12 +53,12 @@ export const useActivities = (): UseActivitiesReturn => {
     const filteredActivities = useMemo(() => {
         return activities.filter(a => {
             const matchesSearch = a.titre.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                (a.Module?.titre && a.Module.titre.toLowerCase().includes(searchTerm.toLowerCase()));
+                (a.Module?.nom && a.Module.nom.toLowerCase().includes(searchTerm.toLowerCase()));
 
             // Note: Schema has isActive but JS code uses statut. 
             // For now, we keep the logic but use any/cast if needed, 
             // or adapt to schema. JS code: a.Module?.statut
-            const moduleStatut = (a.Module as any)?.statut;
+            const moduleStatut = a.Module?.statut;
             const matchesStatus = statusFilter === 'all' ||
                 (moduleStatut === statusFilter) ||
                 (statusFilter === 'en_preparation' && !moduleStatut);
@@ -74,13 +74,13 @@ export const useActivities = (): UseActivitiesReturn => {
         activities.forEach(a => {
             if (!a.Module || !a.module_id) return;
 
-            const moduleStatut = (a.Module as any)?.statut;
+            const moduleStatut = a.Module?.statut;
             const matchesStatus = statusFilter === 'all' ||
                 (moduleStatut === statusFilter) ||
                 (statusFilter === 'en_preparation' && !moduleStatut);
 
-            if (matchesStatus && a.Module?.titre) {
-                modulesMap.set(a.module_id, a.Module.titre);
+            if (matchesStatus && a.Module?.nom) {
+                modulesMap.set(a.module_id, a.Module.nom);
             }
         });
 
@@ -90,13 +90,18 @@ export const useActivities = (): UseActivitiesReturn => {
     }, [activities, statusFilter]);
 
     const deleteActivity = async (id: string) => {
+        const previousActivities = [...activities];
+
+        // Optimistic UI Update
+        setActivities(prev => prev.filter(a => a.id !== id));
+
         try {
             await activityService.deleteActivity(id);
-            // Optimistic update
-            setActivities(prev => prev.filter(a => a.id !== id));
             return true;
         } catch (error) {
             console.error("Error deleting activity:", error);
+            // Revert on error
+            setActivities(previousActivities);
             return false;
         }
     };

@@ -2,11 +2,14 @@ import React from 'react';
 import { Loader2 } from 'lucide-react';
 import clsx from 'clsx';
 
-export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
-    variant?: 'primary' | 'secondary' | 'danger' | 'ghost' | 'success';
+export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement | HTMLAnchorElement> {
+    variant?: 'primary' | 'secondary' | 'danger' | 'ghost' | 'success' | 'raised';
     size?: 'sm' | 'default' | 'lg';
     loading?: boolean;
     icon?: React.ElementType;
+    iconRight?: React.ElementType;
+    as?: any;
+    to?: string;
 }
 
 const Button: React.FC<ButtonProps> = ({
@@ -19,6 +22,9 @@ const Button: React.FC<ButtonProps> = ({
     loading = false,
     className,
     icon: Icon,
+    iconRight: IconRight,
+    as: Component = 'button',
+    to,
     ...props
 }) => {
 
@@ -27,7 +33,8 @@ const Button: React.FC<ButtonProps> = ({
         secondary: "bg-white/5 hover:bg-white/10 text-grey-light border border-border/10",
         danger: "bg-danger hover:bg-red-600 text-white shadow-lg shadow-danger/20",
         ghost: "hover:bg-white/5 text-grey-medium hover:text-text-main",
-        success: "bg-success hover:bg-emerald-600 text-white shadow-lg shadow-success/20"
+        success: "bg-success hover:bg-emerald-600 text-white shadow-lg shadow-success/20",
+        raised: "btn-raised font-bold"
     };
 
     const sizes = {
@@ -36,28 +43,46 @@ const Button: React.FC<ButtonProps> = ({
         lg: "py-4 px-8 text-base font-bold"
     };
 
+    const buttonClasses = clsx(
+        "rounded-xl transition-all flex items-center justify-center gap-2 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100",
+        variants[variant],
+        sizes[size as keyof typeof sizes],
+        className
+    );
+
+    const content = loading ? (
+        <Loader2 className="animate-spin" size={size === 'sm' ? 14 : 20} />
+    ) : (
+        <>
+            {Icon && <Icon size={size === 'sm' ? 14 : 20} />}
+            {children}
+            {IconRight && <IconRight size={size === 'sm' ? 14 : 20} />}
+        </>
+    );
+
+    if (to) {
+        return (
+            <Component
+                to={to}
+                className={buttonClasses}
+                {...(disabled || loading ? { onClick: (e: any) => e.preventDefault() } : {})}
+                {...props}
+            >
+                {content}
+            </Component>
+        );
+    }
+
     return (
-        <button
-            type={type}
+        <Component
+            type={Component === 'button' ? type : undefined}
             onClick={onClick}
             disabled={disabled || loading}
-            className={clsx(
-                "rounded-xl transition-all flex items-center justify-center gap-2 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100",
-                variants[variant],
-                sizes[size as keyof typeof sizes],
-                className
-            )}
+            className={buttonClasses}
             {...props}
         >
-            {loading ? (
-                <Loader2 className="animate-spin" size={size === 'sm' ? 14 : 20} />
-            ) : (
-                <>
-                    {Icon && <Icon size={size === 'sm' ? 14 : 20} />}
-                    {children}
-                </>
-            )}
-        </button>
+            {content}
+        </Component>
     );
 };
 

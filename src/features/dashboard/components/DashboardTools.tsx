@@ -1,5 +1,6 @@
 import React from 'react';
 import { Settings2, CheckSquare, LayoutList, GraduationCap, FileText, Users, Zap } from 'lucide-react';
+import { Button, Select } from '../../../components/ui';
 import clsx from 'clsx';
 import { useNavigate } from 'react-router-dom';
 import { Group } from '../../attendance/services/attendanceService';
@@ -41,16 +42,17 @@ const DashboardTools: React.FC<DashboardToolsProps> = ({
                                 { label: 'Suivi Global', icon: LayoutList, path: '/dashboard/suivi', color: 'bg-primary' },
                                 { label: 'Gestion Classes', icon: GraduationCap, path: '/dashboard/user/classes', color: 'bg-amber-500' }
                             ].map(action => (
-                                <button
+                                <Button
                                     key={action.label}
+                                    variant="ghost"
                                     onClick={() => navigate(action.path)}
-                                    className="flex items-center gap-3 p-3 bg-surface hover:bg-white/5 border border-white/5 rounded-xl transition-all"
+                                    className="justify-start gap-4 p-4 border border-white/5 hover:bg-white/5"
                                 >
-                                    <div className={clsx("p-1.5 rounded-lg text-white", action.color)}>
-                                        <action.icon size={14} />
+                                    <div className={clsx("p-2 rounded-lg text-white shrink-0", action.color)}>
+                                        <action.icon size={16} />
                                     </div>
                                     <span className="text-xs font-bold text-text-main">{action.label}</span>
-                                </button>
+                                </Button>
                             ))}
                         </div>
                     </div>
@@ -74,34 +76,28 @@ const DashboardTools: React.FC<DashboardToolsProps> = ({
                         <p className="text-xs text-grey-medium leading-relaxed italic">Générez un livret A5 contenant les listes de travail pour chaque élève du groupe sélectionné.</p>
 
                         {/* Group Selector */}
-                        <div className="space-y-2">
-                            <label className="text-xs font-bold text-grey-medium uppercase tracking-wider">
-                                Sélectionner un groupe
-                            </label>
-                            <select
-                                value={selectedGroup?.id || ''}
-                                onChange={(e) => {
-                                    const group = groups?.find(g => g.id === e.target.value);
-                                    onGroupChange(group);
-                                }}
-                                className="w-full bg-background border border-white/10 text-white rounded-lg p-2.5 appearance-none focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all"
-                            >
-                                <option value="">Choisir un groupe...</option>
-                                {groups?.map(group => (
-                                    <option key={group.id} value={group.id}>
-                                        {group.nom}
-                                    </option>
-                                ))}
-                            </select>
-                        </div>
+                        <Select
+                            label="Sélectionner un groupe"
+                            value={selectedGroup?.id || ''}
+                            onChange={(e) => {
+                                const group = groups?.find(g => g.id === e.target.value);
+                                onGroupChange(group);
+                            }}
+                            options={[
+                                { value: '', label: 'Choisir un groupe...' },
+                                ...(groups || []).map(group => ({ value: group.id, label: group.nom }))
+                            ]}
+                            fullWidth
+                        />
 
-                        <button
+                        <Button
                             onClick={handleGenerateGroupTodoList}
-                            disabled={!selectedGroup || isGenerating}
-                            className="w-full py-3 bg-primary text-text-dark rounded-xl font-black text-xs uppercase tracking-widest hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                            loading={isGenerating}
+                            disabled={!selectedGroup}
+                            className="w-full"
                         >
-                            {isGenerating ? "Génération..." : "Lancer l'impression"}
-                        </button>
+                            Lancer l'impression
+                        </Button>
                     </div>
 
                     {/* Random Picker */}
@@ -113,12 +109,13 @@ const DashboardTools: React.FC<DashboardToolsProps> = ({
                             <h3 className="font-bold text-text-main">La Main Innocente</h3>
                         </div>
                         <p className="text-xs text-grey-medium leading-relaxed italic">Tirage au sort d'un élève avec animation.</p>
-                        <button
+                        <Button
                             onClick={onOpenRandomPicker}
-                            className="w-full py-3 bg-purple-600 hover:bg-purple-700 text-white rounded-xl font-black text-xs uppercase tracking-widest hover:scale-[1.02] active:scale-[0.98] transition-all"
+                            variant="primary"
+                            className="w-full bg-purple-600 hover:bg-purple-700"
                         >
                             Lancer le tirage
-                        </button>
+                        </Button>
                     </div>
 
                     {/* Homework Tracker (Placeholder) */}

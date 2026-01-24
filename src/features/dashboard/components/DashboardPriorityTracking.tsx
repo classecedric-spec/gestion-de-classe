@@ -4,6 +4,7 @@ import clsx from 'clsx';
 import { getInitials } from '../../../lib/helpers';
 import { Student } from '../../attendance/services/attendanceService';
 import { DashboardData } from '../hooks/useDashboardData';
+import { Avatar, Badge } from '../../../components/ui';
 
 interface DashboardPriorityTrackingProps {
     priorityData: DashboardData['priorityStudents'];
@@ -24,15 +25,17 @@ const StudentListItem: React.FC<StudentListItemProps> = ({ student, badgeColor, 
         onClick={() => onStudentClick(student)}
     >
         <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-full bg-background border border-white/10 flex items-center justify-center text-xs font-bold text-grey-medium shrink-0">
-                {getInitials(student)}
-            </div>
-            <span className="text-base font-medium text-text-secondary">{student.prenom} {student.nom}</span>
+            <Avatar
+                size="sm"
+                initials={getInitials(student)}
+                src={student.photo_url}
+            />
+            <span className="text-sm font-medium text-text-secondary">{student.prenom} {student.nom}</span>
         </div>
         <div className="relative">
-            <span className={clsx("text-sm font-bold px-2 py-1 rounded-md whitespace-nowrap", badgeColor)}>
+            <Badge variant={badgeColor.includes('danger') ? 'danger' : 'warning'} size="sm" className="whitespace-nowrap">
                 {badgeText}
-            </span>
+            </Badge>
             {hoverContent && (
                 <div className="absolute bottom-full right-0 mb-2 hidden group-hover:block z-50 w-32 bg-zinc-900/95 backdrop-blur-xl border border-white/10 rounded-xl p-3 shadow-2xl pointer-events-none">
                     {hoverContent}
@@ -115,14 +118,18 @@ const DashboardPriorityTracking: React.FC<DashboardPriorityTrackingProps> = ({ p
                         {priorityData.completion?.map((s, i) => (
                             <div key={i} className="group flex flex-wrap items-center justify-between p-2 rounded-lg hover:bg-white/5 transition-colors gap-2 cursor-pointer relative" onClick={() => onStudentClick(s)}>
                                 <div className="flex items-center gap-3">
-                                    <div className="w-8 h-8 rounded-full bg-background border border-white/10 flex items-center justify-center text-xs font-bold text-grey-medium shrink-0">
-                                        {getInitials(s)}
-                                    </div>
-                                    <span className="text-base font-medium text-text-secondary">{s.prenom} {s.nom}</span>
+                                    <Avatar
+                                        size="sm"
+                                        initials={getInitials(s)}
+                                        src={s.photo_url}
+                                    />
+                                    <span className="text-sm font-medium text-text-secondary">{s.prenom} {s.nom}</span>
                                 </div>
                                 <div className="text-right relative">
-                                    <span className="block text-sm font-bold text-danger">{s.displayScore}%</span>
-                                    <span className="text-xs text-grey-dark whitespace-nowrap">{s.startedCount} en cours</span>
+                                    <Badge variant="danger" size="sm" className="block mb-1">
+                                        {s.displayScore}%
+                                    </Badge>
+                                    <span className="text-[10px] text-grey-dark whitespace-nowrap uppercase font-bold tracking-tight">{s.startedCount} en cours</span>
 
                                     <div className="absolute bottom-full right-0 mb-2 hidden group-hover:block z-50 w-48 bg-zinc-900/95 backdrop-blur-xl border border-white/10 rounded-xl p-3 shadow-2xl pointer-events-none text-left">
                                         <p className="text-[10px] font-bold text-grey-light mb-2 border-b border-white/10 pb-1">Taux par Branche</p>

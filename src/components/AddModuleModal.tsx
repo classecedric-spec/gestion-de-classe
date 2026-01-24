@@ -51,10 +51,15 @@ const AddModuleModal: React.FC<AddModuleModalProps> = ({
         refetchSubBranches
     } = useBranchesData(formData.branchId);
     const { fridays, formatDateForInput, formatDateLabel } = useFridayShortcuts();
-    const { submit, loading, error } = useModuleSubmit(moduleToEdit, (module) => {
-        onAdded(module);
-        onClose();
-    });
+    const { submit, loading, error } = useModuleSubmit(
+        moduleToEdit,
+        (module) => {
+            onAdded(module);
+            onClose();
+        },
+        branches,
+        subBranches
+    );
 
     // Modal states
     const [showAddBranchModal, setShowAddBranchModal] = useState(false);

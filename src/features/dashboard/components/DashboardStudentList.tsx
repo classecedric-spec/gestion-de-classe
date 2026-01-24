@@ -2,6 +2,7 @@ import React, { useMemo } from 'react';
 import { Users, ChevronRight } from 'lucide-react';
 import { getInitials } from '../../../lib/helpers';
 import { Student } from '../../attendance/services/attendanceService';
+import { Avatar, EmptyState, Badge } from '../../../components/ui';
 
 interface DashboardStudentListProps {
     students: Student[];
@@ -50,9 +51,9 @@ const DashboardStudentList: React.FC<DashboardStudentListProps> = ({ students, s
                 <h2 className="text-xl font-bold text-text-main flex items-center gap-3">
                     <Users className="text-primary" /> Vos Élèves
                 </h2>
-                <div className="text-[10px] font-black text-grey-medium uppercase tracking-[0.2em]">
+                <Badge variant="secondary" size="sm">
                     {filteredStudents.length} / {students.length}
-                </div>
+                </Badge>
             </div>
 
             <div className="space-y-12">
@@ -72,17 +73,12 @@ const DashboardStudentList: React.FC<DashboardStudentListProps> = ({ students, s
                                     onClick={() => onStudentClick(student)}
                                     className="group relative bg-surface hover:bg-white/5 border border-white/5 rounded-2xl p-3 flex flex-row items-center gap-4 transition-all hover:translate-x-1 hover:shadow-lg cursor-pointer"
                                 >
-                                    <div className="relative shrink-0 w-12 h-12">
-                                        <div className="w-full h-full rounded-full bg-background border-2 border-white/5 p-0.5 overflow-hidden group-hover:border-primary/50 transition-colors">
-                                            {student.photo_url ? (
-                                                <img src={student.photo_url} alt="" className="w-full h-full object-cover rounded-full" />
-                                            ) : (
-                                                <div className="w-full h-full flex items-center justify-center bg-white/5 text-primary">
-                                                    <span className="text-xs font-black">{getInitials(student as any)}</span>
-                                                </div>
-                                            )}
-                                        </div>
-                                    </div>
+                                    <Avatar
+                                        size="md"
+                                        src={student.photo_url}
+                                        initials={getInitials(student as any)}
+                                        className="group-hover:border-primary/50"
+                                    />
 
                                     <div className="flex-1 min-w-0">
                                         <h3 className="font-bold text-sm text-text-main truncate">{student.prenom}</h3>
@@ -98,12 +94,12 @@ const DashboardStudentList: React.FC<DashboardStudentListProps> = ({ students, s
                     </div>
                 ))}
 
-                {sortedLevels.length === 0 && (
-                    <div className="h-64 flex flex-col items-center justify-center gap-4 border-2 border-dashed border-white/5 rounded-3xl text-grey-medium bg-surface/30">
-                        <Users className="w-12 h-12 opacity-10" />
-                        <p className="font-black text-xs uppercase tracking-widest">Aucun élève trouvé.</p>
-                    </div>
-                )}
+                <EmptyState
+                    icon={Users}
+                    title="Aucun élève trouvé"
+                    description="Vérifiez vos filtres ou ajoutez de nouveaux élèves."
+                    size="md"
+                />
             </div>
         </div>
     );

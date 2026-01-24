@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { DndContext, DragOverlay, useSensor, useSensors, MouseSensor, TouchSensor, DragStartEvent, DragEndEvent } from '@dnd-kit/core';
-import { Settings, ChevronRight, ChevronLeft } from 'lucide-react';
-import clsx from 'clsx';
+import { Settings } from 'lucide-react';
 import { toast } from 'sonner';
+import { Tabs, Button, EmptyState } from '../components/ui';
 
 import useAttendance from '../features/attendance/hooks/useAttendance';
 import AttendanceStudentCard from '../features/attendance/components/AttendanceStudentCard';
@@ -93,31 +93,16 @@ const Presence: React.FC = () => {
 
                 {/* CENTER: Period Selector */}
                 <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-0 hidden md:block">
-                    {/* Period Toggle - Dashboard Style */}
-                    <div className="flex bg-black/20 p-1.5 rounded-xl gap-2 min-w-[200px] shadow-sm border border-white/5">
-                        <button
-                            onClick={() => setCurrentPeriod('matin')}
-                            className={clsx(
-                                "flex-1 px-4 py-2 rounded-lg text-xs font-black uppercase tracking-wider transition-all duration-300",
-                                currentPeriod === 'matin'
-                                    ? "bg-primary text-text-dark shadow-lg scale-[1.02]"
-                                    : "text-grey-medium hover:text-white hover:bg-white/5"
-                            )}
-                        >
-                            Matin
-                        </button>
-                        <button
-                            onClick={() => setCurrentPeriod('apres_midi')}
-                            className={clsx(
-                                "flex-1 px-4 py-2 rounded-lg text-xs font-black uppercase tracking-wider transition-all duration-300",
-                                currentPeriod === 'apres_midi'
-                                    ? "bg-primary text-text-dark shadow-lg scale-[1.02]"
-                                    : "text-grey-medium hover:text-white hover:bg-white/5"
-                            )}
-                        >
-                            Après-midi
-                        </button>
-                    </div>
+                    <Tabs
+                        tabs={[
+                            { id: 'matin', label: 'Matin' },
+                            { id: 'apres_midi', label: 'Après-midi' }
+                        ]}
+                        activeTab={currentPeriod}
+                        onChange={(id) => setCurrentPeriod(id as 'matin' | 'apres_midi')}
+                        variant="capsule"
+                        className="min-w-[200px]"
+                    />
                 </div>
 
                 {/* RIGHT: Settings & Date */}
@@ -125,21 +110,23 @@ const Presence: React.FC = () => {
 
                     <div className="flex items-center gap-2 bg-surface p-1.5 rounded-xl border border-white/5 shadow-sm h-[52px] group transition-all duration-300 hover:border-primary/20">
                         <div className="flex items-center gap-2 max-w-0 overflow-hidden opacity-0 group-hover:max-w-[100px] group-hover:opacity-100 transition-all duration-300 ease-in-out">
-                            <button
+                            <Button
+                                variant="ghost"
                                 onClick={() => setIsConfigOpen(true)}
-                                className="p-2 aspect-square h-full hover:bg-white/5 rounded-lg text-grey-light hover:text-primary transition-colors flex items-center justify-center"
+                                className="p-2 aspect-square h-full"
+                                icon={Settings}
                                 title="Configuration"
-                            >
-                                <Settings size={20} />
-                            </button>
-
+                            />
                             <div className="w-px h-6 bg-white/10 mx-1" />
                         </div>
 
                         {/* Date Picker - Height matched to selector approx */}
                         <div className="relative h-full flex items-center">
+                            <label htmlFor="presence-date-picker" className="sr-only">Date</label>
                             <input
+                                id="presence-date-picker"
                                 type="date"
+                                title="Sélectionner la date"
                                 value={currentDate}
                                 onClick={(e: any) => e.target.showPicker && e.target.showPicker()}
                                 onChange={(e) => setCurrentDate(e.target.value)}
@@ -152,30 +139,16 @@ const Presence: React.FC = () => {
 
             {/* Mobile Period Selector (visible only on small screens) */}
             <div className="md:hidden flex justify-center mb-6">
-                <div className="flex bg-black/20 p-1.5 rounded-xl gap-2 w-full max-w-sm shadow-sm border border-white/5">
-                    <button
-                        onClick={() => setCurrentPeriod('matin')}
-                        className={clsx(
-                            "flex-1 px-4 py-2 rounded-lg text-xs font-black uppercase tracking-wider transition-all duration-300",
-                            currentPeriod === 'matin'
-                                ? "bg-primary text-text-dark shadow-lg scale-[1.02]"
-                                : "text-grey-medium hover:text-white hover:bg-white/5"
-                        )}
-                    >
-                        Matin
-                    </button>
-                    <button
-                        onClick={() => setCurrentPeriod('apres_midi')}
-                        className={clsx(
-                            "flex-1 px-4 py-2 rounded-lg text-xs font-black uppercase tracking-wider transition-all duration-300",
-                            currentPeriod === 'apres_midi'
-                                ? "bg-primary text-text-dark shadow-lg scale-[1.02]"
-                                : "text-grey-medium hover:text-white hover:bg-white/5"
-                        )}
-                    >
-                        Après-midi
-                    </button>
-                </div>
+                <Tabs
+                    tabs={[
+                        { id: 'matin', label: 'Matin' },
+                        { id: 'apres_midi', label: 'Après-midi' }
+                    ]}
+                    activeTab={currentPeriod}
+                    onChange={(id) => setCurrentPeriod(id as 'matin' | 'apres_midi')}
+                    variant="capsule"
+                    fullWidth
+                />
             </div>
 
             {/* MAIN CONTENT */}
@@ -210,13 +183,14 @@ const Presence: React.FC = () => {
 
                             {/* Action: Mark rest as absent */}
                             {trulyUnassigned.length > 0 && !isSetupLocked && (
-                                <button
+                                <Button
                                     onClick={markUnassignedAbsent}
-                                    className="py-3 px-4 bg-surface hover:bg-white/5 border border-white/5 rounded-xl text-sm font-bold text-grey-light hover:text-danger hover:border-danger/30 transition-all flex items-center justify-center gap-2 group"
+                                    variant="secondary"
+                                    className="w-full hover:text-danger hover:border-danger/30 group"
                                 >
                                     <span className="w-2 h-2 rounded-full bg-danger group-hover:animate-pulse" />
                                     Marquer restants comme absents
-                                </button>
+                                </Button>
                             )}
                         </div>
 
@@ -247,11 +221,13 @@ const Presence: React.FC = () => {
                                     );
                                 })}
 
-                                {/* If no setup selected or empty */}
                                 {categories.length === 0 && (
-                                    <div className="col-span-full h-40 flex items-center justify-center text-grey-dark italic border border-dashed border-white/10 rounded-xl">
-                                        Aucune catégorie configurée.
-                                    </div>
+                                    <EmptyState
+                                        title="Aucune catégorie"
+                                        description="Aucune catégorie configurée pour ce setup."
+                                        size="sm"
+                                        className="col-span-full py-12"
+                                    />
                                 )}
                             </div>
                         </div>
@@ -265,15 +241,16 @@ const Presence: React.FC = () => {
                     </DragOverlay>
                 </DndContext>
             ) : (
-                <div className="flex-1 flex flex-col items-center justify-center text-grey-medium animate-pulse">
-                    <p>Sélectionnez ou créez une configuration pour commencer</p>
-                    <button
-                        onClick={() => setIsConfigOpen(true)}
-                        className="mt-4 px-6 py-2 bg-primary text-text-dark rounded-full font-bold hover:scale-105 transition-transform"
-                    >
-                        Configurer
-                    </button>
-                </div>
+                <EmptyState
+                    title="Configuration requise"
+                    description="Sélectionnez ou créez une configuration pour commencer à gérer les présences."
+                    action={
+                        <Button onClick={() => setIsConfigOpen(true)}>
+                            Configurer
+                        </Button>
+                    }
+                    className="flex-1"
+                />
             )}
 
             {/* Config Modal */}

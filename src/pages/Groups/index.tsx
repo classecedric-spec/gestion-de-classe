@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Layers, Plus, X, Loader2, Trash2, Search, ChevronRight, GraduationCap, Edit, LayoutList } from 'lucide-react';
-import clsx from 'clsx';
+import { Layers, Plus, X, Search, ChevronRight, GraduationCap, Edit, LayoutList } from 'lucide-react';
 import {
     DndContext,
     closestCenter,
@@ -9,7 +8,6 @@ import {
     PointerSensor,
     useSensor,
     useSensors,
-    DragEndEvent,
 } from '@dnd-kit/core';
 import {
     SortableContext,
@@ -30,8 +28,9 @@ import { useGroupStudents } from './hooks/useGroupStudents';
 import { useGroupPDF } from './hooks/useGroupPDF';
 // @ts-ignore
 import { useInAppMigration } from '../../hooks/useInAppMigration';
-import { Tables } from '../../../types/supabase';
+import { Tables } from '../../types/supabase';
 import { StudentWithClass } from './hooks/useGroupStudents';
+import { Badge, Button, SmartTabs, EmptyState, ConfirmModal, Avatar, Input } from '../../components/ui';
 
 const Groups: React.FC = () => {
     const navigate = useNavigate();
@@ -57,6 +56,7 @@ const Groups: React.FC = () => {
         setSearchQuery,
         filteredGroups,
         fetchGroups,
+        handleAddGroup,
         handleDeleteGroup,
         handleDragEnd
     } = useGroupsData();
@@ -74,7 +74,6 @@ const Groups: React.FC = () => {
 
     const {
         loading: pdfLoading,
-        handleGenerateGroupTodoList: onGeneratePDF,
         handleCancelGeneration
     } = useGroupPDF();
 
@@ -149,27 +148,24 @@ const Groups: React.FC = () => {
                             <Layers className="text-primary" size={24} />
                             Liste des Groupes
                         </h2>
-                        <span className="px-2 py-1 bg-primary/10 text-primary text-[10px] font-bold rounded-md uppercase tracking-wider">
+                        <Badge variant="primary" size="sm">
                             {groups.length} Total
-                        </span>
+                        </Badge>
                     </div>
 
-                    <div className="relative group">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-grey-medium group-focus-within:text-primary transition-colors" size={18} />
-                        <input
-                            type="text"
-                            placeholder="Rechercher un groupe..."
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                            className="w-full bg-background/50 border border-white/10 rounded-xl py-2 pl-10 pr-4 text-sm text-text-main focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all"
-                        />
-                    </div>
+                    <Input
+                        placeholder="Rechercher un groupe..."
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        icon={Search}
+                        className="bg-background/50"
+                    />
                 </div>
 
                 <div className="flex-1 overflow-y-auto p-4 space-y-2 custom-scrollbar">
                     {loading ? (
-                        <div className="flex items-center justify-center h-32">
-                            <Loader2 className="text-primary animate-spin" size={32} />
+                        <div className="flex items-center justify-center py-12">
+                            <Avatar size="lg" loading initials="" />
                         </div>
                     ) : filteredGroups.length > 0 ? (
                         <DndContext
@@ -194,54 +190,54 @@ const Groups: React.FC = () => {
                             </SortableContext>
                         </DndContext>
                     ) : (
-                        <div className="text-center py-12 px-4">
-                            <p className="text-grey-dark italic">Aucun groupe trouvé</p>
-                        </div>
+                        <EmptyState
+                            icon={Layers}
+                            title="Aucun groupe"
+                            description="Commencez par créer un nouveau groupe pour organiser vos élèves."
+                            size="sm"
+                        />
                     )}
                 </div>
 
                 <div className="p-4 border-t border-white/5 bg-surface/30">
-                    <button
+                    <Button
                         onClick={() => setShowModal(true)}
-                        className="w-full py-3 bg-white/5 hover:bg-primary/20 hover:text-primary text-grey-light rounded-xl border border-dashed border-white/20 hover:border-primary/50 transition-all flex items-center justify-center gap-2 group"
+                        variant="secondary"
+                        className="w-full border-dashed"
+                        icon={Plus}
                     >
-                        <Plus size={18} className="group-hover:scale-110 transition-transform" />
-                        <span className="font-medium">Nouveau Groupe</span>
-                    </button>
+                        Nouveau Groupe
+                    </Button>
                 </div>
             </div>
 
             {/* Detail Column (Students in group) */}
             <div className="flex-1 bg-surface/30 backdrop-blur-md rounded-2xl border border-white/5 overflow-hidden shadow-xl flex flex-col relative">
                 {!selectedGroup ? (
-                    <div className="flex-1 flex flex-col items-center justify-center text-grey-dark p-12 text-center">
-                        <div className="w-20 h-20 rounded-full bg-white/5 flex items-center justify-center mb-6">
-                            <Layers size={40} />
-                        </div>
-                        <h3 className="text-xl font-bold text-grey-medium mb-2">Sélectionnez un groupe</h3>
-                        <p className="max-w-xs">Cliquez sur un groupe pour voir la liste des enfants associés.</p>
-                    </div>
+                    <EmptyState
+                        icon={Layers}
+                        title="Sélectionnez un groupe"
+                        description="Cliquez sur un groupe dans la liste à gauche pour voir les détails et les élèves associés."
+                        size="lg"
+                        className="flex-1"
+                    />
                 ) : (
                     <>
                         {/* Header Section */}
                         <div className="p-8 border-b border-white/5 bg-surface/20 flex justify-between items-start">
                             <div className="flex gap-6 items-center flex-1 min-w-0">
-                                <div className={clsx(
-                                    "w-24 h-24 rounded-2xl border-4 border-background flex items-center justify-center text-3xl font-bold text-primary shadow-2xl shrink-0 overflow-hidden",
-                                    selectedGroup.photo_url ? "bg-[#D9B981]" : "bg-surface"
-                                )}>
-                                    {selectedGroup.photo_url ? (
-                                        <img src={selectedGroup.photo_url} alt="Group" className="w-[90%] h-[90%] object-contain" />
-                                    ) : (
-                                        <>{selectedGroup.acronyme || (selectedGroup.nom && selectedGroup.nom[0])}</>
-                                    )}
-                                </div>
+                                <Avatar
+                                    size="xl"
+                                    src={selectedGroup.photo_url}
+                                    initials={selectedGroup.acronyme || (selectedGroup.nom && selectedGroup.nom[0])}
+                                    className={selectedGroup.photo_url ? "bg-[#D9B981]" : "bg-surface"}
+                                />
                                 <div className="min-w-0">
                                     <h1 className="text-3xl font-black text-text-main mb-1 tracking-tight truncate">{selectedGroup.nom}</h1>
                                     <div className="flex items-center gap-3">
-                                        <span className="px-2 py-0.5 bg-primary/10 text-primary text-[10px] font-black uppercase tracking-tighter rounded border border-primary/20">
+                                        <Badge variant="primary" size="sm" className="border border-primary/20">
                                             {selectedGroup.acronyme || 'N/A'}
-                                        </span>
+                                        </Badge>
                                         <div className="w-1 h-1 rounded-full bg-grey-dark" />
                                         <p className="text-grey-medium text-sm font-medium">
                                             {studentsInGroup.length} {studentsInGroup.length > 1 ? 'Enfants' : 'Enfant'}
@@ -251,36 +247,18 @@ const Groups: React.FC = () => {
                             </div>
                         </div>
 
-                        {/* Tabs */}
+                        {/* Tabs - Level 2 Smart Selector (flat style) */}
                         <div className="flex justify-center px-8 mb-6 mt-2">
-                            <div className="neu-selector-container p-1.5 rounded-2xl w-full">
-                                <button
-                                    onClick={() => setActiveTab('students')}
-                                    data-active={activeTab === 'students'}
-                                    className={clsx(
-                                        "flex items-center justify-center gap-2 rounded-xl font-black uppercase tracking-[0.12em] transition-all duration-300",
-                                        activeTab === 'students'
-                                            ? "bg-primary text-text-dark"
-                                            : "text-grey-medium hover:text-white"
-                                    )}
-                                >
-                                    <GraduationCap size={16} />
-                                    <span className="tab-label">Liste des élèves</span>
-                                </button>
-                                <button
-                                    onClick={() => setActiveTab('actions')}
-                                    data-active={activeTab === 'actions'}
-                                    className={clsx(
-                                        "flex items-center justify-center gap-2 rounded-xl font-black uppercase tracking-[0.12em] transition-all duration-300",
-                                        activeTab === 'actions'
-                                            ? "bg-primary text-text-dark"
-                                            : "text-grey-medium hover:text-white"
-                                    )}
-                                >
-                                    <LayoutList size={16} />
-                                    <span className="tab-label">Actions</span>
-                                </button>
-                            </div>
+                            <SmartTabs
+                                tabs={[
+                                    { id: 'students', label: 'Liste des élèves', icon: GraduationCap },
+                                    { id: 'actions', label: 'Actions', icon: LayoutList }
+                                ]}
+                                activeTab={activeTab}
+                                onChange={(id) => setActiveTab(id as 'students' | 'actions')}
+                                fullWidth
+                                level={2}
+                            />
                         </div>
 
                         {/* Students List Tab */}
@@ -294,42 +272,38 @@ const Groups: React.FC = () => {
 
                                     {loadingStudents ? (
                                         <div className="flex flex-col items-center justify-center py-12 gap-3">
-                                            <Loader2 className="animate-spin text-primary" size={32} />
+                                            <Avatar size="lg" loading initials="" />
                                             <p className="text-grey-medium animate-pulse text-sm">Chargement des élèves...</p>
                                         </div>
                                     ) : studentsInGroup.length === 0 ? (
-                                        <div className="text-center py-12 p-8 bg-white/5 rounded-2xl border border-dashed border-white/10 flex flex-col items-center gap-4">
-                                            <GraduationCap size={48} className="mx-auto text-grey-dark opacity-20" />
-                                            <div>
-                                                <p className="text-grey-medium italic">Aucun enfant dans ce groupe pour le moment.</p>
-                                                <p className="text-xs text-grey-dark mt-1">Cliquez sur le bouton ci-dessous pour ajouter des élèves.</p>
-                                            </div>
-                                        </div>
+                                        <EmptyState
+                                            icon={GraduationCap}
+                                            title="Aucun enfant"
+                                            description="Aucun enfant dans ce groupe pour le moment. Ajoutez des élèves pour commencer l'organisation."
+                                            size="md"
+                                        />
                                     ) : (
                                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                                             {studentsInGroup.map(student => (
                                                 <div key={student.id} className="relative group/card">
-                                                    <button
+                                                    <Button
+                                                        variant="danger"
+                                                        size="sm"
                                                         onClick={(e) => handleRemoveClick(e, student)}
-                                                        className="absolute -top-2 -right-2 z-10 p-2 bg-danger/10 hover:bg-danger text-danger hover:text-white rounded-full border border-danger/20 opacity-0 group-hover/card:opacity-100 transition-all shadow-lg scale-90 hover:scale-100"
+                                                        className="absolute -top-2 -right-2 z-10 h-8 w-8 p-0 rounded-full opacity-0 group-hover/card:opacity-100 transition-all shadow-lg"
                                                         title="Retirer du groupe"
-                                                    >
-                                                        <X size={14} strokeWidth={3} />
-                                                    </button>
+                                                        icon={X}
+                                                    />
                                                     <div
                                                         onClick={() => navigate('/dashboard/user/students', { state: { selectedStudentId: student.id } })}
                                                         className="w-full flex items-center gap-4 p-4 rounded-xl bg-white/5 border border-white/5 hover:border-primary/30 hover:bg-white/10 transition-all text-left group cursor-pointer"
                                                     >
-                                                        <div className={clsx(
-                                                            "w-12 h-12 rounded-lg flex items-center justify-center text-lg font-bold text-primary group-hover:scale-110 transition-transform overflow-hidden shadow-inner",
-                                                            student.photo_url ? "bg-[#D9B981]" : "bg-background"
-                                                        )}>
-                                                            {student.photo_url ? (
-                                                                <img src={student.photo_url} alt="Student" className="w-[90%] h-[90%] object-contain" />
-                                                            ) : (
-                                                                <>{student.prenom[0]}{student.nom[0]}</>
-                                                            )}
-                                                        </div>
+                                                        <Avatar
+                                                            size="md"
+                                                            src={student.photo_url}
+                                                            initials={`${student.prenom[0]}${student.nom[0]}`}
+                                                            className={student.photo_url ? "bg-[#D9B981]" : "bg-background"}
+                                                        />
                                                         <div className="flex-1 min-w-0">
                                                             <p className="font-semibold text-text-main group-hover:text-primary transition-colors">
                                                                 {student.prenom} {student.nom}
@@ -339,13 +313,14 @@ const Groups: React.FC = () => {
                                                             </p>
                                                         </div>
 
-                                                        <button
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="sm"
                                                             onClick={(e) => { e.stopPropagation(); handleEditStudent(student); }}
-                                                            className="p-1.5 text-grey-medium hover:text-white hover:bg-white/10 rounded-full transition-colors opacity-0 group-hover:opacity-100 mr-2"
+                                                            className="h-8 w-8 p-0 opacity-0 group-hover:opacity-100 mr-2"
                                                             title="Modifier"
-                                                        >
-                                                            <Edit size={14} />
-                                                        </button>
+                                                            icon={Edit}
+                                                        />
 
                                                         <ChevronRight size={16} className="text-grey-dark group-hover:text-primary group-hover:translate-x-1 transition-all" />
                                                     </div>
@@ -356,26 +331,27 @@ const Groups: React.FC = () => {
                                 </div>
 
                                 <div className="p-4 border-t border-white/5 bg-surface/30">
-                                    <button
+                                    <Button
                                         onClick={() => setShowAddToGroupModal(true)}
-                                        className="w-full py-3 bg-white/5 hover:bg-primary/20 hover:text-primary text-grey-light rounded-xl border border-dashed border-white/20 hover:border-primary/50 transition-all flex items-center justify-center gap-2 group"
+                                        variant="secondary"
+                                        className="w-full border-dashed"
+                                        icon={Plus}
                                     >
-                                        <Plus size={18} className="group-hover:scale-110 transition-transform" />
-                                        <span className="font-medium">Ajouter des enfants</span>
-                                    </button>
+                                        Ajouter des enfants
+                                    </Button>
                                 </div>
                             </>
                         )}
 
                         {/* Actions Tab */}
                         {activeTab === 'actions' && (
-                            <div className="flex-1 flex flex-col items-center justify-center text-grey-dark p-12 text-center bg-background/20">
-                                <div className="w-20 h-20 rounded-full bg-white/5 flex items-center justify-center mb-6">
-                                    <LayoutList size={40} />
-                                </div>
-                                <h3 className="text-xl font-bold text-grey-medium mb-2">Aucune action disponible</h3>
-                                <p className="max-w-xs text-grey-medium">Il n'y a actuellement aucune action rapide pour ce groupe.</p>
-                            </div>
+                            <EmptyState
+                                icon={LayoutList}
+                                title="Aucune action disponible"
+                                description="Il n'y a actuellement aucune action rapide pour ce groupe."
+                                size="lg"
+                                className="flex-1"
+                            />
                         )}
                     </>
                 )}
@@ -385,7 +361,7 @@ const Groups: React.FC = () => {
             <AddGroupModal
                 isOpen={showModal}
                 onClose={handleCloseGroupModal}
-                onAdded={fetchGroups}
+                onAdded={handleAddGroup}
                 groupToEdit={isEditingGroup ? groupToEdit : null}
             />
 
@@ -398,78 +374,39 @@ const Groups: React.FC = () => {
             />
 
             <AddStudentToGroupModal
-                isOpen={showAddToGroupModal}
-                onClose={() => setShowAddToGroupModal(false)}
-                groupId={selectedGroup?.id}
+                showModal={showAddToGroupModal}
+                handleCloseModal={() => setShowAddToGroupModal(false)}
+                groupId={selectedGroup?.id || ''}
+                groupName={selectedGroup?.nom || ''}
                 onAdded={() => {
                     if (selectedGroup) fetchStudentsInGroup(selectedGroup.id);
                     fetchGroups();
                 }}
             />
 
-            {/* Remove Student Confirmation Modal */}
-            {showRemoveModal && (
-                <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
-                    <div className="bg-card-bg border border-white/10 rounded-2xl shadow-2xl max-w-sm w-full p-6 animate-in zoom-in-95 duration-200" onClick={(e) => e.stopPropagation()}>
-                        <div className="flex flex-col items-center text-center gap-4">
-                            <div className="w-12 h-12 rounded-full bg-danger/10 flex items-center justify-center text-danger">
-                                <Trash2 size={24} />
-                            </div>
-                            <div>
-                                <h3 className="text-lg font-bold text-white mb-2">Retirer l'élève ?</h3>
-                                <p className="text-sm text-grey-medium">
-                                    Êtes-vous sûr de vouloir retirer <span className="text-white font-bold">{studentToRemove?.prenom} {studentToRemove?.nom}</span> du groupe <span className="text-primary">{selectedGroup?.nom}</span> ?
-                                </p>
-                            </div>
-                            <div className="flex gap-3 w-full mt-2">
-                                <button
-                                    onClick={() => setShowRemoveModal(false)}
-                                    className="flex-1 py-3 bg-white/5 hover:bg-white/10 text-white rounded-xl font-bold transition-colors"
-                                >
-                                    Annuler
-                                </button>
-                                <button
-                                    onClick={confirmRemoveStudent}
-                                    className="flex-1 py-3 bg-danger hover:bg-danger/90 text-white rounded-xl font-bold transition-colors shadow-lg shadow-danger/20"
-                                >
-                                    Retirer
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            )}
+            {/* Remove Student Confirmation */}
+            <ConfirmModal
+                isOpen={showRemoveModal}
+                onClose={() => setShowRemoveModal(false)}
+                onConfirm={confirmRemoveStudent}
+                title="Retirer l'élève ?"
+                message={`Êtes-vous sûr de vouloir retirer "${studentToRemove?.prenom} ${studentToRemove?.nom}" du groupe "${selectedGroup?.nom}" ?`}
+                confirmText="Retirer"
+                cancelText="Annuler"
+                variant="danger"
+            />
 
-            {/* Delete Group Confirmation Modal */}
-            {groupToDelete && (
-                <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-                    <div className="w-full max-w-sm bg-surface border border-white/10 rounded-2xl shadow-2xl p-6 text-center animate-in zoom-in-95 duration-200">
-                        <div className="w-16 h-16 bg-danger/10 text-danger rounded-full flex items-center justify-center mx-auto mb-4">
-                            <Trash2 size={32} />
-                        </div>
-                        <h2 className="text-xl font-bold text-text-main mb-2">Supprimer le groupe ?</h2>
-                        <p className="text-sm text-grey-medium mb-6">
-                            Êtes-vous sûr de vouloir supprimer le groupe <span className="text-white font-bold">"{groupToDelete.nom}"</span> ?
-                            <br />Cette action est irréversible.
-                        </p>
-                        <div className="flex gap-3">
-                            <button
-                                onClick={() => setGroupToDelete(null)}
-                                className="flex-1 py-3 bg-white/5 hover:bg-white/10 text-grey-light rounded-xl font-medium transition-colors"
-                            >
-                                Annuler
-                            </button>
-                            <button
-                                onClick={confirmDeleteGroup}
-                                disabled={loading}
-                                className="flex-1 py-3 bg-danger hover:bg-danger/90 text-white rounded-xl font-bold shadow-lg shadow-danger/20 flex items-center justify-center gap-2"
-                            >
-                                {loading ? <Loader2 className="animate-spin" size={20} /> : "Supprimer"}
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
+            {/* Delete Group Confirmation */}
+            <ConfirmModal
+                isOpen={!!groupToDelete}
+                onClose={() => setGroupToDelete(null)}
+                onConfirm={confirmDeleteGroup}
+                title="Supprimer le groupe ?"
+                message={`Êtes-vous sûr de vouloir supprimer le groupe "${groupToDelete?.nom}" ? Cette action est irréversible.`}
+                confirmText="Supprimer"
+                cancelText="Annuler"
+                variant="danger"
+            />
         </div>
     );
 };

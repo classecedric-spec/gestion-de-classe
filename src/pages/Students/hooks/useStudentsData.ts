@@ -4,6 +4,7 @@ import { getCurrentUser } from '../../../lib/database';
 import { useOfflineSync } from '../../../context/OfflineSyncContext';
 import { Tables } from '../../../types/supabase';
 import { studentService } from '../../../features/students/services/studentService';
+import { toast } from 'sonner';
 
 // Helper type for Student with joined fields
 export interface StudentDetailed extends Tables<'Eleve'> {
@@ -78,27 +79,28 @@ export const useStudentsData = (initialStudentId: string | null = null) => {
     }, [initialStudentId, selectedStudent]);
 
     // Callback après sauvegarde d'un élève
-    const handleStudentSaved = useCallback(async (studentId: string) => {
-        await fetchStudents();
-        try {
-            // @ts-ignore
-            const _updatedStudent = await studentService.getStudent(studentId);
-            // We need the full object with joins, so maybe just finding it in the new list is enough
-            // But fetchStudents updates state async. 
-            // Let's refetch specific student using the service if we can, BUT getStudent doesn't return joins.
-            // Best is to wait for fetchStudents to complete and set selected from there?
-            // Or just rely on fetchStudents doing its job.
-            // For now, let's just trigger fetchStudents, and maybe try to set selected from there if finding it.
-            // Actually, we can just let the user re-select or rely on the list.
-            // But to be cleaner, let's keep the logic simple:
-            // fetchStudents will update the list.
-            // Then we can try to find it in the new list? No, we don't have access to the new state yet.
-            // The original code did a single fetch. 
-            // Since getStudent doesn't return joins, we rely on fetchStudents.
-        } catch (e) {
-            console.error(e);
+    const handleStudentSaved = useCallback(async (studentOrId: any) => {
+        // Optimistic / Immediate Update
+        if (typeof studentOrId === 'object' && studentOrId !== null) {
+            const savedStudent = studentOrId as StudentDetailed;
+            setStudents(prev => {
+                const exists = prev.some(s => s.id === savedStudent.id);
+                if (exists) {
+                    return prev.map(s => s.id === savedStudent.id ? savedStudent : s);
+                } else {
+                    return [...prev, savedStudent].sort((a, b) => a.nom.localeCompare(b.nom));
+                }
+            });
+
+            // Also update selected if it matches
+            if (selectedStudent?.id === savedStudent.id) {
+                setSelectedStudent(savedStudent);
+            }
+        } else {
+            // Always re-fetch to ensure consistency (relations etc) only if we didn't get the object
+            await fetchStudents();
         }
-    }, [fetchStudents]);
+    }, [fetchStudents, selectedStudent]);
 
     // Met à jour l'importance de suivi de l'élève
     const handleUpdateImportance = useCallback(async (newVal: string) => {
@@ -155,22 +157,32 @@ export const useStudentsData = (initialStudentId: string | null = null) => {
         const targetStudent = studentToDelete;
         if (!targetStudent) return;
 
-        setLoading(true);
+        // Store current states for rollback
+        const previousStudents = [...students];
+        const previousSelected = selectedStudent;
+
+        // Optimistic UI Update: remove from list immediately
+        setStudents(prev => prev.filter(s => s.id !== targetStudent.id));
+
+        // If the deleted student was selected, select nothing or something else
+        if (selectedStudent?.id === targetStudent.id) {
+            setSelectedStudent(null);
+        }
+
+        setStudentToDelete(null);
+
         try {
             await studentService.deleteStudent(targetStudent.id);
-
-            if (selectedStudent?.id === targetStudent.id) {
-                setSelectedStudent(null);
-            }
-
-            setStudentToDelete(null);
-            fetchStudents();
+            toast.success(`Élève ${targetStudent.prenom} supprimé`);
         } catch (error: any) {
-            alert('Erreur lors de la suppression: ' + error.message);
+            // Rollback on error
+            setStudents(previousStudents);
+            setSelectedStudent(previousSelected);
+            toast.error('Erreur lors de la suppression: ' + error.message);
         } finally {
-            setLoading(false);
+            fetchStudents(); // Re-fetch to be safe and consistent with joined fields
         }
-    }, [studentToDelete, selectedStudent, fetchStudents]);
+    }, [studentToDelete, students, selectedStudent, fetchStudents]);
 
     // Filtre les élèves
     const filteredStudents = students.filter(s =>

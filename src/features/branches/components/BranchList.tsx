@@ -1,5 +1,5 @@
 import React from 'react';
-import { GitBranch, Search, Plus, Loader2 } from 'lucide-react';
+import { GitBranch, Search, Plus } from 'lucide-react';
 import {
     DndContext,
     closestCenter,
@@ -17,6 +17,7 @@ import {
 } from '@dnd-kit/sortable';
 import SortableBranchItem from './SortableBranchItem';
 import type { Database } from '../../../types/supabase';
+import { Badge, Button, Avatar, EmptyState } from '../../../components/ui';
 
 type BrancheRow = Database['public']['Tables']['Branche']['Row'];
 
@@ -77,9 +78,9 @@ const BranchList: React.FC<BranchListProps> = ({
                         <GitBranch className="text-primary" size={24} />
                         Branches
                     </h2>
-                    <span className="px-2 py-1 bg-primary/10 text-primary text-[10px] font-bold rounded-md uppercase tracking-wider">
+                    <Badge variant="primary" size="sm">
                         {branches.length} Total
-                    </span>
+                    </Badge>
                 </div>
 
                 <div className="relative group">
@@ -97,9 +98,16 @@ const BranchList: React.FC<BranchListProps> = ({
             {/* List Items */}
             <div className="flex-1 overflow-y-auto p-4 space-y-2 custom-scrollbar">
                 {loading ? (
-                    <div className="flex justify-center p-8"><Loader2 className="animate-spin text-primary" /></div>
+                    <div className="flex justify-center p-8">
+                        <Avatar loading size="md" initials="" />
+                    </div>
                 ) : branches.length === 0 ? (
-                    <div className="text-center p-8 text-grey-medium italic">Aucune branche trouvée.</div>
+                    <EmptyState
+                        icon={GitBranch}
+                        title="Aucune branche"
+                        description="Aucune branche trouvée."
+                        size="sm"
+                    />
                 ) : (
                     <DndContext
                         sensors={sensors}
@@ -127,13 +135,14 @@ const BranchList: React.FC<BranchListProps> = ({
 
             {/* Add Button */}
             <div className="p-4 border-t border-white/5 bg-surface/30">
-                <button
+                <Button
                     onClick={onOpenAdd}
-                    className="w-full py-3 bg-white/5 hover:bg-primary/20 hover:text-primary text-grey-light rounded-xl border border-dashed border-white/20 hover:border-primary/50 transition-all flex items-center justify-center gap-2 group"
+                    variant="secondary"
+                    className="w-full border-dashed"
+                    icon={Plus}
                 >
-                    <Plus size={18} className="group-hover:scale-110 transition-transform" />
-                    <span className="font-medium">Nouvelle Branche</span>
-                </button>
+                    Nouvelle Branche
+                </Button>
             </div>
         </div>
     );

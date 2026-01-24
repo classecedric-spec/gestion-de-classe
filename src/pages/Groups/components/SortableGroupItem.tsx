@@ -3,7 +3,8 @@ import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { Layers, Edit, X, ChevronRight, GripVertical } from 'lucide-react';
 import clsx from 'clsx';
-import { Tables } from '../../../../types/supabase';
+import { Tables } from '../../../types/supabase';
+import { Avatar } from '../../../components/ui';
 
 interface SortableGroupItemProps {
     group: Tables<'Groupe'>;
@@ -54,18 +55,17 @@ export function SortableGroupItem({ group, selectedGroup, onClick, onEdit, onDel
                 <GripVertical size={16} />
             </div>
 
-            <div className={clsx(
-                "w-10 h-10 rounded-lg flex items-center justify-center text-lg font-bold shadow-inner overflow-hidden shrink-0",
-                selectedGroup?.id === group.id ? "bg-white/20 text-text-dark" : "bg-background text-primary",
-                selectedGroup?.id === group.id ? "bg-white/20 text-text-dark" : "bg-background text-primary",
-                group.photo_url && "bg-[#D9B981]"
-            )}>
-                {group.photo_url ? (
-                    <img src={group.photo_url} alt="Group" className="w-[90%] h-[90%] object-contain" />
-                ) : (
-                    <Layers size={20} />
+            <Avatar
+                size="md"
+                src={group.photo_url}
+                icon={Layers}
+                initials={group.acronyme || (group.nom && group.nom[0])}
+                className={clsx(
+                    selectedGroup?.id === group.id ? "bg-white/20" : "bg-background",
+                    group.photo_url && "bg-[#D9B981]"
                 )}
-            </div>
+            />
+
             <div className="flex-1 min-w-0">
                 <p className={clsx(
                     "font-semibold truncate",

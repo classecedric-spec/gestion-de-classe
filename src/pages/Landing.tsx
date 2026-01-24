@@ -4,7 +4,7 @@ import { Layers, ChevronRight, CheckCircle2, Star, ShieldCheck, Zap, Sparkles } 
 import Footer from '../components/Footer';
 import PublicHeader from '../components/PublicHeader';
 import { isMobilePhone } from '../lib/helpers';
-
+import { Badge, Button } from '../components/ui';
 
 const Landing: React.FC = () => {
     // Redirect mobile phone users to the mobile version
@@ -20,10 +20,14 @@ const Landing: React.FC = () => {
 
                 <section className="max-w-7xl mx-auto px-6 md:px-12 text-center mb-32 relative pt-20">
 
-                    <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-surface/50 border border-white/10 text-[11px] font-bold uppercase tracking-widest text-primary mb-8 animate-in fade-in slide-in-from-bottom-4 duration-700 shadow-xl shadow-black/20 backdrop-blur-md">
-                        <Sparkles size={12} />
-                        <span>Nouvelle Version 1.2</span>
-                    </div>
+                    <Badge
+                        variant="primary"
+                        size="sm"
+                        icon={<Sparkles size={12} />}
+                        className="mb-8 animate-in fade-in slide-in-from-bottom-4 duration-700 shadow-xl shadow-black/20 backdrop-blur-md rounded-full px-4"
+                    >
+                        Nouvelle Version 1.2
+                    </Badge>
 
                     <h1 className="text-6xl md:text-8xl lg:text-9xl font-semibold text-white mb-8 tracking-tighter leading-[0.95] animate-in fade-in slide-in-from-bottom-8 duration-1000">
                         Gestion de classe. <br />
@@ -36,19 +40,23 @@ const Landing: React.FC = () => {
                     </p>
 
                     <div className="flex flex-col md:flex-row items-center justify-center gap-4 animate-in fade-in slide-in-from-bottom-12 duration-1000 delay-200">
-                        <Link
+                        <Button
+                            as={Link}
                             to="/login"
-                            className="w-full md:w-auto flex items-center justify-center gap-2 bg-white text-black font-semibold py-4 px-8 rounded-full hover:scale-105 transition-all shadow-xl shadow-white/10 text-sm"
+                            className="bg-white text-black hover:bg-grey-light hover:scale-105 rounded-full shadow-xl shadow-white/10"
+                            size="lg"
                         >
                             Commencer maintenant
-                        </Link>
-                        <button
+                        </Button>
+                        <Button
+                            variant="ghost"
                             onClick={() => document.getElementById('features')?.scrollIntoView({ behavior: 'smooth' })}
-                            className="w-full md:w-auto flex items-center justify-center gap-2 text-white hover:text-primary font-medium py-4 px-8 rounded-full hover:bg-white/5 transition-all text-sm cursor-pointer"
+                            className="hover:text-primary rounded-full hover:bg-white/5"
+                            size="lg"
+                            icon={ChevronRight}
                         >
                             Découvrir les fonctionnalités
-                            <ChevronRight size={16} />
-                        </button>
+                        </Button>
                     </div>
 
                     <div className="mt-24 relative max-w-5xl mx-auto perspective-1000 animate-in fade-in slide-in-from-bottom-16 duration-1000 delay-300">
@@ -90,9 +98,9 @@ const Landing: React.FC = () => {
 
                 <section id="features" className="max-w-7xl mx-auto px-6 md:px-12 mb-40 flex flex-col md:flex-row items-center gap-16">
                     <div className="flex-1 space-y-8">
-                        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/5 border border-white/10 text-[11px] font-bold uppercase tracking-widest text-grey-light">
+                        <Badge variant="default" size="sm" className="rounded-full">
                             Gestion Illimitée
-                        </div>
+                        </Badge>
                         <h2 className="text-4xl md:text-5xl font-semibold text-white tracking-tight">
                             Vos élèves. <br />
                             <span className="text-grey-dark">Au bout des doigts.</span>
@@ -119,9 +127,9 @@ const Landing: React.FC = () => {
 
                 <section className="max-w-7xl mx-auto px-6 md:px-12 mb-40 flex flex-col md:flex-row-reverse items-center gap-16">
                     <div className="flex-1 space-y-8">
-                        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/5 border border-white/10 text-[11px] font-bold uppercase tracking-widest text-grey-light">
+                        <Badge variant="default" size="sm" className="rounded-full">
                             Suivi Pédagogique
-                        </div>
+                        </Badge>
                         <h2 className="text-4xl md:text-5xl font-semibold text-white tracking-tight">
                             La réussite. <br />
                             <span className="text-grey-dark">Visualisée.</span>
@@ -194,13 +202,15 @@ const Landing: React.FC = () => {
                                 Rejoignez l'élite des enseignants modernes. Configurez votre espace de travail en moins de 2 minutes.
                             </p>
 
-                            <Link
+                            <Button
+                                as={Link}
                                 to="/login"
-                                className="inline-flex items-center gap-4 bg-primary text-text-dark font-black py-5 px-16 rounded-2xl hover:bg-white hover:scale-105 transition-all shadow-2xl shadow-primary/20 hover:shadow-white/20 hover:-translate-y-1 text-xs uppercase tracking-[0.15em]"
+                                className="inline-flex py-5 px-16 rounded-2xl hover:scale-105 text-xs uppercase tracking-[0.15em]"
+                                size="lg"
+                                icon={ChevronRight}
                             >
                                 Créer mon compte
-                                <ChevronRight size={20} />
-                            </Link>
+                            </Button>
                         </div>
                     </div>
                 </section>

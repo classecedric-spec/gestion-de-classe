@@ -4,6 +4,8 @@ import { SupabaseMaterialRepository } from '../repositories/SupabaseMaterialRepo
 
 // Re-export types for backward compatibility
 export type { TypeMateriel, MaterialActivity };
+export type TypeMaterielInsert = TablesInsert<'TypeMateriel'>;
+export type TypeMaterielUpdate = TablesUpdate<'TypeMateriel'>;
 
 /**
  * Service for Material management

@@ -4,8 +4,8 @@ import { fetchStudentPdfData } from '../../lib/pdf';
 import { calculateAge } from '../../lib/helpers';
 import {
     Search, User as UserIcon, Calendar, GraduationCap, ShieldCheck, Loader2, ChevronRight, ChevronDown,
-    Filter, Plus, X, BookOpen, Layers, Trash2, Edit, Users, CheckCircle2, Clock, AlertCircle,
-    LayoutList, GitGraph, FileText, Activity, GitBranch
+    Filter, Plus, X, BookOpen, Layers, Edit, Users, CheckCircle2, Clock, AlertCircle,
+    LayoutList, GitGraph, FileText, Activity, GitBranch, SlidersHorizontal
 } from 'lucide-react';
 import { isOverdue } from '../../features/tracking/utils/progressionHelpers';
 import clsx from 'clsx';
@@ -15,7 +15,7 @@ import { fr } from 'date-fns/locale';
 import StudentTrackingPDFModern from '../../components/StudentTrackingPDFModern';
 
 // Nouveaux composants UI
-import { Badge, Avatar, Select, Tabs, EmptyState } from '../../components/ui';
+import { Badge, Avatar, EmptyState, Button, ConfirmModal, SearchBar, FilterSelect, CardInfo, CardList, CardTabs, SmartTabs, InfoSection, InfoRow, InfoSectionEditable, InfoRowEditable } from '../../components/ui';
 
 // Hooks extraits
 import { useStudentsData } from './hooks/useStudentsData';
@@ -26,6 +26,12 @@ import { useBranchIndices } from './hooks/useBranchIndices';
 const Students: React.FC = () => {
     const location = useLocation();
     const initialStudentId = location.state?.selectedStudentId;
+    const [showFilters, setShowFilters] = React.useState(false);
+
+    // --- Height Synchronization ---
+    const leftContentRef = React.useRef<HTMLDivElement>(null);
+    const rightContentRef = React.useRef<HTMLDivElement>(null);
+    const [headerHeight, setHeaderHeight] = React.useState<number | undefined>(undefined);
 
     // --- Hooks ---
     const {
@@ -47,12 +53,37 @@ const Students: React.FC = () => {
 
     const {
         isDraggingPhoto, draggingPhotoId, updatingPhotoId, setDraggingPhotoId,
-        processAndSavePhoto, handlePhotoDrop, handlePhotoDragOver, handlePhotoDragLeave, handlePhotoChange
+        processAndSavePhoto, handlePhotoDrop, handlePhotoDragOver, handlePhotoDragLeave
     } = useStudentPhoto(setSelectedStudent, setStudents);
 
     const {
         branches, studentIndices, fetchBranches, loadUserPreferences, handleUpdateBranchIndex
     } = useBranchIndices();
+
+    // --- Height Measure Effect (Inner Content Strategy) ---
+    React.useLayoutEffect(() => {
+        const syncHeight = () => {
+            const leftEl = leftContentRef.current;
+            const rightEl = rightContentRef.current;
+
+            if (leftEl) {
+                const h1 = leftEl.getBoundingClientRect().height;
+                const h2 = rightEl ? rightEl.getBoundingClientRect().height : 0;
+
+                if (h2 > 0) {
+                    const max = Math.max(h1, h2);
+                    setHeaderHeight(max);
+                } else {
+                    setHeaderHeight(undefined);
+                }
+            }
+        };
+
+        syncHeight();
+        const t = setTimeout(syncHeight, 50);
+        const t2 = setTimeout(syncHeight, 300);
+        return () => { clearTimeout(t); clearTimeout(t2); };
+    }, [students.length, showFilters, selectedStudent, searchQuery, filterGroup, filterClass]);
 
     // --- Effects ---
     useEffect(() => {
@@ -101,14 +132,9 @@ const Students: React.FC = () => {
                 const module = p.Activite?.Module;
                 const status = p.etat;
 
-                // Check if module exists, has a deadline, and activity is not done
                 if (!module || !module.date_fin || status === 'termine') return;
 
-                // Check if overdue
                 const endDate = new Date(module.date_fin);
-                // Reset time part to ensure we only compare dates effectively (though user probably means strictly past deadline)
-                // If deadline is today, is it overdue? Usually overdue means past the date. 
-                // Let's assume strict inequality: now > endDate
                 if (endDate >= now) return;
 
                 if (!overdueModules[module.id]) {
@@ -123,42 +149,28 @@ const Students: React.FC = () => {
 
             if (hasOverdueWork) {
                 const sortedModules = Object.values(overdueModules).sort((a, b) => {
-                    // Sort by Date
                     if (!a.date_fin && !b.date_fin) return 0;
                     if (!a.date_fin) return 1;
                     if (!b.date_fin) return -1;
-
                     const dateA = new Date(a.date_fin);
                     const dateB = new Date(b.date_fin);
                     const dateDiff = dateA.getTime() - dateB.getTime();
                     if (dateDiff !== 0) return dateDiff;
-
-                    // Sort by Branch
                     const branchA = a.SousBranche?.Branche?.nom || '';
                     const branchB = b.SousBranche?.Branche?.nom || '';
                     if (branchA.localeCompare(branchB) !== 0) return branchA.localeCompare(branchB);
-
-                    // Sort by Module Name
                     return a.nom.localeCompare(b.nom);
                 });
 
                 const totalOverdueActivities = sortedModules.reduce((acc, mod) => acc + mod.activities.length, 0);
-
                 console.groupCollapsed(`%c📅 Travaux en retard pour ${selectedStudent.prenom} ${selectedStudent.nom} (${totalOverdueActivities} ateliers)`, 'font-size: 14px; font-weight: bold; color: #e11d48; background: #ffe4e6; padding: 4px 8px; border-radius: 4px;');
-
                 sortedModules.forEach(mod => {
                     const dateStr = mod.date_fin ? new Date(mod.date_fin).toLocaleDateString('fr-FR') : 'Date inconnue';
                     const branchName = mod.SousBranche?.Branche?.nom ? `[${mod.SousBranche.Branche.nom}] ` : '';
-
                     console.groupCollapsed(`%c${branchName}${mod.nom} %c(${dateStr}) - ${mod.activities.length} atelier(s) restant(s)`, 'font-weight: bold; color: #2563eb;', 'color: #dc2626; font-weight: bold;');
-
-                    mod.activities.forEach((actName: string) => {
-                        console.log(`%c• ${actName}`, 'color: #4b5563; margin-left: 10px;');
-                    });
-
+                    mod.activities.forEach((actName: string) => { console.log(`%c• ${actName}`, 'color: #4b5563; margin-left: 10px;'); });
                     console.groupEnd();
                 });
-
                 console.groupEnd();
             }
         }
@@ -172,7 +184,7 @@ const Students: React.FC = () => {
         }
 
         try {
-            const pdfResult = await fetchStudentPdfData(selectedStudent.id, selectedStudent.Niveau?.id || ''); // Assumed Niveau type or check
+            const pdfResult = await fetchStudentPdfData(selectedStudent.id, selectedStudent.Niveau?.id || '');
             if (!pdfResult || pdfResult.modules.length === 0) {
                 alert("Aucune activité à faire trouvée.");
                 return;
@@ -184,7 +196,6 @@ const Students: React.FC = () => {
                 modules: pdfResult.modules
             };
 
-            // Dynamic import PDF library
             const { pdf } = await import('@react-pdf/renderer');
             const { saveAs } = await import('file-saver');
 
@@ -241,31 +252,57 @@ const Students: React.FC = () => {
                 const totalCount = activities.length;
                 const percent = Math.round((completedCount / totalCount) * 100);
                 const isExpanded = expandedModules[module.id];
+                const isModuleOverdue = module.date_fin && new Date(module.date_fin) < new Date() && completedCount < totalCount;
 
                 if (showPendingOnly && completedCount === totalCount) return null;
 
                 return (
-                    <div key={module.id} className="bg-surface/30 border border-white/5 rounded-xl overflow-hidden hover:border-primary/20 transition-all">
+                    <div key={module.id} className="bg-surface/50 border border-transparent rounded-xl overflow-hidden hover:border-white/10 hover:bg-surface transition-all group">
                         <div
                             onClick={() => toggleModuleExpansion(module.id)}
-                            className="p-4 flex items-center justify-between cursor-pointer hover:bg-white/5 transition-colors"
+                            className="py-2.5 px-4 cursor-pointer hover:bg-white/5 transition-colors flex items-center justify-between gap-6"
                         >
-                            <div className="flex items-center gap-4">
-                                <div className="p-2 bg-primary/10 text-primary rounded-lg"><Layers size={20} /></div>
-                                <div>
-                                    <h3 className="font-bold text-text-main">
-                                        {module.nom}
-                                        {module.date_fin && <span className="text-primary/70 font-black ml-1 text-xs">({format(new Date(module.date_fin), 'dd/MM', { locale: fr })})</span>}
-                                    </h3>
+                            {/* Left: Title & Chevron (Takes remaining space) */}
+                            <div className="flex items-center gap-4 min-w-0 flex-1">
+                                <div className={clsx(
+                                    "transition-all duration-300",
+                                    isExpanded ? "rotate-90 text-primary" : "rotate-0 text-grey-dark group-hover:text-grey-medium"
+                                )}>
+                                    <ChevronRight size={18} />
                                 </div>
+                                <h3 className={clsx(
+                                    "font-bold text-text-main text-lg truncate tracking-tight group-hover:text-white transition-all w-fit",
+                                    isModuleOverdue && "border-b-2 border-danger/60 hover:border-danger text-danger/90 hover:text-danger"
+                                )}>
+                                    {module.nom}
+                                </h3>
                             </div>
-                            <div className="flex items-center gap-4">
-                                <div className="flex items-center gap-2">
-                                    <div className="w-24 h-1.5 bg-background rounded-full overflow-hidden">
-                                        <div className="h-full bg-primary transition-all duration-500" style={{ width: `${percent}%` }} />
-                                    </div>
+
+                            {/* Right: Metrics Block (40% width, anchored right) */}
+                            <div className="flex items-center gap-6 w-[40%] shrink-0">
+                                {/* Date Badge (Before the bar) */}
+                                <div className="shrink-0">
+                                    {module.date_fin ? (
+                                        <Badge variant="primary" size="xs" className="px-2 py-0.5 font-black">
+                                            {format(new Date(module.date_fin), 'dd/MM', { locale: fr })}
+                                        </Badge>
+                                    ) : (
+                                        <span className="text-[10px] font-bold text-grey-dark uppercase tracking-widest italic opacity-20 px-2">N/A</span>
+                                    )}
                                 </div>
-                                {isExpanded ? <ChevronDown size={20} className="text-grey-medium" /> : <ChevronRight size={20} className="text-grey-medium" />}
+
+                                {/* Progress Bar Area */}
+                                <div className="flex-1 flex items-center gap-4">
+                                    <div className="flex-1 h-1.5 bg-background/50 rounded-full overflow-hidden border border-white/5">
+                                        <div
+                                            className="h-full bg-primary transition-all duration-1000 ease-out shadow-[0_0_10px_rgba(var(--primary-rgb),0.5)]"
+                                            style={{ width: `${percent}%` }}
+                                        />
+                                    </div>
+                                    <span className="text-xs font-black text-grey-medium min-w-[35px] text-right tabular-nums">
+                                        {completedCount}/{totalCount}
+                                    </span>
+                                </div>
                             </div>
                         </div>
 
@@ -284,9 +321,9 @@ const Students: React.FC = () => {
                                                 }
                                                 size="xs"
                                                 icon={
-                                                    p.etat === 'termine' ? CheckCircle2 :
-                                                        p.etat === 'besoin_d_aide' ? AlertCircle :
-                                                            Clock
+                                                    p.etat === 'termine' ? <CheckCircle2 size={12} /> :
+                                                        p.etat === 'besoin_d_aide' ? <AlertCircle size={12} /> :
+                                                            <Clock size={12} />
                                                 }
                                                 className={p.etat === 'besoin_d_aide' ? 'animate-pulse' : ''}
                                             >
@@ -306,60 +343,90 @@ const Students: React.FC = () => {
 
     return (
         <div className="h-full flex gap-8 animate-in fade-in duration-500 relative">
-            {/* List Column */}
-            <div className="w-1/3 flex flex-col bg-surface/30 backdrop-blur-md rounded-2xl border border-white/5 overflow-hidden shadow-xl">
-                <div className="p-6 border-b border-white/5 space-y-4">
+            {/* List Column - Split into 2 cards */}
+            <div className="w-1/4 flex flex-col gap-6 overflow-hidden">
+                {/* Card 1: Title & Controls */}
+                <CardInfo
+                    ref={leftContentRef}
+                    height={headerHeight}
+                    contentClassName="space-y-5"
+                >
+                    {/* Header Row: Title & Badge */}
                     <div className="flex items-center justify-between">
-                        <h2 className="text-xl font-bold text-text-main flex items-center gap-2">
+                        <h2 className="text-cq-xl font-bold text-text-main flex items-center gap-2">
                             <GraduationCap className="text-primary" size={24} />
                             Liste des Enfants
                         </h2>
-                        <span className="px-2 py-1 bg-primary/10 text-primary text-[10px] font-bold rounded-md uppercase tracking-wider">
-                            {students.length} Total
-                        </span>
+                        <Badge variant="primary" size="xs">{students.length} Total</Badge>
                     </div>
 
-                    <div className="relative group">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-grey-medium group-focus-within:text-primary transition-colors" size={18} />
-                        <input
-                            type="text"
-                            placeholder="Rechercher un élève..."
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                            className="w-full bg-background/50 border border-white/10 rounded-xl py-2 pl-10 pr-4 text-sm text-text-main focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all"
-                        />
+                    {/* Separator */}
+                    <div className="border-t border-white/10" />
+
+                    {/* Search & Filters */}
+                    <div className="space-y-4">
+                        {/* Search & Toggle Row */}
+                        <div className="flex gap-3">
+                            <SearchBar
+                                placeholder="Rechercher un élève..."
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                                iconColor="text-primary"
+                            />
+
+                            {/* Filters Toggle Button */}
+                            <button
+                                onClick={() => setShowFilters(!showFilters)}
+                                className={clsx(
+                                    "p-2.5 rounded-xl border transition-all flex items-center justify-center shrink-0",
+                                    showFilters
+                                        ? "bg-primary text-text-dark border-primary shadow-lg shadow-primary/20"
+                                        : "bg-surface/50 border-white/10 text-grey-medium hover:text-white hover:border-white/20"
+                                )}
+                                title="Afficher les filtres"
+                            >
+                                <SlidersHorizontal size={20} />
+                            </button>
+                        </div>
+
+                        {/* Filters Row - Collapsible */}
+                        {showFilters && (
+                            <div className="flex gap-2 animate-in slide-in-from-top-2 fade-in duration-200">
+                                <FilterSelect
+                                    options={[
+                                        { value: 'all', label: 'Groupes: Tous' },
+                                        ...Array.from(new Set(students.flatMap(s => s.EleveGroupe?.map(eg => eg.Groupe?.nom)).filter(Boolean)))
+                                            .sort()
+                                            .map(g => ({ value: g as string, label: g as string }))
+                                    ]}
+                                    value={filterGroup}
+                                    onChange={(e) => setFilterGroup(e.target.value)}
+                                    icon={Users}
+                                    className="flex-1"
+                                />
+
+                                <FilterSelect
+                                    options={[
+                                        { value: 'all', label: 'Classes: Tous' },
+                                        ...Array.from(new Set(students.map(s => s.Classe?.nom).filter(Boolean)))
+                                            .map(c => ({ value: c as string, label: c as string }))
+                                    ]}
+                                    value={filterClass}
+                                    onChange={(e) => setFilterClass(e.target.value)}
+                                    icon={Filter}
+                                    className="flex-1"
+                                />
+                            </div>
+                        )}
                     </div>
+                </CardInfo>
 
-                    {/* Filters Row */}
-                    <div className="flex gap-2">
-                        <Select
-                            variant="neu"
-                            options={[
-                                { value: 'all', label: 'Groupes: Tous' },
-                                ...Array.from(new Set(students.flatMap(s => s.EleveGroupe?.map(eg => eg.Groupe?.nom)).filter(Boolean)))
-                                    .sort()
-                                    .map(g => ({ value: g as string, label: g as string }))
-                            ]}
-                            value={filterGroup}
-                            onChange={(e) => setFilterGroup(e.target.value)}
-                            icon={Users}
-                        />
-
-                        <Select
-                            variant="neu"
-                            options={[
-                                { value: 'all', label: 'Classes: Tous' },
-                                ...Array.from(new Set(students.map(s => s.Classe?.nom).filter(Boolean)))
-                                    .map(c => ({ value: c as string, label: c as string }))
-                            ]}
-                            value={filterClass}
-                            onChange={(e) => setFilterClass(e.target.value)}
-                            icon={Filter}
-                        />
-                    </div>
-                </div>
-
-                <div className="flex-1 overflow-y-auto p-4 space-y-2 custom-scrollbar">
+                {/* Card 2: List Only */}
+                <CardList
+                    actionLabel="Ajouter un élève"
+                    onAction={handleOpenCreate}
+                    actionIcon={Plus}
+                >
                     {loading ? (
                         <div className="flex items-center justify-center h-32">
                             <Loader2 className="text-primary animate-spin" size={32} />
@@ -370,7 +437,7 @@ const Students: React.FC = () => {
                                 key={student.id}
                                 onClick={() => setSelectedStudent(student)}
                                 className={clsx(
-                                    "w-full flex items-center gap-4 p-3 rounded-xl transition-all border text-left group relative hover:z-50 cursor-pointer",
+                                    "w-full flex items-center gap-4 py-2.5 px-4 rounded-xl transition-all border text-left group relative hover:z-50 cursor-pointer",
                                     selectedStudent?.id === student.id
                                         ? "selected-state"
                                         : "bg-surface/50 border-transparent hover:border-white/10 hover:bg-surface"
@@ -407,14 +474,6 @@ const Students: React.FC = () => {
                                         selectedStudent?.id === student.id ? "text-text-dark" : "text-text-main"
                                     )}>
                                         {student.prenom} {student.nom}
-                                    </p>
-                                    <p className={clsx(
-                                        "text-xs truncate",
-                                        selectedStudent?.id === student.id ? "text-text-dark/70" : "text-grey-medium"
-                                    )}>
-                                        {student.Classe?.nom || 'Sans classe'} • {(student.EleveGroupe?.length || 0) > 0
-                                            ? student.EleveGroupe?.map(eg => eg.Groupe?.nom).filter(Boolean).join(', ')
-                                            : 'Sans groupe'}
                                     </p>
                                 </div>
 
@@ -458,33 +517,28 @@ const Students: React.FC = () => {
                             size="sm"
                         />
                     )}
-                </div>
-
-                <div className="p-4 border-t border-white/5 bg-surface/30">
-                    <button
-                        onClick={handleOpenCreate}
-                        className="w-full py-3 bg-white/5 hover:bg-primary/20 hover:text-primary text-grey-light rounded-xl border border-dashed border-white/20 hover:border-primary/50 transition-all flex items-center justify-center gap-2 group"
-                    >
-                        <Plus size={18} className="group-hover:scale-110 transition-transform" />
-                        <span className="font-medium">Ajouter un élève</span>
-                    </button>
-                </div>
+                </CardList>
             </div>
 
-            {/* Detail Column */}
-            <div className="flex-1 bg-surface/30 backdrop-blur-md rounded-2xl border border-white/5 overflow-hidden shadow-xl flex flex-col relative">
+            {/* Detail Column - Split into 2 cards */}
+            <div className="flex-1 flex flex-col gap-6 overflow-hidden relative">
                 {!selectedStudent ? (
-                    <EmptyState
-                        icon={UserIcon}
-                        title="Sélectionnez un élève"
-                        description="Cliquez sur un nom dans la liste pour afficher ses informations détaillées."
-                        size="md"
-                    />
+                    <div className="flex-1 card-flat overflow-hidden">
+                        <EmptyState
+                            icon={UserIcon}
+                            title="Sélectionnez un élève"
+                            description="Cliquez sur un nom dans la liste pour afficher ses informations détaillées."
+                            size="md"
+                        />
+                    </div>
                 ) : (
                     <>
-                        {/* Header */}
-                        <div className="p-8 border-b border-white/5 bg-surface/20 flex flex-col justify-between items-start gap-6">
-                            <div className="flex gap-6 items-center w-full">
+                        {/* Card 1: Student Info */}
+                        <CardInfo
+                            ref={rightContentRef}
+                            height={headerHeight}
+                        >
+                            <div className="flex gap-5 items-center">
                                 <Avatar
                                     size="xl"
                                     src={selectedStudent.photo_url}
@@ -494,176 +548,149 @@ const Students: React.FC = () => {
                                     loading={updatingPhotoId === selectedStudent.id}
                                     onDragOver={handlePhotoDragOver}
                                     onDragLeave={handlePhotoDragLeave}
-                                    onDrop={(e, file) => handlePhotoDrop(e, selectedStudent)}
+                                    onDrop={(e, _file) => handlePhotoDrop(e, selectedStudent)}
                                     className={clsx(
                                         isDraggingPhoto && "border-primary bg-primary/20 scale-105"
                                     )}
                                 />
-                                <div>
-                                    <h2 className="text-3xl font-bold text-text-main mb-1 truncate">{selectedStudent.prenom} {selectedStudent.nom}</h2>
-                                    <div className="flex flex-wrap gap-2 mt-1">
+                                <div className="flex-1 min-w-0">
+                                    <h2 className="text-cq-xl font-bold text-text-main truncate">
+                                        {selectedStudent.prenom} {selectedStudent.nom}
+                                    </h2>
+                                    <p className="text-cq-base text-grey-medium mt-0.5">
+                                        {selectedStudent.Classe?.nom || 'Sans classe'} • {selectedStudent.Niveau?.nom || 'Niveau non défini'}
+                                    </p>
+                                    <div className="flex flex-wrap gap-1.5 mt-3">
                                         {selectedStudent.EleveGroupe && selectedStudent.EleveGroupe.length > 0 ? (
                                             selectedStudent.EleveGroupe.map(eg => eg.Groupe && (
-                                                <Badge key={eg.Groupe.id} variant="primary" size="sm">
+                                                <Badge key={eg.Groupe.id} variant="primary" size="xs" icon={<span>🏆</span>}>
                                                     {eg.Groupe.nom}
                                                 </Badge>
                                             ))
                                         ) : (
-                                            <span className="text-xs text-grey-medium italic py-1">Aucun groupe</span>
+                                            <span className="text-xs text-grey-medium italic">Aucun groupe</span>
                                         )}
                                     </div>
                                 </div>
                             </div>
+                        </CardInfo>
 
-                            {/* Tabs */}
-                            <div className="flex justify-center w-full px-8 mb-4 mt-2">
-                                <Tabs
-                                    tabs={[
-                                        { id: 'infos', label: 'Informations' },
-                                        { id: 'suivi', label: 'Suivi Pédagogique' },
-                                        { id: 'todo', label: 'To-Do List' },
-                                        { id: 'urgent', label: 'Suivi Urgent' }
-                                    ]}
-                                    activeTab={currentTab}
-                                    onChange={setCurrentTab}
-                                    fullWidth
-                                />
-                            </div>
-                        </div>
-
-                        <div className="flex-1 overflow-y-auto p-8 custom-scrollbar bg-background/20">
+                        {/* Card 2: Tabs & Content */}
+                        <CardTabs
+                            tabs={[
+                                { id: 'infos', label: 'Informations' },
+                                { id: 'suivi', label: 'Suivi Pédagogique' },
+                                { id: 'todo', label: 'To-Do List' },
+                                { id: 'urgent', label: 'Suivi Urgent' }
+                            ]}
+                            activeTab={currentTab}
+                            onChange={setCurrentTab}
+                        >
                             {currentTab === 'infos' && (
                                 <div className="grid md:grid-cols-2 gap-8 animate-in fade-in slide-in-from-bottom-2 duration-300">
-                                    <div className="space-y-6">
-                                        <h3 className="text-sm font-bold uppercase tracking-widest text-grey-dark border-b border-white/5 pb-2">Parcours Scolaire</h3>
-                                        <div className="space-y-4">
-                                            <div className="flex items-center gap-4">
-                                                <div className="p-3 rounded-xl bg-white/5 text-primary"><BookOpen size={24} /></div>
-                                                <p className="text-text-main font-bold text-lg">{selectedStudent.Classe?.nom || 'Non affecté'}</p>
-                                            </div>
-                                            <div className="flex items-center gap-4">
-                                                <div className="p-3 rounded-xl bg-white/5 text-primary"><Layers size={24} /></div>
-                                                <p className="text-text-main font-bold text-lg">{selectedStudent.Niveau?.nom || 'Non renseigné'}</p>
-                                            </div>
-                                            <div className="flex items-center gap-4">
-                                                <div className="p-3 rounded-xl bg-white/5 text-primary"><Calendar size={24} /></div>
-                                                <p className="text-text-main font-bold text-lg">{calculateAge(selectedStudent.date_naissance)}</p>
-                                            </div>
-                                        </div>
-                                    </div>
+                                    {/* Parcours Scolaire */}
+                                    <InfoSection title="Parcours Scolaire">
+                                        <InfoRow
+                                            icon={BookOpen}
+                                            value={selectedStudent.Classe?.nom || 'Non affecté'}
+                                        />
+                                        <InfoRow
+                                            icon={Layers}
+                                            value={selectedStudent.Niveau?.nom || 'Non renseigné'}
+                                        />
+                                        <InfoRow
+                                            icon={Calendar}
+                                            value={calculateAge(selectedStudent.date_naissance)}
+                                        />
+                                    </InfoSection>
 
-                                    <div className="space-y-6">
-                                        <h3 className="text-sm font-bold uppercase tracking-widest text-grey-dark border-b border-white/5 pb-2">Informations & Responsables</h3>
-                                        <div className="space-y-4">
-                                            <div className="flex items-start gap-3">
-                                                <div className="p-2 rounded-lg bg-white/5 text-primary"><ShieldCheck size={18} /></div>
-                                                <div>
-                                                    <p className="text-xs text-grey-medium">Équipe Enseignante</p>
-                                                    <div className="space-y-1 mt-1">
-                                                        {(selectedStudent.Classe?.ClasseAdulte?.length || 0) > 0 ? (
-                                                            selectedStudent.Classe?.ClasseAdulte?.map((ca, idx) => (
-                                                                <div key={idx} className="flex items-center gap-2 text-sm">
-                                                                    <p className="text-text-main font-bold truncate">{ca.Adulte.prenom} {ca.Adulte.nom}</p>
-                                                                    <Badge
-                                                                        variant={ca.role === 'principal' ? 'primary' : 'default'}
-                                                                        size="xs"
-                                                                        style="outline"
-                                                                    >
-                                                                        {ca.role === 'principal' ? 'Titulaire' : ca.role === 'coenseignant' ? 'Co-Ens.' : 'Support'}
-                                                                    </Badge>
-                                                                </div>
-                                                            ))
-                                                        ) : (
-                                                            <p className="text-text-main font-bold italic opacity-50">Aucun membre assigné</p>
-                                                        )}
-                                                    </div>
+                                    {/* Informations & Responsables */}
+                                    <InfoSection title="Informations & Responsables">
+                                        <InfoRow
+                                            icon={ShieldCheck}
+                                            label="Équipe Enseignante"
+                                            value={
+                                                <div className="space-y-1 mt-1">
+                                                    {(selectedStudent.Classe?.ClasseAdulte?.length || 0) > 0 ? (
+                                                        selectedStudent.Classe?.ClasseAdulte?.map((ca, idx) => (
+                                                            <div key={idx} className="flex items-center gap-2 text-sm">
+                                                                <p className="text-text-main font-bold truncate">{ca.Adulte.prenom} {ca.Adulte.nom}</p>
+                                                                <Badge
+                                                                    variant={ca.role === 'principal' ? 'primary' : 'default'}
+                                                                    size="xs"
+                                                                    style="outline"
+                                                                >
+                                                                    {ca.role === 'principal' ? 'Titulaire' : ca.role === 'coenseignant' ? 'Co-Ens.' : 'Support'}
+                                                                </Badge>
+                                                            </div>
+                                                        ))
+                                                    ) : (
+                                                        <p className="text-text-main font-bold italic opacity-50">Aucun membre assigné</p>
+                                                    )}
                                                 </div>
-                                            </div>
-                                            <div className="flex items-start gap-3">
-                                                <div className="p-2 rounded-lg bg-white/5 text-primary"><UserIcon size={18} /></div>
-                                                <div>
-                                                    <p className="text-xs text-grey-medium">Parents</p>
-                                                    <p className="text-text-main font-medium">
-                                                        {selectedStudent.nom_parents || [
-                                                            `${selectedStudent.parent1_prenom} ${selectedStudent.parent1_nom}`,
-                                                            `${selectedStudent.parent2_prenom} ${selectedStudent.parent2_nom}`
-                                                        ].filter(p => p.trim() !== "").join(' & ') || 'Non renseignés'}
-                                                    </p>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
+                                            }
+                                        />
+                                        <InfoRow
+                                            icon={UserIcon}
+                                            label="Parents"
+                                            value={selectedStudent.nom_parents || [
+                                                `${selectedStudent.parent1_prenom} ${selectedStudent.parent1_nom}`,
+                                                `${selectedStudent.parent2_prenom} ${selectedStudent.parent2_nom}`
+                                            ].filter(p => p.trim() !== "").join(' & ') || 'Non renseignés'}
+                                        />
+                                    </InfoSection>
 
                                     {/* Branch Indices */}
-                                    <div className="md:col-span-2 space-y-4">
-                                        <h3 className="text-sm font-bold uppercase tracking-widest text-grey-dark border-b border-white/5 pb-2">Indices de Branche (Performance)</h3>
-                                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 content-start">
-                                            <div className="bg-white/5 p-1 rounded-xl border border-white/5 flex flex-col gap-0.5 shadow-lg hover:bg-white/10 transition-colors">
-                                                <div className="flex items-center gap-2 overflow-hidden px-1">
-                                                    <Activity size={12} className="text-primary shrink-0" />
-                                                    <span className="text-xs font-bold text-gray-300 truncate" title="Importance Globale">Global</span>
-                                                </div>
-                                                <input
-                                                    type="number"
-                                                    min="0"
-                                                    max="100"
+                                    <div className="md:col-span-2">
+                                        <InfoSectionEditable title="Indices de Branche (Performance)">
+                                            <InfoRowEditable
+                                                icon={Activity}
+                                                label="Global"
+                                                value={selectedStudent.importance_suivi ?? ''}
+                                                onChange={(val) => handleUpdateImportance(val)}
+                                                placeholder="50"
+                                            />
+                                            {branches.map(branch => (
+                                                <InfoRowEditable
+                                                    key={branch.id}
+                                                    icon={GitBranch}
+                                                    label={branch.nom}
+                                                    value={studentIndices[selectedStudent.id]?.[branch.id] ?? ''}
+                                                    onChange={(val) => handleUpdateBranchIndex(selectedStudent.id, branch.id, val)}
                                                     placeholder="50"
-                                                    className="w-full bg-black/20 text-center text-xs font-mono font-bold text-white rounded-lg py-1 focus:outline-none focus:ring-1 focus:ring-primary/50"
-                                                    value={selectedStudent.importance_suivi ?? ''}
-                                                    onChange={(e) => handleUpdateImportance(e.target.value)}
                                                 />
-                                            </div>
-
-                                            {branches.map(branch => {
-                                                const val = studentIndices[selectedStudent.id]?.[branch.id];
-                                                return (
-                                                    <div key={branch.id} className="bg-white/5 p-1 rounded-xl border border-white/5 flex flex-col gap-0.5 shadow-lg hover:bg-white/10 transition-colors">
-                                                        <div className="flex items-center gap-2 overflow-hidden px-1">
-                                                            <GitBranch size={12} className="text-primary shrink-0" />
-                                                            <span className="text-xs font-bold text-gray-300 truncate" title={branch.nom}>{branch.nom}</span>
-                                                        </div>
-                                                        <input
-                                                            type="number"
-                                                            min="0"
-                                                            max="100"
-                                                            placeholder="50"
-                                                            className="w-full bg-black/20 text-center text-xs font-mono font-bold text-white rounded-lg py-1 focus:outline-none focus:ring-1 focus:ring-primary/50"
-                                                            value={val ?? ''}
-                                                            onChange={(e) => handleUpdateBranchIndex(selectedStudent.id, branch.id, e.target.value)}
-                                                        />
-                                                    </div>
-                                                );
-                                            })}
-                                        </div>
+                                            ))}
+                                        </InfoSectionEditable>
                                     </div>
                                 </div>
                             )}
 
                             {currentTab === 'suivi' && (
                                 <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
-                                    <div className="flex w-full justify-center">
-                                        <Tabs
+                                    <div className="flex flex-col items-start gap-2 mb-6">
+                                        <SmartTabs
                                             tabs={[
                                                 { id: 'journal', label: 'Journal', icon: LayoutList },
                                                 { id: 'progression', label: 'Progression', icon: GitGraph }
                                             ]}
                                             activeTab={suiviMode}
                                             onChange={(tabId) => setSuiviMode(tabId as 'journal' | 'progression')}
-                                            variant="capsule"
+                                            level={3}
                                         />
-                                    </div>
 
-                                    <div className="flex justify-end">
-                                        <button
-                                            onClick={() => setShowPendingOnly(!showPendingOnly)}
-                                            className={clsx(
-                                                "text-xs font-bold uppercase tracking-wider flex items-center gap-2 px-3 py-1.5 rounded-lg border transition-all",
-                                                showPendingOnly ? "bg-primary/10 border-primary text-primary" : "bg-surface/30 border-white/5 text-grey-medium hover:text-white"
-                                            )}
-                                        >
-                                            <Filter size={12} />
-                                            {showPendingOnly ? "En cours uniquement" : "Tout afficher"}
-                                        </button>
+                                        {suiviMode === 'journal' && (
+                                            <div className="animate-in fade-in slide-in-from-top-1 duration-300">
+                                                <SmartTabs
+                                                    tabs={[
+                                                        { id: 'pending', label: 'En cours', icon: Activity, variant: 'warning' },
+                                                        { id: 'all', label: 'Tout voir', icon: LayoutList, variant: 'primary' }
+                                                    ]}
+                                                    activeTab={showPendingOnly ? 'pending' : 'all'}
+                                                    onChange={(tabId) => setShowPendingOnly(tabId === 'pending')}
+                                                    level={3}
+                                                />
+                                            </div>
+                                        )}
                                     </div>
 
                                     {loadingProgress ? (
@@ -671,7 +698,9 @@ const Students: React.FC = () => {
                                     ) : studentProgress.length === 0 ? (
                                         <div className="text-center p-8 text-grey-medium opacity-60 italic">Aucune activité commencée.</div>
                                     ) : (
-                                        <div className="space-y-4">{suiviMode === 'journal' && renderJournalView()}</div>
+                                        <div className="space-y-6">
+                                            {suiviMode === 'journal' && <div className="space-y-1">{renderJournalView()}</div>}
+                                        </div>
                                     )}
                                 </div>
                             )}
@@ -810,51 +839,33 @@ const Students: React.FC = () => {
 
                             {currentTab === 'todo' && (
                                 <div className="h-full flex flex-col items-center justify-center gap-4 text-grey-medium">
-                                    <button
+                                    <Button
                                         onClick={generatePDF}
-                                        className="px-6 py-3 bg-white text-primary border-2 border-primary font-bold rounded-xl shadow-lg hover:bg-gray-50 transition-all flex items-center gap-2"
+                                        variant="secondary"
+                                        size="lg"
+                                        icon={FileText}
                                     >
-                                        <FileText size={20} />
                                         Créer le PDF
-                                    </button>
+                                    </Button>
                                     <p className="text-sm italic opacity-60">Le contenu sera généré automatiquement.</p>
                                 </div>
                             )}
-                        </div>
+                        </CardTabs>
                     </>
                 )}
             </div>
 
-            {/* Delete Modal */}
-            {studentToDelete && (
-                <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-                    <div className="w-full max-w-sm bg-surface border border-white/10 rounded-2xl shadow-2xl p-6 text-center animate-in zoom-in-95 duration-200">
-                        <div className="w-16 h-16 bg-danger/10 text-danger rounded-full flex items-center justify-center mx-auto mb-4">
-                            <Trash2 size={32} />
-                        </div>
-                        <h2 className="text-xl font-bold text-text-main mb-2">Supprimer l'élève ?</h2>
-                        <p className="text-sm text-grey-medium mb-6">
-                            Êtes-vous sûr de vouloir supprimer <span className="text-white font-bold">"{studentToDelete.prenom} {studentToDelete.nom}"</span> ?
-                            <br />Cette action est irréversible.
-                        </p>
-                        <div className="flex gap-3">
-                            <button
-                                onClick={() => setStudentToDelete(null)}
-                                className="flex-1 py-3 bg-white/5 hover:bg-white/10 text-grey-light rounded-xl font-medium transition-colors"
-                            >
-                                Annuler
-                            </button>
-                            <button
-                                onClick={handleDelete}
-                                disabled={loading}
-                                className="flex-1 py-3 bg-danger hover:bg-danger/90 text-white rounded-xl font-bold shadow-lg shadow-danger/20 flex items-center justify-center gap-2"
-                            >
-                                {loading ? <Loader2 className="animate-spin" size={20} /> : "Supprimer"}
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
+            <ConfirmModal
+                isOpen={!!studentToDelete}
+                onClose={() => setStudentToDelete(null)}
+                onConfirm={handleDelete}
+                title="Supprimer l'élève ?"
+                message={`Êtes-vous sûr de vouloir supprimer "${studentToDelete?.prenom} ${studentToDelete?.nom}" ? Cette action est irréversible.`}
+                confirmText="Supprimer"
+                cancelText="Annuler"
+                variant="danger"
+                isLoading={loading}
+            />
 
             <StudentModal
                 showModal={showModal}
@@ -863,7 +874,7 @@ const Students: React.FC = () => {
                 editId={editId}
                 onSaved={handleStudentSaved}
             />
-        </div>
+        </div >
     );
 };
 

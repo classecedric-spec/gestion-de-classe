@@ -130,7 +130,7 @@ const Avatar: React.FC<AvatarProps> = ({
     return (
         <div
             className={clsx(
-                'relative rounded-xl flex items-center justify-center font-bold shadow-inner overflow-hidden transition-all',
+                'relative rounded-full flex items-center justify-center font-bold shadow-inner overflow-hidden transition-all',
                 sizeClasses[size],
                 src ? 'bg-primary' : 'bg-surface',
                 editable && 'cursor-pointer group',

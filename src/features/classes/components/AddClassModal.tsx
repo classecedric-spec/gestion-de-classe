@@ -1,7 +1,6 @@
-import React, { useState, useEffect, ChangeEvent } from 'react';
-import { Plus, Edit, BookOpen } from 'lucide-react';
-import Modal from '../../../components/ui/Modal';
-import Button from '../../../components/ui/Button';
+import React, { useState, useEffect } from 'react';
+import { Plus, Edit, BookOpen, X } from 'lucide-react';
+import { Modal, Button, Input, Select } from '../../../components/ui';
 import ImageUpload from '../../../components/ui/ImageUpload';
 import { useClassForm } from '../hooks/useClassForm';
 import ImportStudentsSection, { ImportedStudent } from './ImportStudentsSection';
@@ -135,79 +134,73 @@ const AddClassModal: React.FC<AddClassModalProps> = ({ isOpen, onClose, onAdded,
                     storagePath={`classes/${classToEdit?.id || 'new'}_logo.jpg`}
                 />
 
-                <div className="space-y-1">
-                    <label className="text-xs font-semibold text-grey-light uppercase" htmlFor="class-name">Nom de la classe</label>
-                    <input
-                        id="class-name"
-                        type="text"
-                        name="nom"
-                        value={classData.nom}
-                        onChange={handleChange}
-                        className="w-full bg-input border border-border/10 rounded-xl p-3 text-text-main focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all"
-                        placeholder="Ex: 5ème Scientifique"
-                        title="Nom de la classe"
-                        required
-                    />
-                </div>
-                <div className="space-y-1">
-                    <label className="text-xs font-semibold text-grey-light uppercase" htmlFor="class-acronym">Acronyme</label>
-                    <input
-                        id="class-acronym"
-                        type="text"
-                        name="acronyme"
-                        value={classData.acronyme}
-                        onChange={handleChange}
-                        className="w-full bg-input border border-border/10 rounded-xl p-3 text-text-main focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all"
-                        placeholder="Ex: 5SC"
-                        title="Acronyme de la classe"
-                    />
-                </div>
+                <Input
+                    label="Nom de la classe"
+                    id="class-name"
+                    name="nom"
+                    value={classData.nom}
+                    onChange={handleChange}
+                    placeholder="Ex: 5ème Scientifique"
+                    title="Nom de la classe"
+                    required
+                />
+                <Input
+                    label="Acronyme"
+                    id="class-acronym"
+                    name="acronyme"
+                    value={classData.acronyme}
+                    onChange={handleChange}
+                    placeholder="Ex: 5SC"
+                    title="Acronyme de la classe"
+                />
 
                 {/* Adults Configuration */}
                 <div className="space-y-3 pt-2 border-t border-white/5 text-left">
                     <div className="flex items-center justify-between">
                         <label className="text-xs font-semibold text-grey-light uppercase">Personnel Enseignant</label>
-                        <button
-                            type="button"
+                        <Button
+                            variant="ghost"
+                            size="sm"
                             onClick={handleAddRow}
-                            className="text-[10px] font-bold text-primary hover:text-primary/80 uppercase tracking-wider flex items-center gap-1"
+                            className="text-[10px] h-auto py-1 font-bold text-primary hover:text-primary/80 uppercase tracking-wider"
+                            icon={Plus}
                         >
-                            <Plus size={12} /> Ajouter
-                        </button>
+                            Ajouter
+                        </Button>
                     </div>
 
                     <div className="space-y-2">
                         {adultRows.map((row, index) => (
                             <div key={index} className="flex gap-2 items-start animate-in slide-in-from-top-1 text-left">
-                                <select
+                                <Select
                                     value={row.adulte_id}
+                                    onChange={(e: any) => handleUpdateRow(index, 'adulte_id', e.target.value)}
+                                    options={[
+                                        { value: '', label: 'Sélectionner...' },
+                                        ...adultsList.map(a => ({ value: a.id, label: `${a.prenom} ${a.nom}` }))
+                                    ]}
+                                    className="flex-1"
                                     title="Sélectionner un enseignant"
-                                    onChange={(e: ChangeEvent<HTMLSelectElement>) => handleUpdateRow(index, 'adulte_id', e.target.value)}
-                                    className="flex-1 bg-input border border-border/10 rounded-xl p-2.5 text-sm text-text-main focus:border-primary outline-none"
-                                >
-                                    <option value="">Sélectionner...</option>
-                                    {adultsList.map(a => (
-                                        <option key={a.id}>{a.prenom} {a.nom}</option>
-                                    ))}
-                                </select>
-                                <select
+                                />
+                                <Select
                                     value={row.role}
+                                    onChange={(e: any) => handleUpdateRow(index, 'role', e.target.value)}
+                                    options={[
+                                        { value: 'principal', label: 'Principal' },
+                                        { value: 'coenseignant', label: 'Co-Ens.' },
+                                        { value: 'support', label: 'Support' }
+                                    ]}
+                                    className="w-32"
                                     title="Rôle de l'enseignant"
-                                    onChange={(e: ChangeEvent<HTMLSelectElement>) => handleUpdateRow(index, 'role', e.target.value)}
-                                    className="w-32 bg-input border border-border/10 rounded-xl p-2.5 text-sm text-text-main focus:border-primary outline-none"
-                                >
-                                    <option value="principal">Principal</option>
-                                    <option value="coenseignant" >Co-Ens.</option>
-                                    <option value="support">Support</option>
-                                </select>
-                                <button
-                                    type="button"
+                                />
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
                                     onClick={() => handleRemoveRow(index)}
-                                    className="p-2.5 text-danger hover:bg-danger/10 rounded-xl transition-colors"
+                                    className="h-[46px] w-[46px] p-0 text-danger hover:bg-danger/10"
                                     title="Retirer cet enseignant"
-                                >
-                                    <Plus size={18} className="rotate-45" />
-                                </button>
+                                    icon={X}
+                                />
                             </div>
                         ))}
                     </div>

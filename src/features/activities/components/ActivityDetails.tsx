@@ -3,6 +3,7 @@ import { Puzzle, Folder, CheckCircle } from 'lucide-react';
 import clsx from 'clsx';
 import { useActivityRequirements } from '../hooks/useActivityRequirements';
 import { ActivityWithRelations } from '../services/activityService';
+import { Badge, Avatar, EmptyState } from '../../../components/ui';
 
 interface ActivityDetailsProps {
     selectedActivity: ActivityWithRelations | null;
@@ -17,10 +18,13 @@ const ActivityDetails: React.FC<ActivityDetailsProps> = ({
 
     if (!selectedActivity) {
         return (
-            <div className="flex-1 bg-surface/30 backdrop-blur-md rounded-2xl border border-white/5 shadow-xl flex flex-col overflow-hidden relative items-center justify-center text-grey-medium">
-                <Puzzle size={64} className="mb-4 opacity-50" />
-                <p className="text-xl">Sélectionnez une activité pour voir les détails</p>
-            </div>
+            <EmptyState
+                icon={Puzzle}
+                title="Sélectionnez une activité"
+                description="Choisissez une activité dans la liste pour voir ses exigences et détails."
+                size="lg"
+                className="flex-1 bg-surface/30 backdrop-blur-md rounded-2xl border border-white/5 shadow-xl"
+            />
         );
     }
 
@@ -29,17 +33,19 @@ const ActivityDetails: React.FC<ActivityDetailsProps> = ({
             {/* Header Detail */}
             <div className="flex items-start justify-between border-b border-white/5 p-8 bg-surface/20">
                 <div className="flex gap-6 items-center">
-                    <div className="w-20 h-20 rounded-2xl bg-surface border-4 border-background flex items-center justify-center text-primary shadow-2xl shrink-0">
-                        <Puzzle size={40} />
-                    </div>
+                    <Avatar
+                        size="lg"
+                        icon={Puzzle}
+                        className="bg-surface border-4 border-background"
+                    />
                     <div>
                         <h1 className="text-3xl font-bold text-text-main mb-2">{selectedActivity.titre}</h1>
                         <div className="flex items-center gap-4 text-grey-medium">
                             {selectedActivity.Module && (
-                                <span className="flex items-center gap-2 bg-white/5 px-3 py-1 rounded-full text-sm">
-                                    <Folder size={14} />
-                                    {selectedActivity.Module.titre}
-                                </span>
+                                <Badge variant="secondary" size="sm" className="bg-white/5">
+                                    <Folder size={14} className="mr-2" />
+                                    {selectedActivity.Module.nom}
+                                </Badge>
                             )}
                         </div>
                     </div>

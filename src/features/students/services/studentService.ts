@@ -58,6 +58,9 @@ export class StudentService {
         editId: string | null = null,
         photoBase64Arg: string | null = null
     ): Promise<string> => {
+        // Uniquify group IDs to prevent duplicate inserts (409 Conflict)
+        const uniqueGroupIds = Array.from(new Set(groupIds));
+
         // Validation des données
         const validation = validateWith(StudentSchema.partial(), studentData);
 
@@ -107,8 +110,8 @@ export class StudentService {
         const currentLinks = await this.repository.getStudentGroupLinks(studentId);
 
         const currentLinkedGroupIds = currentLinks.map(l => l.groupe_id);
-        const groupsToAdd = groupIds.filter(id => !currentLinkedGroupIds.includes(id));
-        const groupsToRemove = currentLinkedGroupIds.filter(id => !groupIds.includes(id));
+        const groupsToAdd = uniqueGroupIds.filter(id => !currentLinkedGroupIds.includes(id));
+        const groupsToRemove = currentLinkedGroupIds.filter(id => !uniqueGroupIds.includes(id));
 
         // Add new links
         for (const gid of groupsToAdd) {

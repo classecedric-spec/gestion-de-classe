@@ -7,7 +7,6 @@ import ActivityTypesPanel from '../features/adults/components/ActivityTypesPanel
 const Adults: React.FC = () => {
     // Hooks
     const {
-        adults, // Used internally by filteredAdults logic inside hook if needed elsewhere
         loading: loadingAdults,
         searchTerm,
         setSearchTerm,
@@ -26,7 +25,7 @@ const Adults: React.FC = () => {
     } = useActivityTypes();
 
     return (
-        <div className="h-full flex gap-6 animate-in fade-in duration-500">
+        <div className="h-full flex gap-8 animate-in fade-in duration-500">
             {/* LEFT PANEL: ADULT LIST */}
             <AdultList
                 adults={filteredAdults}

@@ -20,6 +20,23 @@ export class SupabaseClassRepository implements IClassRepository {
         return (data as any) || [];
     }
 
+    async getClassById(classId: string): Promise<ClassWithAdults | null> {
+        const { data, error } = await supabase
+            .from('Classe')
+            .select(`
+                *,
+                ClasseAdulte (
+                    role,
+                    Adulte (id, nom, prenom)
+                )
+            `)
+            .eq('id', classId)
+            .single();
+
+        if (error) throw error;
+        return data as any;
+    }
+
     async getStudentsByClass(classId: string): Promise<StudentWithRelations[]> {
         const { data, error } = await supabase
             .from('Eleve')

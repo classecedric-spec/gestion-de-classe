@@ -49,17 +49,35 @@ export const useGroupsData = () => {
         try {
             await groupService.deleteGroup(groupId);
 
-            if (selectedGroup?.id === groupId) {
-                setSelectedGroup(null);
-            }
+            // Calculate remaining groups BEFORE updating state
+            const remainingGroups = groups.filter(g => g.id !== groupId);
 
-            await fetchGroups();
+            // Optimistic update: remove group from local state immediately
+            setGroups(remainingGroups);
+
+            // If the deleted group was selected, select first remaining group
+            if (selectedGroup?.id === groupId) {
+                setSelectedGroup(remainingGroups.length > 0 ? remainingGroups[0] : null);
+            }
         } catch (error) {
+            // On error, refetch to ensure consistency
+            await fetchGroups();
             throw error;
         } finally {
             setLoading(false);
         }
-    }, [selectedGroup, fetchGroups]);
+    }, [selectedGroup, groups, fetchGroups]);
+
+    const handleAddGroup = useCallback((newGroup: Tables<'Groupe'>) => {
+        // Optimistic update: add new group to local state immediately
+        setGroups(prev => {
+            const updated = [...prev, newGroup];
+            return updated.sort((a, b) => (a.nom || '').localeCompare(b.nom || ''));
+        });
+
+        // Select the newly created group
+        setSelectedGroup(newGroup);
+    }, []);
 
     const handleDragEnd = useCallback(async (event: any) => {
         const { active, over } = event;
@@ -102,6 +120,7 @@ export const useGroupsData = () => {
         setSearchQuery,
         filteredGroups,
         fetchGroups,
+        handleAddGroup,
         handleDeleteGroup,
         handleDragEnd
     };

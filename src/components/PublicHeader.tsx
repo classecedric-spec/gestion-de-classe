@@ -60,13 +60,16 @@ const PublicHeader: React.FC<PublicHeaderProps> = ({ solidBackground = false }) 
                     ))}
                 </nav>
 
-                <Link
+                <Button
+                    as={Link}
                     to="/login"
-                    className="hidden md:flex items-center gap-2 bg-white/5 hover:bg-primary text-white hover:text-text-dark border border-white/10 hover:border-primary py-2.5 px-6 rounded-xl transition-all font-bold text-xs uppercase tracking-widest hover:scale-105 active:scale-95 shadow-xl shadow-black/20"
+                    variant="secondary"
+                    className="hidden md:flex hover:bg-primary hover:text-text-dark hover:border-primary"
+                    icon={LogIn}
+                    size="sm"
                 >
-                    <LogIn size={16} />
                     Se Connecter
-                </Link>
+                </Button>
 
                 <button
                     onClick={toggleMobileMenu}
@@ -98,6 +101,8 @@ const PublicHeader: React.FC<PublicHeaderProps> = ({ solidBackground = false }) 
                         <button
                             onClick={closeMobileMenu}
                             className="p-2 hover:bg-white/5 rounded-lg transition-colors text-grey-medium hover:text-white"
+                            aria-label="Fermer le menu"
+                            title="Fermer"
                         >
                             <X size={20} />
                         </button>
@@ -117,14 +122,16 @@ const PublicHeader: React.FC<PublicHeaderProps> = ({ solidBackground = false }) 
                     </nav>
 
                     <div className="p-4 border-t border-border">
-                        <Link
+                        <Button
+                            as={Link}
                             to="/login"
                             onClick={closeMobileMenu}
-                            className="flex items-center justify-center gap-2 bg-primary text-text-dark py-3 px-6 rounded-xl font-bold text-sm uppercase tracking-wider hover:bg-primary-light transition-all shadow-lg shadow-primary/20 w-full"
+                            variant="primary"
+                            className="w-full"
+                            icon={LogIn}
                         >
-                            <LogIn size={18} />
                             Se Connecter
-                        </Link>
+                        </Button>
                     </div>
                 </div>
             </aside>

@@ -2,7 +2,7 @@ import { Tables, TablesInsert, TablesUpdate } from '../../../types/supabase';
 
 // Define complex types for joined queries
 export type ActivityWithRelations = Tables<'Activite'> & {
-    Module: Pick<Tables<'Module'>, 'titre' | 'isActive'> | null;
+    Module: Pick<Tables<'Module'>, 'nom' | 'statut'> | null;
     ActiviteNiveau: (Tables<'ActiviteNiveau'> & {
         Niveau: Pick<Tables<'Niveau'>, 'nom' | 'ordre'> | null
     })[];
@@ -17,7 +17,7 @@ export interface ActivityLevelInput {
 }
 
 export interface IActivityRepository {
-    getModule(id: string): Promise<{ titre: string } | null>;
+    getModule(id: string): Promise<{ nom: string } | null>;
     getMaterialTypes(): Promise<Tables<'TypeMateriel'>[]>;
     getActivityMaterials(activityId: string): Promise<{ type_materiel_id: string }[]>;
     createMaterialType(name: string, userId: string): Promise<Tables<'TypeMateriel'>>;

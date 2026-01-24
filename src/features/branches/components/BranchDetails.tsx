@@ -17,6 +17,7 @@ import {
 } from '@dnd-kit/sortable';
 import SortableSubBranchItem from './SortableSubBranchItem';
 import type { Database } from '../../../types/supabase';
+import { Avatar, EmptyState, Badge } from '../../../components/ui';
 
 type BrancheRow = Database['public']['Tables']['Branche']['Row'];
 type SousBrancheRow = Database['public']['Tables']['SousBranche']['Row'];
@@ -53,10 +54,13 @@ const BranchDetails: React.FC<BranchDetailsProps> = ({ selectedBranch, subBranch
 
     if (!selectedBranch) {
         return (
-            <div className="flex-1 bg-surface/30 backdrop-blur-md rounded-2xl border border-white/5 shadow-xl flex flex-col items-center justify-center text-grey-medium">
-                <GitBranch size={64} className="mb-4 opacity-50" />
-                <p className="text-xl">Sélectionnez une branche pour voir les détails</p>
-            </div>
+            <EmptyState
+                icon={GitBranch}
+                title="Sélectionnez une branche"
+                description="Choisissez une branche dans la liste pour voir ses détails et les sous-branches associées."
+                size="lg"
+                className="flex-1 bg-surface/30 backdrop-blur-md rounded-2xl border border-white/5 shadow-xl"
+            />
         );
     }
 
@@ -67,19 +71,15 @@ const BranchDetails: React.FC<BranchDetailsProps> = ({ selectedBranch, subBranch
             {/* Header */}
             <div className="p-8 border-b border-white/5 flex items-start justify-between bg-surface/20">
                 <div className="flex gap-6 items-center">
-                    <div className="w-24 h-24 rounded-2xl bg-surface border-4 border-background flex items-center justify-center text-primary shadow-2xl shrink-0 overflow-hidden relative group">
-                        {photo ? (
-                            <img src={photo} alt={selectedBranch.nom} className="w-full h-full object-cover" />
-                        ) : (
-                            <GitBranch size={48} />
-                        )}
-                    </div>
+                    <Avatar
+                        size="xl"
+                        src={photo}
+                        icon={GitBranch}
+                        className="bg-surface border-4 border-background"
+                    />
                     <div>
                         <h1 className="text-4xl font-bold text-text-main mb-2">{selectedBranch.nom}</h1>
                     </div>
-                </div>
-                <div className="flex gap-2">
-                    {/* Add SubBranch button could go here */}
                 </div>
             </div>
 
@@ -88,15 +88,19 @@ const BranchDetails: React.FC<BranchDetailsProps> = ({ selectedBranch, subBranch
                 <h3 className="text-lg font-bold text-text-main mb-6 flex items-center gap-3 border-b border-white/5 pb-2 uppercase tracking-wide">
                     <GitBranch className="text-primary" size={24} />
                     Sous-branches liées
-                    <span className="text-xs px-2 py-0.5 bg-white/10 rounded-full text-grey-light ml-auto">
+                    <Badge variant="secondary" size="sm" className="ml-auto bg-white/10 text-grey-light">
                         {subBranches.length}
-                    </span>
+                    </Badge>
                 </h3>
 
                 {subBranches.length === 0 ? (
-                    <div className="text-center p-12 border-2 border-dashed border-white/5 rounded-xl">
-                        <p className="text-grey-medium italic">Aucune sous-branche liée.</p>
-                    </div>
+                    <EmptyState
+                        icon={GitBranch}
+                        title="Aucune sous-branche"
+                        description="Aucune sous-branche liée à cette branche."
+                        size="md"
+                        className="border-2 border-dashed border-white/5 rounded-xl"
+                    />
                 ) : (
                     <DndContext
                         sensors={sensors}

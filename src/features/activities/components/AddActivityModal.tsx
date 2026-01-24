@@ -19,7 +19,7 @@ interface AddActivityModalProps {
     defaultModuleId?: string | null;
     defaultModuleName?: string | null;
     nextOrder?: number;
-    onAdded: () => void;
+    onAdded: (activity?: any) => void;
 }
 
 const ActivityLevelExceptionsAny = ActivityLevelExceptions as any;

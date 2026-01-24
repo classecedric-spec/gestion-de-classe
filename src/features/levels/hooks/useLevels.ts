@@ -19,21 +19,18 @@ export const useLevels = () => {
             const data = await levelService.fetchLevels();
             setLevels(data);
 
-            // Auto-select first if none selected
-            if (data.length > 0 && !selectedLevel) {
-                // Check if the current selected level still exists, if not select first
-                // Actually the logic in JS was just: if (data.length > 0 && !selectedLevel) setSelectedLevel(data[0]);
-                // Implicitly if selectedLevel is not null, we keep it. But if it was deleted it might be stale.
-                // For now sticking to original logic.
-                setSelectedLevel(data[0]);
-            }
+            // Auto-select first if none selected (using functional update to avoid dependency)
+            setSelectedLevel(current => {
+                if (current) return current;
+                return data.length > 0 ? data[0] : null;
+            });
         } catch (error) {
             console.error("Error fetching levels:", error);
             toast.error("Erreur lors du chargement des niveaux");
         } finally {
             setLoading(false);
         }
-    }, [selectedLevel]);
+    }, []); // Removed selectedLevel dependency
 
     useEffect(() => {
         fetchLevels();
@@ -83,8 +80,18 @@ export const useLevels = () => {
     };
 
     const updateLevel = async (id: string, levelData: TablesUpdate<'Niveau'>): Promise<boolean> => {
+        const previousLevels = [...levels];
+        const previousSelected = selectedLevel;
+
+        // Optimistic UI Update
+        setLevels(prev => prev.map(l => l.id === id ? { ...l, ...levelData } as LevelWithStudentCount : l));
+        if (selectedLevel && selectedLevel.id === id) {
+            setSelectedLevel(prev => prev ? ({ ...prev, ...levelData } as LevelWithStudentCount) : null);
+        }
+
         try {
             const updated = await levelService.updateLevel(id, levelData);
+            // Replace with server data for consistency
             setLevels(prev => prev.map(l => l.id === id ? updated : l));
             if (selectedLevel && selectedLevel.id === id) {
                 setSelectedLevel(updated);
@@ -93,24 +100,35 @@ export const useLevels = () => {
             return true;
         } catch (error) {
             console.error("Error updating level:", error);
+            // Revert on error
+            setLevels(previousLevels);
+            setSelectedLevel(previousSelected);
             toast.error("Erreur lors de la mise à jour");
             return false;
         }
     };
 
     const deleteLevel = async (id: string): Promise<boolean> => {
+        const previousLevels = [...levels];
+        const previousSelected = selectedLevel;
+
+        // Optimistic UI Update
+        const newLevels = levels.filter(l => l.id !== id);
+        setLevels(newLevels);
+
+        if (selectedLevel && selectedLevel.id === id) {
+            setSelectedLevel(newLevels.length > 0 ? newLevels[0] : null);
+        }
+
         try {
             await levelService.deleteLevel(id);
-            const newLevels = levels.filter(l => l.id !== id);
-            setLevels(newLevels);
-
-            if (selectedLevel && selectedLevel.id === id) {
-                setSelectedLevel(newLevels.length > 0 ? newLevels[0] : null);
-            }
             toast.success("Niveau supprimé");
             return true;
         } catch (error) {
             console.error("Error deleting level:", error);
+            // Revert on error
+            setLevels(previousLevels);
+            setSelectedLevel(previousSelected);
             toast.error("Erreur lors de la suppression");
             return false;
         }

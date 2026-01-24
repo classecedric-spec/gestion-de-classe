@@ -17,7 +17,7 @@ interface ActivityFormProps {
     defaultModuleId?: string | null;
     defaultModuleName?: string | null;
     nextOrder?: number;
-    onAdded: () => void;
+    onAdded: (activity?: any) => void;
     onClose: () => void;
 }
 
@@ -88,11 +88,11 @@ export const useActivityForm = ({
                     setTitle(activityToEdit.titre);
                     setModuleId(activityToEdit.module_id || '');
 
-                    if (activityToEdit.Module?.titre) {
-                        setModuleName(activityToEdit.Module.titre);
+                    if (activityToEdit.Module?.nom) {
+                        setModuleName(activityToEdit.Module.nom);
                     } else if (activityToEdit.module_id) {
                         const mod = await activityService.getModule(activityToEdit.module_id);
-                        if (mod?.titre) setModuleName(mod.titre);
+                        if (mod?.nom) setModuleName(mod.nom);
                     }
 
                     setNbExercises(activityToEdit.nombre_exercices ?? 1);
@@ -190,14 +190,29 @@ export const useActivityForm = ({
                 (activityData as any).ordre = nextOrder || 0;
             }
 
-            await activityService.saveActivity(
+            // Save to DB
+            const activityId = await activityService.saveActivity(
                 activityData,
                 selectedMaterialTypes,
                 activityLevels,
                 !!activityToEdit
             );
 
-            onAdded();
+            // Construct optimistic object for UI
+            const optimisticActivity = {
+                id: activityId,
+                ...activityData,
+                created_at: activityToEdit ? activityToEdit.created_at : new Date().toISOString(),
+                Module: {
+                    nom: moduleName || '...', // Best effort
+                    statut: 'en_cours'
+                },
+                // Include empty relation arrays to avoid crashes if UI maps over them
+                ActiviteNiveau: [],
+                ActiviteMateriel: []
+            };
+
+            onAdded(optimisticActivity);
             onClose();
             return true;
         } catch (err: any) {

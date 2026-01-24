@@ -3,6 +3,7 @@ import { ClassWithAdults, StudentWithRelations } from '../services/classService'
 
 export interface IClassRepository {
     getClasses(): Promise<ClassWithAdults[]>;
+    getClassById(classId: string): Promise<ClassWithAdults | null>;
     getStudentsByClass(classId: string): Promise<StudentWithRelations[]>;
     deleteClass(classId: string): Promise<void>;
     removeStudentFromClass(studentId: string): Promise<void>;

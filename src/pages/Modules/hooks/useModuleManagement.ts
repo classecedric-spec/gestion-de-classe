@@ -1,19 +1,19 @@
-import { useState, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { filterModules, sortModules, extractBranches, extractSubBranches, ModuleWithRelations } from '../utils/moduleHelpers';
 import { toast } from 'react-hot-toast';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { moduleService } from '../../../features/modules/services/moduleService';
 
 /**
  * useModuleManagement
- * Manages modules CRUD, filters, and selection using React Query
+ * Manages modules CRUD using simple local state strategy (like Groups page)
  */
 export function useModuleManagement() {
-    const queryClient = useQueryClient();
+    // Local Data State
+    const [modules, setModules] = useState<ModuleWithRelations[]>([]);
+    const [loading, setLoading] = useState(true);
 
-    // Local UI state
+    // Filter & Selection State
     const [selectedModuleId, setSelectedModuleId] = useState<string | null>(null);
-
     const [searchTerm, setSearchTerm] = useState('');
     const [statusFilter, setStatusFilter] = useState('all');
     const [branchFilter, setBranchFilter] = useState('all');
@@ -23,14 +23,24 @@ export function useModuleManagement() {
     const [moduleToEdit, setModuleToEdit] = useState<ModuleWithRelations | null>(null);
     const [moduleToDelete, setModuleToDelete] = useState<ModuleWithRelations | null>(null);
 
-    // 1. Fetch Modules Query
-    const {
-        data: modules = [],
-        isLoading: loading
-    } = useQuery<ModuleWithRelations[]>({
-        queryKey: ['modules'],
-        queryFn: () => moduleService.getAllModules(),
-    });
+    // 1. Fetch Modules
+    const fetchModules = useCallback(async () => {
+        setLoading(true);
+        try {
+            const data = await moduleService.getAllModules();
+            setModules(data || []);
+        } catch (error) {
+            console.error("Error fetching modules:", error);
+            toast.error("Impossible de charger les modules");
+        } finally {
+            setLoading(false);
+        }
+    }, []);
+
+    // Initial Fetch
+    useEffect(() => {
+        fetchModules();
+    }, [fetchModules]);
 
     // Handle initial selection
     const selectedModule = useMemo(() => {
@@ -48,89 +58,86 @@ export function useModuleManagement() {
     }, [modules, selectedModuleId]);
 
 
-    // 2. Delete Mutation
-    const deleteMutation = useMutation({
-        mutationFn: async (moduleId: string) => {
-            await moduleService.deleteModule(moduleId);
-            return moduleId;
-        },
-        onSuccess: (deletedId) => {
-            let nextId: string | null = null;
+    // 2. Delete Action
+    const handleDelete = async () => {
+        if (!moduleToDelete) return;
+        const idToDelete = moduleToDelete.id;
 
-            if (selectedModule?.id === deletedId) {
-                const currentIndex = modules.findIndex(m => m.id === deletedId);
-                if (currentIndex !== -1) {
-                    if (currentIndex < modules.length - 1) {
-                        nextId = modules[currentIndex + 1].id;
-                    } else if (currentIndex > 0) {
-                        nextId = modules[currentIndex - 1].id;
-                    }
-                }
-            } else {
-                nextId = selectedModule?.id || null;
+        // Optimistic Update: Remove immediately
+        const previousModules = [...modules];
+        setModules(prev => prev.filter(m => m.id !== idToDelete));
+
+        // Handle selection logic
+        if (selectedModule?.id === idToDelete) {
+            const currentIndex = modules.findIndex(m => m.id === idToDelete);
+            let nextModule = null;
+            if (currentIndex !== -1) {
+                if (currentIndex < modules.length - 1) nextModule = modules[currentIndex + 1];
+                else if (currentIndex > 0) nextModule = modules[currentIndex - 1];
             }
+            setSelectedModuleId(nextModule ? nextModule.id : null);
+        }
 
-            if (nextId) setSelectedModuleId(nextId);
+        setModuleToDelete(null); // Close modal
 
+        try {
+            await moduleService.deleteModule(idToDelete);
             toast.success("Module supprimé");
-            setModuleToDelete(null);
-
-            queryClient.invalidateQueries({ queryKey: ['modules'] });
-        },
-        onError: (err) => {
+        } catch (err) {
             console.error('Error deleting module:', err);
+            // Rollback
+            setModules(previousModules);
             toast.error("Erreur lors de la suppression du module");
         }
-    });
+    };
 
-    // 3. Status Toggle Mutation
-    const toggleStatusMutation = useMutation({
-        mutationFn: async (module: ModuleWithRelations) => {
-            return await moduleService.toggleModuleStatus(module);
-        },
-        onMutate: async (newModule) => {
-            await queryClient.cancelQueries({ queryKey: ['modules'] });
-            const previousModules = queryClient.getQueryData<ModuleWithRelations[]>(['modules']);
+    // 3. Toggle Status Action
+    const toggleStatus = async (module: ModuleWithRelations) => {
+        // Calculate new status locally
+        const currentStatus = module.statut || 'en_preparation';
+        let newStatus = 'en_cours';
+        if (currentStatus === 'en_preparation') newStatus = 'en_cours';
+        else if (currentStatus === 'en_cours') newStatus = 'archive';
+        else if (currentStatus === 'archive') newStatus = 'en_cours';
 
-            const nextStatus = newModule['statut'] === 'en_preparation' ? 'en_cours' :
-                newModule['statut'] === 'en_cours' ? 'archive' : 'en_cours';
+        // Optimistic Update
+        const updatedModule = { ...module, statut: newStatus };
+        setModules(prev => prev.map(m => m.id === module.id ? updatedModule : m));
 
-            queryClient.setQueryData<ModuleWithRelations[]>(['modules'], old => old?.map(m =>
-                m.id === newModule.id ? { ...m, statut: nextStatus } : m
-            ));
-
-            return { previousModules };
-        },
-        onError: (_err, _newModule, context) => {
-            if (context?.previousModules) {
-                queryClient.setQueryData(['modules'], context.previousModules);
-            }
+        try {
+            await moduleService.toggleModuleStatus(module);
+            // Success - no action needed as we already updated
+        } catch (err) {
+            console.error('Error updating status:', err);
+            // Rollback
+            setModules(prev => prev.map(m => m.id === module.id ? module : m));
             toast.error("Impossible de mettre à jour le statut");
-        },
-        onSettled: () => {
-            queryClient.invalidateQueries({ queryKey: ['modules'] });
-        }
-    });
-
-
-    // Actions
-    const handleDelete = async () => {
-        if (moduleToDelete) {
-            deleteMutation.mutate(moduleToDelete.id);
         }
     };
 
-    const toggleStatus = (module: ModuleWithRelations) => {
-        toggleStatusMutation.mutate(module);
-    };
-
-    const handleCreated = async (newModule: ModuleWithRelations | null) => {
-        await queryClient.invalidateQueries({ queryKey: ['modules'] });
-        if (newModule) {
-            setSearchTerm('');
-            setSelectedModuleId(newModule.id);
+    // 4. Handle Created/Updated
+    const handleCreated = (newModule: ModuleWithRelations | null) => {
+        if (!newModule) {
+            // If fallback failed, we forced a fetch
+            fetchModules();
+            return;
         }
+
+        setModules(prev => {
+            const exists = prev.find(m => m.id === newModule.id);
+            if (exists) {
+                // Update existing
+                return prev.map(m => m.id === newModule.id ? newModule : m);
+            }
+            // Add new
+            return [...prev, newModule].sort((a, b) => a.nom.localeCompare(b.nom));
+        });
+
+        setSelectedModuleId(newModule.id);
+        setSearchTerm('');
         setModuleToEdit(null);
+
+        // We TRUST the local update. No need to refetch immediately.
     };
 
     const handleSetBranchFilter = (val: string) => {
@@ -179,8 +186,8 @@ export function useModuleManagement() {
             setSubBranchFilter,
             setModuleToEdit,
             setModuleToDelete,
-            setModules: () => { }, // No-op, managed by Query
-            fetchModules: () => queryClient.invalidateQueries({ queryKey: ['modules'] }),
+            setModules, // Only exposed if absolutely necessary
+            fetchModules,
             handleDelete,
             toggleStatus,
             handleCreated

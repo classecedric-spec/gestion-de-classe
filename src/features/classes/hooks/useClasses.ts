@@ -152,33 +152,89 @@ export const useClasses = () => {
         }
     };
 
+    const handleAddClass = useCallback((newClass: ClassWithAdults) => {
+        // Optimistic update: add new class to local state immediately
+        setClasses(prev => {
+            const updated = [...prev, newClass];
+            return updated.sort((a, b) => (a.nom || '').localeCompare(b.nom || ''));
+        });
+
+        // Select the newly created class
+        setSelectedClass(newClass);
+    }, []);
+
+    const handleUpdateClass = useCallback((updatedClass: ClassWithAdults) => {
+        // Optimistic update: replace old class with updated data
+        setClasses(prev =>
+            prev.map(c => c.id === updatedClass.id ? updatedClass : c)
+                .sort((a, b) => (a.nom || '').localeCompare(b.nom || ''))
+        );
+
+        // Sync selection if the updated class is current
+        if (selectedClass?.id === updatedClass.id) {
+            setSelectedClass(updatedClass);
+        }
+    }, [selectedClass]);
+
     const handleDeleteClass = async () => {
         const target = activeItem.classToDelete;
         if (!target) return;
 
-        setLoading(true);
+        const previousClasses = [...classes];
+        const previousSelection = selectedClass;
+
+        // Optimistic UI Update: remove class from local state immediately
+        const remainingClasses = classes.filter(c => c.id !== target.id);
+        setClasses(remainingClasses);
+
+        // If the deleted class was selected, select first remaining class
+        if (selectedClass?.id === target.id) {
+            setSelectedClass(remainingClasses.length > 0 ? remainingClasses[0] : null);
+            setStudentsInClass([]);
+        }
+
+        toggleModal('deleteConfirm', false);
+
         try {
             await classService.deleteClass(target.id);
-
-            if (selectedClass?.id === target.id) {
-                setSelectedClass(null);
-                setStudentsInClass([]);
-            }
-            toggleModal('deleteConfirm', false);
-            fetchClasses();
         } catch (error: any) {
             alert('Erreur suppression: ' + error.message);
-        } finally {
-            setLoading(false);
+            // Revert on error
+            setClasses(previousClasses);
+            setSelectedClass(previousSelection);
+            if (previousSelection?.id === target.id) {
+                fetchStudents(target.id);
+            }
         }
     };
 
+
+
+    const handleAddStudent = useCallback((newStudent: StudentWithRelations) => {
+        // Optimistic Check: Does this student belong to the currently selected class?
+        if (selectedClass && newStudent.classe_id === selectedClass.id) {
+            setStudentsInClass(prev => {
+                // Prevent duplicates just in case
+                if (prev.some(s => s.id === newStudent.id)) return prev;
+
+                const updated = [...prev, newStudent];
+                // Sort by name (simple default sort)
+                return updated.sort((a, b) => (a.nom || '').localeCompare(b.nom || ''));
+            });
+        }
+    }, [selectedClass]);
+
     const handleRemoveStudent = async (studentId: string) => {
+        // Optimistic update
+        const previousStudents = [...studentsInClass];
+        setStudentsInClass(prev => prev.filter(s => s.id !== studentId));
+
         try {
             await classService.removeStudentFromClass(studentId);
-            if (selectedClass) fetchStudents(selectedClass.id);
         } catch (error: any) {
             alert('Erreur: ' + error.message);
+            // Revert on error
+            setStudentsInClass(previousStudents);
         }
     };
 
@@ -235,7 +291,10 @@ export const useClasses = () => {
         // Actions
         handleSelectClass,
         handleSort,
+        handleAddClass,
+        handleUpdateClass,
         handleDeleteClass,
+        handleAddStudent,
         handleRemoveStudent,
         handleUpdateStudent,
         refreshClasses: fetchClasses,

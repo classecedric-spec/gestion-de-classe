@@ -7,6 +7,7 @@ export interface ClassFormData {
     nom: string;
     acronyme: string;
     logo_url: string;
+    photo_base64?: string; // For temporary storage of newly uploaded image
     principaux: string[]; // IDs of principal adults
     complementaires: string[]; // IDs of complementary adults
 }
@@ -14,7 +15,7 @@ export interface ClassFormData {
 export interface UseClassFormProps {
     isEditing: boolean;
     classToEdit: ClassWithAdults | null;
-    onSaved: () => void;
+    onSaved: (classData?: ClassWithAdults) => void;
     onClose: () => void;
 }
 
@@ -23,6 +24,7 @@ export const useClassForm = ({ isEditing, classToEdit, onSaved, onClose }: UseCl
         nom: '',
         acronyme: '',
         logo_url: '',
+        photo_base64: '',
         principaux: [],
         complementaires: []
     };
@@ -92,12 +94,14 @@ export const useClassForm = ({ isEditing, classToEdit, onSaved, onClose }: UseCl
 
         try {
             let savedClassId = classToEdit?.id;
+            let finalLogoUrl = classData.logo_url;
 
             const payload: any = {
                 nom: classData.nom,
                 acronyme: classData.acronyme,
                 logo_url: classData.logo_url
             };
+
 
             // 1. Create/Update Record
             if (isEditing && savedClassId) {
@@ -106,6 +110,21 @@ export const useClassForm = ({ isEditing, classToEdit, onSaved, onClose }: UseCl
                 // Insert
                 const { id } = await classService.createClass(payload);
                 savedClassId = id;
+            }
+
+            // Image Upload Logic after getting/having savedClassId
+            if (savedClassId && classData.photo_base64 && classData.photo_base64.startsWith('data:image')) {
+                try {
+                    const response = await fetch(classData.photo_base64);
+                    const blob = await response.blob();
+                    const logoUrl = await classService.uploadLogo(savedClassId, blob);
+                    if (logoUrl) {
+                        await classService.updateClass(savedClassId, { logo_url: logoUrl });
+                        finalLogoUrl = logoUrl;
+                    }
+                } catch (imgErr) {
+                    console.error("Error uploading class logo:", imgErr);
+                }
             }
 
             if (!savedClassId) throw new Error("Could not determine Class ID");
@@ -122,7 +141,35 @@ export const useClassForm = ({ isEditing, classToEdit, onSaved, onClose }: UseCl
                 await classService.linkAdult(savedClassId, adultId, 'complementaire');
             }
 
-            onSaved();
+            // 4. Fetch the full class with relations to enable optimistic UI update
+            let updatedClass = await classService.getClassById(savedClassId);
+
+            // Fallback: If fetch fails (latency/consistency), construct object manually for optimistic UI
+            if (!updatedClass) {
+                console.warn("Could not fetch new class immediately. Using local data fallback.");
+                const constructedAdults = [
+                    ...classData.principaux.map(id => ({
+                        role: 'principal',
+                        Adulte: adultsList.find(a => a.id === id) || { id, nom: '?', prenom: '?' }
+                    })),
+                    ...classData.complementaires.map(id => ({
+                        role: 'complementaire',
+                        Adulte: adultsList.find(a => a.id === id) || { id, nom: '?', prenom: '?' }
+                    }))
+                ];
+
+                updatedClass = {
+                    id: savedClassId,
+                    created_at: new Date().toISOString(),
+                    nom: classData.nom,
+                    acronyme: classData.acronyme,
+                    logo_url: finalLogoUrl || classData.logo_url,
+                    titulaire_id: null,
+                    ClasseAdulte: constructedAdults
+                } as any;
+            }
+
+            onSaved(updatedClass || undefined);
             onClose();
 
         } catch (error: any) {

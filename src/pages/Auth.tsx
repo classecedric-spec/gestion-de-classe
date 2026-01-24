@@ -1,5 +1,5 @@
 import React from 'react';
-import { Loader2, ArrowRight } from 'lucide-react';
+import { ArrowRight } from 'lucide-react';
 
 import { useDatabaseStatus } from '../hooks/useDatabaseStatus';
 import { useAuthForm } from '../hooks/useAuthForm';
@@ -9,6 +9,7 @@ import { DatabaseStatusAlert } from '../components/auth/DatabaseStatusAlert';
 import { AuthHeader } from '../components/auth/AuthHeader';
 import { AuthFooter } from '../components/auth/AuthFooter';
 import { AuthFormFields } from '../components/auth/AuthFormFields';
+import { Button } from '../components/ui';
 
 const Auth: React.FC = () => {
     // Hooks
@@ -98,20 +99,17 @@ const Auth: React.FC = () => {
                         )}
 
                         {/* Submit Button */}
-                        <button
+                        <Button
                             type="submit"
-                            disabled={loading}
-                            className="w-full bg-primary text-text-dark font-black py-4 rounded-xl shadow-lg shadow-primary/20 hover:shadow-primary/40 hover:-translate-y-0.5 active:translate-y-0 transition-all flex items-center justify-center gap-2 group disabled:opacity-50 disabled:cursor-not-allowed mt-4"
+                            loading={loading}
+                            variant="primary"
+                            className="w-full mt-4"
+                            iconRight={ArrowRight}
                         >
-                            {loading ? <Loader2 className="animate-spin" size={20} /> : (
-                                <>
-                                    <span className="text-xs uppercase tracking-widest">
-                                        {mode === 'FORGOT' ? "Réinitialiser" : (mode === 'SIGNUP' ? "Commencer maintenant" : 'Accéder au Dashboard')}
-                                    </span>
-                                    <ArrowRight size={16} className="group-hover:translate-x-1 transition-transform" />
-                                </>
-                            )}
-                        </button>
+                            <span className="text-xs uppercase tracking-widest font-black">
+                                {mode === 'FORGOT' ? "Réinitialiser" : (mode === 'SIGNUP' ? "Commencer maintenant" : 'Accéder au Dashboard')}
+                            </span>
+                        </Button>
                     </form>
 
                     {/* Footer */}

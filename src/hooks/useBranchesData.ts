@@ -1,12 +1,13 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/database';
+import { Tables } from '../types/supabase';
 
 /**
  * Hook for fetching branches and sub-branches data
  */
 export const useBranchesData = (branchId: string) => {
-    const [branches, setBranches] = useState<{ id: string; nom: string }[]>([]);
-    const [subBranches, setSubBranches] = useState<{ id: string; nom: string }[]>([]);
+    const [branches, setBranches] = useState<Tables<'Branche'>[]>([]);
+    const [subBranches, setSubBranches] = useState<Tables<'SousBranche'>[]>([]);
     const [loading, setLoading] = useState(false);
 
     useEffect(() => {
@@ -26,7 +27,7 @@ export const useBranchesData = (branchId: string) => {
             setLoading(true);
             const { data, error } = await supabase
                 .from('Branche')
-                .select('id, nom')
+                .select('*')
                 .order('nom');
             if (error) throw error;
             setBranches(data || []);
@@ -41,7 +42,7 @@ export const useBranchesData = (branchId: string) => {
         try {
             const { data, error } = await supabase
                 .from('SousBranche')
-                .select('id, nom')
+                .select('*')
                 .eq('branche_id', bId)
                 .order('nom');
             if (error) throw error;
@@ -51,11 +52,11 @@ export const useBranchesData = (branchId: string) => {
         }
     };
 
-    const addBranch = (branch: { id: string; nom: string }) => {
+    const addBranch = (branch: Tables<'Branche'>) => {
         setBranches(prev => [...prev, branch].sort((a, b) => a.nom.localeCompare(b.nom)));
     };
 
-    const updateSubBranches = (newSubBranches: { id: string; nom: string }[]) => {
+    const updateSubBranches = (newSubBranches: Tables<'SousBranche'>[]) => {
         setSubBranches(newSubBranches);
     };
 

@@ -27,6 +27,8 @@ export type { SelectProps, SelectOption } from './Select';
 export { default as Tabs } from './Tabs';
 export type { TabsProps, Tab } from './Tabs';
 
+export { default as SmartTabs } from './SmartTabs';
+
 export { default as EmptyState } from './EmptyState';
 export type { EmptyStateProps } from './EmptyState';
 
@@ -34,3 +36,13 @@ export { default as StatCard } from './StatCard';
 export type { StatCardProps, StatCardVariant } from './StatCard';
 
 export { default as ImageUpload } from './ImageUpload';
+
+export { SearchBar } from './SearchBar';
+export { FilterSelect } from './FilterSelect';
+export { CardInfo } from './CardInfo';
+export { CardList } from './CardList';
+export { CardTabs } from './CardTabs';
+export { InfoRow } from './InfoRow';
+export { InfoSection } from './InfoSection';
+export { InfoRowEditable } from './InfoRowEditable';
+export { InfoSectionEditable } from './InfoSectionEditable';

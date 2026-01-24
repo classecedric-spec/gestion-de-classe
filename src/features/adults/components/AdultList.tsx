@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { User, Plus, Search, Edit, Trash2, X, ChevronDown, Loader2, Save } from 'lucide-react';
+import { User, Plus, Search, Edit, X, ChevronDown, Save } from 'lucide-react';
 import type { Database } from '../../../types/supabase';
+import { Badge, Button, Avatar, EmptyState, ConfirmModal } from '../../../components/ui';
 
 type AdultRow = Database['public']['Tables']['Adulte']['Row'];
 type AdultInsert = Database['public']['Tables']['Adulte']['Insert'];
@@ -40,12 +41,6 @@ const AdultList: React.FC<AdultListProps> = ({
     };
 
     const openEditModal = (adult: AdultRow) => {
-        // We might want to store 'fonction' in a specific column or metadata, 
-        // but currently the Adulte table doesn't have a 'fonction' column in the types I saw earlier.
-        // I will assume for now it's managed externally or I should check if I missed a column.
-        // Actually, looking at the previous JS code: `adult.fonction || 'Personnel'` 
-        // It seems expected. Let's start with basic fields from the Type.
-        // If `fonction` is missing from DB schema, I'll keep it in local state but it might not persist unless added to DB.
         setCurrentAdult({ ...adult, fonction: (adult as any).fonction || '' });
         setIsEditing(true);
         setShowModal(true);
@@ -59,10 +54,6 @@ const AdultList: React.FC<AdultListProps> = ({
         const payload = {
             nom: currentAdult.nom,
             prenom: currentAdult.prenom,
-            // fonction: currentAdult.fonction // NOTE: 'fonction' is likely missing from DB schema based on types. 
-            // If it is required, we need to update the DB schema. 
-            // For now, I'm passing it, but TS might complain if it's not in AdultUpdate.
-            // I will cast to any to avoid blockage during migration if the DB schema is actually wider than the types file.
         };
 
         if (isEditing && currentAdult.id) {
@@ -88,59 +79,79 @@ const AdultList: React.FC<AdultListProps> = ({
                         <User className="text-primary" size={24} />
                         Adultes
                     </h2>
-                    <button
-                        onClick={openAddModal}
-                        className="p-2 bg-primary/10 text-primary rounded-lg hover:bg-primary/20 transition-all active:scale-95"
-                    >
-                        <Plus size={20} />
-                    </button>
+                    <Badge variant="primary" size="sm">
+                        {adults.length} Total
+                    </Badge>
                 </div>
 
                 <div className="relative group">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-grey-medium group-focus-within:text-primary transition-colors" size={16} />
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-grey-medium group-focus-within:text-primary transition-colors" size={18} />
                     <input
                         type="text"
                         placeholder="Rechercher un adulte..."
                         value={searchTerm}
                         onChange={(e) => onSearchChange(e.target.value)}
-                        className="w-full bg-background/50 border border-white/10 rounded-xl pl-9 pr-4 py-2 text-sm text-text-main focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all"
+                        className="w-full bg-background/50 border border-white/10 rounded-xl pl-10 pr-4 py-2 text-sm text-text-main focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all"
                     />
                 </div>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar">
+            <div className="flex-1 overflow-y-auto p-4 space-y-2 custom-scrollbar">
                 {loading && adults.length === 0 ? (
-                    <div className="flex justify-center py-8"><Loader2 className="animate-spin text-primary" size={24} /></div>
+                    <div className="flex justify-center py-8">
+                        <Avatar loading size="md" initials="" />
+                    </div>
                 ) : adults.length === 0 ? (
-                    <div className="text-center py-8 text-grey-dark text-sm italic">Aucun adulte trouvé.</div>
+                    <EmptyState
+                        icon={User}
+                        title="Aucun adulte"
+                        description="Aucun adulte trouvé."
+                        size="sm"
+                    />
                 ) : (
                     adults.map(adult => (
-                        <div key={adult.id} className="group flex items-center gap-3 p-3 bg-white/5 rounded-xl border border-transparent hover:border-white/10 hover:bg-surface transition-all">
-                            <div className="w-10 h-10 bg-background rounded-lg flex items-center justify-center text-primary font-bold text-sm shadow-inner shrink-0">
-                                {adult.prenom?.[0]}{adult.nom?.[0]}
-                            </div>
+                        <div key={adult.id} className="group flex items-center gap-4 p-4 bg-white/5 rounded-xl border border-white/5 hover:border-primary/30 hover:bg-white/10 transition-all">
+                            <Avatar
+                                size="md"
+                                initials={`${adult.prenom?.[0]}${adult.nom?.[0]}`}
+                                className="bg-background text-primary font-bold shadow-inner shrink-0"
+                            />
                             <div className="flex-1 min-w-0">
-                                <h3 className="font-bold text-sm text-text-main truncate">{adult.prenom} {adult.nom}</h3>
-                                {/* Assuming 'fonction' might exist on runtime object even if not in static type */}
-                                <p className="text-[10px] text-grey-medium truncate uppercase tracking-wider">{(adult as any).fonction || 'Personnel'}</p>
+                                <h3 className="font-bold text-sm text-text-main truncate group-hover:text-primary transition-colors">{adult.prenom} {adult.nom}</h3>
+                                {(adult as any).fonction && (
+                                    <p className="text-[10px] text-grey-medium truncate uppercase tracking-wider mt-0.5">{(adult as any).fonction}</p>
+                                )}
                             </div>
                             <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                                 <button
                                     onClick={() => openEditModal(adult)}
-                                    className="p-1.5 text-grey-medium hover:text-primary transition-colors"
+                                    className="p-2 text-grey-medium hover:text-white hover:bg-white/10 rounded-full transition-colors"
+                                    title="Modifier"
                                 >
                                     <Edit size={14} />
                                 </button>
                                 <button
                                     onClick={() => setAdultToDelete(adult)}
-                                    className="p-1.5 text-grey-medium hover:text-danger transition-colors"
+                                    className="p-2 text-grey-medium hover:text-danger hover:bg-danger/10 rounded-full transition-colors"
+                                    title="Supprimer"
                                 >
-                                    <Trash2 size={14} />
+                                    <X size={14} />
                                 </button>
                             </div>
                         </div>
                     ))
                 )}
+            </div>
+
+            <div className="p-4 border-t border-white/5 bg-surface/30">
+                <Button
+                    onClick={openAddModal}
+                    variant="secondary"
+                    className="w-full border-dashed"
+                    icon={Plus}
+                >
+                    Nouvel Adulte
+                </Button>
             </div>
 
             {/* Modal */}
@@ -207,19 +218,16 @@ const AdultList: React.FC<AdultListProps> = ({
             )}
 
             {/* Confirm Delete */}
-            {adultToDelete && (
-                <div className="fixed inset-0 z-[210] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in">
-                    <div className="w-full max-w-sm bg-surface border border-white/10 rounded-2xl shadow-2xl p-6 text-center animate-in zoom-in-95">
-                        <div className="w-16 h-16 bg-danger/10 text-danger rounded-full flex items-center justify-center mx-auto mb-4"><Trash2 size={32} /></div>
-                        <h2 className="text-xl font-bold text-text-main mb-2">Supprimer l'adulte ?</h2>
-                        <p className="text-sm text-grey-medium mb-6">Voulez-vous vraiment supprimer <span className="text-white font-bold">{adultToDelete.prenom} {adultToDelete.nom}</span> ?</p>
-                        <div className="flex gap-3">
-                            <button onClick={() => setAdultToDelete(null)} className="flex-1 py-3 bg-white/5 text-grey-light rounded-xl font-medium">Annuler</button>
-                            <button onClick={handleDeleteConfirm} className="flex-1 py-3 bg-danger text-white rounded-xl font-bold">Supprimer</button>
-                        </div>
-                    </div>
-                </div>
-            )}
+            <ConfirmModal
+                isOpen={!!adultToDelete}
+                onClose={() => setAdultToDelete(null)}
+                onConfirm={handleDeleteConfirm}
+                title="Supprimer l'adulte ?"
+                message={`Voulez-vous vraiment supprimer "${adultToDelete?.prenom} ${adultToDelete?.nom}" ?`}
+                confirmText="Supprimer"
+                cancelText="Annuler"
+                variant="danger"
+            />
         </div>
     );
 };

@@ -1,5 +1,6 @@
 import { useState, useCallback, useMemo, useEffect } from 'react';
 import { materialService, TypeMateriel, MaterialActivity, TypeMaterielInsert, TypeMaterielUpdate } from '../services/materialService';
+import { getCurrentUser } from '../../../lib/database';
 import { toast } from 'sonner';
 
 export const useMaterials = () => {
@@ -19,17 +20,21 @@ export const useMaterials = () => {
             const data = await materialService.fetchAll();
             setMateriels(data);
 
-            // Auto-select first if none selected and data exists
-            if (data.length > 0 && !selectedMateriel) {
-                setSelectedMateriel(data[0]);
-            }
+            // Auto-select logic moved to useEffect
         } catch (error) {
             console.error('Error fetching materiels:', error);
             toast.error('Erreur lors du chargement du matériel');
         } finally {
             setLoading(false);
         }
-    }, [selectedMateriel]);
+    }, []);
+
+    // Initial selection effect
+    useEffect(() => {
+        if (materiels.length > 0 && !selectedMateriel) {
+            setSelectedMateriel(materiels[0]);
+        }
+    }, [materiels, selectedMateriel]);
 
     // Fetch linked activities when selected material changes
     const fetchLinkedActivitiesDetails = useCallback(async (id: string | undefined) => {
@@ -62,7 +67,10 @@ export const useMaterials = () => {
     // Create material
     const createMateriel = useCallback(async (materialData: Omit<TypeMaterielInsert, 'user_id'>) => {
         try {
-            const newMateriel = await materialService.create(materialData);
+            const user = await getCurrentUser();
+            if (!user) throw new Error("Utilisateur non connecté");
+
+            const newMateriel = await materialService.create(materialData, user.id);
             setMateriels(prev => [...prev, newMateriel].sort((a, b) => (a.nom || '').localeCompare(b.nom || '')));
             setSelectedMateriel(newMateriel);
             toast.success('Matériel créé avec succès');
@@ -76,8 +84,21 @@ export const useMaterials = () => {
 
     // Update material
     const updateMateriel = useCallback(async (id: string, materialData: TypeMaterielUpdate) => {
+        const previousMateriels = [...materiels];
+        const previousSelected = selectedMateriel;
+
+        // Optimistic UI Update
+        setMateriels(prev =>
+            prev.map(m => m.id === id ? { ...m, ...materialData } as TypeMateriel : m).sort((a, b) => (a.nom || '').localeCompare(b.nom || ''))
+        );
+
+        if (selectedMateriel?.id === id) {
+            setSelectedMateriel(prev => prev ? ({ ...prev, ...materialData } as TypeMateriel) : null);
+        }
+
         try {
             const updated = await materialService.update(id, materialData);
+            // Replace with server data for consistency
             setMateriels(prev =>
                 prev.map(m => m.id === id ? updated : m).sort((a, b) => (a.nom || '').localeCompare(b.nom || ''))
             );
@@ -90,27 +111,37 @@ export const useMaterials = () => {
             return true;
         } catch (error) {
             console.error('Error updating material:', error);
+            // Revert on error
+            setMateriels(previousMateriels);
+            setSelectedMateriel(previousSelected);
             toast.error('Erreur lors de la modification');
             return false;
         }
-    }, [selectedMateriel]);
+    }, [selectedMateriel, materiels]);
 
     // Delete material
     const deleteMateriel = useCallback(async (id: string) => {
+        const previousMateriels = [...materiels];
+        const previousSelected = selectedMateriel;
+
+        // Optimistic UI Update
+        const updatedList = materiels.filter(m => m.id !== id);
+        setMateriels(updatedList);
+
+        if (selectedMateriel?.id === id) {
+            setSelectedMateriel(updatedList.length > 0 ? updatedList[0] : null);
+        }
+
         try {
             await materialService.delete(id);
-            const updatedList = materiels.filter(m => m.id !== id);
-            setMateriels(updatedList);
-
-            if (selectedMateriel?.id === id) {
-                // Select next available
-                setSelectedMateriel(updatedList.length > 0 ? updatedList[0] : null);
-            }
-
             toast.success('Matériel supprimé avec succès');
             return true;
         } catch (error: any) {
             console.error('Error deleting material:', error);
+            // Revert on error
+            setMateriels(previousMateriels);
+            setSelectedMateriel(previousSelected);
+
             // Specific error for constraint violation (linked activities)
             if (error.code === '23503') { // Foreign key violation
                 toast.error("Impossible de supprimer : ce matériel est lié à des activités.");

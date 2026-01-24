@@ -9,7 +9,7 @@ export interface EmptyStateProps {
         label: string;
         onClick: () => void;
         icon?: React.ElementType;
-    };
+    } | React.ReactNode;
     className?: string;
     size?: 'sm' | 'md' | 'lg';
 }
@@ -113,17 +113,23 @@ const EmptyState: React.FC<EmptyStateProps> = ({
             )}
 
             {action && (
-                <button
-                    onClick={action.onClick}
-                    className={clsx(
-                        'mt-6 bg-primary hover:bg-primary/90 text-text-dark font-bold rounded-xl',
-                        'transition-all active:scale-95 flex items-center gap-2',
-                        sizes[size].button
+                <div className="mt-6">
+                    {React.isValidElement(action) ? (
+                        action
+                    ) : (
+                        <button
+                            onClick={(action as any).onClick}
+                            className={clsx(
+                                'bg-primary hover:bg-primary/90 text-text-dark font-bold rounded-xl',
+                                'transition-all active:scale-95 flex items-center gap-2',
+                                sizes[size].button
+                            )}
+                        >
+                            {(action as any).icon && React.createElement((action as any).icon, { size: 16 })}
+                            {(action as any).label}
+                        </button>
                     )}
-                >
-                    {ActionIcon && <ActionIcon size={16} />}
-                    {action.label}
-                </button>
+                </div>
             )}
         </div>
     );

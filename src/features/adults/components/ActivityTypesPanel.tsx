@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { Activity, Plus, Edit, Trash2, X, Loader2, Save } from 'lucide-react';
+import { Activity, Plus, Edit, X, Save } from 'lucide-react';
 import { ActivityType } from '../services/adultService';
+import { Badge, Button, Avatar, EmptyState, ConfirmModal } from '../../../components/ui';
 
 interface ActivityTypesPanelProps {
     activityTypes: ActivityType[];
@@ -62,41 +63,55 @@ const ActivityTypesPanel: React.FC<ActivityTypesPanelProps> = ({
                     </h2>
                     <p className="text-xs text-grey-medium mt-1 font-medium">Configurez les types de suivi disponibles pour les adultes</p>
                 </div>
-                <button
+                <Button
                     onClick={openAddModal}
-                    className="px-4 py-2 bg-primary/10 text-primary rounded-xl font-bold hover:bg-primary/20 transition-all active:scale-95 flex items-center gap-2 border border-primary/20"
+                    variant="primary"
+                    size="md"
+                    icon={Plus}
                 >
-                    <Plus size={18} />
                     Nouveau type
-                </button>
+                </Button>
             </div>
 
             <div className="flex-1 overflow-y-auto p-6 custom-scrollbar bg-background/20">
                 {loading && activityTypes.length === 0 ? (
-                    <div className="flex justify-center py-8"><Loader2 className="animate-spin text-primary" size={24} /></div>
+                    <div className="flex justify-center py-8">
+                        <Avatar loading size="md" initials="" />
+                    </div>
+                ) : activityTypes.length === 0 ? (
+                    <EmptyState
+                        icon={Activity}
+                        title="Aucun type d'action"
+                        description="Commencez par ajouter un type d'action pour le suivi des adultes."
+                        size="md"
+                    />
                 ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                         {activityTypes.map(act => (
-                            <div key={act.id} className="p-4 bg-white/5 rounded-xl border border-white/5 hover:border-primary/30 transition-all group pointer-events-none">
-                                <div className="flex items-center justify-between pointer-events-auto">
+                            <div key={act.id} className="p-4 bg-white/5 rounded-xl border border-white/5 hover:border-primary/30 transition-all group">
+                                <div className="flex items-center justify-between">
                                     <div className="flex items-center gap-3">
-                                        <div className="w-8 h-8 bg-background rounded-lg flex items-center justify-center text-primary">
-                                            <Activity size={16} />
-                                        </div>
-                                        <span className="font-bold text-sm text-text-main">{act.label}</span>
+                                        <Avatar
+                                            size="sm"
+                                            icon={Activity}
+                                            className="bg-background text-primary"
+                                        />
+                                        <span className="font-bold text-sm text-text-main group-hover:text-primary transition-colors">{act.label}</span>
                                     </div>
                                     <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                                         <button
                                             onClick={() => openEditModal(act)}
                                             className="p-2 text-grey-medium hover:text-primary transition-colors"
+                                            title="Modifier"
                                         >
                                             <Edit size={14} />
                                         </button>
                                         <button
                                             onClick={() => setActivityToDelete(act)}
                                             className="p-2 text-grey-medium hover:text-danger transition-colors"
+                                            title="Supprimer"
                                         >
-                                            <Trash2 size={14} />
+                                            <X size={14} />
                                         </button>
                                     </div>
                                 </div>
@@ -112,7 +127,7 @@ const ActivityTypesPanel: React.FC<ActivityTypesPanelProps> = ({
                     <div className="w-full max-w-md bg-surface border border-white/10 rounded-2xl shadow-2xl p-8 animate-in zoom-in-95">
                         <div className="flex justify-between items-center mb-6">
                             <h2 className="text-2xl font-bold text-white">{isEditing ? 'Modifier le type' : 'Nouvelle action'}</h2>
-                            <button onClick={() => setShowModal(false)} className="text-grey-medium hover:text-white"><X size={24} /></button>
+                            <button onClick={() => setShowModal(false)} className="text-grey-medium hover:text-white" title="Fermer"><X size={24} /></button>
                         </div>
                         <form onSubmit={handleSubmit} className="space-y-4">
                             <div>
@@ -132,19 +147,16 @@ const ActivityTypesPanel: React.FC<ActivityTypesPanelProps> = ({
             )}
 
             {/* Confirm Delete */}
-            {activityToDelete && (
-                <div className="fixed inset-0 z-[210] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in">
-                    <div className="w-full max-w-sm bg-surface border border-white/10 rounded-2xl shadow-2xl p-6 text-center animate-in zoom-in-95">
-                        <div className="w-16 h-16 bg-danger/10 text-danger rounded-full flex items-center justify-center mx-auto mb-4"><Trash2 size={32} /></div>
-                        <h2 className="text-xl font-bold text-text-main mb-2">Supprimer le type ?</h2>
-                        <p className="text-sm text-grey-medium mb-6">Voulez-vous vraiment supprimer l'action <span className="text-white font-bold">{activityToDelete.label}</span> ?</p>
-                        <div className="flex gap-3">
-                            <button onClick={() => setActivityToDelete(null)} className="flex-1 py-3 bg-white/5 text-grey-light rounded-xl font-medium">Annuler</button>
-                            <button onClick={handleDeleteConfirm} className="flex-1 py-3 bg-danger text-white rounded-xl font-bold">Supprimer</button>
-                        </div>
-                    </div>
-                </div>
-            )}
+            <ConfirmModal
+                isOpen={!!activityToDelete}
+                onClose={() => setActivityToDelete(null)}
+                onConfirm={handleDeleteConfirm}
+                title="Supprimer le type ?"
+                message={`Voulez-vous vraiment supprimer "${activityToDelete?.label}" ?`}
+                confirmText="Supprimer"
+                cancelText="Annuler"
+                variant="danger"
+            />
         </div>
     );
 };

@@ -3,15 +3,15 @@ import { Tables, TablesInsert, TablesUpdate } from '../../../types/supabase';
 import { IActivityRepository, ActivityWithRelations } from './IActivityRepository';
 
 export class SupabaseActivityRepository implements IActivityRepository {
-    async getModule(id: string): Promise<{ titre: string } | null> {
+    async getModule(id: string): Promise<{ nom: string } | null> {
         const { data, error } = await supabase
             .from('Module')
-            .select('titre')
+            .select('nom')
             .eq('id', id)
             .single();
 
         if (error) throw error;
-        return data as { titre: string } | null;
+        return data as { nom: string } | null;
     }
 
     async getMaterialTypes(): Promise<Tables<'TypeMateriel'>[]> {
@@ -151,7 +151,7 @@ export class SupabaseActivityRepository implements IActivityRepository {
             .from('Activite')
             .select(`
                 *,
-                Module (titre, isActive),
+                Module (nom, statut),
                 ActiviteNiveau (
                     *,
                     Niveau (nom, ordre)

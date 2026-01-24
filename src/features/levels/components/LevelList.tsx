@@ -1,5 +1,5 @@
 import React from 'react';
-import { Layers, Search, Plus, Loader2 } from 'lucide-react';
+import { Layers, Search, Plus } from 'lucide-react';
 import {
     DndContext,
     closestCenter,
@@ -16,19 +16,19 @@ import {
     verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
 import SortableLevelItem from './SortableLevelItem';
-import { LevelWithStudentCount } from '../../../types';
+import { Badge, Button, Avatar, EmptyState } from '../../../components/ui';
 
 interface LevelListProps {
-    levels: LevelWithStudentCount[];
+    levels: any[];
     loading: boolean;
     searchTerm: string;
     onSearchChange: (value: string) => void;
-    selectedLevel: LevelWithStudentCount | null;
-    onSelect: (level: LevelWithStudentCount) => void;
+    selectedLevel: any | null;
+    onSelect: (level: any) => void;
     onOpenAdd: () => void;
-    onEdit: (level: LevelWithStudentCount) => void;
-    onDelete: (level: LevelWithStudentCount) => void;
-    onReorder: (levels: LevelWithStudentCount[]) => void;
+    onEdit: (level: any) => void;
+    onDelete: (level: any) => void;
+    onReorder: (levels: any[]) => void;
 }
 
 const LevelList: React.FC<LevelListProps> = ({
@@ -43,7 +43,7 @@ const LevelList: React.FC<LevelListProps> = ({
     onDelete,
     onReorder
 }) => {
-    // Drag and Drop Logic
+    // Drag and Drop sensors
     const sensors = useSensors(
         useSensor(PointerSensor, {
             activationConstraint: {
@@ -68,39 +68,43 @@ const LevelList: React.FC<LevelListProps> = ({
 
     return (
         <div className="w-1/3 flex flex-col bg-surface/30 backdrop-blur-md rounded-2xl border border-white/5 overflow-hidden shadow-xl min-w-[300px]">
-
-            {/* Header & Search */}
+            {/* Header */}
             <div className="p-6 border-b border-white/5 space-y-4">
                 <div className="flex items-center justify-between">
                     <h2 className="text-xl font-bold text-text-main flex items-center gap-2">
                         <Layers className="text-primary" size={24} />
                         Niveaux
                     </h2>
-                    <span className="px-2 py-1 bg-primary/10 text-primary text-[10px] font-bold rounded-md uppercase tracking-wider">
+                    <Badge variant="primary" size="sm">
                         {levels.length} Total
-                    </span>
+                    </Badge>
                 </div>
 
                 <div className="relative group">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-grey-medium group-focus-within:text-primary transition-colors" size={16} />
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-grey-medium group-focus-within:text-primary transition-colors" size={18} />
                     <input
                         type="text"
-                        placeholder="Rechercher..."
+                        placeholder="Rechercher un niveau..."
                         value={searchTerm}
                         onChange={(e) => onSearchChange(e.target.value)}
-                        className="w-full bg-background/50 border border-white/10 rounded-xl pl-9 pr-4 py-2 text-sm text-text-main focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all"
+                        className="w-full bg-background/50 border border-white/10 rounded-xl pl-10 pr-4 py-2 text-sm text-text-main focus:ring-2 focus:ring-primary/50 outline-none transition-all"
                     />
                 </div>
             </div>
 
-            {/* List */}
+            {/* List Items */}
             <div className="flex-1 overflow-y-auto p-4 space-y-2 custom-scrollbar">
                 {loading ? (
-                    <div className="flex justify-center py-8"><Loader2 className="animate-spin text-primary" size={24} /></div>
-                ) : levels.length === 0 ? (
-                    <div className="text-center py-8 text-grey-dark text-sm italic">
-                        Aucun niveau trouvé.
+                    <div className="flex justify-center p-8">
+                        <Avatar loading size="md" initials="" />
                     </div>
+                ) : levels.length === 0 ? (
+                    <EmptyState
+                        icon={Layers}
+                        title="Aucun niveau"
+                        description="Aucun niveau trouvé."
+                        size="sm"
+                    />
                 ) : (
                     <DndContext
                         sensors={sensors}
@@ -108,16 +112,15 @@ const LevelList: React.FC<LevelListProps> = ({
                         onDragEnd={handleDragEnd}
                     >
                         <SortableContext
-                            items={levels.map(n => n.id)}
+                            items={levels.map(l => l.id)}
                             strategy={verticalListSortingStrategy}
                         >
-                            {levels.map((level, index) => (
+                            {levels.map((level) => (
                                 <SortableLevelItem
                                     key={level.id}
                                     level={level}
-                                    index={index}
                                     isSelected={selectedLevel?.id === level.id}
-                                    onClick={onSelect}
+                                    onClick={() => onSelect(level)}
                                     onEdit={onEdit}
                                     onDelete={onDelete}
                                 />
@@ -127,18 +130,19 @@ const LevelList: React.FC<LevelListProps> = ({
                 )}
             </div>
 
-            {/* Add Level Button */}
+            {/* Add Button */}
             <div className="p-4 border-t border-white/5 bg-surface/30">
-                <button
+                <Button
                     onClick={onOpenAdd}
-                    className="w-full py-3 bg-white/5 hover:bg-primary/20 hover:text-primary text-grey-light rounded-xl border border-dashed border-white/20 hover:border-primary/50 transition-all flex items-center justify-center gap-2 group"
+                    variant="secondary"
+                    className="w-full border-dashed"
+                    icon={Plus}
                 >
-                    <Plus size={18} className="group-hover:scale-110 transition-transform" />
-                    <span className="font-medium">Ajouter un niveau</span>
-                </button>
+                    Nouveau Niveau
+                </Button>
             </div>
         </div>
     );
 };
 
-export default React.memo(LevelList);
+export default LevelList;

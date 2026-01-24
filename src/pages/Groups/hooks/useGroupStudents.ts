@@ -63,20 +63,27 @@ export const useGroupStudents = (selectedGroup: Tables<'Groupe'> | null) => {
     const confirmRemoveStudent = useCallback(async () => {
         if (!selectedGroup || !studentToRemove) return;
 
+        const previousStudents = [...studentsInGroup];
+        const studentId = studentToRemove.id;
+
+        // Optimistic update: remove student from local state immediately
+        setStudentsInGroup(prev => prev.filter(s => s.id !== studentId));
+        setShowRemoveModal(false);
+        setStudentToRemove(null);
+
         try {
             const { error } = await supabase
                 .from('EleveGroupe')
                 .delete()
-                .match({ eleve_id: studentToRemove.id, groupe_id: selectedGroup.id });
+                .match({ eleve_id: studentId, groupe_id: selectedGroup.id });
 
             if (error) throw error;
-            await fetchStudentsInGroup(selectedGroup.id);
-            setShowRemoveModal(false);
-            setStudentToRemove(null);
         } catch (error: any) {
             alert('Erreur: ' + error.message);
+            // Revert on error
+            setStudentsInGroup(previousStudents);
         }
-    }, [selectedGroup, studentToRemove, fetchStudentsInGroup]);
+    }, [selectedGroup, studentToRemove, studentsInGroup]);
 
     useEffect(() => {
         if (selectedGroup) {

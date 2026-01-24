@@ -1,6 +1,7 @@
 import React from 'react';
 import { AlertTriangle, X } from 'lucide-react';
 import clsx from 'clsx';
+import Button from './Button';
 
 export type ConfirmModalVariant = 'warning' | 'danger' | 'info';
 
@@ -13,6 +14,7 @@ export interface ConfirmModalProps {
     confirmText?: string;
     cancelText?: string;
     variant?: ConfirmModalVariant;
+    isLoading?: boolean;
 }
 
 const ConfirmModal: React.FC<ConfirmModalProps> = ({
@@ -23,27 +25,26 @@ const ConfirmModal: React.FC<ConfirmModalProps> = ({
     message = "Êtes-vous sûr de vouloir continuer ?",
     confirmText = "Confirmer",
     cancelText = "Annuler",
-    variant = "warning"
+    variant = "warning",
+    isLoading = false
 }) => {
     if (!isOpen) return null;
 
     const handleConfirm = () => {
         onConfirm();
-        onClose();
+        // Optionnellement différer onClose si isLoading est géré par l'appelant
+        if (!isLoading) onClose();
     };
 
-    const variantStyles: Record<ConfirmModalVariant, { icon: string; button: string }> = {
+    const variantStyles: Record<ConfirmModalVariant, { icon: string }> = {
         warning: {
-            icon: 'text-yellow-500',
-            button: 'bg-yellow-500 hover:bg-yellow-600 text-white'
+            icon: 'text-yellow-500'
         },
         danger: {
-            icon: 'text-red-500',
-            button: 'bg-red-500 hover:bg-red-600 text-white'
+            icon: 'text-red-500'
         },
         info: {
-            icon: 'text-primary',
-            button: 'bg-primary hover:bg-primary-light text-text-dark'
+            icon: 'text-primary'
         }
     };
 
@@ -84,23 +85,19 @@ const ConfirmModal: React.FC<ConfirmModalProps> = ({
 
                 {/* Footer */}
                 <div className="flex items-center justify-end gap-3 p-6 border-t border-white/10">
-                    <button
+                    <Button
+                        variant="secondary"
                         onClick={onClose}
-                        className="px-4 py-2 rounded-lg bg-white/5 hover:bg-white/10 text-grey-light hover:text-white transition-all font-medium"
-                        type="button"
                     >
                         {cancelText}
-                    </button>
-                    <button
+                    </Button>
+                    <Button
+                        variant={variant === 'danger' ? 'danger' : 'primary'}
                         onClick={handleConfirm}
-                        className={clsx(
-                            "px-4 py-2 rounded-lg font-bold transition-all",
-                            styles.button
-                        )}
-                        type="button"
+                        loading={isLoading}
                     >
                         {confirmText}
-                    </button>
+                    </Button>
                 </div>
             </div>
         </div>

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useSubBranches } from '../features/sub-branches/hooks/useSubBranches';
+import { useBranches } from '../features/branches/hooks/useBranches';
 import SubBranchList from '../features/sub-branches/components/SubBranchList';
 import SubBranchDetails from '../features/sub-branches/components/SubBranchDetails';
 import AddSubBranchModal from '../features/branches/components/AddSubBranchModal';
@@ -19,6 +20,9 @@ const SubBranches: React.FC = () => {
         deleteSubBranch,
         subBranches,
     } = useSubBranches();
+
+    // Fetch branches for the modal dropdown
+    const { branches: availableBranches } = useBranches();
 
     // In-app migration
     useInAppMigration(filteredSubBranches, 'SousBranche', 'sousbranche');
@@ -113,7 +117,7 @@ const SubBranches: React.FC = () => {
                 isOpen={isAddModalOpen}
                 onClose={() => setIsAddModalOpen(false)}
                 onSubmit={handleModalSubmit}
-                branches={subBranches}
+                branches={availableBranches}
                 subBranchToEdit={subBranchToEdit}
             />
         </div>

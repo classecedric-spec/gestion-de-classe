@@ -1,7 +1,8 @@
 import React, { ChangeEvent } from 'react';
-import { Search, Loader2, Edit, X, ChevronRight, BookOpen, Plus } from 'lucide-react';
+import { Search, Edit, X, ChevronRight, BookOpen, Plus } from 'lucide-react';
 import clsx from 'clsx';
 import { ClassWithAdults } from '../services/classService';
+import { Badge, Button, EmptyState, Avatar, Input } from '../../../components/ui';
 
 export interface ClassListProps {
     classes: ClassWithAdults[];
@@ -27,84 +28,79 @@ const ClassList: React.FC<ClassListProps> = ({
     onCreate
 }) => {
     return (
-        <div className="w-1/3 flex flex-col bg-surface/80 backdrop-blur-md rounded-2xl border border-border/5 overflow-hidden shadow-xl">
+        <div className="w-1/3 flex flex-col bg-surface/30 backdrop-blur-md rounded-2xl border border-white/5 overflow-hidden shadow-xl">
             {/* Header */}
-            <div className="p-6 border-b border-border/5 space-y-4">
+            <div className="p-6 border-b border-white/5 space-y-4">
                 <div className="flex items-center justify-between">
                     <h2 className="text-xl font-bold text-text-main flex items-center gap-2">
                         <BookOpen className="text-primary" size={24} />
                         Liste des Classes
                     </h2>
-                    <span className="px-2 py-1 bg-primary/10 text-primary text-[10px] font-bold rounded-md uppercase tracking-wider">
+                    <Badge variant="primary" size="sm">
                         {classes.length} Total
-                    </span>
+                    </Badge>
                 </div>
-                <div className="relative group">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-grey-medium group-focus-within:text-primary transition-colors" size={16} />
-                    <input
-                        type="text"
-                        placeholder="Rechercher une classe..."
-                        value={searchQuery}
-                        onChange={(e: ChangeEvent<HTMLInputElement>) => onSearch(e.target.value)}
-                        className="w-full bg-surface/50 border border-border/10 rounded-xl py-2 pl-9 pr-4 text-sm text-text-main focus:outline-none focus:ring-1 focus:ring-primary/50 transition-all"
-                    />
-                </div>
+                <Input
+                    placeholder="Rechercher une classe..."
+                    value={searchQuery}
+                    onChange={(e: ChangeEvent<HTMLInputElement>) => onSearch(e.target.value)}
+                    icon={Search}
+                    className="bg-background/50"
+                />
             </div>
 
             {/* List */}
-            <div className="flex-1 overflow-y-auto custom-scrollbar p-3 space-y-1">
+            <div className="flex-1 overflow-y-auto custom-scrollbar p-4 space-y-2">
                 {loading ? (
                     <div className="flex justify-center py-8">
-                        <Loader2 className="animate-spin text-primary" size={24} />
+                        <Avatar size="md" loading={true} initials="" />
                     </div>
                 ) : classes.length === 0 ? (
-                    <div className="text-center py-8 px-4">
-                        <p className="text-sm text-grey-medium italic">Aucune classe trouvée</p>
-                    </div>
+                    <EmptyState
+                        icon={BookOpen}
+                        title="Aucune classe"
+                        description="Commencez par créer une nouvelle classe."
+                        size="sm"
+                    />
                 ) : (
                     classes.map((classe) => (
                         <div
                             key={classe.id}
                             onClick={() => onSelect(classe)}
                             className={clsx(
-                                "w-full flex items-center gap-3 p-3 rounded-xl transition-all text-left group relative hover:z-50 cursor-pointer",
+                                "group relative w-full flex items-center gap-4 p-4 rounded-xl border transition-all text-left cursor-pointer",
                                 selectedClass?.id === classe.id
-                                    ? "bg-primary/10 border border-primary/20 shadow-sm"
-                                    : "hover:bg-input border border-transparent"
+                                    ? "bg-white/10 border-primary/30 shadow-sm"
+                                    : "bg-white/5 border-white/5 hover:border-primary/30 hover:bg-white/10"
                             )}
                             tabIndex={0}
                             onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') onSelect(classe); }}
                         >
-                            {/* Avatar */}
-                            <div className={clsx(
-                                "w-10 h-10 rounded-lg flex items-center justify-center font-bold overflow-hidden shadow-inner shrink-0",
-                                selectedClass?.id === classe.id ? "bg-primary/20 text-text-dark" : "bg-background text-primary",
-                                (classe.photo_base64 || classe.logo_url) && "bg-[#D9B981]"
-                            )}>
-                                {classe.photo_base64 ? (
-                                    <img src={classe.photo_base64} alt="Logo" className="w-[90%] h-[90%] object-contain" />
-                                ) : classe.logo_url ? (
-                                    <img src={classe.logo_url} alt="Logo" className="w-[90%] h-[90%] object-contain" />
-                                ) : (
-                                    classe.acronyme || (classe.nom ? classe.nom[0] : '?')
+                            <Avatar
+                                size="md"
+                                src={(classe as any).photo_base64 || classe.logo_url}
+                                initials={classe.acronyme || (classe.nom ? classe.nom[0] : '?')}
+                                className={clsx(
+                                    selectedClass?.id === classe.id ? "bg-background" : "bg-background",
+                                    ((classe as any).photo_base64 || classe.logo_url) && "bg-[#D9B981]"
                                 )}
-                            </div>
+                            />
 
                             {/* Info */}
                             <div className="flex-1 min-w-0">
-                                <p className={clsx("font-bold truncate text-sm", selectedClass?.id === classe.id ? "text-primary" : "text-text-main")}>
+                                <p className={clsx("font-semibold truncate text-base", selectedClass?.id === classe.id ? "text-primary" : "text-text-main group-hover:text-primary transition-colors")}>
                                     {classe.nom}
                                 </p>
-                                <div className="flex flex-wrap gap-1 mt-0.5">
+                                <div className="flex flex-wrap gap-1 mt-1">
                                     {classe.acronyme && (
-                                        <span className="text-[9px] uppercase font-black px-1.5 py-0.5 rounded flex items-center bg-black/5 text-grey-medium">
+                                        <Badge variant="default" size="xs">
                                             {classe.acronyme}
-                                        </span>
+                                        </Badge>
                                     )}
                                     {classe.ClasseAdulte && classe.ClasseAdulte.length > 0 && (
-                                        <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-black/5 text-grey-medium truncate max-w-[120px]">
+                                        <Badge variant="default" size="xs" className="max-w-[120px] truncate">
                                             {classe.ClasseAdulte.filter(ca => ca.role === 'principal').map(ca => ca.Adulte?.nom).join(', ')}
-                                        </span>
+                                        </Badge>
                                     )}
                                 </div>
                             </div>
@@ -116,7 +112,7 @@ const ClassList: React.FC<ClassListProps> = ({
                             )}>
                                 <button
                                     onClick={(e) => { e.stopPropagation(); onEdit(classe); }}
-                                    className="p-1.5 rounded-lg text-grey-medium hover:text-primary hover:bg-surface transition-colors"
+                                    className="p-2 rounded-full text-grey-medium hover:text-white hover:bg-white/10 transition-colors"
                                     title="Modifier"
                                 >
                                     <Edit size={14} />
@@ -126,15 +122,15 @@ const ClassList: React.FC<ClassListProps> = ({
                             {/* Delete Button (Corner) */}
                             <button
                                 onClick={(e) => { e.stopPropagation(); onDelete(classe); }}
-                                className="absolute -top-2 -right-2 z-10 p-2 bg-surface hover:bg-danger text-danger hover:text-white rounded-full border border-danger/20 opacity-0 group-hover:opacity-100 transition-all shadow-lg scale-90 hover:scale-100"
+                                className="absolute -top-2 -right-2 z-10 p-2 bg-danger/10 hover:bg-danger text-danger hover:text-white rounded-full border border-danger/20 opacity-0 group-hover:opacity-100 transition-all shadow-lg scale-90 hover:scale-100"
                                 title="Supprimer"
                             >
                                 <X size={14} strokeWidth={3} />
                             </button>
 
-                            <ChevronRight size={14} className={clsx(
-                                "opacity-0 transition-transform text-primary",
-                                selectedClass?.id === classe.id ? "opacity-100 translate-x-1" : "group-hover:opacity-100 group-hover:translate-x-1"
+                            <ChevronRight size={16} className={clsx(
+                                "transition-all text-grey-dark group-hover:text-primary",
+                                selectedClass?.id === classe.id ? "opacity-100 translate-x-1" : "opacity-0 group-hover:opacity-100 group-hover:translate-x-1"
                             )} />
                         </div>
                     ))
@@ -142,14 +138,15 @@ const ClassList: React.FC<ClassListProps> = ({
             </div>
 
             {/* Footer */}
-            <div className="p-4 border-t border-border/5 bg-surface/50">
-                <button
+            <div className="p-4 border-t border-white/5 bg-surface/30">
+                <Button
                     onClick={onCreate}
-                    className="w-full py-3 bg-white hover:bg-white/90 text-black rounded-xl shadow-lg shadow-black/5 transition-all font-bold flex items-center justify-center gap-2 group transform active:scale-[0.98]"
+                    variant="secondary"
+                    className="w-full border-dashed"
+                    icon={Plus}
                 >
-                    <Plus size={18} className="text-primary group-hover:scale-110 transition-transform" />
                     Nouvelle Classe
-                </button>
+                </Button>
             </div>
         </div>
     );

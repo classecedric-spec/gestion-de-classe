@@ -28,7 +28,7 @@ export interface StudentFormState {
 export interface UseStudentFormProps {
     isEditing: boolean;
     editId: string | null;
-    onSaved: (id: string) => void;
+    onSaved: (student: any) => void;
     onClose: () => void;
 }
 
@@ -171,7 +171,11 @@ export const useStudentForm = ({ isEditing, editId, onSaved, onClose }: UseStude
     const handleGroupAdded = (newGroup: Tables<'Groupe'>) => {
         if (newGroup) {
             setGroupsList(prev => [...prev, newGroup].sort((a, b) => (a.nom || '').localeCompare(b.nom || '')));
-            setStudent(prev => ({ ...prev, groupe_ids: [...(prev.groupe_ids || []), newGroup.id] }));
+            setStudent(prev => {
+                const currentIds = prev.groupe_ids || [];
+                if (currentIds.includes(newGroup.id)) return prev;
+                return { ...prev, groupe_ids: [...currentIds, newGroup.id] };
+            });
         }
     };
 
@@ -209,7 +213,7 @@ export const useStudentForm = ({ isEditing, editId, onSaved, onClose }: UseStude
                 date_naissance: student.date_naissance || null,
                 classe_id: student.classe_id || null,
                 niveau_id: student.niveau_id || null,
-                user_id: user.id,
+                // user_id: user.id, // REMOVED: Column does not exist
                 parent1_nom: student.parent1_nom,
                 parent1_prenom: student.parent1_prenom,
                 parent1_email: student.parent1_email,
@@ -219,8 +223,10 @@ export const useStudentForm = ({ isEditing, editId, onSaved, onClose }: UseStude
                 nom_parents: student.nom_parents,
                 // photo_base64 removed from here
                 photo_url: student.photo_url,
-                sex: student.sex
-            };
+                sex: student.sex,
+                // @ts-ignore - DB schema uses titulaire_id, not user_id (types out of sync)
+                titulaire_id: user.id
+            } as any;
 
             const savedId = await studentService.saveStudent(
                 studentData,
@@ -231,7 +237,30 @@ export const useStudentForm = ({ isEditing, editId, onSaved, onClose }: UseStude
                 student.photo_base64 // Pass it here
             );
 
-            onSaved(savedId);
+            // 2. Optimistic / Fallback Retrieval
+            let fullStudent: any = null;
+            try {
+                // Attempt to fetch real record
+                fullStudent = await studentService.getStudent(savedId);
+            } catch (e) {
+                console.warn("Could not fetch new student immediately due to latency/error", e);
+            }
+
+            // 3. Fallback Construction (if fetch failed or returned null)
+            if (!fullStudent) {
+                console.warn("Using local fallback for new student");
+                fullStudent = {
+                    id: savedId,
+                    created_at: new Date().toISOString(),
+                    ...studentData,
+                    // Hydrate Relations for UI display
+                    Classe: classesList.find(c => c.id === studentData.classe_id) || null,
+                    Niveau: niveauxList.find(n => n.id === studentData.niveau_id) || null,
+                    // Add other relations if necessary (like EleveGroupe if needed for UI)
+                };
+            }
+
+            onSaved(fullStudent as any);
             onClose();
             return true;
         } catch (err: unknown) {

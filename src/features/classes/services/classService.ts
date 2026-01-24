@@ -23,6 +23,8 @@ export interface StudentWithRelations extends Tables<'Eleve'> {
             nom: string | null;
         } | null;
     }[];
+    photo_base64?: string | null;
+    photo_hash: string | null;
 }
 
 export class ClassService {
@@ -35,6 +37,13 @@ export class ClassService {
      */
     getClasses = async (): Promise<ClassWithAdults[]> => {
         return await this.repository.getClasses();
+    }
+
+    /**
+     * Récupère une classe par son ID avec ses relations
+     */
+    getClassById = async (classId: string): Promise<ClassWithAdults | null> => {
+        return await this.repository.getClassById(classId);
     }
 
     /**

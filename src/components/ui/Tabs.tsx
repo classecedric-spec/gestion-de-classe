@@ -7,6 +7,7 @@ export interface Tab {
     icon?: React.ElementType;
     badge?: number | string;
     disabled?: boolean;
+    variant?: 'primary' | 'danger' | 'success' | 'warning';
 }
 
 export interface TabsProps {

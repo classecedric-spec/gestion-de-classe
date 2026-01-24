@@ -16,11 +16,11 @@ import { toast } from 'react-hot-toast';
 import { SupabaseAttendanceRepository } from '../features/attendance/repositories/SupabaseAttendanceRepository';
 import { SupabaseGroupRepository } from '../features/groups/repositories/SupabaseGroupRepository';
 import { SupabaseTrackingRepository } from '../features/tracking/repositories/SupabaseTrackingRepository';
+import { SupabaseTrackingRepository } from '../features/tracking/repositories/SupabaseTrackingRepository';
 import { SupabaseUserRepository } from '../features/users/repositories/SupabaseUserRepository';
-import { SupabaseStudentRepository } from '../features/students/repositories/SupabaseStudentRepository';
 // Using generic tables types for state where specific service types aren't available/matching perfectly yet, or keeping existing types if compatible
 import { Tables } from '../types/supabase';
-import { StatCard } from '../components/ui';
+import { StatCard, Button } from '../components/ui';
 
 // Instantiate repositories
 const attendanceRepository = new SupabaseAttendanceRepository();
@@ -267,9 +267,14 @@ const MobileDashboard: React.FC = () => {
                 <User size={48} className="text-primary mb-4" />
                 <h1 className="text-xl font-bold text-white mb-2">Non connecté</h1>
                 <p className="text-grey-medium mb-6">Veuillez vous connecter pour accéder à l'application.</p>
-                <Link to="/login" className="bg-primary text-text-dark font-bold py-3 px-8 rounded-xl">
+                <Button
+                    as={Link}
+                    to="/login"
+                    className="w-full"
+                    size="lg"
+                >
                     Se connecter
-                </Link>
+                </Button>
             </div>
         );
     }
@@ -288,12 +293,13 @@ const MobileDashboard: React.FC = () => {
                             <p className="text-[10px] text-grey-medium font-medium capitalize">{dateString}</p>
                         </div>
                     </div>
-                    <button
+                    <Button
+                        variant="ghost"
                         onClick={handleLogout}
-                        className="w-10 h-10 bg-white/5 rounded-xl flex items-center justify-center text-grey-medium hover:text-danger hover:bg-danger/10 transition-all border border-white/5"
-                    >
-                        <LogOut size={18} />
-                    </button>
+                        className="w-10 h-10 p-0"
+                        icon={LogOut}
+                        title="Se déconnecter"
+                    />
                 </div>
             </header>
 

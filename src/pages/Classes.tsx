@@ -1,20 +1,19 @@
 import React from 'react';
-import { Loader2, Trash2 } from 'lucide-react';
 import { useClasses } from '../features/classes/hooks/useClasses';
 
 // Components
 import ClassList from '../features/classes/components/ClassList';
 import ClassDetails from '../features/classes/components/ClassDetails';
 
-// Modals (Legacy or soon to be refactored)
+// Modals
 import AddClassModal from '../features/classes/components/AddClassModal';
 import StudentModal from '../features/students/components/StudentModal';
 import AddStudentToClassModal from '../components/AddStudentToClassModal';
+import { ConfirmModal } from '../components/ui';
 
 const Classes: React.FC = () => {
     const {
         // Data
-        classes,
         filteredClasses,
         loading,
         loadingStudents,
@@ -27,10 +26,12 @@ const Classes: React.FC = () => {
         // Actions
         handleSelectClass,
         handleSort,
+        handleAddClass,
+        handleUpdateClass,
         handleDeleteClass,
+        handleAddStudent,
         handleRemoveStudent,
         handleUpdateStudent,
-        refreshClasses,
         refreshStudents,
 
         // Modal State
@@ -38,6 +39,9 @@ const Classes: React.FC = () => {
         activeItem,
         toggleModal
     } = useClasses();
+
+    // Local state for student removal confirmation
+    const [studentToRemove, setStudentToRemove] = React.useState<string | null>(null);
 
     return (
         <div className="h-full flex gap-8 animate-in fade-in duration-500 relative">
@@ -66,15 +70,13 @@ const Classes: React.FC = () => {
                 loadingStudents={loadingStudents}
                 viewMode={viewMode}
                 setViewMode={setViewMode}
-                sortConfig={sortConfig}
+                sortConfig={sortConfig as any}
                 onSort={handleSort}
                 onUpdateStudent={handleUpdateStudent}
                 onEditStudent={(student: any) => toggleModal('studentDetails', true, student)}
                 onRemoveStudent={(e: any, id: string) => {
                     e.stopPropagation();
-                    if (confirm("Voulez-vous retirer cet élève de la classe ?")) {
-                        handleRemoveStudent(id);
-                    }
+                    setStudentToRemove(id);
                 }}
                 onAddStudent={() => toggleModal('addStudentToClass', true)}
             />
@@ -85,7 +87,13 @@ const Classes: React.FC = () => {
             <AddClassModal
                 isOpen={modals.createEditClass}
                 onClose={() => toggleModal('createEditClass', false)}
-                onAdded={() => refreshClasses(true)} // true = keep selection
+                onAdded={(c) => {
+                    if (activeItem.classToEdit && c) {
+                        handleUpdateClass(c as any);
+                    } else if (c) {
+                        handleAddClass(c as any);
+                    }
+                }}
                 classToEdit={activeItem.classToEdit}
             />
 
@@ -95,48 +103,50 @@ const Classes: React.FC = () => {
                 onClose={() => toggleModal('studentDetails', false)}
                 isEditing={!!activeItem.studentToEditId}
                 editId={activeItem.studentToEditId}
-                onSaved={() => refreshStudents()}
+                onSaved={(student) => {
+                    if (activeItem.studentToEditId) {
+                        refreshStudents();
+                    } else if (student) {
+                        handleAddStudent(student);
+                    }
+                }}
             />
 
             {/* Add Student To Class (Existing Student) */}
             <AddStudentToClassModal
                 showModal={modals.addStudentToClass}
                 handleCloseModal={() => toggleModal('addStudentToClass', false)}
-                classId={selectedClass?.id}
-                className={selectedClass?.nom}
+                classId={selectedClass?.id || ''}
+                className={selectedClass?.nom || ''}
                 onAdded={() => refreshStudents()}
             />
 
-            {/* Delete Confirmation Overlay */}
-            {modals.deleteConfirm && activeItem.classToDelete && (
-                <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-                    <div className="w-full max-w-sm bg-surface border border-white/10 rounded-2xl shadow-2xl p-6 text-center animate-in zoom-in-95 duration-200">
-                        <div className="w-16 h-16 bg-danger/10 text-danger rounded-full flex items-center justify-center mx-auto mb-4">
-                            <Trash2 size={32} />
-                        </div>
-                        <h2 className="text-xl font-bold text-text-main mb-2">Supprimer la classe ?</h2>
-                        <p className="text-sm text-grey-medium mb-6">
-                            Êtes-vous sûr de vouloir supprimer <span className="text-text-main font-bold">"{activeItem.classToDelete.nom}"</span> ?
-                            <br />Les élèves ne seront pas supprimés.
-                        </p>
-                        <div className="flex gap-3">
-                            <button
-                                onClick={() => toggleModal('deleteConfirm', false)}
-                                className="flex-1 py-3 bg-white/5 hover:bg-white/10 text-grey-light rounded-xl font-medium transition-colors"
-                            >
-                                Annuler
-                            </button>
-                            <button
-                                onClick={handleDeleteClass}
-                                disabled={loading}
-                                className="flex-1 py-3 bg-danger hover:bg-danger/90 text-white rounded-xl font-bold shadow-lg shadow-danger/20 flex items-center justify-center gap-2"
-                            >
-                                {loading ? <Loader2 className="animate-spin" size={20} /> : "Supprimer"}
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
+            {/* Delete Class Confirmation */}
+            <ConfirmModal
+                isOpen={modals.deleteConfirm && !!activeItem.classToDelete}
+                onClose={() => toggleModal('deleteConfirm', false)}
+                onConfirm={handleDeleteClass}
+                title="Supprimer la classe ?"
+                message={`Êtes-vous sûr de vouloir supprimer "${activeItem.classToDelete?.nom || 'cette classe'}" ? Les élèves ne seront pas supprimés.`}
+                confirmText="Supprimer"
+                cancelText="Annuler"
+                variant="danger"
+            />
+
+            {/* Remove Student Confirmation */}
+            <ConfirmModal
+                isOpen={!!studentToRemove}
+                onClose={() => setStudentToRemove(null)}
+                onConfirm={() => {
+                    if (studentToRemove) handleRemoveStudent(studentToRemove);
+                    setStudentToRemove(null);
+                }}
+                title="Retirer l'élève ?"
+                message="Voulez-vous retirer cet élève de la classe ?"
+                confirmText="Retirer"
+                cancelText="Annuler"
+                variant="warning"
+            />
         </div>
     );
 };

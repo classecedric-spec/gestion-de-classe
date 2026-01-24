@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Users, Table, Clock, Monitor } from 'lucide-react';
-import clsx from 'clsx';
 import { ROUTES } from '../routes';
 import SuiviPedagogique from './SuiviPedagogique';
 import AvancementAteliers from './AvancementAteliers';
 import TimerModal from '../components/TimerModal';
+import { Tabs, Button } from '../components/ui';
 
 import { cleanupOrphanProgressions } from '../lib/database';
 import { Timer } from '../features/tracking/hooks/useTimerIntegration';
@@ -80,43 +80,31 @@ const SuiviGlobal: React.FC = () => {
         <div className="flex flex-col h-full w-full overflow-hidden bg-background">
             {/* View Toggle Header */}
             <div className="bg-surface/50 border-b border-white/5 px-6 py-4 flex items-center sticky top-0 z-40 backdrop-blur-md shrink-0">
-                {/* Left spacer to balance right side content for perfect centering */}
                 <div className="flex-1 hidden lg:block" />
 
-                <div className="neu-selector-container p-1.5 rounded-2xl mx-auto shadow-2xl overflow-hidden">
-                    <button
-                        onClick={() => navigate(ROUTES.DASHBOARD_SUIVI)}
-                        data-active={activeView === 'suivi'}
-                        className={clsx(
-                            "rounded-xl font-black uppercase tracking-[0.15em] transition-all duration-300 px-4 py-2 flex items-center gap-2",
-                            activeView === 'suivi'
-                                ? "bg-primary text-text-dark shadow-lg scale-[1.02]"
-                                : "text-grey-medium hover:text-white hover:bg-white/5"
-                        )}
-                    >
-                        <Users size={20} />
-                        <span className="hidden md:inline">Encodage</span>
-                    </button>
-                    <button
-                        onClick={() => navigate(`${ROUTES.DASHBOARD_SUIVI}?tab=groups`)}
-                        data-active={activeView === 'avancement'}
-                        className={clsx(
-                            "rounded-xl font-black uppercase tracking-[0.15em] transition-all duration-300 px-4 py-2 flex items-center gap-2",
-                            activeView === 'avancement'
-                                ? "bg-primary text-text-dark shadow-lg scale-[1.02]"
-                                : "text-grey-medium hover:text-white hover:bg-white/5"
-                        )}
-                    >
-                        <Table size={20} />
-                        <span className="hidden md:inline">Suivi des groupes</span>
-                    </button>
-                    <button
+                <div className="flex items-center gap-4">
+                    <Tabs
+                        tabs={[
+                            { id: 'suivi', label: 'Encodage', icon: Users },
+                            { id: 'avancement', label: 'Suivi des groupes', icon: Table }
+                        ]}
+                        activeTab={activeView}
+                        onChange={(id) => {
+                            if (id === 'suivi') navigate(ROUTES.DASHBOARD_SUIVI);
+                            else navigate(`${ROUTES.DASHBOARD_SUIVI}?tab=groups`);
+                        }}
+                        variant="capsule"
+                    />
+
+                    <Button
+                        variant="ghost"
                         onClick={() => window.open('/suivi-tbi', '_blank')}
-                        className="rounded-xl font-black uppercase tracking-[0.15em] transition-all duration-300 px-4 py-2 flex items-center gap-2 text-grey-medium hover:text-white hover:bg-white/5"
+                        icon={Monitor}
+                        className="rounded-xl font-black uppercase tracking-[0.15em]"
+                        size="sm"
                     >
-                        <Monitor size={20} />
-                        <span className="hidden md:inline">TBI</span>
-                    </button>
+                        TBI
+                    </Button>
                 </div>
 
                 {/* Right side content */}
@@ -194,15 +182,16 @@ const SuiviGlobal: React.FC = () => {
                                     </p>
                                 </div>
                             )}
-                            <button
+                            <Button
                                 onClick={() => {
                                     setTimerFinished(false);
                                     setTimer(prev => ({ ...prev, message: '' }));
                                 }}
-                                className="w-full py-4 bg-primary hover:bg-primary/90 text-black text-lg font-bold rounded-xl transition-all hover:scale-[1.02] active:scale-95 shadow-xl shadow-primary/20"
+                                className="w-full py-4 text-lg font-bold shadow-xl shadow-primary/20"
+                                size="lg"
                             >
                                 Je comprends
-                            </button>
+                            </Button>
                         </div>
                     </div>
                 )

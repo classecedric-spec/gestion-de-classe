@@ -21,7 +21,9 @@ interface ModuleWithDetails {
  */
 export const useModuleSubmit = (
     moduleToEdit: ModuleWithDetails | null | undefined,
-    onSuccess: (module: ModuleWithDetails) => void
+    onSuccess: (module: ModuleWithDetails) => void,
+    availableBranches: any[] = [],
+    availableSubBranches: any[] = []
 ) => {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -47,18 +49,58 @@ export const useModuleSubmit = (
             };
 
             let savedModule: any;
+            let idCallback: string;
 
             if (moduleToEdit) {
                 await moduleService.updateModule(moduleToEdit.id, moduleData);
-                // The service updateModule doesn't return data with joins usually.
-                // We might need a getModuleWithDetails in the service.
-                savedModule = await moduleService.getModuleDetails(moduleToEdit.id);
+                idCallback = moduleToEdit.id;
             } else {
                 const created = await moduleService.createModule({
                     ...moduleData,
                     user_id: user.id
                 });
-                savedModule = await moduleService.getModuleDetails(created.id);
+                idCallback = created.id;
+            }
+
+            // Attempt to fetch full details
+            try {
+                savedModule = await moduleService.getModuleDetails(idCallback);
+            } catch (fetchError) {
+                console.warn("Could not fetch module details immediately, using fallback", fetchError);
+            }
+
+            // Fallback Construction if fetch failed or returned incomplete data
+            // We check if we have the SubBranch relation if a subBranchId was provided
+            const needsSubBranch = !!formData.subBranchId;
+            const hasSubBranch = savedModule && savedModule.SousBranche;
+
+            if (!savedModule || (needsSubBranch && !hasSubBranch)) {
+                const subBranch = availableSubBranches.find(sb => String(sb.id) === String(formData.subBranchId));
+                // If subBranch is found, use its branch_id to find the branch. 
+                // If not (maybe hypothetical), try to find branch from the selected subBranch list if possible or passed arg.
+                // Actually availableSubBranches usually belongs to the selected branch in the UI context.
+
+                let branch: any = null;
+                if (subBranch) {
+                    branch = availableBranches.find(b => String(b.id) === String(subBranch.branche_id));
+                }
+
+                savedModule = {
+                    id: idCallback,
+                    ...moduleData,
+                    created_at: new Date().toISOString(),
+                    SousBranche: subBranch ? {
+                        id: subBranch.id,
+                        nom: subBranch.nom,
+                        branche_id: subBranch.branche_id,
+                        order: subBranch.ordre,
+                        Branche: branch ? {
+                            id: branch.id,
+                            nom: branch.nom,
+                            ordre: branch.ordre
+                        } : null
+                    } : null
+                };
             }
 
             onSuccess(savedModule);

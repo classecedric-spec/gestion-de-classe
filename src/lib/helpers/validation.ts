@@ -30,23 +30,36 @@ const optionalString = (max: number = 255) =>
     z.string().max(max).optional().nullable();
 
 /** Email validation */
-const emailSchema = z.string().email('Email invalide').optional().nullable();
+const emailSchema = z.union([
+    z.string().email('Email invalide'),
+    z.literal(''),
+    z.null(),
+    z.undefined()
+]);
 
 /** Phone validation (French format) */
-const phoneSchema = z.string()
-    .regex(/^(\+33|0)[1-9](\d{2}){4}$/, 'Numéro de téléphone invalide')
-    .optional()
-    .nullable()
-    .or(z.literal(''));
+const phoneSchema = z.union([
+    z.string().regex(/^(\+33|0)[1-9](\d{2}){4}$/, 'Numéro de téléphone invalide'),
+    z.literal(''),
+    z.null(),
+    z.undefined()
+]);
 
 /** Date string (YYYY-MM-DD) */
-const dateSchema = z.string()
-    .regex(/^\d{4}-\d{2}-\d{2}$/, 'Date invalide (format: AAAA-MM-JJ)')
-    .optional()
-    .nullable();
+const dateSchema = z.union([
+    z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Date invalide (format: AAAA-MM-JJ)'),
+    z.literal(''),
+    z.null(),
+    z.undefined()
+]);
 
 /** Photo URL validation */
-const photoUrlSchema = z.string().url('URL de photo invalide').optional().nullable();
+const photoUrlSchema = z.union([
+    z.string().url('URL de photo invalide'),
+    z.literal(''),
+    z.null(),
+    z.undefined()
+]);
 
 // =============================================================================
 // Entity Schemas
@@ -60,7 +73,12 @@ export const StudentSchema = z.object({
     prenom: requiredString(100, 'Le prénom'),
     date_naissance: dateSchema,
     annee_inscription: z.number().int().min(2000).max(2100).optional().nullable(),
-    sex: z.enum(['M', 'F', 'Autre']).optional().nullable(),
+    sex: z.union([
+        z.enum(['M', 'F', 'Autre']),
+        z.literal(''),
+        z.null(),
+        z.undefined()
+    ]).optional(),
     photo_url: photoUrlSchema,
 
     // Parents
