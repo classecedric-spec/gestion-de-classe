@@ -34,7 +34,8 @@ export function useProgressions(
     setRotationSkips: React.Dispatch<React.SetStateAction<Record<string, any>>>,
     groupedProgressions: Record<string, Record<string, { total: number; done: number }>>,
     selectedBranchForSuivi: string,
-    fetchHelpRequests?: () => void
+    fetchHelpRequests?: () => void,
+    defaultLuckyCheckIndex?: number
 ) {
     // const { isOnline, addToQueue } = useOfflineSync();
 
@@ -88,10 +89,33 @@ export function useProgressions(
             }
 
             if (branchId) {
-                const idx = manualIndices[targetStudentId]?.[branchId] ?? 50;
+                const specificIdx = manualIndices[targetStudentId]?.[branchId];
+                const studentGlobalIdx = selectedStudent?.importance_suivi;
+
+                // Fallback chain: specific branch index > student global importance > global default
+                const idx = specificIdx ?? studentGlobalIdx ?? defaultLuckyCheckIndex ?? 50;
+
                 if (Math.random() * 100 < idx) {
                     finalStatus = 'a_verifier';
                     toast("Vérification requise (Auto)", { description: "L'activité doit être vérifiée.", duration: 4000 });
+                }
+            }
+        }
+
+        // TRUST ADJUSTMENT LOGIC (Learning)
+        if (currentStatus === 'a_verifier') {
+            const act = activities.find(a => a.id === activityId);
+            const branchId = act?.Module?.SousBranche?.Branche?.id;
+
+            if (branchId) {
+                if (finalStatus === 'termine') {
+                    // Validation success: increase trust (decrease index)
+                    trackingService.updateStudentTrust(targetStudentId, branchId, -2, 'up');
+                    toast.success("Confiance augmentée (-2%)");
+                } else if (finalStatus === 'a_commencer') {
+                    // Validation failure: decrease trust (increase index)
+                    trackingService.updateStudentTrust(targetStudentId, branchId, 5, 'down');
+                    toast.error("Confiance diminuée (+5%)");
                 }
             }
         }

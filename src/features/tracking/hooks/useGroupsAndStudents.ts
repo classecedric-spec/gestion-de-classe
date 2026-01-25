@@ -30,6 +30,7 @@ export function useGroupsAndStudents() {
     // Preferences
     const [manualIndices, setManualIndices] = useState<Record<string, any>>({});
     const [rotationSkips, setRotationSkips] = useState<Record<string, any>>({});
+    const [defaultLuckyCheckIndex, setDefaultLuckyCheckIndex] = useState<number>(50);
 
     // Pending student selection (from Home navigation)
     const pendingStudentSelection = useRef<string | null>(null);
@@ -91,6 +92,17 @@ export function useGroupsAndStudents() {
         }
     };
 
+    // Load default lucky check index
+    const loadDefaultLuckyCheckIndex = async () => {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+
+        const value = await trackingService.loadUserPreference(user.id, 'default_lucky_check_index');
+        if (value !== undefined && value !== null) {
+            setDefaultLuckyCheckIndex(Number(value));
+        }
+    };
+
     // Handle navigation from Home (eleve_id in location.state)
     useEffect(() => {
         if (location.state?.eleve_id && groups.length > 0 && !selectedStudent) {
@@ -131,6 +143,7 @@ export function useGroupsAndStudents() {
         fetchGroups();
         loadManualIndices();
         loadRotationSkips();
+        loadDefaultLuckyCheckIndex();
     }, []);
 
     // Fetch students when group selected
@@ -174,7 +187,8 @@ export function useGroupsAndStudents() {
             selectedStudent,
             loadingStudents,
             manualIndices,
-            rotationSkips
+            rotationSkips,
+            defaultLuckyCheckIndex
         },
         actions: {
             setSelectedGroupId,

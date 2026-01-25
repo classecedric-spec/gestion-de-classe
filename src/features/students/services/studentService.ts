@@ -73,6 +73,9 @@ export class StudentService {
         // Prepare data for save
         const dataToSave = { ...studentData };
 
+        // Ensure titulaire_id is set
+        (dataToSave as any).titulaire_id = userId;
+
         // Handle Photo Upload if base64 is present
         let photoUrl: string | null = null;
         const photoBase64 = photoBase64Arg;

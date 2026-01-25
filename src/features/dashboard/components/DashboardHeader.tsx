@@ -1,5 +1,5 @@
 import React from 'react';
-import { Search, LayoutList, CheckSquare, Users, Activity, Settings2, AlertCircle } from 'lucide-react';
+import { Search, LayoutList, Users, AlertCircle } from 'lucide-react';
 import { SmartTabs, Input } from '../../../components/ui';
 
 interface DashboardHeaderProps {
@@ -10,6 +10,7 @@ interface DashboardHeaderProps {
     showSearch: boolean;
     searchQuery: string;
     setSearchQuery: (query: string) => void;
+    isSidebarOpen: boolean;
 }
 
 const DashboardHeader: React.FC<DashboardHeaderProps> = ({
@@ -19,24 +20,24 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({
     setCurrentTab,
     showSearch,
     searchQuery,
-    setSearchQuery
+    setSearchQuery,
+    isSidebarOpen
 }) => {
 
     const tabs = [
         { id: 'overview', label: "Vue d'ensemble", icon: LayoutList },
-        { id: 'retard', label: 'En Retard', icon: AlertCircle },
         { id: 'students', label: 'Élèves', icon: Users },
-        { id: 'summary', label: 'Bilan du Jour', icon: CheckSquare },
-        { id: 'analytics', label: 'Analyses', icon: Activity },
-        { id: 'tools', label: 'Outils', icon: Settings2 }
+        { id: 'urgent', label: 'Vision Urgente', icon: AlertCircle }
     ];
 
     return (
         <header className="relative flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div className="flex-1 flex items-center">
-                <h1 className="text-2xl font-black text-text-main uppercase tracking-tight leading-none">
-                    {userName ? `Bonjour ${userName}` : (userEmail ? `Bonjour ${userEmail.split('@')[0]}` : 'Bienvenue')}
-                </h1>
+                {!isSidebarOpen && (
+                    <h1 className="text-2xl font-black text-text-main uppercase tracking-tight leading-none animate-in fade-in">
+                        {userName ? `Bonjour ${userName}` : (userEmail ? `Bonjour ${userEmail.split('@')[0]}` : 'Bienvenue')}
+                    </h1>
+                )}
                 {showSearch && (
                     <div className="ml-4 w-full max-w-sm hidden md:block">
                         <Input
@@ -44,7 +45,6 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
                             icon={Search}
-                            size="sm"
                         />
                     </div>
                 )}

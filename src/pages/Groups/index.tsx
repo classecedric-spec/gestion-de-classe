@@ -30,7 +30,8 @@ import { useInAppMigration } from '../../hooks/useInAppMigration';
 import { Tables } from '../../types/supabase';
 import { Badge, SearchBar, EmptyState, ConfirmModal, Avatar, ListItem, CardInfo, CardList, CardTabs, ActionItem } from '../../components/ui';
 import PdfProgress from '../../components/ui/PdfProgress';
-import { GraduationCap, LayoutList, Plus, Users, FileText, Layers } from 'lucide-react';
+import { GraduationCap, LayoutList, Plus, Users, FileText, Layers, QrCode } from 'lucide-react';
+import GroupQRModal from '../../features/groups/components/GroupQRModal';
 
 const Groups: React.FC = () => {
     const navigate = useNavigate();
@@ -50,6 +51,7 @@ const Groups: React.FC = () => {
     const [isEditingStudent, setIsEditingStudent] = useState(false);
     const [editStudentId, setEditStudentId] = useState<string | null>(null);
     const [showAddToGroupModal, setShowAddToGroupModal] = useState(false);
+    const [showQRModal, setShowQRModal] = useState(false);
 
     // Hooks
     const {
@@ -356,6 +358,14 @@ const Groups: React.FC = () => {
                                                 onClick={() => generateGroupTodoList(selectedGroup as any)}
                                                 loading={isGeneratingPDF}
                                             />
+                                            <ActionItem
+                                                icon={QrCode}
+                                                label="Codes QR"
+                                                subtitle="Générer pour le groupe"
+                                                progress={0}
+                                                onClick={() => setShowQRModal(true)}
+                                                loading={false}
+                                            />
                                         </div>
 
                                         {/* Progress Indicator (shared component) */}
@@ -398,6 +408,13 @@ const Groups: React.FC = () => {
                     if (selectedGroup) fetchStudentsInGroup(selectedGroup.id);
                     fetchGroups();
                 }}
+            />
+
+            <GroupQRModal
+                isOpen={showQRModal}
+                onClose={() => setShowQRModal(false)}
+                groupName={selectedGroup?.nom || 'Groupe'}
+                students={studentsInGroup}
             />
 
             {/* Remove Student Confirmation */}

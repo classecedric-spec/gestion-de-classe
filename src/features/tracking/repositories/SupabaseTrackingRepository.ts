@@ -111,7 +111,7 @@ export class SupabaseTrackingRepository implements ITrackingRepository {
     async getStudentsInGroup(groupId: string): Promise<{ ids: string[], full: Tables<'Eleve'>[] }> {
         const { data, error } = await supabase
             .from('EleveGroupe')
-            .select('eleve_id, Eleve(*)')
+            .select('eleve_id, Eleve(*, Niveau(*))')
             .eq('groupe_id', groupId);
 
         if (error) throw error;
@@ -527,7 +527,28 @@ export class SupabaseTrackingRepository implements ITrackingRepository {
                 allProgs = allProgs.concat(chunkProgs);
             }
         }
-
         return allProgs;
+    }
+
+    async updateStudentTrust(eleveId: string, branchId: string, adjustment: number, trend: 'up' | 'down' | 'stable'): Promise<void> {
+        // 1. Update Branch Specific Index (User Preference)
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+            const currentIndices = await this.loadUserPreference(user.id, 'eleve_profil_competences') || {};
+            const studentData = currentIndices[eleveId] || {};
+            const currentVal = Number(studentData[branchId] ?? 50);
+            const newVal = Math.max(0, Math.min(100, currentVal + adjustment));
+
+            currentIndices[eleveId] = { ...studentData, [branchId]: newVal };
+            await this.saveUserPreference(user.id, 'eleve_profil_competences', currentIndices);
+        }
+
+        // 2. Update Global Student Trend
+        const { error } = await supabase
+            .from('Eleve')
+            .update({ trust_trend: trend })
+            .eq('id', eleveId);
+
+        if (error) throw error;
     }
 }

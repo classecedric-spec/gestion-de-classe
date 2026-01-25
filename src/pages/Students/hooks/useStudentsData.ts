@@ -20,6 +20,7 @@ export interface StudentDetailed extends Tables<'Eleve'> {
         Groupe: { id: string; nom: string };
     }[];
     importance_suivi?: number | null;
+    trust_trend?: 'up' | 'down' | 'stable' | null;
 }
 
 /**

@@ -1,5 +1,5 @@
 import React from 'react';
-import { ArrowLeft, Users, ChevronDown, WifiOff, Loader2, Activity } from 'lucide-react';
+import { ArrowLeft, Users, ChevronDown, WifiOff, Loader2, Activity, Clock } from 'lucide-react';
 import { clsx } from 'clsx';
 import { useNavigate } from 'react-router-dom';
 
@@ -30,6 +30,7 @@ const MobileHeader: React.FC<MobileHeaderProps> = ({
             <div className="flex items-center gap-3 mb-3">
                 <button
                     onClick={() => navigate('/mobile-dashboard')}
+                    title="Retour au tableau de bord"
                     className="w-10 h-10 bg-white/5 border border-white/10 rounded-xl flex items-center justify-center text-grey-medium hover:text-primary hover:bg-white/10 transition-all shrink-0"
                 >
                     <ArrowLeft size={20} />
@@ -39,6 +40,7 @@ const MobileHeader: React.FC<MobileHeaderProps> = ({
                     <select
                         value={currentGroupId}
                         onChange={(e) => onGroupChange(e.target.value)}
+                        aria-label="Sélectionner un groupe"
                         className="w-full bg-background border border-white/10 text-white rounded-xl py-2.5 pl-10 pr-8 appearance-none text-sm font-bold"
                     >
                         {groups.map(g => (
@@ -61,6 +63,14 @@ const MobileHeader: React.FC<MobileHeaderProps> = ({
                     )}
                 </div>
                 <div className="flex items-center gap-2">
+                    <button
+                        onClick={() => navigate(`/mobile-vision-urgente/${currentGroupId}`)}
+                        className="flex items-center gap-2 bg-rose-500/20 text-rose-500 px-3 py-1.5 rounded-full border border-rose-500/20 shadow-lg shadow-rose-500/5 active:scale-95 transition-all text-[10px] font-black uppercase tracking-widest"
+                        title="Vision Urgente"
+                    >
+                        <Clock size={12} />
+                        Urgent
+                    </button>
                     <button
                         onClick={onAutoSuivi}
                         disabled={isAutoGenerating || !isOnline}

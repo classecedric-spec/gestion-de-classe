@@ -18,6 +18,7 @@ export interface ListItemProps {
     className?: string;
     deleteTitle?: string;
     noTruncate?: boolean;
+    rightElement?: React.ReactNode;
 }
 
 /**
@@ -37,7 +38,8 @@ const ListItem: React.FC<ListItemProps> = ({
     rightIcon: RightIcon = ChevronRight,
     className,
     deleteTitle = "Supprimer",
-    noTruncate = false
+    noTruncate = false,
+    rightElement
 }) => {
     return (
         <div
@@ -119,6 +121,12 @@ const ListItem: React.FC<ListItemProps> = ({
                     "transition-transform",
                     isSelected ? "text-text-dark translate-x-1" : "text-grey-dark group-hover:translate-x-1"
                 )} />
+
+                {rightElement && (
+                    <div className="flex items-center shrink-0">
+                        {rightElement}
+                    </div>
+                )}
             </div>
 
             {/* Absolute Delete Button - Stylized like the student list */}

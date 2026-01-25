@@ -30,6 +30,8 @@ export const useCacheSettings = () => {
     const [selectedBulkIndex, setSelectedBulkIndex] = useState<number | string>(50);
     const [isUpdatingBulk, setIsUpdatingBulk] = useState(false);
     const [isLoadingBulkData, setIsLoadingBulkData] = useState(false);
+    const [defaultLuckyCheckIndex, setDefaultLuckyCheckIndex] = useState<number>(50);
+    const [isSavingDefaultIndex, setIsSavingDefaultIndex] = useState(false);
 
     // Charge les statistiques du cache
     const loadCacheStats = useCallback(async () => {
@@ -97,10 +99,49 @@ export const useCacheSettings = () => {
                 .select('id, prenom, nom')
                 .order('prenom');
             setAllStudents(studentsData || []);
+
+            // Load default lucky check index
+            const { data: defaultIndexPref } = await supabase
+                .from('UserPreference')
+                .select('value')
+                .eq('user_id', user.id)
+                .eq('key', 'default_lucky_check_index')
+                .maybeSingle();
+
+            if (defaultIndexPref?.value !== undefined && defaultIndexPref?.value !== null) {
+                setDefaultLuckyCheckIndex(Number(defaultIndexPref.value));
+            }
         } catch (err) {
             console.error("Error fetching bulk data:", err);
         } finally {
             setIsLoadingBulkData(false);
+        }
+    }, [setDefaultLuckyCheckIndex]);
+
+    // Sauvegarde de l'indice par défaut
+    const handleSaveDefaultLuckyCheckIndex = useCallback(async (newIndex: number) => {
+        setIsSavingDefaultIndex(true);
+        try {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) throw new Error("Utilisateur non trouvé");
+
+            const { error } = await supabase
+                .from('UserPreference')
+                .upsert({
+                    user_id: user.id,
+                    key: 'default_lucky_check_index',
+                    value: newIndex,
+                    updated_at: new Date().toISOString()
+                } as any, { onConflict: 'user_id, key' });
+
+            if (error) throw error;
+            setDefaultLuckyCheckIndex(newIndex);
+            toast.success("Indice par défaut sauvegardé");
+        } catch (err) {
+            console.error("Error saving default index:", err);
+            toast.error("Erreur lors de la sauvegarde");
+        } finally {
+            setIsSavingDefaultIndex(false);
         }
     }, []);
 
@@ -232,6 +273,11 @@ export const useCacheSettings = () => {
         isLoadingBulkData,
         fetchBulkData,
         handleBulkUpdateIndices,
-        handleBulkAdjustIndices
+        handleBulkAdjustIndices,
+        // Default Lucky Check
+        defaultLuckyCheckIndex,
+        setDefaultLuckyCheckIndex,
+        isSavingDefaultIndex,
+        handleSaveDefaultLuckyCheckIndex
     };
 };

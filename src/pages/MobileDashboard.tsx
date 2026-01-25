@@ -16,7 +16,6 @@ import { toast } from 'react-hot-toast';
 import { SupabaseAttendanceRepository } from '../features/attendance/repositories/SupabaseAttendanceRepository';
 import { SupabaseGroupRepository } from '../features/groups/repositories/SupabaseGroupRepository';
 import { SupabaseTrackingRepository } from '../features/tracking/repositories/SupabaseTrackingRepository';
-import { SupabaseTrackingRepository } from '../features/tracking/repositories/SupabaseTrackingRepository';
 import { SupabaseUserRepository } from '../features/users/repositories/SupabaseUserRepository';
 // Using generic tables types for state where specific service types aren't available/matching perfectly yet, or keeping existing types if compatible
 import { Tables } from '../types/supabase';

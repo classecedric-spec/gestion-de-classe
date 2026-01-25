@@ -3,6 +3,7 @@ import { DndContext, DragOverlay, useSensor, useSensors, MouseSensor, TouchSenso
 import { Settings } from 'lucide-react';
 import { toast } from 'sonner';
 import { SmartTabs, Button, EmptyState } from '../components/ui';
+import PageLayout from '../components/layout/PageLayout';
 
 import useAttendance from '../features/attendance/hooks/useAttendance';
 import AttendanceStudentCard from '../features/attendance/components/AttendanceStudentCard';
@@ -80,64 +81,62 @@ const Presence: React.FC = () => {
 
     const trulyUnassigned = students.filter(s => !attendances.some(a => a.eleve_id === s.id));
 
+    // --- Header Content Props ---
+    const centerContent = (
+        <div className="hidden md:block">
+            <SmartTabs
+                tabs={[
+                    { id: 'matin', label: 'Matin' },
+                    { id: 'apres_midi', label: 'Après-midi' }
+                ]}
+                activeTab={currentPeriod}
+                onChange={(id) => setCurrentPeriod(id as 'matin' | 'apres_midi')}
+                level={3}
+                className="min-w-[200px]"
+                disableCompact={true}
+            />
+        </div>
+    );
 
-    return (
-        <div className="h-full flex flex-col p-6 animate-in fade-in duration-500">
-            {/* HEADER */}
-            <div className="relative flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 min-h-[50px]">
-                {/* LEFT: Title */}
-                <div className="z-10 bg-background/50 backdrop-blur-sm pr-4">
-                    <h1 className="text-3xl font-bold text-text-main mb-1">Présence</h1>
-                    <p className="text-grey-medium">Gérez les présences et l'organisation de la classe</p>
+    const rightContent = (
+        <div className="flex items-center gap-3 self-end md:self-auto">
+            <div className="flex items-center gap-2 bg-surface p-1.5 rounded-xl border border-white/5 shadow-sm h-[52px] group transition-all duration-300 hover:border-primary/20">
+                <div className="flex items-center gap-2 max-w-0 overflow-hidden opacity-0 group-hover:max-w-[100px] group-hover:opacity-100 transition-all duration-300 ease-in-out">
+                    <Button
+                        variant="ghost"
+                        onClick={() => setIsConfigOpen(true)}
+                        className="p-2 aspect-square h-full"
+                        icon={Settings}
+                        title="Configuration"
+                    />
+                    <div className="w-px h-6 bg-white/10 mx-1" />
                 </div>
 
-                {/* CENTER: Period Selector */}
-                <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-0 hidden md:block">
-                    <SmartTabs
-                        tabs={[
-                            { id: 'matin', label: 'Matin' },
-                            { id: 'apres_midi', label: 'Après-midi' }
-                        ]}
-                        activeTab={currentPeriod}
-                        onChange={(id) => setCurrentPeriod(id as 'matin' | 'apres_midi')}
-                        level={3}
-                        className="min-w-[200px]"
-                        disableCompact={true}
+                {/* Date Picker - Height matched to selector approx */}
+                <div className="relative h-full flex items-center">
+                    <label htmlFor="presence-date-picker" className="sr-only">Date</label>
+                    <input
+                        id="presence-date-picker"
+                        type="date"
+                        title="Sélectionner la date"
+                        value={currentDate}
+                        onClick={(e: any) => e.target.showPicker && e.target.showPicker()}
+                        onChange={(e) => setCurrentDate(e.target.value)}
+                        className="h-full px-3 bg-black/20 border border-white/5 rounded-lg text-sm text-text-main focus:outline-none focus:border-primary/50 font-medium [&::-webkit-calendar-picker-indicator]:hidden cursor-pointer flex items-center"
                     />
                 </div>
-
-                {/* RIGHT: Settings & Date */}
-                <div className="z-10 flex items-center gap-3 self-end md:self-auto">
-
-                    <div className="flex items-center gap-2 bg-surface p-1.5 rounded-xl border border-white/5 shadow-sm h-[52px] group transition-all duration-300 hover:border-primary/20">
-                        <div className="flex items-center gap-2 max-w-0 overflow-hidden opacity-0 group-hover:max-w-[100px] group-hover:opacity-100 transition-all duration-300 ease-in-out">
-                            <Button
-                                variant="ghost"
-                                onClick={() => setIsConfigOpen(true)}
-                                className="p-2 aspect-square h-full"
-                                icon={Settings}
-                                title="Configuration"
-                            />
-                            <div className="w-px h-6 bg-white/10 mx-1" />
-                        </div>
-
-                        {/* Date Picker - Height matched to selector approx */}
-                        <div className="relative h-full flex items-center">
-                            <label htmlFor="presence-date-picker" className="sr-only">Date</label>
-                            <input
-                                id="presence-date-picker"
-                                type="date"
-                                title="Sélectionner la date"
-                                value={currentDate}
-                                onClick={(e: any) => e.target.showPicker && e.target.showPicker()}
-                                onChange={(e) => setCurrentDate(e.target.value)}
-                                className="h-full px-3 bg-black/20 border border-white/5 rounded-lg text-sm text-text-main focus:outline-none focus:border-primary/50 font-medium [&::-webkit-calendar-picker-indicator]:hidden cursor-pointer flex items-center"
-                            />
-                        </div>
-                    </div>
-                </div>
             </div>
+        </div>
+    );
 
+    return (
+        <PageLayout
+            title="Présence"
+            subtitle="Gérez les présences et l'organisation de la classe"
+            centerContent={centerContent}
+            rightContent={rightContent}
+            containerClassName="p-6"
+        >
             {/* Mobile Period Selector (visible only on small screens) */}
             <div className="md:hidden flex justify-center mb-6">
                 <SmartTabs
@@ -159,7 +158,7 @@ const Presence: React.FC = () => {
                     onDragStart={handleDragStart}
                     onDragEnd={handleDragEnd}
                 >
-                    <div className="flex-1 flex gap-6 min-h-0 overflow-hidden">
+                    <div className="h-full flex gap-6 min-h-0 overflow-hidden">
 
                         {/* LEFT: Unassigned & Absents */}
                         <div className="w-1/4 min-w-[280px] flex flex-col gap-4">
@@ -206,7 +205,7 @@ const Presence: React.FC = () => {
                                             <AttendanceColumn
                                                 id={cat.id}
                                                 title={cat.nom}
-                                                color={cat.couleur}
+                                                color={cat.couleur ?? undefined}
                                                 count={catStudents.length}
                                             >
                                                 {catStudents.map(student => (
@@ -276,7 +275,7 @@ const Presence: React.FC = () => {
                 studentsForExport={students}
                 currentDateForExport={currentDate}
             />
-        </div>
+        </PageLayout>
     );
 };
 

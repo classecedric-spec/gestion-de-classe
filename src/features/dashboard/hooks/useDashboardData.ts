@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react';
 import { supabase } from '../../../lib/database';
 import { Student } from '../../attendance/services/attendanceService';
+import { compareUrgentItems } from '../../progression/utils/urgentSorting';
 
 // Level Colors for Charts
 export const LEVEL_COLORS: Record<string, string> = {
@@ -495,26 +496,108 @@ export const useDashboardData = () => {
                 .neq('day_of_week', 'DOCK');
 
             // 12. Overdue Students Logic (via Secure View)
-            // 12. Overdue Students Logic (Direct Query)
-            const { data: overdueItems } = await supabase
-                .from('Progression')
-                .select('eleve_id')
-                .lt('date_limite', today)
-                .neq('etat', 'termine')
-                .neq('etat', 'a_verifier');
+            // 12. Overdue Students Logic (Detailed)
+            // 12. Overdue Students Logic (Detailed & Robust)
+            // Fetch ALL 'en_cours' items and filter in JS to match exactly the logic of the Student View
+            // 1. Fetch Active Modules Hierarchy (Depth 2: Module -> SousBranche -> Branche)
+            // 1. Fetch Active Modules Hierarchy
+            const { data: activeModules, error: modError } = await supabase
+                .from('Module')
+                .select(`
+                    id, nom, date_fin, statut,
+                    SousBranche:sous_branche_id (
+                        nom,
+                        ordre,
+                        Branche:branche_id (
+                            nom, ordre
+                        )
+                    )
+                `)
+                .eq('statut', 'en_cours');
 
-            const overdueCounts: Record<string, number> = {};
-            (overdueItems || []).forEach(item => {
-                overdueCounts[item.eleve_id] = (overdueCounts[item.eleve_id] || 0) + 1;
+            if (modError) console.error("Module query error:", modError);
+
+            const modulesMap = new Map((activeModules || []).map(m => [m.id, m]));
+
+            // 2. Fetch Progressions (Depth 1: Progression -> Activite)
+            const { data: allEnCoursItems, error: progError } = await supabase
+                .from('Progression')
+                .select(`
+                    id, 
+                    etat, 
+                    updated_at,
+                    eleve_id,
+                    activite_id,
+                    Activite (
+                        titre,
+                        module_id
+                    )
+                `)
+                .in('etat', ['en_cours', 'non_commence']);
+
+            if (progError) console.error("Progression query error:", progError);
+
+            const now = new Date();
+
+            const overdueItems = (allEnCoursItems || []).filter(item => {
+                // Enrich manually
+                const act = item.Activite as any;
+                const moduleId = act?.module_id;
+
+                if (!moduleId) return false;
+
+                const module = modulesMap.get(moduleId);
+
+                // Attach the full module object to the item for downstream logic
+                if (act) {
+                    act.Module = module;
+                }
+
+                if (!module || !module.date_fin) return false;
+
+                // Only active modules
+                if (module.statut !== 'en_cours') return false;
+
+                // Check deadline strictly < now
+                const deadline = new Date(module.date_fin);
+                return deadline < now;
             });
 
-            const sortedOverdueStudents = Object.entries(overdueCounts)
-                .map(([eleveId, count]) => {
+            console.log("Modules found:", activeModules?.length);
+            console.log("Progressions found:", allEnCoursItems?.length);
+            console.log("Overdue calculated:", overdueItems.length);
+            console.log("Filtered Overdue:", overdueItems.length);
+
+            // Group by Student
+            const overdueByStudent: Record<string, any[]> = {};
+            (overdueItems || []).forEach(item => {
+                if (!overdueByStudent[item.eleve_id]) overdueByStudent[item.eleve_id] = [];
+                overdueByStudent[item.eleve_id].push(item);
+            });
+
+            const sortedOverdueStudents = Object.entries(overdueByStudent)
+                .map(([eleveId, items]) => {
                     const student = allStudents.find(s => s.id === eleveId);
-                    return student ? { ...student, overdueCount: count } : null;
+                    if (!student) return null;
+
+                    // Sort items: Date (ASC) > Branch > Module
+                    // Use shared logic factorized in urgentSorting.ts
+                    const sortedItems = items.sort(compareUrgentItems);
+
+                    return {
+                        ...student,
+                        overdueCount: items.length,
+                        overdueItems: sortedItems
+                    };
                 })
                 .filter(Boolean)
-                .sort((a: any, b: any) => b.overdueCount - a.overdueCount);
+                // Sort Students: Count (DESC) > Name (ASC)
+                .sort((a: any, b: any) => {
+                    if (b.overdueCount !== a.overdueCount) return b.overdueCount - a.overdueCount;
+                    return (a.prenom || '').localeCompare(b.prenom || '');
+                });
+
+            console.log("Sorted Overdue Students (Fixed):", sortedOverdueStudents?.map(s => `${s.prenom} (${s.overdueCount})`));
 
             setDashboardData({
                 planning: {

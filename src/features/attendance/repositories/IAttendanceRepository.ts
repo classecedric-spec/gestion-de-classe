@@ -3,7 +3,9 @@ import { Tables, TablesInsert } from '../../../types/supabase';
 export type Group = Tables<'Groupe'>;
 export type Student = Tables<'Eleve'> & {
     Classe: { nom: string } | null;
-    Niveau: { nom: string; ordre: number | null } | null
+    Niveau: { nom: string; ordre: number | null } | null;
+    importance_suivi?: number | null;
+    trust_trend?: 'up' | 'down' | 'stable' | null;
 };
 export type SetupPresence = Tables<'SetupPresence'>;
 export type CategoriePresence = Tables<'CategoriePresence'>;

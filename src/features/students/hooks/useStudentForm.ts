@@ -224,7 +224,6 @@ export const useStudentForm = ({ isEditing, editId, onSaved, onClose }: UseStude
                 // photo_base64 removed from here
                 photo_url: student.photo_url,
                 sex: student.sex,
-                // @ts-ignore - DB schema uses titulaire_id, not user_id (types out of sync)
                 titulaire_id: user.id
             } as any;
 

@@ -95,7 +95,8 @@ const TrackingDashboard: React.FC<TrackingDashboardProps> = ({
         groupsHook.actions.setRotationSkips,
         branchesHook.states.groupedProgressions,
         branchesHook.states.selectedBranchForSuivi,
-        helpHook.actions.fetchHelpRequests
+        helpHook.actions.fetchHelpRequests,
+        groupsHook.states.defaultLuckyCheckIndex
     );
 
     // Update help hook with progressions fetch function

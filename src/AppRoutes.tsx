@@ -34,6 +34,13 @@ const LandingMobile = lazy(() => import('./pages/LandingMobile'));
 const MobileDashboard = lazy(() => import('./pages/MobileDashboard'));
 const MobileEncodage = lazy(() => import('./pages/MobileEncodage'));
 const MobilePresence = lazy(() => import('./pages/MobilePresence'));
+const StudentKiosk = lazy(() => import('./pages/StudentKiosk'));
+const MobileVisionUrgente = lazy(() => import('./pages/MobileVisionUrgente'));
+
+// New Dashboard Tabs
+const DashboardOverview = lazy(() => import('./pages/Home/tabs/DashboardOverview'));
+const DashboardStudentsPage = lazy(() => import('./pages/Home/tabs/DashboardStudentsPage'));
+const VisionUrgente = lazy(() => import('./pages/Home/tabs/VisionUrgente'));
 
 const AppRoutes = () => {
     return (
@@ -91,7 +98,14 @@ const AppRoutes = () => {
                     <ProtectedRoute><Layout /></ProtectedRoute>
                 </Suspense>
             }>
-                <Route index element={<Suspense fallback={<PageLoader />}><Home /></Suspense>} />
+                <Route path="" element={<Suspense fallback={<PageLoader />}><Home /></Suspense>}>
+                    <Route index element={<Navigate to="vue-d-ensemble" replace />} />
+                    <Route path="vue-d-ensemble" element={<Suspense fallback={<PageLoader />}><DashboardOverview /></Suspense>} />
+                    <Route path="eleves" element={<Suspense fallback={<PageLoader />}><DashboardStudentsPage /></Suspense>} />
+                    <Route path="vision-urgente" element={<Suspense fallback={<PageLoader />}><VisionUrgente /></Suspense>} />
+                    <Route path="*" element={<div className="p-8 text-center text-grey-medium">Page en construction</div>} />
+                </Route>
+
                 <Route path={ROUTES.DASHBOARD_SUIVI} element={<Suspense fallback={<PageLoader />}><SuiviGlobal /></Suspense>} />
                 <Route path="avancement" element={<Navigate to="/dashboard/suivi" replace />} />
 
@@ -126,6 +140,18 @@ const AppRoutes = () => {
             <Route path="/mobile-suivi/:groupId" element={
                 <Suspense fallback={<PageLoader />}>
                     <ProtectedRoute><MobileSuivi /></ProtectedRoute>
+                </Suspense>
+            } />
+
+            <Route path="/mobile-vision-urgente/:groupId" element={
+                <Suspense fallback={<PageLoader />}>
+                    <ProtectedRoute><MobileVisionUrgente /></ProtectedRoute>
+                </Suspense>
+            } />
+
+            <Route path="/kiosk/*" element={
+                <Suspense fallback={<PageLoader />}>
+                    <StudentKiosk />
                 </Suspense>
             } />
 

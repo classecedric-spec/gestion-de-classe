@@ -1,25 +1,48 @@
 import React, { useMemo } from 'react';
-import { Users, ChevronRight } from 'lucide-react';
+import { Users, ChevronRight, Search, Filter } from 'lucide-react';
 import { getInitials } from '../../../lib/helpers';
-import { Student } from '../../attendance/services/attendanceService';
-import { Avatar, EmptyState, Badge } from '../../../components/ui';
+import { Student, Group } from '../../attendance/services/attendanceService';
+import { Avatar, EmptyState, Badge, Input, Select } from '../../../components/ui';
 
 interface DashboardStudentListProps {
     students: Student[];
+    activeGroup: Group | null;
+    groups: Group[];
+    onGroupChange: (group: Group | null) => void;
     searchQuery: string;
+    onSearchChange: (query: string) => void;
     onStudentClick: (student: Student) => void;
 }
 
-const DashboardStudentList: React.FC<DashboardStudentListProps> = ({ students, searchQuery, onStudentClick }) => {
+const DashboardStudentList: React.FC<DashboardStudentListProps> = ({
+    students,
+    activeGroup,
+    groups,
+    onGroupChange,
+    searchQuery,
+    onSearchChange,
+    onStudentClick
+}) => {
 
     // Filter and Sort Logic extracted from original Home
     const filteredStudents = useMemo(() => {
-        if (!searchQuery) return students;
-        return students.filter(s =>
-            s.prenom?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            s.nom?.toLowerCase().includes(searchQuery.toLowerCase())
-        );
-    }, [students, searchQuery]);
+        let filtered = students;
+
+        // Filter by Group
+        if (activeGroup) {
+            filtered = filtered.filter(s => s.groupe_id === activeGroup.id);
+        }
+
+        // Filter by Search
+        if (searchQuery) {
+            filtered = filtered.filter(s =>
+                s.prenom?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                s.nom?.toLowerCase().includes(searchQuery.toLowerCase())
+            );
+        }
+
+        return filtered;
+    }, [students, searchQuery, activeGroup]);
 
     const sortedLevels = useMemo(() => {
         const studentsByLevel = filteredStudents.reduce((acc, student) => {
@@ -46,14 +69,50 @@ const DashboardStudentList: React.FC<DashboardStudentListProps> = ({ students, s
     }, [filteredStudents]);
 
     return (
-        <div className="space-y-8">
-            <div className="flex items-center justify-between">
-                <h2 className="text-xl font-bold text-text-main flex items-center gap-3">
-                    <Users className="text-primary" /> Vos Élèves
-                </h2>
-                <Badge variant="secondary" size="sm">
-                    {filteredStudents.length} / {students.length}
-                </Badge>
+        <div className="space-y-6">
+            <div className="flex flex-col gap-4">
+                <div className="flex items-center justify-between">
+                    <h2 className="text-xl font-bold text-text-main flex items-center gap-3">
+                        <Users className="text-primary" /> Vos Élèves
+                    </h2>
+                    <Badge variant="secondary" size="sm">
+                        {filteredStudents.length} / {students.length}
+                    </Badge>
+                </div>
+
+                <div className="flex flex-col md:flex-row gap-4">
+                    {/* Search Bar */}
+                    <div className="w-full md:max-w-md">
+                        <Input
+                            placeholder="Rechercher un élève..."
+                            value={searchQuery}
+                            onChange={(e) => onSearchChange(e.target.value)}
+                            icon={Search}
+                            className="bg-surface border-white/5 focus:border-primary/50"
+                        />
+                    </div>
+
+                    {/* Group Selector */}
+                    {groups && groups.length > 0 && (
+                        <div className="w-full md:w-64">
+                            <select
+                                value={activeGroup?.id || ''}
+                                onChange={(e) => {
+                                    const group = groups.find(g => g.id === e.target.value);
+                                    onGroupChange(group || null);
+                                }}
+                                className="w-full h-10 px-3 rounded-xl bg-surface border border-white/5 text-sm text-text-main focus:outline-none focus:border-primary/50"
+                            >
+                                <option value="">Tous les groupes</option>
+                                {groups.map(group => (
+                                    <option key={group.id} value={group.id}>
+                                        {group.nom}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+                    )}
+                </div>
             </div>
 
             <div className="space-y-12">

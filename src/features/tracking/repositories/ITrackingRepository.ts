@@ -87,6 +87,7 @@ export interface ITrackingRepository {
     fetchStudentProgressDetails(studentId: string): Promise<any[]>;
     getActivitiesByModules(moduleIds: string[]): Promise<any[]>;
     getProgressionsForStudentsAndActivities(studentIds: string[], activityIds: string[]): Promise<any[]>;
+    updateStudentTrust(eleveId: string, branchId: string, adjustment: number, trend: 'up' | 'down' | 'stable'): Promise<void>;
 }
 
 // Re-export types for convenience

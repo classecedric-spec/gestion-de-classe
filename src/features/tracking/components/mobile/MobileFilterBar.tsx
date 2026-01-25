@@ -2,13 +2,28 @@ import React from 'react';
 import { Users, ChevronDown, X } from 'lucide-react';
 
 interface MobileFilterBarProps {
-    students: { id: string; prenom: string | null; nom: string | null }[];
+    students: {
+        id: string;
+        prenom: string | null;
+        nom: string | null;
+        Niveau?: { nom: string } | null;
+    }[];
     selectedFilter: string | null;
     onFilterChange: (id: string | null) => void;
 }
 
 const MobileFilterBar: React.FC<MobileFilterBarProps> = ({ students, selectedFilter, onFilterChange }) => {
     if (!students || students.length === 0) return null;
+
+    // Group students by level
+    const groupedStudents: Record<string, typeof students> = {};
+    students.forEach(student => {
+        const levelName = student.Niveau?.nom || 'Sans Niveau';
+        if (!groupedStudents[levelName]) {
+            groupedStudents[levelName] = [];
+        }
+        groupedStudents[levelName].push(student);
+    });
 
     return (
         <div className="fixed bottom-0 left-0 right-0 p-4 bg-surface/80 backdrop-blur-md border-t border-white/5 z-30">
@@ -17,13 +32,18 @@ const MobileFilterBar: React.FC<MobileFilterBarProps> = ({ students, selectedFil
                     <select
                         value={selectedFilter || ''}
                         onChange={(e) => onFilterChange(e.target.value || null)}
+                        title="Filtrer par élève"
                         className="w-full bg-background border border-white/10 text-white rounded-xl py-3 pl-10 pr-8 appearance-none text-sm font-bold shadow-lg"
                     >
                         <option value="">Tous les élèves ({students.length})</option>
-                        {students.map(student => (
-                            <option key={student.id} value={student.id}>
-                                {student.prenom} {student.nom}
-                            </option>
+                        {Object.entries(groupedStudents).map(([level, levelStudents]) => (
+                            <optgroup key={level} label={level} className="bg-surface text-primary font-black uppercase text-[10px]">
+                                {levelStudents.map(student => (
+                                    <option key={student.id} value={student.id} className="bg-background text-white text-sm py-1">
+                                        {student.prenom} {student.nom}
+                                    </option>
+                                ))}
+                            </optgroup>
                         ))}
                     </select>
                     <Users className="absolute left-3 top-1/2 -translate-y-1/2 text-primary pointer-events-none" size={16} />
@@ -33,6 +53,7 @@ const MobileFilterBar: React.FC<MobileFilterBarProps> = ({ students, selectedFil
                 {selectedFilter && (
                     <button
                         onClick={() => onFilterChange(null)}
+                        title="Réinitialiser le filtre"
                         className="w-11 h-11 bg-danger text-white rounded-xl flex items-center justify-center shadow-lg border border-white/10 shrink-0"
                     >
                         <X size={20} />

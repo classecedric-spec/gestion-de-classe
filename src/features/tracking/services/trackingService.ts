@@ -49,6 +49,13 @@ export class TrackingService {
     }
 
     /**
+     * Update student trust score and trend
+     */
+    async updateStudentTrust(eleveId: string, branchId: string, adjustment: number, trend: 'up' | 'down' | 'stable'): Promise<void> {
+        return await this.repository.updateStudentTrust(eleveId, branchId, adjustment, trend);
+    }
+
+    /**
      * Delete a progression (e.g. removing a manual follow-up)
      */
     async deleteProgression(id: string): Promise<boolean> {

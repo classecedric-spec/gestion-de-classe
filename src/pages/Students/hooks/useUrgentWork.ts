@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+import { compareUrgentItems } from '../../../features/progression/utils/urgentSorting';
 
 export const useUrgentWork = (studentProgress: any[]) => {
     return useMemo(() => {
@@ -35,38 +36,7 @@ export const useUrgentWork = (studentProgress: any[]) => {
             }
         });
 
-        const sortedModules = Object.values(overdueModules).sort((a: any, b: any) => {
-            // 1. Date Fin (Closest deadlines first)
-            if (a.date_fin !== b.date_fin) {
-                if (!a.date_fin) return 1;
-                if (!b.date_fin) return -1;
-                return a.date_fin.localeCompare(b.date_fin);
-            }
-
-            const branchA = a.SousBranche?.Branche;
-            const branchB = b.SousBranche?.Branche;
-            const subBranchA = a.SousBranche;
-            const subBranchB = b.SousBranche;
-
-            // 2. Branch (Ordre then Nom)
-            if (branchA?.ordre !== branchB?.ordre) {
-                return (branchA?.ordre ?? 999) - (branchB?.ordre ?? 999);
-            }
-            if (branchA?.nom !== branchB?.nom) {
-                return (branchA?.nom || '').localeCompare(branchB?.nom || '');
-            }
-
-            // 3. SubDomain (Ordre then Nom)
-            if (subBranchA?.ordre !== subBranchB?.ordre) {
-                return (subBranchA?.ordre ?? 999) - (subBranchB?.ordre ?? 999);
-            }
-            if (subBranchA?.nom !== subBranchB?.nom) {
-                return (subBranchA?.nom || '').localeCompare(subBranchB?.nom || '');
-            }
-
-            // 4. Module Name
-            return a.nom.localeCompare(b.nom);
-        });
+        const sortedModules = Object.values(overdueModules).sort(compareUrgentItems);
 
         return {
             modules: sortedModules,

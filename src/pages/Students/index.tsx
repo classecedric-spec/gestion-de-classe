@@ -5,15 +5,17 @@ import { calculateAge } from '../../lib/helpers';
 import {
     Search, User as UserIcon, Calendar, GraduationCap, ShieldCheck, Loader2, ChevronRight, ChevronDown,
     Filter, Plus, BookOpen, Layers, Users, CheckCircle2, Clock, AlertCircle,
-    LayoutList, GitGraph, FileText, Activity, GitBranch, SlidersHorizontal
+    LayoutList, GitGraph, FileText, Activity, GitBranch, SlidersHorizontal,
+    TrendingUp, TrendingDown, Minus, QrCode
 } from 'lucide-react';
-import { isOverdue } from '../../features/tracking/utils/progressionHelpers';
 import clsx from 'clsx';
 import StudentModal from '../../features/students/components/StudentModal';
+import StudentQRModal from '../../features/students/components/StudentQRModal';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import StudentTrackingPDFModern from '../../components/StudentTrackingPDFModern';
 import { downloadFile } from '../../lib/helpers/download';
+import PageLayout from '../../components/layout/PageLayout';
 
 // Nouveaux composants UI
 import { Badge, Avatar, EmptyState, ConfirmModal, SearchBar, FilterSelect, CardInfo, CardList, CardTabs, SmartTabs, InfoSection, InfoRow, InfoSectionEditable, InfoRowEditable, ListItem } from '../../components/ui';
@@ -29,13 +31,8 @@ const Students: React.FC = () => {
     const location = useLocation();
     const initialStudentId = location.state?.selectedStudentId;
     const [showFilters, setShowFilters] = React.useState(false);
+    const [showQRModal, setShowQRModal] = React.useState(false);
 
-    // --- Height Synchronization ---
-    const leftContentRef = React.useRef<HTMLDivElement>(null);
-    const rightContentRef = React.useRef<HTMLDivElement>(null);
-    const [headerHeight, setHeaderHeight] = React.useState<number | undefined>(undefined);
-
-    // --- Hooks ---
     const {
         students, setStudents, selectedStudent, setSelectedStudent, loading,
         searchQuery, setSearchQuery, filterClass, setFilterClass, filterGroup, setFilterGroup,
@@ -63,31 +60,6 @@ const Students: React.FC = () => {
     } = useBranchIndices();
 
     const { modules: sortedModules, count: totalOverdueCount, hasWork: hasOverdueWork } = useUrgentWork(studentProgress);
-
-    // --- Height Measure Effect (Inner Content Strategy) ---
-    React.useLayoutEffect(() => {
-        const syncHeight = () => {
-            const leftEl = leftContentRef.current;
-            const rightEl = rightContentRef.current;
-
-            if (leftEl) {
-                const h1 = leftEl.getBoundingClientRect().height;
-                const h2 = rightEl ? rightEl.getBoundingClientRect().height : 0;
-
-                if (h2 > 0) {
-                    const max = Math.max(h1, h2);
-                    setHeaderHeight(max);
-                } else {
-                    setHeaderHeight(undefined);
-                }
-            }
-        };
-
-        syncHeight();
-        const t = setTimeout(syncHeight, 50);
-        const t2 = setTimeout(syncHeight, 300);
-        return () => { clearTimeout(t); clearTimeout(t2); };
-    }, [students.length, showFilters, selectedStudent, searchQuery, filterGroup, filterClass]);
 
     // --- Effects ---
     useEffect(() => {
@@ -330,474 +302,511 @@ const Students: React.FC = () => {
             });
     };
 
+    const rightContent = (
+        <Badge variant="primary" size="sm" className="font-bold">
+            {students.length} Élèves au total
+        </Badge>
+    );
+
     return (
-        <div className="h-full flex gap-6 animate-in fade-in duration-500 relative">
-            {/* List Column - Split into 2 cards */}
-            <div className="w-1/4 flex flex-col gap-6 overflow-hidden">
-                {/* Card 1: Title & Controls */}
-                <CardInfo
-                    ref={leftContentRef}
-                    height={headerHeight}
-                    contentClassName="space-y-5"
-                >
-                    {/* Header Row: Title & Badge */}
-                    <div className="flex items-center justify-between">
-                        <h2 className="text-cq-xl font-bold text-text-main flex items-center gap-2">
-                            <GraduationCap className="text-primary" size={24} />
-                            Liste des Enfants
-                        </h2>
-                        <Badge variant="primary" size="xs">{students.length} Total</Badge>
-                    </div>
-
-                    {/* Separator */}
-                    <div className="border-t border-white/10" />
-
-                    {/* Search & Filters */}
-                    <div className="space-y-4">
-                        {/* Search & Toggle Row */}
-                        <div className="flex gap-3">
-                            <SearchBar
-                                placeholder="Rechercher un élève..."
-                                value={searchQuery}
-                                onChange={(e) => setSearchQuery(e.target.value)}
-                                iconColor="text-primary"
-                            />
-
-                            {/* Filters Toggle Button */}
-                            <button
-                                onClick={() => setShowFilters(!showFilters)}
-                                className={clsx(
-                                    "p-2.5 rounded-xl border transition-all flex items-center justify-center shrink-0",
-                                    showFilters
-                                        ? "bg-primary text-text-dark border-primary shadow-lg shadow-primary/20"
-                                        : "bg-surface/50 border-white/10 text-grey-medium hover:text-white hover:border-white/20"
-                                )}
-                                title="Afficher les filtres"
-                            >
-                                <SlidersHorizontal size={20} />
-                            </button>
+        <PageLayout
+            title="Élèves"
+            subtitle="Gérez vos élèves et leur progression"
+            rightContent={rightContent}
+            containerClassName="p-6"
+        >
+            <div className="h-full flex gap-6 animate-in fade-in duration-500 relative">
+                {/* List Column - Split into 2 cards */}
+                <div className="w-1/4 flex flex-col gap-6 overflow-hidden">
+                    {/* Card 1: Title & Controls */}
+                    <CardInfo
+                        contentClassName="space-y-5"
+                    >
+                        {/* Header Row: Title & Badge */}
+                        <div className="flex items-center justify-between">
+                            <h2 className="text-cq-xl font-bold text-text-main flex items-center gap-2">
+                                <GraduationCap className="text-primary" size={24} />
+                                Liste
+                            </h2>
+                            <Badge variant="default" size="xs">{filteredStudents.length} / {students.length}</Badge>
                         </div>
 
-                        {/* Filters Row - Collapsible */}
-                        {showFilters && (
-                            <div className="flex gap-2 animate-in slide-in-from-top-2 fade-in duration-200">
-                                <FilterSelect
-                                    options={[
-                                        { value: 'all', label: 'Groupes: Tous' },
-                                        ...Array.from(new Set(students.flatMap(s => s.EleveGroupe?.map(eg => eg.Groupe?.nom)).filter(Boolean)))
-                                            .sort()
-                                            .map(g => ({ value: g as string, label: g as string }))
-                                    ]}
-                                    value={filterGroup}
-                                    onChange={(e) => setFilterGroup(e.target.value)}
-                                    icon={Users}
-                                    className="flex-1"
+                        {/* Separator */}
+                        <div className="border-t border-white/10" />
+
+                        {/* Search & Filters */}
+                        <div className="space-y-4">
+                            {/* Search & Toggle Row */}
+                            <div className="flex gap-3">
+                                <SearchBar
+                                    placeholder="Rechercher un élève..."
+                                    value={searchQuery}
+                                    onChange={(e) => setSearchQuery(e.target.value)}
+                                    iconColor="text-primary"
                                 />
 
-                                <FilterSelect
-                                    options={[
-                                        { value: 'all', label: 'Classes: Tous' },
-                                        ...Array.from(new Set(students.map(s => s.Classe?.nom).filter(Boolean)))
-                                            .map(c => ({ value: c as string, label: c as string }))
-                                    ]}
-                                    value={filterClass}
-                                    onChange={(e) => setFilterClass(e.target.value)}
-                                    icon={Filter}
-                                    className="flex-1"
-                                />
-                            </div>
-                        )}
-                    </div>
-                </CardInfo>
-
-                {/* Card 2: List Only */}
-                <CardList
-                    actionLabel="Ajouter un élève"
-                    onAction={handleOpenCreate}
-                    actionIcon={Plus}
-                >
-                    {loading ? (
-                        <div className="flex items-center justify-center h-32">
-                            <Loader2 className="text-primary animate-spin" size={32} />
-                        </div>
-                    ) : filteredStudents.length > 0 ? (
-                        filteredStudents.map(student => (
-                            <ListItem
-                                key={student.id}
-                                id={student.id}
-                                title={`${student.prenom} ${student.nom}`}
-                                // Subtitle removed as requested
-                                isSelected={selectedStudent?.id === student.id}
-                                onClick={() => setSelectedStudent(student)}
-                                onEdit={() => handleEdit(student)}
-                                onDelete={() => setStudentToDelete(student)}
-                                deleteTitle="Supprimer l'élève"
-                                avatar={{
-                                    src: student.photo_url,
-                                    initials: `${student.prenom[0]}${student.nom[0]}`,
-                                    editable: true,
-                                    loading: updatingPhotoId === student.id,
-                                    onImageChange: (file) => processAndSavePhoto(file, student),
-                                    onDragOver: (e) => { e.preventDefault(); e.stopPropagation(); setDraggingPhotoId(student.id); },
-                                    onDragLeave: (e) => { e.preventDefault(); e.stopPropagation(); setDraggingPhotoId(null); },
-                                    onDrop: (e, file) => {
-                                        e.preventDefault();
-                                        e.stopPropagation();
-                                        setDraggingPhotoId(null);
-                                        processAndSavePhoto(file, student);
-                                    },
-                                    className: clsx(
-                                        draggingPhotoId === student.id && "ring-2 ring-primary scale-110 bg-primary/20"
-                                    )
-                                }}
-                            />
-                        ))
-                    ) : (
-                        <EmptyState
-                            icon={Search}
-                            title="Aucun élève trouvé"
-                            description="Essayez d'ajuster vos filtres de recherche"
-                            size="sm"
-                        />
-                    )}
-                </CardList>
-            </div>
-
-            {/* Detail Column - Split into 2 cards */}
-            <div className="flex-1 flex flex-col gap-6 overflow-hidden relative">
-                {!selectedStudent ? (
-                    <div className="flex-1 card-flat overflow-hidden">
-                        <EmptyState
-                            icon={UserIcon}
-                            title="Sélectionnez un élève"
-                            description="Cliquez sur un nom dans la liste pour afficher ses informations détaillées."
-                            size="md"
-                        />
-                    </div>
-                ) : (
-                    <>
-                        {/* Card 1: Student Info */}
-                        <CardInfo
-                            ref={rightContentRef}
-                            height={headerHeight}
-                        >
-                            <div className="flex gap-5 items-center">
-                                <Avatar
-                                    size="xl"
-                                    src={selectedStudent.photo_url}
-                                    initials={`${selectedStudent.prenom[0]}${selectedStudent.nom[0]}`}
-                                    editable
-                                    onImageChange={(file) => processAndSavePhoto(file, selectedStudent)}
-                                    loading={updatingPhotoId === selectedStudent.id}
-                                    onDragOver={handlePhotoDragOver}
-                                    onDragLeave={handlePhotoDragLeave}
-                                    onDrop={(e, _file) => handlePhotoDrop(e, selectedStudent)}
+                                {/* Filters Toggle Button */}
+                                <button
+                                    onClick={() => setShowFilters(!showFilters)}
                                     className={clsx(
-                                        isDraggingPhoto && "border-primary bg-primary/20 scale-105"
+                                        "p-2.5 rounded-xl border transition-all flex items-center justify-center shrink-0",
+                                        showFilters
+                                            ? "bg-primary text-text-dark border-primary shadow-lg shadow-primary/20"
+                                            : "bg-surface/50 border-white/10 text-grey-medium hover:text-white hover:border-white/20"
                                     )}
-                                />
-                                <div className="flex-1 min-w-0">
-                                    <h2 className="text-cq-xl font-bold text-text-main truncate">
-                                        {selectedStudent.prenom} {selectedStudent.nom}
-                                    </h2>
-                                    <p className="text-cq-base text-grey-medium mt-0.5">
-                                        {selectedStudent.Classe?.nom || 'Sans classe'} • {selectedStudent.Niveau?.nom || 'Niveau non défini'}
-                                    </p>
-                                    <div className="flex flex-wrap gap-1.5 mt-3">
-                                        {selectedStudent.EleveGroupe && selectedStudent.EleveGroupe.length > 0 ? (
-                                            selectedStudent.EleveGroupe.map(eg => eg.Groupe && (
-                                                <Badge key={eg.Groupe.id} variant="primary" size="xs" icon={<span>🏆</span>}>
-                                                    {eg.Groupe.nom}
-                                                </Badge>
-                                            ))
-                                        ) : (
-                                            <span className="text-xs text-grey-medium italic">Aucun groupe</span>
-                                        )}
-                                    </div>
-                                </div>
+                                    title="Afficher les filtres"
+                                >
+                                    <SlidersHorizontal size={20} />
+                                </button>
                             </div>
-                        </CardInfo>
 
-                        {/* Card 2: Tabs & Content */}
-                        <CardTabs
-                            tabs={[
-                                { id: 'infos', label: 'Informations' },
-                                { id: 'suivi', label: 'Suivi Pédagogique' },
-                                { id: 'todo', label: 'To-Do List' },
-                                { id: 'urgent', label: 'Suivi Urgent' }
-                            ]}
-                            activeTab={currentTab}
-                            onChange={setCurrentTab}
-                            actionLabel={currentTab === 'todo' ? "Créer le PDF" : undefined}
-                            onAction={currentTab === 'todo' ? generatePDF : undefined}
-                            actionIcon={FileText}
-                        >
-                            {currentTab === 'infos' && (
-                                <div className="grid md:grid-cols-2 gap-8 animate-in fade-in slide-in-from-bottom-2 duration-300">
-                                    {/* Parcours Scolaire */}
-                                    <InfoSection title="Parcours Scolaire">
-                                        <InfoRow
-                                            icon={BookOpen}
-                                            value={selectedStudent.Classe?.nom || 'Non affecté'}
-                                        />
-                                        <InfoRow
-                                            icon={Layers}
-                                            value={selectedStudent.Niveau?.nom || 'Non renseigné'}
-                                        />
-                                        <InfoRow
-                                            icon={Calendar}
-                                            value={calculateAge(selectedStudent.date_naissance)}
-                                        />
-                                    </InfoSection>
+                            {/* Filters Row - Collapsible */}
+                            {showFilters && (
+                                <div className="flex gap-2 animate-in slide-in-from-top-2 fade-in duration-200">
+                                    <FilterSelect
+                                        options={[
+                                            { value: 'all', label: 'Groupes: Tous' },
+                                            ...Array.from(new Set(students.flatMap(s => s.EleveGroupe?.map(eg => eg.Groupe?.nom)).filter(Boolean)))
+                                                .sort()
+                                                .map(g => ({ value: g as string, label: g as string }))
+                                        ]}
+                                        value={filterGroup}
+                                        onChange={(e) => setFilterGroup(e.target.value)}
+                                        icon={Users}
+                                        className="flex-1"
+                                    />
 
-                                    {/* Informations & Responsables */}
-                                    <InfoSection title="Informations & Responsables">
-                                        <InfoRow
-                                            icon={ShieldCheck}
-                                            label="Équipe Enseignante"
-                                            value={
-                                                <div className="space-y-1 mt-1">
-                                                    {(selectedStudent.Classe?.ClasseAdulte?.length || 0) > 0 ? (
-                                                        selectedStudent.Classe?.ClasseAdulte?.map((ca, idx) => (
-                                                            <div key={idx} className="flex items-center gap-2 text-sm">
-                                                                <p className="text-text-main font-bold truncate">{ca.Adulte.prenom} {ca.Adulte.nom}</p>
-                                                                <Badge
-                                                                    variant={ca.role === 'principal' ? 'primary' : 'default'}
-                                                                    size="xs"
-                                                                    style="outline"
-                                                                >
-                                                                    {ca.role === 'principal' ? 'Titulaire' : ca.role === 'coenseignant' ? 'Co-Ens.' : 'Support'}
-                                                                </Badge>
-                                                            </div>
-                                                        ))
-                                                    ) : (
-                                                        <p className="text-text-main font-bold italic opacity-50">Aucun membre assigné</p>
-                                                    )}
-                                                </div>
-                                            }
-                                        />
-                                        <InfoRow
-                                            icon={UserIcon}
-                                            label="Parents"
-                                            value={selectedStudent.nom_parents || [
-                                                `${selectedStudent.parent1_prenom} ${selectedStudent.parent1_nom}`,
-                                                `${selectedStudent.parent2_prenom} ${selectedStudent.parent2_nom}`
-                                            ].filter(p => p.trim() !== "").join(' & ') || 'Non renseignés'}
-                                        />
-                                    </InfoSection>
-
-                                    {/* Branch Indices */}
-                                    <div className="md:col-span-2">
-                                        <InfoSectionEditable title="Indices de Branche (Performance)">
-                                            <InfoRowEditable
-                                                icon={Activity}
-                                                label="Global"
-                                                value={selectedStudent.importance_suivi ?? ''}
-                                                onChange={(val) => handleUpdateImportance(val)}
-                                                placeholder="50"
-                                            />
-                                            {branches.map(branch => (
-                                                <InfoRowEditable
-                                                    key={branch.id}
-                                                    icon={GitBranch}
-                                                    label={branch.nom}
-                                                    value={studentIndices[selectedStudent.id]?.[branch.id] ?? ''}
-                                                    onChange={(val) => handleUpdateBranchIndex(selectedStudent.id, branch.id, val)}
-                                                    placeholder="50"
-                                                />
-                                            ))}
-                                        </InfoSectionEditable>
-                                    </div>
+                                    <FilterSelect
+                                        options={[
+                                            { value: 'all', label: 'Classes: Tous' },
+                                            ...Array.from(new Set(students.map(s => s.Classe?.nom).filter(Boolean)))
+                                                .map(c => ({ value: c as string, label: c as string }))
+                                        ]}
+                                        value={filterClass}
+                                        onChange={(e) => setFilterClass(e.target.value)}
+                                        icon={Filter}
+                                        className="flex-1"
+                                    />
                                 </div>
                             )}
+                        </div>
+                    </CardInfo>
 
-                            {currentTab === 'suivi' && (
-                                <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
-                                    <div className="flex flex-col items-start gap-2 mb-6">
-                                        <SmartTabs
-                                            tabs={[
-                                                { id: 'journal', label: 'Journal', icon: LayoutList },
-                                                { id: 'progression', label: 'Progression', icon: GitGraph }
-                                            ]}
-                                            activeTab={suiviMode}
-                                            onChange={(tabId) => setSuiviMode(tabId as 'journal' | 'progression')}
-                                            level={3}
-                                        />
+                    {/* Card 2: List Only */}
+                    <CardList
+                        actionLabel="Ajouter un élève"
+                        onAction={handleOpenCreate}
+                        actionIcon={Plus}
+                    >
+                        {loading ? (
+                            <div className="flex items-center justify-center h-32">
+                                <Loader2 className="text-primary animate-spin" size={32} />
+                            </div>
+                        ) : filteredStudents.length > 0 ? (
+                            filteredStudents.map(student => (
+                                <ListItem
+                                    key={student.id}
+                                    id={student.id}
+                                    title={`${student.prenom} ${student.nom}`}
+                                    // Subtitle removed as requested
+                                    isSelected={selectedStudent?.id === student.id}
+                                    onClick={() => setSelectedStudent(student)}
+                                    onEdit={() => handleEdit(student)}
+                                    onDelete={() => setStudentToDelete(student)}
+                                    rightElement={
+                                        student.trust_trend && (
+                                            <div className={clsx(
+                                                "p-1 rounded-full",
+                                                student.trust_trend === 'up' && "text-success bg-success/10",
+                                                student.trust_trend === 'down' && "text-danger bg-danger/10",
+                                                student.trust_trend === 'stable' && "text-grey-dark bg-grey-dark/10"
+                                            )}>
+                                                {student.trust_trend === 'up' && <TrendingUp size={14} />}
+                                                {student.trust_trend === 'down' && <TrendingDown size={14} />}
+                                                {student.trust_trend === 'stable' && <Minus size={14} />}
+                                            </div>
+                                        )
+                                    }
+                                    deleteTitle="Supprimer l'élève"
+                                    avatar={{
+                                        src: student.photo_url,
+                                        initials: `${student.prenom[0]}${student.nom[0]}`,
+                                        editable: true,
+                                        loading: updatingPhotoId === student.id,
+                                        onImageChange: (file) => processAndSavePhoto(file, student),
+                                        onDragOver: (e) => { e.preventDefault(); e.stopPropagation(); setDraggingPhotoId(student.id); },
+                                        onDragLeave: (e) => { e.preventDefault(); e.stopPropagation(); setDraggingPhotoId(null); },
+                                        onDrop: (e, file) => {
+                                            e.preventDefault();
+                                            e.stopPropagation();
+                                            setDraggingPhotoId(null);
+                                            processAndSavePhoto(file, student);
+                                        },
+                                        className: clsx(
+                                            draggingPhotoId === student.id && "ring-2 ring-primary scale-110 bg-primary/20"
+                                        )
+                                    }}
+                                />
+                            ))
+                        ) : (
+                            <EmptyState
+                                icon={Search}
+                                title="Aucun élève trouvé"
+                                description="Essayez d'ajuster vos filtres de recherche"
+                                size="sm"
+                            />
+                        )}
+                    </CardList>
+                </div>
 
-                                        {suiviMode === 'journal' && (
-                                            <div className="animate-in fade-in slide-in-from-top-1 duration-300">
-                                                <SmartTabs
-                                                    tabs={[
-                                                        { id: 'pending', label: 'En cours', icon: Activity, variant: 'warning' },
-                                                        { id: 'all', label: 'Tout voir', icon: LayoutList, variant: 'primary' }
-                                                    ]}
-                                                    activeTab={showPendingOnly ? 'pending' : 'all'}
-                                                    onChange={(tabId) => setShowPendingOnly(tabId === 'pending')}
-                                                    level={3}
+                {/* Detail Column - Split into 2 cards */}
+                <div className="flex-1 flex flex-col gap-6 overflow-hidden relative">
+                    {!selectedStudent ? (
+                        <div className="flex-1 card-flat overflow-hidden">
+                            <EmptyState
+                                icon={UserIcon}
+                                title="Sélectionnez un élève"
+                                description="Cliquez sur un nom dans la liste pour afficher ses informations détaillées."
+                                size="md"
+                            />
+                        </div>
+                    ) : (
+                        <>
+                            {/* Card 1: Student Info */}
+                            <CardInfo>
+                                <div className="flex gap-5 items-center">
+                                    <Avatar
+                                        size="xl"
+                                        src={selectedStudent.photo_url}
+                                        initials={`${selectedStudent.prenom[0]}${selectedStudent.nom[0]}`}
+                                        editable
+                                        onImageChange={(file) => processAndSavePhoto(file, selectedStudent)}
+                                        loading={updatingPhotoId === selectedStudent.id}
+                                        onDragOver={handlePhotoDragOver}
+                                        onDragLeave={handlePhotoDragLeave}
+                                        onDrop={(e, _file) => handlePhotoDrop(e, selectedStudent)}
+                                        className={clsx(
+                                            isDraggingPhoto && "border-primary bg-primary/20 scale-105"
+                                        )}
+                                    />
+                                    <div className="flex-1 min-w-0">
+                                        <div className="flex items-start justify-between">
+                                            <h2 className="text-cq-xl font-bold text-text-main truncate">
+                                                {selectedStudent.prenom} {selectedStudent.nom}
+                                            </h2>
+                                            <button
+                                                onClick={() => setShowQRModal(true)}
+                                                className="p-2 ml-2 bg-white/5 hover:bg-white/10 text-white rounded-lg transition-colors group"
+                                                title="Afficher le Magic QR Code"
+                                            >
+                                                <QrCode size={20} className="group-hover:text-primary transition-colors" />
+                                            </button>
+                                        </div>
+                                        <p className="text-cq-base text-grey-medium mt-0.5">
+                                            {selectedStudent.Classe?.nom || 'Sans classe'} • {selectedStudent.Niveau?.nom || 'Niveau non défini'}
+                                        </p>
+                                        <div className="flex flex-wrap gap-1.5 mt-3">
+                                            {selectedStudent.EleveGroupe && selectedStudent.EleveGroupe.length > 0 ? (
+                                                selectedStudent.EleveGroupe.map(eg => eg.Groupe && (
+                                                    <Badge key={eg.Groupe.id} variant="primary" size="xs" icon={<span>🏆</span>}>
+                                                        {eg.Groupe.nom}
+                                                    </Badge>
+                                                ))
+                                            ) : (
+                                                <span className="text-xs text-grey-medium italic">Aucun groupe</span>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+                            </CardInfo>
+
+                            {/* Card 2: Tabs & Content */}
+                            <CardTabs
+                                tabs={[
+                                    { id: 'infos', label: 'Informations' },
+                                    { id: 'suivi', label: 'Suivi Pédagogique' },
+                                    { id: 'todo', label: 'To-Do List' },
+                                    { id: 'urgent', label: 'Suivi Urgent' }
+                                ]}
+                                activeTab={currentTab}
+                                onChange={setCurrentTab}
+                                actionLabel={currentTab === 'todo' ? "Créer le PDF" : undefined}
+                                onAction={currentTab === 'todo' ? generatePDF : undefined}
+                                actionIcon={FileText}
+                            >
+                                {currentTab === 'infos' && (
+                                    <div className="grid md:grid-cols-2 gap-8 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                                        {/* Parcours Scolaire */}
+                                        <InfoSection title="Parcours Scolaire">
+                                            <InfoRow
+                                                icon={BookOpen}
+                                                value={selectedStudent.Classe?.nom || 'Non affecté'}
+                                            />
+                                            <InfoRow
+                                                icon={Layers}
+                                                value={selectedStudent.Niveau?.nom || 'Non renseigné'}
+                                            />
+                                            <InfoRow
+                                                icon={Calendar}
+                                                value={calculateAge(selectedStudent.date_naissance)}
+                                            />
+                                        </InfoSection>
+
+                                        {/* Informations & Responsables */}
+                                        <InfoSection title="Informations & Responsables">
+                                            <InfoRow
+                                                icon={ShieldCheck}
+                                                label="Équipe Enseignante"
+                                                value={
+                                                    <div className="space-y-1 mt-1">
+                                                        {(selectedStudent.Classe?.ClasseAdulte?.length || 0) > 0 ? (
+                                                            selectedStudent.Classe?.ClasseAdulte?.map((ca, idx) => (
+                                                                <div key={idx} className="flex items-center gap-2 text-sm">
+                                                                    <p className="text-text-main font-bold truncate">{ca.Adulte.prenom} {ca.Adulte.nom}</p>
+                                                                    <Badge
+                                                                        variant={ca.role === 'principal' ? 'primary' : 'default'}
+                                                                        size="xs"
+                                                                        style="outline"
+                                                                    >
+                                                                        {ca.role === 'principal' ? 'Titulaire' : ca.role === 'coenseignant' ? 'Co-Ens.' : 'Support'}
+                                                                    </Badge>
+                                                                </div>
+                                                            ))
+                                                        ) : (
+                                                            <p className="text-text-main font-bold italic opacity-50">Aucun membre assigné</p>
+                                                        )}
+                                                    </div>
+                                                }
+                                            />
+                                            <InfoRow
+                                                icon={UserIcon}
+                                                label="Parents"
+                                                value={selectedStudent.nom_parents || [
+                                                    `${selectedStudent.parent1_prenom} ${selectedStudent.parent1_nom}`,
+                                                    `${selectedStudent.parent2_prenom} ${selectedStudent.parent2_nom}`
+                                                ].filter(p => p.trim() !== "").join(' & ') || 'Non renseignés'}
+                                            />
+                                        </InfoSection>
+
+                                        {/* Branch Indices */}
+                                        <div className="md:col-span-2">
+                                            <InfoSectionEditable title="Indices de Branche (Performance)">
+                                                <InfoRowEditable
+                                                    icon={Activity}
+                                                    label="Global"
+                                                    value={selectedStudent.importance_suivi ?? ''}
+                                                    onChange={(val) => handleUpdateImportance(val)}
+                                                    placeholder="50"
                                                 />
+                                                {branches.map(branch => (
+                                                    <InfoRowEditable
+                                                        key={branch.id}
+                                                        icon={GitBranch}
+                                                        label={branch.nom}
+                                                        value={studentIndices[selectedStudent.id]?.[branch.id] ?? ''}
+                                                        onChange={(val) => handleUpdateBranchIndex(selectedStudent.id, branch.id, val)}
+                                                        placeholder="50"
+                                                    />
+                                                ))}
+                                            </InfoSectionEditable>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {currentTab === 'suivi' && (
+                                    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                                        <div className="flex flex-col items-start gap-2 mb-6">
+                                            <SmartTabs
+                                                tabs={[
+                                                    { id: 'journal', label: 'Journal', icon: LayoutList },
+                                                    { id: 'progression', label: 'Progression', icon: GitGraph }
+                                                ]}
+                                                activeTab={suiviMode}
+                                                onChange={(tabId) => setSuiviMode(tabId as 'journal' | 'progression')}
+                                                level={3}
+                                            />
+
+                                            {suiviMode === 'journal' && (
+                                                <div className="animate-in fade-in slide-in-from-top-1 duration-300">
+                                                    <SmartTabs
+                                                        tabs={[
+                                                            { id: 'pending', label: 'En cours', icon: Activity, variant: 'warning' },
+                                                            { id: 'all', label: 'Tout voir', icon: LayoutList, variant: 'primary' }
+                                                        ]}
+                                                        activeTab={showPendingOnly ? 'pending' : 'all'}
+                                                        onChange={(tabId) => setShowPendingOnly(tabId === 'pending')}
+                                                        level={3}
+                                                    />
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        {loadingProgress ? (
+                                            <div className="flex justify-center p-8"><Loader2 className="animate-spin text-primary" size={32} /></div>
+                                        ) : studentProgress.length === 0 ? (
+                                            <div className="text-center p-8 text-grey-medium opacity-60 italic">Aucune activité commencée.</div>
+                                        ) : (
+                                            <div className="space-y-6">
+                                                {suiviMode === 'journal' && <div className="space-y-1">{renderJournalView()}</div>}
                                             </div>
                                         )}
                                     </div>
+                                )}
 
-                                    {loadingProgress ? (
-                                        <div className="flex justify-center p-8"><Loader2 className="animate-spin text-primary" size={32} /></div>
-                                    ) : studentProgress.length === 0 ? (
-                                        <div className="text-center p-8 text-grey-medium opacity-60 italic">Aucune activité commencée.</div>
-                                    ) : (
-                                        <div className="space-y-6">
-                                            {suiviMode === 'journal' && <div className="space-y-1">{renderJournalView()}</div>}
-                                        </div>
-                                    )}
-                                </div>
-                            )}
+                                {currentTab === 'urgent' && (
+                                    <div className="space-y-2 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                                        <h3 className="text-xl font-bold text-text-main flex items-center gap-2 mb-4">
+                                            <div className="flex items-center gap-2">
+                                                <AlertCircle size={24} className="text-primary" />
+                                                <span>Travaux à terminer</span>
+                                            </div>
+                                            <span className="text-sm font-normal text-grey-medium ml-2 bg-white/5 px-2 py-0.5 rounded-full">
+                                                {totalOverdueCount} ateliers
+                                            </span>
+                                        </h3>
 
-                            {currentTab === 'urgent' && (
-                                <div className="space-y-2 animate-in fade-in slide-in-from-bottom-2 duration-300">
-                                    <h3 className="text-xl font-bold text-text-main flex items-center gap-2 mb-4">
-                                        <div className="flex items-center gap-2">
-                                            <AlertCircle size={24} className="text-primary" />
-                                            <span>Travaux à terminer</span>
-                                        </div>
-                                        <span className="text-sm font-normal text-grey-medium ml-2 bg-white/5 px-2 py-0.5 rounded-full">
-                                            {totalOverdueCount} ateliers
-                                        </span>
-                                    </h3>
+                                        {!hasOverdueWork ? (
+                                            <div className="flex flex-col items-center justify-center p-12 text-center text-grey-medium opacity-60">
+                                                <CheckCircle2 size={48} className="mb-4 text-success" />
+                                                <p className="text-lg font-medium">Aucun travail en cours !</p>
+                                                <p className="text-sm">Tout est à jour.</p>
+                                            </div>
+                                        ) : (
+                                            sortedModules.map((module: any) => {
+                                                const isExpanded = expandedModules[module.id];
+                                                const activities = module.activities;
+                                                const completedCount = activities.filter((a: any) => a.etat === 'termine').length; // Will be 0
+                                                const totalCount = activities.length;
+                                                const percent = Math.round((completedCount / totalCount) * 100);
 
-                                    {!hasOverdueWork ? (
-                                        <div className="flex flex-col items-center justify-center p-12 text-center text-grey-medium opacity-60">
-                                            <CheckCircle2 size={48} className="mb-4 text-success" />
-                                            <p className="text-lg font-medium">Aucun travail en cours !</p>
-                                            <p className="text-sm">Tout est à jour.</p>
-                                        </div>
-                                    ) : (
-                                        sortedModules.map((module: any) => {
-                                            const isExpanded = expandedModules[module.id];
-                                            const activities = module.activities;
-                                            const completedCount = activities.filter((a: any) => a.etat === 'termine').length; // Will be 0
-                                            const totalCount = activities.length;
-                                            const percent = Math.round((completedCount / totalCount) * 100);
+                                                // We can flag if it's strictly overdue for styling if needed, but we are using standard style now.
+                                                // const isModuleOverdue = module.date_fin && new Date(module.date_fin) < new Date() && completedCount < totalCount;
 
-                                            // We can flag if it's strictly overdue for styling if needed, but we are using standard style now.
-                                            // const isModuleOverdue = module.date_fin && new Date(module.date_fin) < new Date() && completedCount < totalCount;
-
-                                            return (
-                                                <div key={module.id} className="bg-surface/50 border border-transparent rounded-xl overflow-hidden hover:border-white/10 hover:bg-surface transition-all group">
-                                                    <div
-                                                        onClick={() => toggleModuleExpansion(module.id)}
-                                                        className="py-1.5 px-4 cursor-pointer hover:bg-white/5 transition-colors flex items-center justify-between gap-6"
-                                                    >
-                                                        {/* Left: Title & Chevron (Takes remaining space) */}
-                                                        <div className="flex items-center gap-4 min-w-0 flex-1">
-                                                            <div className={clsx(
-                                                                "transition-all duration-300",
-                                                                isExpanded ? "rotate-90 text-primary" : "rotate-0 text-grey-dark group-hover:text-grey-medium"
-                                                            )}>
-                                                                <ChevronRight size={18} />
-                                                            </div>
-                                                            <h3 className={clsx(
-                                                                "font-bold text-text-main text-lg truncate tracking-tight group-hover:text-white transition-all w-fit"
-                                                                // removed danger style override as requested
-                                                            )}>
-                                                                {module.nom}
-                                                            </h3>
-                                                        </div>
-
-                                                        {/* Right: Metrics Block (40% width, anchored right) - COPIED FROM JOURNAL */}
-                                                        <div className="flex items-center gap-6 w-[40%] shrink-0">
-                                                            {/* Date Badge */}
-                                                            <div className="shrink-0">
-                                                                {module.date_fin ? (
-                                                                    <Badge variant="primary" size="xs" className="px-2 py-0.5 font-black">
-                                                                        {format(new Date(module.date_fin), 'dd/MM', { locale: fr })}
-                                                                    </Badge>
-                                                                ) : (
-                                                                    <span className="text-[10px] font-bold text-grey-dark uppercase tracking-widest italic opacity-20 px-2">N/A</span>
-                                                                )}
-                                                            </div>
-
-                                                            {/* Progress Bar Area */}
-                                                            <div className="flex-1 flex items-center gap-4">
-                                                                <div className="flex-1 h-1.5 bg-background/50 rounded-full overflow-hidden border border-white/5">
-                                                                    <div
-                                                                        className="h-full bg-primary transition-all duration-1000 ease-out shadow-[0_0_10px_rgba(var(--primary-rgb),0.5)]"
-                                                                        style={{ width: `${percent}%` }}
-                                                                    />
+                                                return (
+                                                    <div key={module.id} className="bg-surface/50 border border-transparent rounded-xl overflow-hidden hover:border-white/10 hover:bg-surface transition-all group">
+                                                        <div
+                                                            onClick={() => toggleModuleExpansion(module.id)}
+                                                            className="py-1.5 px-4 cursor-pointer hover:bg-white/5 transition-colors flex items-center justify-between gap-6"
+                                                        >
+                                                            {/* Left: Title & Chevron (Takes remaining space) */}
+                                                            <div className="flex items-center gap-4 min-w-0 flex-1">
+                                                                <div className={clsx(
+                                                                    "transition-all duration-300",
+                                                                    isExpanded ? "rotate-90 text-primary" : "rotate-0 text-grey-dark group-hover:text-grey-medium"
+                                                                )}>
+                                                                    <ChevronRight size={18} />
                                                                 </div>
-                                                                <span className="text-xs font-black text-grey-medium min-w-[35px] text-right tabular-nums">
-                                                                    {completedCount}/{totalCount}
-                                                                </span>
+                                                                <h3 className={clsx(
+                                                                    "font-bold text-text-main text-lg truncate tracking-tight group-hover:text-white transition-all w-fit"
+                                                                    // removed danger style override as requested
+                                                                )}>
+                                                                    {module.nom}
+                                                                </h3>
+                                                            </div>
+
+                                                            {/* Right: Metrics Block (40% width, anchored right) - COPIED FROM JOURNAL */}
+                                                            <div className="flex items-center gap-6 w-[40%] shrink-0">
+                                                                {/* Date Badge */}
+                                                                <div className="shrink-0">
+                                                                    {module.date_fin ? (
+                                                                        <Badge variant="primary" size="xs" className="px-2 py-0.5 font-black">
+                                                                            {format(new Date(module.date_fin), 'dd/MM', { locale: fr })}
+                                                                        </Badge>
+                                                                    ) : (
+                                                                        <span className="text-[10px] font-bold text-grey-dark uppercase tracking-widest italic opacity-20 px-2">N/A</span>
+                                                                    )}
+                                                                </div>
+
+                                                                {/* Progress Bar Area */}
+                                                                <div className="flex-1 flex items-center gap-4">
+                                                                    <div className="flex-1 h-1.5 bg-background/50 rounded-full overflow-hidden border border-white/5">
+                                                                        <div
+                                                                            className="h-full bg-primary transition-all duration-1000 ease-out shadow-[0_0_10px_rgba(var(--primary-rgb),0.5)]"
+                                                                            style={{ width: `${percent}%` }}
+                                                                        />
+                                                                    </div>
+                                                                    <span className="text-xs font-black text-grey-medium min-w-[35px] text-right tabular-nums">
+                                                                        {completedCount}/{totalCount}
+                                                                    </span>
+                                                                </div>
                                                             </div>
                                                         </div>
-                                                    </div>
 
-                                                    {isExpanded && (
-                                                        <div className="border-t border-white/5 bg-black/20">
-                                                            {module.activities.sort((a: any, b: any) => (a.Activite?.ordre || 0) - (b.Activite?.ordre || 0)).map((p: any) => (
-                                                                <div key={p.id} className="p-3 pl-16 border-b border-white/5 last:border-0 flex items-center justify-between hover:bg-white/5 transition-colors group">
-                                                                    <h4 className="text-sm text-grey-light font-medium group-hover:text-white transition-colors">
-                                                                        <span className="text-xs text-grey-dark mr-2">#{p.Activite?.ordre}</span>
-                                                                        {p.Activite?.titre}
-                                                                    </h4>
-                                                                    <div className="flex items-center gap-3">
-                                                                        <div
-                                                                            onClick={(e) => {
-                                                                                e.stopPropagation();
-                                                                                handleUrgentValidation(p.Activite.id, selectedStudent.id, studentIndices);
-                                                                            }}
-                                                                            className={clsx(
-                                                                                "px-2 py-1 rounded text-[10px] font-black uppercase tracking-wider flex items-center gap-1.5 transition-all cursor-pointer hover:scale-105",
-                                                                                p.etat === 'besoin_d_aide'
-                                                                                    ? "bg-amber-500/20 text-amber-500 hover:bg-amber-500/30 animate-pulse"
-                                                                                    : "bg-blue-500/20 text-blue-500 hover:bg-blue-500/30"
-                                                                            )}
-                                                                        >
-                                                                            <Clock size={10} />
-                                                                            {p.etat === 'besoin_d_aide' ? "Besoin d'aide" : "En cours"}
+                                                        {isExpanded && (
+                                                            <div className="border-t border-white/5 bg-black/20">
+                                                                {module.activities.sort((a: any, b: any) => (a.Activite?.ordre || 0) - (b.Activite?.ordre || 0)).map((p: any) => (
+                                                                    <div key={p.id} className="p-3 pl-16 border-b border-white/5 last:border-0 flex items-center justify-between hover:bg-white/5 transition-colors group">
+                                                                        <h4 className="text-sm text-grey-light font-medium group-hover:text-white transition-colors">
+                                                                            <span className="text-xs text-grey-dark mr-2">#{p.Activite?.ordre}</span>
+                                                                            {p.Activite?.titre}
+                                                                        </h4>
+                                                                        <div className="flex items-center gap-3">
+                                                                            <div
+                                                                                onClick={(e) => {
+                                                                                    e.stopPropagation();
+                                                                                    handleUrgentValidation(p.Activite.id, selectedStudent.id, studentIndices);
+                                                                                }}
+                                                                                className={clsx(
+                                                                                    "px-2 py-1 rounded text-[10px] font-black uppercase tracking-wider flex items-center gap-1.5 transition-all cursor-pointer hover:scale-105",
+                                                                                    p.etat === 'besoin_d_aide'
+                                                                                        ? "bg-amber-500/20 text-amber-500 hover:bg-amber-500/30 animate-pulse"
+                                                                                        : "bg-blue-500/20 text-blue-500 hover:bg-blue-500/30"
+                                                                                )}
+                                                                            >
+                                                                                <Clock size={10} />
+                                                                                {p.etat === 'besoin_d_aide' ? "Besoin d'aide" : "En cours"}
+                                                                            </div>
                                                                         </div>
                                                                     </div>
-                                                                </div>
-                                                            ))}
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            );
-                                        })
-                                    )}
-                                </div>
-                            )}
+                                                                ))}
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                );
+                                            })
+                                        )}
+                                    </div>
+                                )}
 
-                            {currentTab === 'todo' && (
-                                <div className="h-full flex flex-col items-center justify-center p-12 text-center text-grey-medium opacity-60">
-                                    <FileText size={48} className="mb-4 text-primary opacity-40" />
-                                    <p className="text-lg font-medium">Prêt pour l'impression</p>
-                                    <p className="text-sm italic">Cliquez sur le bouton ci-dessous pour générer la liste des activités à faire pour {selectedStudent.prenom}.</p>
-                                </div>
-                            )}
-                        </CardTabs>
-                    </>
-                )}
-            </div>
+                                {currentTab === 'todo' && (
+                                    <div className="h-full flex flex-col items-center justify-center p-12 text-center text-grey-medium opacity-60">
+                                        <FileText size={48} className="mb-4 text-primary opacity-40" />
+                                        <p className="text-lg font-medium">Prêt pour l'impression</p>
+                                        <p className="text-sm italic">Cliquez sur le bouton ci-dessous pour générer la liste des activités à faire pour {selectedStudent.prenom}.</p>
+                                    </div>
+                                )}
+                            </CardTabs>
+                        </>
+                    )}
+                </div>
 
-            <ConfirmModal
-                isOpen={!!studentToDelete}
-                onClose={() => setStudentToDelete(null)}
-                onConfirm={handleDelete}
-                title="Supprimer l'élève ?"
-                message={`Êtes-vous sûr de vouloir supprimer "${studentToDelete?.prenom} ${studentToDelete?.nom}" ? Cette action est irréversible.`}
-                confirmText="Supprimer"
-                cancelText="Annuler"
-                variant="danger"
-                isLoading={loading}
-            />
+                <ConfirmModal
+                    isOpen={!!studentToDelete}
+                    onClose={() => setStudentToDelete(null)}
+                    onConfirm={handleDelete}
+                    title="Supprimer l'élève ?"
+                    message={`Êtes-vous sûr de vouloir supprimer "${studentToDelete?.prenom} ${studentToDelete?.nom}" ? Cette action est irréversible.`}
+                    confirmText="Supprimer"
+                    cancelText="Annuler"
+                    variant="danger"
+                    isLoading={loading}
+                />
 
-            <StudentModal
-                showModal={showModal}
-                onClose={handleCloseModal}
-                isEditing={isEditing}
-                editId={editId}
-                onSaved={handleStudentSaved}
-            />
-        </div >
+                <StudentModal
+                    showModal={showModal}
+                    onClose={handleCloseModal}
+                    isEditing={isEditing}
+                    editId={editId}
+                    onSaved={handleStudentSaved}
+                />
+
+                <StudentQRModal
+                    isOpen={showQRModal}
+                    onClose={() => setShowQRModal(false)}
+                    student={selectedStudent}
+                />
+            </div >
+        </PageLayout>
     );
 };
 

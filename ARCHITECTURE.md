@@ -4,7 +4,7 @@ Ce document décrit l'architecture technique de l'application de Gestion de Clas
 
 ## Vue d'ensemble
 
-Le projet est une Single Page Application (SPA) construite avec React et Vite, utilisant Supabase comme Backend-as-a-Service (BaaS). L'architecture suit le **Repository Pattern** pour une séparation claire des responsabilités.
+Le projet est une Single Page Application (SPA) construite avec React et Vite, utilisant Supabase comme Backend-as-a-Service (BaaS). L'architecture suit le **Repository Pattern** pour une séparation claire des responsabilités entre la logique métier et l'accès aux données.
 
 ```mermaid
 graph TD
@@ -15,6 +15,7 @@ graph TD
         Router[React Router]
         Services[Services Layer]
         Repos[Repositories Layer]
+        State[Hook State/Context]
     end
     
     subgraph "Backend (Supabase)"
@@ -32,6 +33,7 @@ graph TD
     Repos -->|JWT| Auth
     Repos -->|Synchro| Realtime
     Repos -->|Fichiers| Storage
+    UI -->|Etat| State
 ```
 
 ## Technologies
@@ -48,228 +50,92 @@ graph TD
 
 - **Backend**:
   - [Supabase](https://supabase.com/)
-    - PostgreSQL Database
+    - PostgreSQL Database (Relationnelle)
     - Authentication (Email-based)
-    - Row Level Security (RLS)
-    - Real-time subscriptions
-    - File storage
+    - Row Level Security (RLS) pour la sécurité des données
+    - Real-time subscriptions pour la synchro instantanée
+    - File storage pour les photos et documents
 
 ## Architecture en Couches
 
 ### 1. Presentation Layer (Components)
 
-- Composants React réutilisables
-- Gestion de l'état local
-- Interaction utilisateur
+Composants React réutilisables, gestion de l'état local et interaction utilisateur.
 
 ### 2. Business Logic Layer (Services)
 
-- Validation des données
-- Orchestration des opérations
-- Logique métier centralisée
-- **Pattern :** Dependency Injection
+Validation des données, orchestration des opérations et logique métier centralisée. Utilise l'injection de dépendances pour les repositories.
 
 ### 3. Data Access Layer (Repositories)
 
-- Abstraction de la source de données
-- Requêtes Supabase isolées
-- **Pattern :** Repository Pattern
+Abstraction de la source de données. Isole les requêtes Supabase (`supabaseClient`) du reste de l'application.
 
 ### 4. Infrastructure Layer (Lib)
 
-- Utilitaires partagés
-- Configuration
-- Helpers
+Utilitaires partagés, configuration globale, helpers et synchronisation.
 
 ## Structure des Dossiers
 
-```
+```text
 /src
-├── /components          # Composants réutilisables (Layout, Modales, UI)
-├── /pages              # Vues principales (Dashboard, Auth, Landing)
-├── /features           # Modules métier (feature-based architecture)
+├── /components          # Composants UI globaux et Layouts
+├── /pages              # Composants de pages (entry point des routes)
+├── /features           # Architecture orientée "domaines métier"
+│   ├── /activities     # Gestion des activités pédagogiques
 │   ├── /attendance     # Gestion des présences
-│   │   ├── /components
-│   │   ├── /hooks
-│   │   ├── /repositories
-│   │   │   ├── IAttendanceRepository.ts
-│   │   │   └── SupabaseAttendanceRepository.ts
-│   │   └── /services
-│   │       ├── attendanceService.ts
-│   │       └── attendanceService.test.ts
-│   ├── /tracking       # Suivi pédagogique
-│   │   ├── /types
-│   │   ├── /repositories
-│   │   └── /services
-│   ├── /students       # Gestion des élèves
-│   ├── /activities     # Gestion des activités
-│   ├── /classes        # Gestion des classes
-│   ├── /groups         # Gestion des groupes
-│   ├── /levels         # Gestion des niveaux
-│   ├── /branches       # Gestion des branches
-│   ├── /adults         # Gestion des adultes
-│   └── /materials      # Gestion du matériel
-├── /lib                # Utilitaires et configuration
-│   ├── /storage        # Stockage et images
-│   │   ├── storageService.ts
-│   │   ├── imageCompression.ts
-│   │   ├── photoCache.ts
-│   │   └── index.ts
-│   ├── /database       # Configuration DB
-│   │   ├── supabaseClient.ts
-│   │   ├── supabaseQueries.ts
-│   │   ├── cleanupUtils.ts
-│   │   └── index.ts
-│   ├── /helpers        # Utilitaires généraux
-│   │   ├── utils.ts
-│   │   ├── validation.ts
-│   │   ├── statusHelpers.ts
-│   │   └── index.ts
-│   ├── /sync           # Synchronisation
-│   │   ├── deltaSync.ts
-│   │   ├── offline.ts
-│   │   └── index.ts
-│   └── /pdf            # Génération PDF
-│       ├── pdfUtils.ts
-│       └── index.ts
-├── /hooks              # Custom hooks globaux
-├── /config             # Constantes globales
-└── /types              # Types TypeScript
-
+│   ├── /branches       # Gestion des branches et sous-branches
+│   ├── /classes        # Gestion des classes/divisions
+│   ├── /groups         # Gestion des groupes d'élèves
+│   ├── /levels         # Gestion des niveaux (PS, MS, GS, etc.)
+│   ├── /materials      # Gestion du matériel de classe
+│   ├── /modules        # Modules de progression
+│   ├── /planner        # Planning et emploi du temps
+│   ├── /progression    # Suivi des acquis
+│   ├── /students       # Fiches élèves et photos
+│   ├── /tracking       # Suivi pédagogique détaillé
+│   └── /users          # Profils et paramètres utilisateurs
+├── /lib                # Coeur technique (Supabase, Storage, PDF, Sync)
+├── /hooks              # Hooks React globaux (useAuth, useToast, etc.)
+├── /config             # Constantes et configuration globale
+└── /types              # Définitions de types TypeScript (dont supabase.ts)
 ```
 
 ## Patterns Architecturaux
 
 ### Repository Pattern
 
-Tous les services critiques utilisent le Repository Pattern pour séparer la logique métier de l'accès aux données.
+L'application utilise le Repository Pattern pour découpler le code métier des détails de Supabase.
 
-**Avantages :**
+**Exemple de structure :**
 
-- ✅ Testabilité (mocks faciles)
-- ✅ Changement de source de données simplifié
-- ✅ Séparation des responsabilités
-- ✅ Code plus maintenable
-
-**Exemple :**
-
-```typescript
-// Interface (contrat)
-export interface IStudentRepository {
-  findById(id: string): Promise<Student | null>;
-  create(data: StudentInsert): Promise<Student>;
-  update(id: string, data: StudentUpdate): Promise<Student>;
-}
-
-// Implémentation Supabase
-export class SupabaseStudentRepository implements IStudentRepository {
-  async findById(id: string) {
-    const { data, error } = await supabase
-      .from('Eleve')
-      .select('*')
-      .eq('id', id)
-      .single();
-    if (error) throw error;
-    return data;
-  }
-  // ...
-}
-
-// Service avec injection de dépendances
-export class StudentService {
-  constructor(private repository: IStudentRepository) {}
-  
-  async getStudent(id: string) {
-    return await this.repository.findById(id);
-  }
-}
-
-// Singleton exporté
-export const studentService = new StudentService(
-  new SupabaseStudentRepository()
-);
-```
+- `IStudentRepository.ts` : Définit l'interface (le contrat).
+- `SupabaseStudentRepository.ts` : Implémente le contrat avec Supabase.
+- `StudentService.ts` : Reçoit le repository et gère la logique métier.
 
 ### Services Migrés
 
-Les services suivants utilisent le Repository Pattern :
+Presque tous les domaines métier utilisent désormais ce pattern :
 
-- ✅ **AttendanceService** - Gestion des présences (16 tests)
-- ✅ **TrackingService** - Suivi pédagogique (14 tests)
-- ✅ **AdultService** - Gestion des adultes (4 tests)
-- ✅ **ActivityTypeService** - Types d'activités (10 tests)
-- ✅ **MaterialService** - Gestion du matériel (11 tests)
-- ✅ **StudentService** - Gestion des élèves
-- ✅ **ActivityService** - Gestion des activités
-- ✅ **ClassService** - Gestion des classes
-- ✅ **LevelService** - Gestion des niveaux
-- ✅ **BranchService** - Gestion des branches
-- ✅ **GroupService** - Gestion des groupes
-
-**Total : 55 tests unitaires (100% de réussite)**
-
-## Conventions de Code
-
-### Nommage
-
-- **Interfaces Repository :** `I[Entity]Repository`
-- **Implémentations :** `Supabase[Entity]Repository`
-- **Services :** `[Entity]Service`
-- **Instances :** `[entity]Service` (camelCase)
-
-### Structure de Feature
-
-```
-/features/[feature-name]/
-├── /types              # Types TypeScript spécifiques
-├── /components         # Composants UI
-├── /hooks              # Hooks personnalisés
-├── /repositories       # Accès aux données
-│   ├── I[Feature]Repository.ts
-│   └── Supabase[Feature]Repository.ts
-├── /services           # Logique métier
-│   ├── [feature]Service.ts
-│   └── [feature]Service.test.ts
-└── /utils              # Utilitaires spécifiques
-```
-
-### Tests
-
-- Tests unitaires avec Vitest
-- Mocks des repositories
-- Couverture > 80%
-- Tests de validation métier
+- ✅ **AttendanceService**
+- ✅ **TrackingService**
+- ✅ **StudentService**
+- ✅ **ActivityService**
+- ✅ **MaterialService**
+- ✅ **ClassService / LevelService / BranchService / GroupService**
+- ✅ **AdultService**
 
 ## Sécurité
 
-- **Row Level Security (RLS)** activé sur toutes les tables
-- Authentification JWT via Supabase
-- Validation des données côté client et serveur
-- Protection CSRF native de Supabase
-
-## Performance
-
-- Code splitting avec React Router
-- Lazy loading des composants
-- Optimisation des images (compression)
-- Cache des photos (PhotoCache)
-- Real-time subscriptions optimisées
-
-## Déploiement
-
-- **Production :** Vercel
-- **Base de données :** Supabase Cloud
-- **CI/CD :** GitHub Actions (à venir)
+- **RLS (Row Level Security)** : Activé sur toutes les tables. Chaque utilisateur ne peut voir que les données liées à son `compte_utilisateur_id`.
+- **Authentification** : Gérée exclusivement via Supabase Auth (JWT).
 
 ## Documentation Complémentaire
 
 - [TESTING.md](file:///Users/a/Documents/Sites%20webs/SAAS/Gestion_De_Classe/gestion-de-classe/TESTING.md) - Guide de tests
-- [Analyse Refactoring](file:///Users/a/.gemini/antigravity/brain/c04e9ab5-9406-4e62-9919-537d9633af5b/analyse_refactoring.md) - Opportunités d'amélioration
-- [Plan d'Implémentation](file:///Users/a/.gemini/antigravity/brain/c04e9ab5-9406-4e62-9919-537d9633af5b/implementation_plan.md) - Guide de migration
-- [Walkthrough](file:///Users/a/.gemini/antigravity/brain/c04e9ab5-9406-4e62-9919-537d9633af5b/walkthrough.md) - Résultats de migration
+- `supabase/migrations/` - Historique de la structure de base de données
 
 ---
 
-**Dernière mise à jour :** 2026-01-22  
-**Version :** 1.0.0  
-**Statut :** ✅ Architecture stable et testée
+**Dernière mise à jour :** 25 Janvier 2026
+**Version :** 1.1.0  
+**Statut :** ✅ Architecture stable et documentée

@@ -101,7 +101,7 @@ const Layout: React.FC = () => {
                 )}
 
                 {session ? (
-                    <Outlet context={{ pendingValidation }} />
+                    <Outlet context={{ pendingValidation, isSidebarOpen: isOpen }} />
                 ) : (
                     <UnauthenticatedScreen />
                 )}

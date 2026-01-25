@@ -90,6 +90,24 @@ export const useProfileSettings = (refreshProfile?: () => void) => {
         }
     }, [profile, refreshProfile]);
 
+    const processFile = useCallback(async (file: File) => {
+        try {
+            const base64 = await resizeAndConvertToBase64(file, 400, 400);
+            setProfile(prev => ({ ...prev, photo_base64: base64 }));
+            toast.success("Image traitée avec succès");
+        } catch (error) {
+            console.error("Erreur lors du traitement de l'image:", error);
+            toast.error("Erreur lors du traitement de l'image");
+        }
+    }, []);
+
+    const handleFileChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (file) {
+            processFile(file);
+        }
+    }, [processFile]);
+
     return {
         profile,
         setProfile,
@@ -98,6 +116,8 @@ export const useProfileSettings = (refreshProfile?: () => void) => {
         isDragging,
         setIsDragging,
         getProfile,
-        updateProfile
+        updateProfile,
+        handleFileChange,
+        processFile
     };
 };

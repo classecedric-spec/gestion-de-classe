@@ -328,7 +328,15 @@ export function useMobileTracking() {
                 map.set(req.eleve_id, req.eleve);
             }
         });
-        return Array.from(map.values()).sort((a, b) => (a.nom || '').localeCompare(b.nom || ''));
+        return Array.from(map.values()).sort((a, b) => {
+            // Sort by Level Order first
+            const orderA = a.Niveau?.ordre ?? 999;
+            const orderB = b.Niveau?.ordre ?? 999;
+            if (orderA !== orderB) return orderA - orderB;
+
+            // Then by First Name alphabetical
+            return (a.prenom || '').localeCompare(b.prenom || '');
+        });
     }, [helpRequests]);
 
     const displayedRequests = helpRequests.filter(req => {
