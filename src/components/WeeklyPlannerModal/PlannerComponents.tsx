@@ -150,7 +150,7 @@ export const PlannerSlot: React.FC<PlannerSlotProps & React.HTMLAttributes<HTMLD
         timerRef.current = setTimeout(() => {
             onExtend(currentItem);
             setIsFilling(false);
-        }, 1000);
+        }, 500);
     };
 
     const clearTimer = () => {
@@ -221,7 +221,7 @@ export const PlannerSlot: React.FC<PlannerSlotProps & React.HTMLAttributes<HTMLD
                         onMouseLeave={clearTimer}
                         className={`absolute bottom-0 inset-x-0 h-4 cursor-s-resize flex items-end justify-center pb-1 opacity-0 group-hover:opacity-100 transition-all rounded-b-xl z-20 overflow-hidden ${isFilling ? 'bg-black/20 !opacity-100' : 'hover:bg-black/10'}`}
                     >
-                        <div className={`h-1 rounded-full transition-all ease-out ${isFilling ? 'w-[80%] bg-emerald-400 duration-[1000ms]' : 'w-8 bg-white/30 duration-300'}`}></div>
+                        <div className={`h-1 rounded-full transition-all ease-out ${isFilling ? 'w-[80%] bg-emerald-400 duration-[500ms]' : 'w-8 bg-white/30 duration-300'}`}></div>
                     </div>
                 </>
             ) : (

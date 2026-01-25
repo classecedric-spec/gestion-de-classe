@@ -400,6 +400,6 @@ export const useWeeklyPlanner = (isOpen: boolean) => {
         isSlotCovered,
         handlePrevWeek,
         handleNextWeek,
-        fetchData
+        fetchModules: fetchModules
     };
 };

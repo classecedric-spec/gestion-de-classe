@@ -29,7 +29,7 @@ const WeeklyPlannerModal: React.FC<WeeklyPlannerModalProps> = ({ isOpen, onClose
         activeDragItem, activeOver, handleDragStart, handleDragOver, handleDragEnd,
         resizingItem, resizeTargetPeriod, handleResizeStart, handleResizeMove, handleResizeUp,
         handleToggleDock, handleDelete, handlePermanentDelete, handleExtend, isSlotCovered,
-        handlePrevWeek, handleNextWeek
+        handlePrevWeek, handleNextWeek, fetchModules
     } = useWeeklyPlanner(isOpen);
 
     // Resize listeners
@@ -258,6 +258,7 @@ const WeeklyPlannerModal: React.FC<WeeklyPlannerModalProps> = ({ isOpen, onClose
                         dockedItems={dockItems}
                         onToggleDock={handleToggleDock}
                         currentWeekDate={currentWeek}
+                        fetchModules={fetchModules}
                     />
 
                     <DragOverlay>

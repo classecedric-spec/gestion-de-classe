@@ -4,6 +4,8 @@ import { supabase } from '../../lib/database';
 import { ModuleWithDetails, WeeklyPlanningItem } from './useWeeklyPlanner';
 import { Tables } from '../../types/supabase';
 import { SupabaseActivityRepository } from '../../features/activities/repositories/SupabaseActivityRepository';
+import AddModuleModal from '../AddModuleModal';
+import { toast } from 'sonner';
 
 interface PreparationModalProps {
     isOpen: boolean;
@@ -12,6 +14,7 @@ interface PreparationModalProps {
     dockedItems: WeeklyPlanningItem[];
     onToggleDock: (module: { nom: string; isCustom?: boolean }, isCurrentlyDocked: boolean) => void;
     currentWeekDate: string;
+    fetchModules: () => void;
 }
 
 const activityRepository = new SupabaseActivityRepository();
@@ -19,7 +22,7 @@ const activityRepository = new SupabaseActivityRepository();
 /**
  * PreparationModal - Modal pour préparer le dock
  */
-const PreparationModal: React.FC<PreparationModalProps> = ({ isOpen, onClose, modules, dockedItems, onToggleDock, currentWeekDate }) => {
+const PreparationModal: React.FC<PreparationModalProps> = ({ isOpen, onClose, modules, dockedItems, onToggleDock, currentWeekDate, fetchModules }) => {
     const [activeTab, setActiveTab] = useState<'modules' | 'custom'>('modules');
     const [search, setSearch] = useState('');
     const [filter, setFilter] = useState('en_cours');
@@ -27,6 +30,7 @@ const PreparationModal: React.FC<PreparationModalProps> = ({ isOpen, onClose, mo
     const [savedCustom, setSavedCustom] = useState<Tables<'custom_activities'>[]>([]);
     const [customSearch, setCustomSearch] = useState('');
     const [showAddInput, setShowAddInput] = useState(false);
+    const [showAddModuleModal, setShowAddModuleModal] = useState(false);
 
     useEffect(() => {
         if (isOpen) fetchSavedCustom();
@@ -98,20 +102,32 @@ const PreparationModal: React.FC<PreparationModalProps> = ({ isOpen, onClose, mo
                 </button>
             </div>
 
-            {/* Tabs */}
-            <div className="px-6 pt-4 flex gap-4 border-b border-white/5">
-                <button
-                    onClick={() => setActiveTab('modules')}
-                    className={`pb-4 text-sm font-bold uppercase tracking-wider transition-all border-b-2 ${activeTab === 'modules' ? 'text-primary border-primary' : 'text-grey-medium border-transparent hover:text-text-main'}`}
-                >
-                    Modules Existants
-                </button>
-                <button
-                    onClick={() => setActiveTab('custom')}
-                    className={`pb-4 text-sm font-bold uppercase tracking-wider transition-all border-b-2 ${activeTab === 'custom' ? 'text-primary border-primary' : 'text-grey-medium border-transparent hover:text-text-main'}`}
-                >
-                    Activités Perso
-                </button>
+            {/* Tabs & Actions */}
+            <div className="px-6 pt-4 flex justify-between items-end border-b border-white/5">
+                <div className="flex gap-4">
+                    <button
+                        onClick={() => setActiveTab('modules')}
+                        className={`pb-4 text-sm font-bold uppercase tracking-wider transition-all border-b-2 ${activeTab === 'modules' ? 'text-primary border-primary' : 'text-grey-medium border-transparent hover:text-text-main'}`}
+                    >
+                        Modules Existants
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('custom')}
+                        className={`pb-4 text-sm font-bold uppercase tracking-wider transition-all border-b-2 ${activeTab === 'custom' ? 'text-primary border-primary' : 'text-grey-medium border-transparent hover:text-text-main'}`}
+                    >
+                        Activités Perso
+                    </button>
+                </div>
+
+                {/* Ajout bouton Nouveau Module */}
+                {activeTab === 'modules' && (
+                    <button
+                        onClick={() => setShowAddModuleModal(true)}
+                        className="mb-3 px-3 py-1.5 bg-primary/10 hover:bg-primary/20 text-primary border border-primary/30 rounded-lg text-xs font-bold uppercase tracking-wide flex items-center gap-2 transition-all"
+                    >
+                        <Plus size={14} /> Nouveau Module
+                    </button>
+                )}
             </div>
 
             {/* Content: Modules */}
@@ -263,6 +279,16 @@ const PreparationModal: React.FC<PreparationModalProps> = ({ isOpen, onClose, mo
                     </div>
                 </>
             )}
+
+            {/* Modal de création de module */}
+            <AddModuleModal
+                isOpen={showAddModuleModal}
+                onClose={() => setShowAddModuleModal(false)}
+                onAdded={(module) => {
+                    fetchModules();
+                    toast.success(`Module "${module.nom}" créé avec succès`);
+                }}
+            />
         </div>
     );
 };

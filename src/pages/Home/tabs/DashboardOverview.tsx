@@ -3,7 +3,7 @@ import { useNavigate, useOutletContext } from 'react-router-dom';
 import { Users, CheckSquare, LayoutList, Loader2 } from 'lucide-react';
 import PdfProgress from '../../../components/ui/PdfProgress';
 import { DashboardContextType } from '../DashboardContext';
-
+import WeeklyPlannerModal from '../../../components/WeeklyPlannerModal';
 const DashboardOverview: React.FC = () => {
     const navigate = useNavigate();
     const {
@@ -192,6 +192,11 @@ const DashboardOverview: React.FC = () => {
             <div className="p-8 text-center text-grey-medium opacity-30 bg-surface/30 rounded-3xl border border-white/5 border-dashed">
                 <p className="uppercase tracking-[0.3em] font-black text-[10px]">Options en cours de développement</p>
             </div>
+
+            <WeeklyPlannerModal
+                isOpen={isWeeklyPlannerOpen}
+                onClose={() => setIsWeeklyPlannerOpen(false)}
+            />
         </div>
     );
 };
