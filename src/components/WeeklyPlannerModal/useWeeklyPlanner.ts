@@ -342,6 +342,30 @@ export const useWeeklyPlanner = (isOpen: boolean) => {
         setResizeTargetPeriod(null);
     }, [resizingItem, resizeTargetPeriod]);
 
+    // Shrink from top (remove top slot)
+    const handleShrinkFromTop = useCallback(async (item: WeeklyPlanningItem) => {
+        if ((item.duration || 1) <= 1) return;
+
+        const newPeriod = item.period_index + 1;
+        const newDuration = (item.duration || 1) - 1;
+
+        try {
+            // Optimistic update
+            setSchedule(prev => prev.map(p =>
+                p.id === item.id ? { ...p, period_index: newPeriod, duration: newDuration } : p
+            ));
+
+            await plannerService.updatePlanningItem(item.id, {
+                period_index: newPeriod,
+                duration: newDuration
+            });
+        } catch (err) {
+            console.error("Error shrinking item:", err);
+            // Revert on error (could reuse fetchData but let's just log for now)
+            fetchData();
+        }
+    }, [fetchData]);
+
     // Slot coverage check
     const isSlotCovered = useCallback((day: string, period: number): boolean => {
         return plannerItems.some(item =>
@@ -391,6 +415,7 @@ export const useWeeklyPlanner = (isOpen: boolean) => {
         handleResizeStart,
         handleResizeMove,
         handleResizeUp,
+        handleShrinkFromTop,
 
         // Actions
         handleToggleDock,

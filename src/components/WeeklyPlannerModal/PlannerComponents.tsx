@@ -103,6 +103,7 @@ interface PlannerSlotProps {
     onDelete: (id: string) => void;
     onResizeStart: (e: React.MouseEvent, item: WeeklyPlanningItem) => void;
     onExtend: (item: WeeklyPlanningItem) => void;
+    onShrink: (item: WeeklyPlanningItem) => void;
     isPlaceholder?: boolean;
     isOver?: boolean;
     isDisabled?: boolean;
@@ -116,6 +117,7 @@ export const PlannerSlot: React.FC<PlannerSlotProps & React.HTMLAttributes<HTMLD
     onDelete,
     onResizeStart,
     onExtend,
+    onShrink,
     isPlaceholder,
     isOver,
     isDisabled,
@@ -130,7 +132,9 @@ export const PlannerSlot: React.FC<PlannerSlotProps & React.HTMLAttributes<HTMLD
 
     const [currentIndex, setCurrentIndex] = useState(0);
     const [isFilling, setIsFilling] = useState(false);
+    const [isShrinking, setIsShrinking] = useState(false);
     const timerRef = useRef<NodeJS.Timeout | null>(null);
+    const shrinkTimerRef = useRef<NodeJS.Timeout | null>(null);
 
     useEffect(() => {
         if (!items || items.length === 0) setCurrentIndex(0);
@@ -143,6 +147,7 @@ export const PlannerSlot: React.FC<PlannerSlotProps & React.HTMLAttributes<HTMLD
     const subBranchInfo = moduleInfo?.SousBranche?.nom;
     const duration = currentItem ? (currentItem.duration || 1) : 1;
 
+    // Bottom Expand Logic
     const handleMouseDown = (e: React.MouseEvent) => {
         if (!currentItem) return;
         onResizeStart(e, currentItem);
@@ -156,6 +161,22 @@ export const PlannerSlot: React.FC<PlannerSlotProps & React.HTMLAttributes<HTMLD
     const clearTimer = () => {
         if (timerRef.current) clearTimeout(timerRef.current);
         setIsFilling(false);
+    };
+
+    // Top Shrink Logic
+    const handleTopMouseDown = (e: React.MouseEvent) => {
+        if (!currentItem || duration <= 1) return;
+        e.stopPropagation(); // Prevent drag start
+        setIsShrinking(true);
+        shrinkTimerRef.current = setTimeout(() => {
+            onShrink(currentItem);
+            setIsShrinking(false);
+        }, 500);
+    };
+
+    const clearTopTimer = () => {
+        if (shrinkTimerRef.current) clearTimeout(shrinkTimerRef.current);
+        setIsShrinking(false);
     };
 
     const nextItem = (e: React.MouseEvent) => { e.stopPropagation(); setCurrentIndex(prev => (prev + 1) % items.length); };
@@ -197,7 +218,7 @@ export const PlannerSlot: React.FC<PlannerSlotProps & React.HTMLAttributes<HTMLD
                         </div>
                     )}
 
-                    <div className="flex flex-col gap-0.5 w-full">
+                    <div className="flex flex-col gap-0.5 w-full mt-1">
                         <span className="font-bold text-sm line-clamp-2 text-white leading-tight text-left pr-6">{currentItem.activity_title}</span>
                         {(branchInfo || subBranchInfo) && (
                             <span className="text-[9px] text-white/70 line-clamp-1 italic font-medium text-left">
@@ -213,8 +234,21 @@ export const PlannerSlot: React.FC<PlannerSlotProps & React.HTMLAttributes<HTMLD
                         <Trash2 size={12} />
                     </button>
 
-                    <div className="absolute top-1 left-1 w-1 h-1 rounded-full bg-white/50"></div>
+                    {/* Top Shrink Handle (Only if duration > 1) */}
+                    {duration > 1 && (
+                        <div
+                            onMouseDown={handleTopMouseDown}
+                            onMouseUp={clearTopTimer}
+                            onMouseLeave={clearTopTimer}
+                            className={`absolute top-0 inset-x-0 h-4 cursor-n-resize flex items-start justify-center pt-1 opacity-0 group-hover:opacity-100 transition-all rounded-t-xl z-20 overflow-hidden ${isShrinking ? 'bg-red-500/20 !opacity-100' : 'hover:bg-red-500/10'}`}
+                        >
+                            <div className={`h-1 rounded-full transition-all ease-out ${isShrinking ? 'w-[80%] bg-red-400 duration-[500ms]' : 'w-8 bg-white/30 duration-300'}`}></div>
+                        </div>
+                    )}
 
+                    {!isShrinking && <div className="absolute top-1 left-1 w-1 h-1 rounded-full bg-white/50"></div>}
+
+                    {/* Bottom Extend Handle */}
                     <div
                         onMouseDown={handleMouseDown}
                         onMouseUp={clearTimer}
