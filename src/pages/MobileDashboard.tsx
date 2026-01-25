@@ -10,7 +10,8 @@ import {
     User,
     AlertCircle,
     Check,
-    Zap
+    Zap,
+    Clock
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { SupabaseAttendanceRepository } from '../features/attendance/repositories/SupabaseAttendanceRepository';
@@ -244,6 +245,42 @@ const MobileDashboard: React.FC = () => {
         }
     };
 
+    const handleGoToVisionUrgente = async () => {
+        try {
+            const user = await getCurrentUser();
+            if (!user) {
+                toast.error('Non connecté');
+                return;
+            }
+
+            // Try to get the last selected group
+            const userProfile = await userRepository.getProfile(user.id);
+            const savedGroupId = userProfile?.last_selected_group_id;
+
+            if (savedGroupId) {
+                // Verify the group still exists
+                const group = await groupRepository.getGroup(savedGroupId);
+
+                if (group) {
+                    navigate(`/mobile-vision-urgente/${savedGroupId}`);
+                    return;
+                }
+            }
+
+            // Fallback: fetch first group available
+            const groups = await groupRepository.getUserGroups(user.id);
+
+            if (groups && groups.length > 0) {
+                navigate(`/mobile-vision-urgente/${groups[0].id}`);
+            } else {
+                toast.error('Aucun groupe disponible');
+            }
+        } catch (error) {
+            console.error('Error fetching groups:', error);
+            toast.error('Erreur lors du chargement');
+        }
+    };
+
     // Get current date
     const today = new Date();
     const dateString = today.toLocaleDateString('fr-FR', {
@@ -324,6 +361,16 @@ const MobileDashboard: React.FC = () => {
                         subtitle="validations • cliquez pour encoder"
                         loading={loadingStats}
                         href="/mobile-encodage"
+                    />
+
+                    <StatCard
+                        icon={Clock}
+                        variant="danger"
+                        title="Retards"
+                        value={stats.studentsToFollow?.length || "-"}
+                        subtitle="cliquez pour voir"
+                        loading={loadingStats}
+                        onClick={handleGoToVisionUrgente}
                     />
 
                     <StatCard
