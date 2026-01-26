@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../../../lib/database';
 import { attendanceService, Group, Student, SetupPresence, CategoriePresence, Attendance } from '../services/attendanceService';
-import { Settings, Plus, Trash2, Save, X, Layers, FileText, LayoutGrid, Download, Check, ChevronLeft, ChevronRight, LucideIcon } from 'lucide-react';
+import { Settings, Plus, Trash2, Save, X, Layers, FileText, LayoutGrid, Download, Check, ChevronLeft, ChevronRight } from 'lucide-react';
 import { PDFViewer, PDFDownloadLink } from '@react-pdf/renderer';
+import AttendancePDF from './AttendancePDF';
 import { Modal, Button, ConfirmModal, Tabs, Input, Select } from '../../../components/ui';
 import clsx from 'clsx';
 import { toast } from 'sonner';
@@ -32,7 +33,7 @@ interface AttendanceConfigModalProps {
 interface CategoryWithTemp extends Partial<CategoriePresence> {
     id: string;
     nom: string;
-    couleur: string | undefined;
+    couleur: string | null | undefined;
     isTemp?: boolean;
 }
 
@@ -135,7 +136,7 @@ const AttendanceConfigModal: React.FC<AttendanceConfigModalProps> = ({
     // Fetch Available Dates when Export tab opens
     useEffect(() => {
         if (activeTab === 'export' && selectedGroup && selectedSetup) {
-            fetchDistinctDates().then((dates) => {
+            fetchDistinctDates().then(() => {
                 // Initial load: day mode by default
             });
             setExportMode('day');
@@ -367,7 +368,6 @@ const AttendanceConfigModal: React.FC<AttendanceConfigModalProps> = ({
                             options={groups.map(g => ({ value: g.id, label: g.nom }))}
                             value={selectedGroup?.id || ''}
                             onChange={e => onSelectGroup && onSelectGroup(groups.find(g => g.id === e.target.value))}
-                            placeholder="Sélectionner un groupe"
                             fullWidth
                         />
 
@@ -462,7 +462,6 @@ const AttendanceConfigModal: React.FC<AttendanceConfigModalProps> = ({
                                         placeholder="ex: Cantine, Ateliers..."
                                         value={currentSet.nom}
                                         onChange={e => setCurrentSet({ ...currentSet, nom: e.target.value })}
-                                        fullWidth
                                     />
                                 </div>
                                 <div className="space-y-3">
@@ -480,10 +479,12 @@ const AttendanceConfigModal: React.FC<AttendanceConfigModalProps> = ({
                                         {categories.map((cat, idx) => (
                                             <div key={cat.id || idx} className="flex items-center gap-2">
                                                 <div className="relative group/color shrink-0">
-                                                    <div className="w-8 h-8 rounded-lg cursor-pointer border border-white/10" style={{ backgroundColor: cat.couleur }} />
+                                                    <div className="w-8 h-8 rounded-lg cursor-pointer border border-white/10 dynamic-bg" style={{ '--dynamic-bg': cat.couleur } as React.CSSProperties} /> {/* eslint-disable-line react-dom/no-unsafe-inline-style */}
                                                     <div className="absolute top-full mt-2 left-0 bg-surface border border-white/10 rounded-lg p-2 grid grid-cols-5 gap-1 z-50 hidden group-hover/color:grid w-40 shadow-xl">
                                                         {COLORS.map(c => (
-                                                            <div key={c} onClick={() => { const newCats = [...categories]; newCats[idx].couleur = c; setCategories(newCats); }} className="w-6 h-6 rounded-full cursor-pointer hover:scale-110 transition-transform" style={{ backgroundColor: c }} />
+                                                            <React.Fragment key={c}>
+                                                                <div onClick={() => { const newCats = [...categories]; newCats[idx].couleur = c; setCategories(newCats); }} className="w-6 h-6 rounded-full cursor-pointer hover:scale-110 transition-transform dynamic-bg" style={{ '--dynamic-bg': c } as React.CSSProperties} /> {/* eslint-disable-line react-dom/no-unsafe-inline-style */}
+                                                            </React.Fragment>
                                                         ))}
                                                     </div>
                                                 </div>
@@ -551,7 +552,6 @@ const AttendanceConfigModal: React.FC<AttendanceConfigModalProps> = ({
                                             value={selectedDay}
                                             onClick={(e: any) => e.target.showPicker && e.target.showPicker()}
                                             onChange={e => setSelectedDay(e.target.value)}
-                                            fullWidth
                                         />
                                         <div className="flex gap-2">
                                             <Button
@@ -736,7 +736,7 @@ const AttendanceConfigModal: React.FC<AttendanceConfigModalProps> = ({
             <ConfirmModal
                 isOpen={confirmModal.isOpen}
                 onClose={() => setConfirmModal({ ...confirmModal, isOpen: false })}
-                onConfirm={confirmModal.onConfirm}
+                onConfirm={confirmModal.onConfirm || (() => { })}
                 title={confirmModal.title}
                 message={confirmModal.message}
                 variant="warning"

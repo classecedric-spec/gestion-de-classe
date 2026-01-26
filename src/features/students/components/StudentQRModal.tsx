@@ -97,7 +97,7 @@ const StudentQRModal: React.FC<StudentQRModalProps> = ({ isOpen, onClose, studen
                         <Link size={20} className="text-primary" />
                         Magic QR Code
                     </h3>
-                    <button onClick={onClose} className="p-1 hover:bg-white/10 rounded-lg text-grey-medium hover:text-white transition-colors">
+                    <button onClick={onClose} aria-label="Fermer" className="p-1 hover:bg-white/10 rounded-lg text-grey-medium hover:text-white transition-colors">
                         <X size={20} />
                     </button>
                 </div>

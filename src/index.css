@@ -654,3 +654,13 @@ a:focus-visible {
   font-size: clamp(0.75rem, 2cqw, 0.875rem) !important;
   line-height: 1.5;
 }
+
+@layer utilities {
+  .dynamic-bg {
+    background-color: var(--dynamic-bg);
+  }
+
+  .dynamic-width {
+    width: var(--dynamic-width);
+  }
+}

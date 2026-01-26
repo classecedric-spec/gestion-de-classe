@@ -217,14 +217,15 @@ const StudentDashboard: React.FC = () => {
 
                                     <div className="flex items-center gap-4 w-full pl-10">
                                         <div className="flex-grow h-3 rounded-full bg-black/40 overflow-hidden border border-white/5">
+                                            {/* eslint-disable-next-line react-dom/no-unsafe-inline-style */}
                                             <div
                                                 className={clsx(
-                                                    "h-full transition-all duration-700 ease-out shadow-[0_0_10px_rgba(255,255,255,0.3)]",
+                                                    "h-full transition-all duration-700 ease-out shadow-[0_0_10px_rgba(255,255,255,0.3)] dynamic-width",
                                                     percent >= 70 ? "bg-success" :
                                                         percent >= 40 ? "bg-primary" :
                                                             "bg-danger"
                                                 )}
-                                                style={{ width: `${percent}%` }}
+                                                style={{ '--dynamic-width': `${percent}%` } as React.CSSProperties}
                                             />
                                         </div>
                                         <span className="text-xs text-grey-medium font-bold whitespace-nowrap min-w-[3rem] text-right">
@@ -271,12 +272,13 @@ const StudentDashboard: React.FC = () => {
             <div className="shrink-0 bg-surface/90 border-t border-white/10 backdrop-blur-xl p-4 flex items-center justify-between shadow-[0_-5px_20px_rgba(0,0,0,0.3)] z-20">
                 <div className="w-full max-w-5xl mx-auto flex items-center gap-4">
                     <div className="h-2 flex-grow bg-white/10 rounded-full overflow-hidden">
+                        {/* eslint-disable-next-line react-dom/no-unsafe-inline-style */}
                         <div
                             className={clsx(
-                                "h-full transition-all duration-1000",
+                                "h-full transition-all duration-1000 dynamic-width",
                                 timeLeft < 30 ? "bg-danger animate-pulse" : "bg-primary"
                             )}
-                            style={{ width: `${(timeLeft / 90) * 100}%` }}
+                            style={{ '--dynamic-width': `${(timeLeft / 90) * 100}%` } as React.CSSProperties}
                         />
                     </div>
                     <div className={clsx(

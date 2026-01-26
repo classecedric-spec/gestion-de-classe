@@ -127,7 +127,7 @@ const GroupQRModal: React.FC<GroupQRModalProps> = ({ isOpen, onClose, groupName,
                         <QrCode size={20} className="text-primary" />
                         Codes QR : {groupName}
                     </h3>
-                    <button onClick={onClose} className="p-1 hover:bg-white/10 rounded-lg text-grey-medium hover:text-white transition-colors">
+                    <button onClick={onClose} aria-label="Fermer" className="p-1 hover:bg-white/10 rounded-lg text-grey-medium hover:text-white transition-colors">
                         <X size={20} />
                     </button>
                 </div>
