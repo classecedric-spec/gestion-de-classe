@@ -101,7 +101,7 @@ const Presence: React.FC = () => {
     const rightContent = (
         <div className="flex items-center gap-3 self-end md:self-auto">
             <div className="flex items-center gap-2 bg-surface p-1.5 rounded-xl border border-white/5 shadow-sm h-[52px] group transition-all duration-300 hover:border-primary/20">
-                <div className="flex items-center gap-2 max-w-0 overflow-hidden opacity-0 group-hover:max-w-[100px] group-hover:opacity-100 transition-all duration-300 ease-in-out">
+                <div className="flex items-center gap-2">
                     <Button
                         variant="ghost"
                         onClick={() => setIsConfigOpen(true)}

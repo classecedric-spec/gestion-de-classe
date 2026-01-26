@@ -669,11 +669,15 @@ const AttendanceConfigModal: React.FC<AttendanceConfigModalProps> = ({
                                     message: "Voulez-vous copier les données du matin vers l'après-midi ? Les données existantes de l'après-midi seront remplacées.",
                                     onConfirm: async () => {
                                         try {
+                                            const { data: { user } } = await supabase.auth.getUser();
+                                            if (!user) throw new Error("Non authentifié");
+
                                             await attendanceService.copyPeriodData(
                                                 currentDateForExport,
                                                 selectedSetup.id,
                                                 'matin',
-                                                'apres_midi'
+                                                'apres_midi',
+                                                user.id
                                             );
                                             toast.success("Données copiées du matin vers l'après-midi");
                                             if (onConfigSaved) onConfigSaved();
@@ -702,11 +706,15 @@ const AttendanceConfigModal: React.FC<AttendanceConfigModalProps> = ({
                                     message: "Voulez-vous copier les données de l'après-midi vers le matin ? Les données existantes du matin seront remplacées.",
                                     onConfirm: async () => {
                                         try {
+                                            const { data: { user } } = await supabase.auth.getUser();
+                                            if (!user) throw new Error("Non authentifié");
+
                                             await attendanceService.copyPeriodData(
                                                 currentDateForExport,
                                                 selectedSetup.id,
                                                 'apres_midi',
-                                                'matin'
+                                                'matin',
+                                                user.id
                                             );
                                             toast.success("Données copiées de l'après-midi vers le matin");
                                             if (onConfigSaved) onConfigSaved();

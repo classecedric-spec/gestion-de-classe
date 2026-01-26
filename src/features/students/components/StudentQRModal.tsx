@@ -2,6 +2,7 @@ import React from 'react';
 import QRCode from "react-qr-code";
 import { X, Printer, Link, Copy } from 'lucide-react';
 import { toast } from 'sonner';
+import { getAppBaseUrl } from '../../../utils/urlUtils';
 
 interface StudentQRModalProps {
     isOpen: boolean;
@@ -16,8 +17,8 @@ interface StudentQRModalProps {
 const StudentQRModal: React.FC<StudentQRModalProps> = ({ isOpen, onClose, student }) => {
     if (!isOpen || !student) return null;
 
-    // Hardcoded IP for testing phase as requested
-    const baseUrl = 'http://192.168.0.244:5173';
+    // Dynamic base URL with network IP fallback
+    const baseUrl = getAppBaseUrl();
     const kioskUrl = `${baseUrl}/kiosk/${student.id}?token=${(student as any).access_token || ''}`;
 
     const handlePrint = () => {

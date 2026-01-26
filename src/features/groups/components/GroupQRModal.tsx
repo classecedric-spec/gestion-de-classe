@@ -1,6 +1,7 @@
 import React from 'react';
 import QRCode from "react-qr-code";
 import { X, Printer, QrCode } from 'lucide-react';
+import { getAppBaseUrl } from '../../../utils/urlUtils';
 
 interface GroupQRModalProps {
     isOpen: boolean;
@@ -12,7 +13,7 @@ interface GroupQRModalProps {
 const GroupQRModal: React.FC<GroupQRModalProps> = ({ isOpen, onClose, groupName, students }) => {
     if (!isOpen) return null;
 
-    const baseUrl = window.location.origin;
+    const baseUrl = getAppBaseUrl();
 
     const handlePrint = () => {
         const printWindow = window.open('', '', 'width=1000,height=800');

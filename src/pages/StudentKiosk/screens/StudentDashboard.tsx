@@ -136,14 +136,33 @@ const StudentDashboard: React.FC = () => {
                         const moduleActivities: any[] = module.Activite || [];
                         if (moduleActivities.length === 0) return false;
 
-                        const allDone = moduleActivities.every((a: any) => {
+                        // Filter activities:
+                        // 1. Must exist in progressions (assigned)
+                        // 2. Must NOT be 'termine' or 'a_verifier' (incomplete)
+                        const hasVisibleActivities = moduleActivities.some((a: any) => {
                             const status = progressions[a.id];
-                            return status === 'termine' || status === 'a_verifier';
+                            return status && status !== 'termine' && status !== 'a_verifier';
                         });
 
-                        return !allDone;
+                        return hasVisibleActivities;
                     }).map((module: any) => {
                         const moduleActivities: any[] = module.Activite || [];
+
+                        // Strict filtering for display inside the module
+                        const visibleActivities = moduleActivities.filter((a: any) => {
+                            const status = progressions[a.id];
+                            return status && status !== 'termine' && status !== 'a_verifier';
+                        });
+
+                        // Stats calculation based on TOTAL activities (to show progress correctly)
+                        // Or should we show progress relative to visually connected ones?
+                        // User request: "only receive activities linked..."
+                        // If I only receive 2 activities out of 10, showing "20% done" might be confusing if I can't see the other 8.
+                        // But usually progress bar shows global progress.
+                        // Let's keep the module stats as they are (global for the module), but only render the actionable items.
+                        // Actually, if we filter the render loop, the 'percent' bar above might be misleading if it implies "100% of visible items".
+                        // Standard behavior: Progress bar = Global Module Progress. List = Actionable Items.
+
                         const total = moduleActivities.length;
                         const completed = moduleActivities.filter((a: any) => {
                             const s = progressions[a.id];
@@ -216,21 +235,21 @@ const StudentDashboard: React.FC = () => {
 
                                 {isExpanded && (
                                     <div className="px-6 pb-6 pt-2 space-y-3 animate-in slide-in-from-top-2 duration-300 border-t border-white/5">
-                                        {moduleActivities.length > 0 ? (
-                                            moduleActivities.map((activity: any) => (
+                                        {visibleActivities.length > 0 ? (
+                                            visibleActivities.map((activity: any) => (
                                                 <ProgressionCell
                                                     key={activity.id}
                                                     activity={activity}
                                                     currentStatus={normalizeStatus(progressions[activity.id]) as ProgressionStatus}
-                                                    onStatusClick={(studId, actId, newStatus) => {
-                                                        updateStatus(activity.id, newStatus);
+                                                    onStatusClick={(actId, newStatus) => {
+                                                        updateStatus(actId, newStatus);
                                                     }}
                                                     studentLevelId={student.niveau_id}
                                                 />
                                             ))
                                         ) : (
                                             <div className="text-center py-6 text-grey-medium italic">
-                                                Aucune activité dans ce module
+                                                Aucune activité à faire dans ce module
                                             </div>
                                         )}
                                     </div>
