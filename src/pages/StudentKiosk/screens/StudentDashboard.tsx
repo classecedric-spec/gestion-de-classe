@@ -22,7 +22,7 @@ const StudentDashboard: React.FC = () => {
         navigate('/kiosk');
     };
 
-    const [timeLeft, setTimeLeft] = useState(90); // 1m30s in seconds
+    const [timeLeft, setTimeLeft] = useState(45); // 45s in seconds
 
     // Auto-logout timer logic
     useEffect(() => {
@@ -38,7 +38,7 @@ const StudentDashboard: React.FC = () => {
         }, 1000);
 
         const resetActivity = () => {
-            setTimeLeft(90);
+            setTimeLeft(45);
         };
 
         // Events to listen for
@@ -63,7 +63,7 @@ const StudentDashboard: React.FC = () => {
         return `${m}:${s < 10 ? '0' : ''}${s}`;
     };
 
-    const { student, modules, progressions, loading, updateStatus, refresh } = useStudentKioskData(studentId);
+    const { student, modules, progressions, loading, updateStatus, refresh, kioskOpen } = useStudentKioskData(studentId);
     const [selectedModuleId, setSelectedModuleId] = useState<string | null>(null);
 
     // Sort modules logic (filtering done in render)
@@ -78,6 +78,52 @@ const StudentDashboard: React.FC = () => {
     }
 
     if (!student) return null;
+
+    // --- KIOSK CLOSED OVERLAY ---
+    if (!kioskOpen) {
+        return (
+            <div className="flex flex-col h-full overflow-hidden relative items-center justify-center p-8 text-center space-y-8 animate-in fade-in duration-500">
+                <div className="w-32 h-32 bg-danger/10 rounded-full flex items-center justify-center border-4 border-danger/20 shadow-[0_0_50px_rgba(239,68,68,0.2)] animate-pulse">
+                    <LogOut size={64} className="text-danger" />
+                </div>
+
+                <div className="space-y-4 max-w-md">
+                    <h1 className="text-4xl font-black text-white uppercase tracking-tight">
+                        Kiosque Fermé
+                    </h1>
+                    <p className="text-xl text-grey-medium">
+                        L'accès aux exercices est désactivé pour le moment.
+                    </p>
+                </div>
+
+                <div className="p-6 bg-surface/50 border border-white/5 rounded-2xl backdrop-blur-sm max-w-sm w-full mx-auto">
+                    <div className="flex items-center gap-4">
+                        <div className="w-16 h-16 rounded-xl overflow-hidden border border-white/10 shrink-0">
+                            {student.photo_url ? (
+                                <img src={student.photo_url} alt="" className="w-full h-full object-cover grayscale opacity-70" />
+                            ) : (
+                                <div className="w-full h-full bg-surface flex items-center justify-center text-xl font-bold text-grey-medium">
+                                    {(student.prenom || ' ')[0]}{(student.nom || ' ')[0]}
+                                </div>
+                            )}
+                        </div>
+                        <div className="text-left">
+                            <h3 className="text-lg font-bold text-white">{student.prenom} {student.nom}</h3>
+                            <p className="text-sm text-grey-medium">Attends que le prof ouvre le kiosque !</p>
+                        </div>
+                    </div>
+                </div>
+
+                <button
+                    onClick={refresh}
+                    className="flex items-center gap-2 px-6 py-3 rounded-xl bg-primary/20 hover:bg-primary/30 text-primary font-bold border border-primary/30 transition-all active:scale-95"
+                >
+                    <RotateCcw size={20} />
+                    <span>Réessayer</span>
+                </button>
+            </div>
+        );
+    }
 
     const handleModuleClick = (moduleId: string) => {
         setSelectedModuleId(prev => prev === moduleId ? null : moduleId);
@@ -278,7 +324,7 @@ const StudentDashboard: React.FC = () => {
                                 "h-full transition-all duration-1000 dynamic-width",
                                 timeLeft < 30 ? "bg-danger animate-pulse" : "bg-primary"
                             )}
-                            style={{ '--dynamic-width': `${(timeLeft / 90) * 100}%` } as React.CSSProperties}
+                            style={{ '--dynamic-width': `${(timeLeft / 45) * 100}%` } as React.CSSProperties}
                         />
                     </div>
                     <div className={clsx(

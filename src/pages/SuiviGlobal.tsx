@@ -8,16 +8,25 @@ import TimerModal from '../components/TimerModal';
 import { SmartTabs, Button } from '../components/ui';
 import PageLayout from '../components/layout/PageLayout';
 
+import { supabase } from '../lib/database';
+import { useAuth } from '../hooks/useAuth';
+import { toast } from 'sonner';
 import { cleanupOrphanProgressions } from '../lib/database';
 import { useTimer } from '../features/tracking/hooks/useTimer';
 
 const SuiviGlobal: React.FC = () => {
     const location = useLocation();
     const navigate = useNavigate();
+    const { session } = useAuth();
+    const userId = session?.user?.id;
 
     const params = new URLSearchParams(location.search);
     const activeView = params.get('tab') === 'groups' ? 'avancement' : 'suivi';
     const [currentTime, setCurrentTime] = useState(new Date());
+
+    // Kiosk State
+    const [kioskOpen, setKioskOpen] = useState(false);
+    const [loadingKiosk, setLoadingKiosk] = useState(false);
 
     const {
         timer,
@@ -40,17 +49,86 @@ const SuiviGlobal: React.FC = () => {
         return () => clearInterval(timerInterval);
     }, []);
 
+    // Fetch initial kiosk status from profile
+    useEffect(() => {
+        if (userId) {
+            checkKioskStatus();
+        }
+    }, [userId]);
+
+    const checkKioskStatus = async () => {
+        if (!userId) return;
+        try {
+            const { data, error } = await supabase
+                .from('CompteUtilisateur')
+                .select('kiosk_is_open')
+                .eq('id', userId)
+                .single();
+
+            if (data) {
+                setKioskOpen(data.kiosk_is_open || false);
+            }
+        } catch (e) {
+            console.error('Error fetching kiosk status', e);
+        }
+    };
+
+    const toggleKiosk = async () => {
+        if (!userId) return;
+        setLoadingKiosk(true);
+        const newState = !kioskOpen;
+
+        try {
+            const { error } = await supabase
+                .from('CompteUtilisateur')
+                .update({ kiosk_is_open: newState })
+                .eq('id', userId);
+
+            if (error) throw error;
+
+            setKioskOpen(newState);
+            toast.success(newState ? "Kiosque OUVERT aux élèves" : "Kiosque FERMÉ aux élèves");
+        } catch (e) {
+            console.error(e);
+            toast.error("Erreur lors de la modification du statut");
+        } finally {
+            setLoadingKiosk(false);
+        }
+    };
+
     // --- Header Content Components ---
     const leftContent = (
-        <Button
-            variant="ghost"
-            onClick={() => window.open('/suivi-tbi', '_blank')}
-            icon={Monitor}
-            className="rounded-xl font-black uppercase tracking-[0.15em]"
-            size="sm"
-        >
-            TBI
-        </Button>
+        <div className="flex items-center gap-3">
+            <Button
+                variant="ghost"
+                onClick={() => window.open('/suivi-tbi', '_blank')}
+                icon={Monitor}
+                className="rounded-xl font-black uppercase tracking-[0.15em]"
+                size="sm"
+            >
+                TBI
+            </Button>
+
+            <div className="h-8 w-px bg-white/10 mx-1" />
+
+            <button
+                onClick={toggleKiosk}
+                disabled={loadingKiosk}
+                className={`
+                    flex items-center gap-3 px-4 py-2 rounded-xl border transition-all active:scale-95
+                    ${kioskOpen
+                        ? 'bg-success/10 border-success/30 hover:bg-success/20 text-success'
+                        : 'bg-danger/10 border-danger/30 hover:bg-danger/20 text-danger'
+                    }
+                `}
+                title={kioskOpen ? "Le kiosque est OUVERT. Tous les élèves peuvent accéder." : "Le kiosque est FERMÉ. L'accès est bloqué."}
+            >
+                <div className={`w-2.5 h-2.5 rounded-full ${kioskOpen ? 'bg-success animate-pulse' : 'bg-danger'}`} />
+                <span className="font-black uppercase tracking-wider text-sm">
+                    {loadingKiosk ? '...' : (kioskOpen ? 'Kiosque Ouvert' : 'Kiosque Fermé')}
+                </span>
+            </button>
+        </div>
     );
 
     const centerContent = (

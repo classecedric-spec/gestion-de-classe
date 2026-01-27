@@ -10,15 +10,39 @@ export function useStudentKioskData(studentId: string | undefined) {
     const [activities, setActivities] = useState<any[]>([]);
     const [progressions, setProgressions] = useState<Record<string, string>>({});
     const [loading, setLoading] = useState(true);
+    const [kioskOpen, setKioskOpen] = useState(true);
 
     const location = useLocation();
     const token = new URLSearchParams(location.search).get('token');
 
     useEffect(() => {
         if (studentId) {
+            checkKioskStatus();
             fetchData();
         }
     }, [studentId, token]);
+
+    const checkKioskStatus = async () => {
+        // DEBUG: Trace studentID
+        console.log("Checking Kiosk Status for:", studentId);
+
+        if (!studentId || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(studentId)) {
+            console.warn("Invalid Student ID for Kiosk check:", studentId);
+            return;
+        }
+        try {
+            console.log("Calling get_kiosk_status RPC...");
+            const { data, error } = await supabase.rpc('get_kiosk_status', { p_student_id: studentId });
+            if (error) {
+                console.error("RPC Error get_kiosk_status:", JSON.stringify(error, null, 2));
+            } else {
+                console.log("Kiosk Status result:", data);
+                if (data !== null) setKioskOpen(data);
+            }
+        } catch (e) {
+            console.error('Error checking kiosk status:', e);
+        }
+    };
 
     const fetchData = async () => {
         setLoading(true);
@@ -234,6 +258,7 @@ export function useStudentKioskData(studentId: string | undefined) {
         progressions,
         loading,
         updateStatus,
+        kioskOpen,
         refresh: fetchData
     };
 }
