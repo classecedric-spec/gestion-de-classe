@@ -73,12 +73,13 @@ export const useHomeData = () => {
                 setGroups(typedGroups || []);
 
                 // Use functional update to check if we have a selected group
-                setSelectedGroup(prev => {
-                    if (typedGroups?.length > 0 && !prev) {
-                        return typedGroups[0];
-                    }
-                    return prev;
-                });
+                // Default to 'All Groups' (null) instead of first group
+                // setSelectedGroup(prev => {
+                //     if (typedGroups?.length > 0 && !prev) {
+                //         return typedGroups[0];
+                //     }
+                //     return prev;
+                // });
 
                 return { user, studentsData: studentsData || [] };
             }

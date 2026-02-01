@@ -153,6 +153,19 @@ export const ModulesListSidebar: React.FC<ModulesListSidebarProps> = ({
                                         )
                                     }}
                                     badges={[
+                                        <Badge
+                                            key="status"
+                                            variant={
+                                                module.statut === 'en_cours' ? 'success' :
+                                                    module.statut === 'archive' ? 'danger' :
+                                                        'warning'
+                                            }
+                                            size="xs"
+                                        >
+                                            {module.statut === 'en_cours' ? 'En cours' :
+                                                module.statut === 'archive' ? 'Archi' :
+                                                    'Prep'}
+                                        </Badge>,
                                         module.date_fin && (
                                             <Badge
                                                 key="date"
@@ -164,7 +177,11 @@ export const ModulesListSidebar: React.FC<ModulesListSidebarProps> = ({
                                         ),
                                         <Badge
                                             key="progress"
-                                            variant={isExpired ? (moduleHook.states.selectedModule?.id === module.id ? 'default' : 'danger') : 'success'}
+                                            variant={
+                                                (module.percent || 0) < 50 ? 'danger' :
+                                                    (module.percent || 0) < 75 ? 'warning' :
+                                                        'success'
+                                            }
                                             size="xs"
                                         >
                                             {module.percent || 0}%

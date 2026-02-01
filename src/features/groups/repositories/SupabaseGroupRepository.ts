@@ -4,9 +4,13 @@ import { IGroupRepository } from './IGroupRepository';
 
 export class SupabaseGroupRepository implements IGroupRepository {
     async getGroups(): Promise<Tables<'Groupe'>[]> {
-        const { data, error } = await supabase.from('Groupe').select('*');
+        const { data, error } = await supabase
+            .from('Groupe')
+            .select('*')
+            .order('ordre', { ascending: true })
+            .order('nom', { ascending: true }); // Secondary sort
         if (error) throw error;
-        return data ? data.sort((a, b) => (a.nom || '').localeCompare(b.nom || '')) : [];
+        return data || [];
     }
 
     async getUserGroups(userId: string): Promise<Tables<'Groupe'>[]> {
@@ -14,7 +18,8 @@ export class SupabaseGroupRepository implements IGroupRepository {
             .from('Groupe')
             .select('*')
             .eq('user_id', userId)
-            .order('nom');
+            .order('ordre', { ascending: true })
+            .order('nom', { ascending: true });
         if (error) throw error;
         return data || [];
     }

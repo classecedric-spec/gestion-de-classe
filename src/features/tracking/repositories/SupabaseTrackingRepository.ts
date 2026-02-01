@@ -15,7 +15,7 @@ export class SupabaseTrackingRepository implements ITrackingRepository {
             .from('Progression')
             .select(`
         *,
-        eleve:Eleve(id, prenom, nom),
+        eleve:Eleve(id, prenom, nom, Niveau(nom, ordre)),
         activite:Activite(
           *,
           Module(
@@ -408,7 +408,7 @@ export class SupabaseTrackingRepository implements ITrackingRepository {
             .from('Progression')
             .select(`
                 *,
-                Eleve (id, prenom, nom, photo_url, photo_hash),
+                Eleve (id, prenom, nom, photo_url, photo_hash, Niveau(nom, ordre)),
                 Activite (
                     id, titre,
                     Module (id, nom, statut)

@@ -63,8 +63,9 @@ const CreateActivitySeriesModal: React.FC<CreateActivitySeriesModalProps> = ({ i
 
     const fetchNextNumber = async () => {
         try {
-            const count = await activityRepository.getActivityCount(moduleId);
-            setStartNumber((count || 0) + 1);
+            // Use Max Order instead of Count to avoid duplicates if items were deleted
+            const maxOrder = await activityRepository.getMaxActivityOrder(moduleId);
+            setStartNumber((maxOrder || 0) + 1);
         } catch (err) {
             console.error('Error fetching activity count:', err);
         }
@@ -252,6 +253,7 @@ const CreateActivitySeriesModal: React.FC<CreateActivitySeriesModalProps> = ({ i
                                 onChange={(e) => setStartNumber(e.target.value)}
                                 min="1"
                                 className="w-full px-4 py-2 bg-input border border-border/10 rounded-xl text-text-main focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all"
+                                aria-label="Numéro de départ"
                             />
                         </div>
                         <div className="space-y-2">
@@ -263,6 +265,7 @@ const CreateActivitySeriesModal: React.FC<CreateActivitySeriesModalProps> = ({ i
                                 min="1"
                                 max="50"
                                 className="w-full px-4 py-2 bg-input border border-border/10 rounded-xl text-text-main focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all"
+                                aria-label="Nombre d'activités"
                             />
                         </div>
                     </div>
@@ -277,6 +280,7 @@ const CreateActivitySeriesModal: React.FC<CreateActivitySeriesModalProps> = ({ i
                                 onChange={(e) => { handleAddLevel(e.target.value); e.target.value = ''; }}
                                 className="bg-surface/50 border border-border/10 rounded-lg text-xs py-1 px-2 focus:outline-none focus:ring-1 focus:ring-primary transition-all cursor-pointer"
                                 value=""
+                                aria-label="Ajouter un niveau"
                             >
                                 <option value="" disabled>Ajouter un niveau...</option>
                                 {levels.filter(l => !selectedLevels.some(sl => sl.id === l.id)).map(lv => (
@@ -305,6 +309,7 @@ const CreateActivitySeriesModal: React.FC<CreateActivitySeriesModalProps> = ({ i
                                                     value={sl.nombre_exercices}
                                                     onChange={(e) => handleLevelChange(index, 'nombre_exercices', e.target.value === '' ? '' : parseInt(e.target.value))}
                                                     className="w-14 bg-background/50 border border-white/5 rounded-lg py-1 text-center text-xs font-bold focus:ring-1 focus:ring-primary outline-none"
+                                                    aria-label="Nombre d'exercices"
                                                 />
                                             </div>
                                             <div className="flex flex-col">
@@ -314,6 +319,7 @@ const CreateActivitySeriesModal: React.FC<CreateActivitySeriesModalProps> = ({ i
                                                     value={sl.nombre_erreurs}
                                                     onChange={(e) => handleLevelChange(index, 'nombre_erreurs', e.target.value === '' ? '' : parseInt(e.target.value))}
                                                     className="w-14 bg-background/50 border border-white/5 rounded-lg py-1 text-center text-xs font-bold focus:ring-1 focus:ring-primary outline-none"
+                                                    aria-label="Nombre d'erreurs tolérées"
                                                 />
                                             </div>
                                             <button

@@ -30,9 +30,14 @@ export interface PdfData extends PdfDataRaw {
 
 /**
  * Fetches and processes PDF data for a single student.
+ * 
+ * LOGIC: RECORD-BASED (User Requirement)
+ * We fetch ONLY existing 'Progression' records.
+ * This ensures the child only sees what has been explicitly assigned/created.
+ * (Now that Generation logic is fixed to create lines, this will show "To Do" items correctly).
  */
 export const fetchStudentPdfData = async (studentId: string, studentNiveauId?: string | null): Promise<PdfDataRaw | null> => {
-    // RÉCUPÉRATION DES DONNÉES
+    // 1. Fetch Progressions with Deep Relations
     const { data: progressionData, error: progError } = await supabase
         .from('Progression')
         .select(`
@@ -43,17 +48,19 @@ export const fetchStudentPdfData = async (studentId: string, studentNiveauId?: s
                 id,
                 titre,
                 ordre,
-                ActiviteNiveau ( niveau_id ),
                 Module (
                     id,
                     nom,
                     date_fin,
                     statut,
-                    branche_id,
-                    SousBranche (
+                    SousBranche:sous_branche_id (
                         id,
                         ordre,
-                        Branche ( id, nom, ordre )
+                        Branche:branche_id (
+                            id,
+                            nom,
+                            ordre
+                        )
                     )
                 )
             )
@@ -62,35 +69,21 @@ export const fetchStudentPdfData = async (studentId: string, studentNiveauId?: s
 
     if (progError) throw progError;
 
-    // FILTRAGE STRICT
-    const filteredProgressions = (progressionData || []).filter((p: any) => {
-        // L'activité et son module doivent exister
-        if (!p.Activite?.Module) return false;
+    if (!progressionData || progressionData.length === 0) return null;
 
-        // STATUT TEMPOREL - Uniquement les modules "en_cours"
-        if (p.Activite.Module.statut !== 'en_cours') return false;
-
-        // États d'activité à afficher (To-Do List)
-        const validStates = ['a_commencer', 'en_cours', 'a_domicile'];
-        if (!validStates.includes(p.etat)) return false;
-
-        // Filtrage par niveau (optionnel)
-        if (studentNiveauId && p.Activite.ActiviteNiveau?.length > 0) {
-            const hasMatchingLevel = p.Activite.ActiviteNiveau.some(
-                (an: any) => an.niveau_id === studentNiveauId
-            );
-            if (!hasMatchingLevel) return false;
-        }
-
-        return true;
-    });
-
-    if (filteredProgressions.length === 0) return null;
-
-    // REGROUPEMENT PAR MODULE
+    // 2. Filter & Map Data
+    const validStates = ['a_commencer', 'en_cours', 'a_domicile'];
     const moduleMap: Record<string, PdfModule> = {};
-    filteredProgressions.forEach((p: any) => {
-        const mod = p.Activite.Module;
+
+    progressionData.forEach((p: any) => {
+        // Filter by state
+        if (!validStates.includes(p.etat)) return;
+
+        // Filter by Module status (must be 'en_cours')
+        const mod = p.Activite?.Module;
+        if (!mod || mod.statut !== 'en_cours') return;
+
+        // Initialize Module in Map if needed
         if (!moduleMap[mod.id]) {
             moduleMap[mod.id] = {
                 id: mod.id,
@@ -102,43 +95,38 @@ export const fetchStudentPdfData = async (studentId: string, studentNiveauId?: s
                 activities: []
             };
         }
+
+        // Add Activity
         moduleMap[mod.id].activities.push({
             name: p.Activite.titre,
             order: p.Activite.ordre || 0,
             etat: p.etat,
-            dateLimite: p.date_limite
+            dateLimite: p.date_limite || mod.date_fin // Fallback to module date? Or keep p? Old logic: p.date_limite
         });
     });
 
-    // TRI EN CASCADE
-    const sortedModules = Object.values(moduleMap).sort((a, b) => {
-        // PRIORITÉ 1 : Date de Fin du Module (plus ancien en premier)
+    // 3. Convert to Array and Sort
+    const pdfModules = Object.values(moduleMap);
+
+    // Sort modules (Same logic)
+    pdfModules.sort((a, b) => {
         if (a.dueDate && b.dueDate) {
             const dateComparison = new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime();
             if (dateComparison !== 0) return dateComparison;
         } else if (a.dueDate) return -1;
         else if (b.dueDate) return 1;
 
-        // PRIORITÉ 2 : Par Branche
-        if (a.branchOrder !== b.branchOrder) {
-            return a.branchOrder - b.branchOrder;
-        }
-
-        // PRIORITÉ 3 : Par Sous-Branche
-        if (a.sbOrder !== b.sbOrder) {
-            return a.sbOrder - b.sbOrder;
-        }
-
-        // PRIORITÉ 4 : Par Ordre Alphabétique
+        if (a.branchOrder !== b.branchOrder) return a.branchOrder - b.branchOrder;
+        if (a.sbOrder !== b.sbOrder) return a.sbOrder - b.sbOrder;
         return a.title.localeCompare(b.title);
     });
 
-    // Tri des activités au sein de chaque module
-    sortedModules.forEach(m => {
+    // Sort activities within modules
+    pdfModules.forEach(m => {
         m.activities.sort((a, b) => a.order - b.order);
     });
 
-    if (sortedModules.length === 0) return null;
+    if (pdfModules.length === 0) return null;
 
-    return { modules: sortedModules };
+    return { modules: pdfModules };
 };

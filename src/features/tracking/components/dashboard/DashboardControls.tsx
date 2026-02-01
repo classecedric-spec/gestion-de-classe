@@ -1,6 +1,6 @@
 import React from 'react';
 import { Users, Settings2, Maximize, Minimize, Check, Loader2 } from 'lucide-react';
-import { Button } from '@/core';
+import { Button } from '../../../../core';
 import clsx from 'clsx';
 import { Timer } from '../../hooks/useTimerIntegration';
 

@@ -31,30 +31,47 @@ export function useProgressionGeneration(
         try {
             // 1. Fetch all students from selected groups
             const students = await studentService.getStudentsByGroups(selectedGroups);
+            const studentIds = students.map(s => s.id);
 
             setProgress(15);
             setProgressText(`${students.length} élèves trouvés...`);
 
             // 2. Fetch all activities for this module
             const activities = selectedModule.Activite || [];
+            const activityIds = activities.map((a: any) => a.id);
+
+            // 3. Fetch EXISTING progressions to prevent duplicates/errors
+            // We need to know which (student, activity) pairs already exist.
+            const existingProgressions = await trackingService.getProgressionsForStudentsAndActivities(studentIds, activityIds);
+            const existingMap = new Set(
+                existingProgressions.map((p: any) => `${p.eleve_id}_${p.activite_id}`)
+            );
+
             const progressionsToInsert: any[] = [];
+            const currentUser = await getCurrentUser();
 
-            let studentIndex = 0;
-            for (const student of students) {
-                studentIndex++;
-                const currentPercentage = 15 + Math.round((studentIndex / students.length) * 75);
+            let activityIndex = 0;
+            for (const activity of activities) {
+                activityIndex++;
+                const currentPercentage = 15 + Math.round((activityIndex / activities.length) * 75);
                 setProgress(currentPercentage);
-                setProgressText(`Analyse : ${student.prenom} ${student.nom}...`);
+                setProgressText(`Analyse : ${activity.titre}...`);
 
-                for (const activity of activities) {
-                    // Get levels associated with this activity
-                    const activityLevels = activity.ActiviteNiveau?.map((an: any) => an.niveau_id) || [];
+                // Get levels associated with this activity
+                const activityLevels = activity.ActiviteNiveau?.map((an: any) => an.niveau_id) || [];
 
-                    // STRICT MATCHING RULE: Only if levels exist and match student level
-                    if (activityLevels.length === 0) continue;
+                for (const student of students) {
+                    // Logic:
+                    // 1. Check if progression already exists
+                    if (existingMap.has(`${student.id}_${activity.id}`)) continue;
 
-                    if (activityLevels.includes(student.niveau_id)) {
-                        const currentUser = await getCurrentUser();
+                    // 2. Check Level Match
+                    // If activity has levels, student MUST match one of them.
+                    // If activity has NO levels (generic), we assign to everyone? 
+                    // Let's assume Yes for generic activities.
+                    const isLevelMatch = activityLevels.length === 0 || activityLevels.includes(student.niveau_id);
+
+                    if (isLevelMatch) {
                         progressionsToInsert.push({
                             eleve_id: student.id,
                             activite_id: activity.id,
@@ -68,15 +85,19 @@ export function useProgressionGeneration(
 
             if (progressionsToInsert.length > 0) {
                 setProgress(95);
-                setProgressText('Enregistrement en base de données...');
+                setProgressText(`Enregistrement de ${progressionsToInsert.length} progressions...`);
+                // Use upsert or create? Repository create uses insert.
+                // Since we filtered existing, insert should be safe, but concurrent races could happen.
+                // We'll trust our filter.
                 await trackingService.createProgressions(progressionsToInsert);
 
                 setProgress(100);
-                showNotification(`${progressionsToInsert.length} lignes de progression générées !`);
+                showNotification(`${progressionsToInsert.length} lignes de progression générées avec succès !`, 'success');
                 setSelectedGroups([]);
-                setDetailTab('activities');
+                setDetailTab('progression'); // Switch to progression tab to see results
             } else {
-                showNotification("Aucun élève correspondant aux niveaux des activités n'a été trouvé dans ces groupes.", 'error');
+                showNotification("Toutes les progressions nécessaires existent déjà ou aucun niveau ne correspond.", 'success');
+                setSelectedGroups([]);
             }
         } catch (err) {
             showNotification("Erreur lors de la génération des progressions.", 'error');

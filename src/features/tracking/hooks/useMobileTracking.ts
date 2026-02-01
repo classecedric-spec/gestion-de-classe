@@ -24,6 +24,7 @@ export function useMobileTracking() {
     const [fullStudents, setFullStudents] = useState<Tables<'Eleve'>[]>([]);
     const [selectedStudentFilter, setSelectedStudentFilter] = useState<string | null>(null);
     const [selectedStatusFilter, setSelectedStatusFilter] = useState<string>('all');
+    const [selectedModuleFilter, setSelectedModuleFilter] = useState<string | null>(null);
 
     // Helpers & Cache
     const [expandedRequestId, setExpandedRequestId] = useState<string | null>(null);
@@ -339,10 +340,21 @@ export function useMobileTracking() {
         });
     }, [helpRequests]);
 
+    const uniqueModules = useMemo(() => {
+        const map = new Map<string, any>();
+        helpRequests.forEach(req => {
+            if (req.activite?.Module && !map.has(req.activite.Module.id)) {
+                map.set(req.activite.Module.id, req.activite.Module);
+            }
+        });
+        return Array.from(map.values()).sort((a, b) => (a.nom || '').localeCompare(b.nom || ''));
+    }, [helpRequests]);
+
     const displayedRequests = helpRequests.filter(req => {
         const matchStudent = selectedStudentFilter ? req.eleve_id === selectedStudentFilter : true;
+        const matchModule = selectedModuleFilter ? req.activite?.Module?.id === selectedModuleFilter : true;
         const matchStatus = selectedStatusFilter === 'all' ? true : req.etat === selectedStatusFilter;
-        return matchStudent && matchStatus;
+        return matchStudent && matchModule && matchStatus;
     });
 
     return {
@@ -352,7 +364,9 @@ export function useMobileTracking() {
             groupName,
             helpRequests: displayedRequests,
             uniqueStudents,
+            uniqueModules,
             selectedStudentFilter,
+            selectedModuleFilter,
             selectedStatusFilter,
             loading,
             expandedRequestId,
@@ -366,7 +380,14 @@ export function useMobileTracking() {
             handleStatusUpdate,
             handleClear,
             handleAutoSuivi,
-            setSelectedStudentFilter,
+            setSelectedStudentFilter: (id: string | null) => {
+                setSelectedStudentFilter(id);
+                if (id) setSelectedModuleFilter(null); // Mutual exclusion
+            },
+            setSelectedModuleFilter: (id: string | null) => {
+                setSelectedModuleFilter(id);
+                if (id) setSelectedStudentFilter(null); // Mutual exclusion
+            },
             setSelectedStatusFilter
         }
     };

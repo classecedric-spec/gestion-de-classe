@@ -4,7 +4,7 @@ import { DndContext, closestCenter, PointerSensor, KeyboardSensor, useSensor, us
 import { SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import clsx from 'clsx';
-import { Tables } from '../../../../types/supabase';
+import { Tables } from '../../../types/supabase';
 
 // Helper type for Activity with extra fields if needed
 type Activity = Tables<'Activite'> & { ActiviteNiveau?: any[] };
@@ -12,11 +12,12 @@ type Activity = Tables<'Activite'> & { ActiviteNiveau?: any[] };
 // Sortable Activity Item Component
 interface SortableItemProps {
     activity: Activity;
+    index: number;
     onEdit: (activity: Activity) => void;
     onDelete?: (activity: Activity) => void;
 }
 
-const SortableActivityItem: React.FC<SortableItemProps> = ({ activity, onEdit, onDelete }) => {
+const SortableActivityItem: React.FC<SortableItemProps> = ({ activity, index, onEdit, onDelete }) => {
     const {
         attributes,
         listeners,
@@ -29,20 +30,24 @@ const SortableActivityItem: React.FC<SortableItemProps> = ({ activity, onEdit, o
     const style = {
         transform: CSS.Transform.toString(transform),
         transition,
-        zIndex: isDragging ? 10 : 1,
-        position: 'relative' as const,
     };
 
     return (
         <div
             ref={setNodeRef}
+            // eslint-disable-next-line
             style={style}
             onClick={() => onEdit(activity)}
             className={clsx(
                 "flex items-center gap-3 p-2 bg-surface/40 hover:bg-surface/60 transition-colors rounded-lg border border-white/5 group cursor-pointer pr-14 relative",
-                isDragging && "opacity-50 border-primary dashed"
+                isDragging ? "z-10 opacity-50 border-primary dashed" : "z-0"
             )}
         >
+            {/* Index / Order */}
+            <div className="text-sm font-black text-grey-dark w-6 text-center shrink-0">
+                {index + 1}
+            </div>
+
             {/* Drag Handle */}
             <div
                 {...attributes}
@@ -130,9 +135,10 @@ const ActivitiesTab: React.FC<ActivitiesTabProps> = ({ activities, onDragEnd, on
                     items={activities.map(a => a.id)}
                     strategy={verticalListSortingStrategy}
                 >
-                    {activities.map((activity) => (
+                    {activities.map((activity, index) => (
                         <SortableActivityItem
                             key={activity.id}
+                            index={index}
                             activity={activity}
                             onEdit={onEditActivity}
                             onDelete={onDelete}

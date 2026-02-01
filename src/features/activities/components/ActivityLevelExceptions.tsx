@@ -84,55 +84,57 @@ const ActivityLevelExceptions: React.FC<ActivityLevelExceptionsProps> = ({
                                 <X size={14} />
                             </button>
 
-                            <div className="flex flex-col sm:flex-row sm:items-center gap-4">
-                                <div className="sm:w-32 shrink-0">
+                            <div className="flex flex-col gap-3">
+                                {/* Ligne 1 : Titre Niveau + Toggle Statut */}
+                                <div className="flex items-center justify-between">
                                     <h6 className="text-[11px] font-black text-primary flex items-center gap-2 uppercase tracking-widest">
                                         <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse"></span>
                                         {al.nom_niveau}
                                     </h6>
+
+                                    <div className="flex w-40 sm:w-48 bg-black/20 rounded-lg p-0.5 border border-white/5 h-7 sm:h-8">
+                                        {(['obligatoire', 'facultatif'] as const).map(status => (
+                                            <button
+                                                key={status}
+                                                type="button"
+                                                onClick={() => onUpdate(index, 'statut_exigence', status)}
+                                                className={clsx(
+                                                    "flex-1 px-3 text-[9px] font-black uppercase rounded-md transition-all tracking-wider",
+                                                    al.statut_exigence === status
+                                                        ? (status === 'obligatoire' ? "bg-success text-text-dark" : "bg-danger text-white")
+                                                        : "text-gray-600 hover:text-white"
+                                                )}
+                                            >
+                                                {status === 'obligatoire' ? 'OBLI' : 'FACUL'}
+                                            </button>
+                                        ))}
+                                    </div>
                                 </div>
 
-                                <div className="flex-1 grid grid-cols-2 sm:grid-cols-2 gap-3">
-                                    <div className="flex items-center gap-2">
-                                        <label htmlFor={`ex_count_${index}`} className="text-[9px] font-bold text-gray-500 uppercase tracking-tighter shrink-0">Exercices</label>
+                                {/* Ligne 2 : Inputs (Exercices / Erreurs) */}
+                                <div className="grid grid-cols-2 gap-4 bg-black/10 p-2 rounded-lg border border-white/5">
+                                    <div className="flex items-center justify-between gap-2">
+                                        <label htmlFor={`ex_count_${index}`} className="text-[9px] font-bold text-gray-400 uppercase tracking-tighter shrink-0">Exercices</label>
                                         <input
                                             id={`ex_count_${index}`}
                                             type="number"
                                             value={al.nombre_exercices}
                                             onChange={(e) => onUpdate(index, 'nombre_exercices', e.target.value)}
-                                            className="w-full max-w-[60px] bg-black/20 border border-white/10 rounded-lg px-2 py-1 text-xs text-white focus:border-primary outline-none"
+                                            className="w-16 bg-black/20 border border-white/10 rounded-md px-2 py-1 text-xs text-center text-white focus:border-primary outline-none focus:bg-black/40 transition-all font-bold"
                                             min="1"
                                         />
                                     </div>
-                                    <div className="flex items-center gap-2">
-                                        <label htmlFor={`err_count_${index}`} className="text-[9px] font-bold text-gray-500 uppercase tracking-tighter shrink-0">Erreurs</label>
+                                    <div className="flex items-center justify-between gap-2 border-l border-white/5 pl-4">
+                                        <label htmlFor={`err_count_${index}`} className="text-[9px] font-bold text-gray-400 uppercase tracking-tighter shrink-0">Erreurs Max</label>
                                         <input
                                             id={`err_count_${index}`}
                                             type="number"
                                             value={al.nombre_erreurs}
                                             onChange={(e) => onUpdate(index, 'nombre_erreurs', e.target.value)}
-                                            className="w-full max-w-[60px] bg-black/20 border border-white/10 rounded-lg px-2 py-1 text-xs text-white focus:border-primary outline-none"
+                                            className="w-16 bg-black/20 border border-white/10 rounded-md px-2 py-1 text-xs text-center text-white focus:border-primary outline-none focus:bg-black/40 transition-all font-bold"
                                             min="0"
                                         />
                                     </div>
-                                </div>
-
-                                <div className="flex sm:w-48 bg-black/20 rounded-lg p-0.5 border border-white/5 h-8">
-                                    {(['obligatoire', 'facultatif'] as const).map(status => (
-                                        <button
-                                            key={status}
-                                            type="button"
-                                            onClick={() => onUpdate(index, 'statut_exigence', status)}
-                                            className={clsx(
-                                                "flex-1 px-3 text-[9px] font-black uppercase rounded-md transition-all tracking-wider",
-                                                al.statut_exigence === status
-                                                    ? (status === 'obligatoire' ? "bg-success text-text-dark" : "bg-danger text-white")
-                                                    : "text-gray-600 hover:text-white"
-                                            )}
-                                        >
-                                            {status}
-                                        </button>
-                                    ))}
                                 </div>
                             </div>
                         </div>

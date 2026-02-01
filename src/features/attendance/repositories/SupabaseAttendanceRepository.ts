@@ -242,14 +242,44 @@ export class SupabaseAttendanceRepository implements IAttendanceRepository {
     }
 
     async getAttendanceRange(start: string, end: string): Promise<AttendanceWithCategory[]> {
-        const { data, error } = await supabase
-            .from('Attendance')
-            .select('*, CategoriePresence(nom)')
-            .gte('date', start)
-            .lte('date', end);
+        let allData: any[] = [];
+        let hasMore = true;
+        let page = 0;
+        const pageSize = 1000;
 
-        if (error) throw error;
-        return (data || []) as AttendanceWithCategory[];
+        console.log(`[Repository] Fetching attendance range: ${start} to ${end}`);
+
+        try {
+            while (hasMore) {
+                const { data, error } = await supabase
+                    .from('Attendance')
+                    .select('*, CategoriePresence(nom)')
+                    .gte('date', start)
+                    .lte('date', end)
+                    .range(page * pageSize, (page + 1) * pageSize - 1);
+
+                if (error) throw error;
+
+                if (data && data.length > 0) {
+                    allData = [...allData, ...data];
+                    console.log(`[Repository] Page ${page} fetched: ${data.length} records. Total so far: ${allData.length}`);
+
+                    if (data.length < pageSize) {
+                        hasMore = false;
+                    } else {
+                        page++;
+                    }
+                } else {
+                    hasMore = false;
+                }
+            }
+        } catch (err) {
+            console.error('[Repository] Error fetching attendance range:', err);
+            throw err;
+        }
+
+        console.log(`[Repository] Total records fetched: ${allData.length}`);
+        return allData as AttendanceWithCategory[];
     }
 
     async copyPeriodData(date: string, setupId: string, fromPeriod: string, toPeriod: string, userId: string): Promise<void> {

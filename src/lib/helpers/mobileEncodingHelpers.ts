@@ -29,10 +29,17 @@ export const getStatusInfo = (status: string) => {
 export const processModules = (modulesData: any[], levelId: string, progMap: Record<string, string>) => {
     const processedModules = modulesData.map((m: any) => {
         const validActivities = (m.Activite || []).filter((act: any) => {
+            // 1. Level Check (Strict)
             const levels = act.ActiviteNiveau?.map((an: any) => an.niveau_id) || [];
-            // STRICT: Activity must have level defined AND match student level
-            if (!levelId) return levels.length > 0;
-            return levels.length > 0 && levels.includes(levelId);
+            const isLevelMatch = levelId ? (levels.length > 0 && levels.includes(levelId)) : levels.length > 0;
+            if (!isLevelMatch) return false;
+
+            // 2. Progression Existence Check (Strict - User Requirement)
+            // If the activity is not in the progression map (no record created), hide it.
+            // This enforces "Generation First" workflow.
+            if (!progMap[act.id]) return false;
+
+            return true;
         }).sort((a: any, b: any) => (a.ordre || 0) - (b.ordre || 0));
 
         const totalActivities = validActivities.length;

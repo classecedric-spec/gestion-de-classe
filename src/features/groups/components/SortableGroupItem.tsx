@@ -7,13 +7,14 @@ import { ListItem } from '../../../core';
 
 interface SortableGroupItemProps {
     group: Tables<'Groupe'>;
+    index: number;
     selectedGroup: Tables<'Groupe'> | null;
     onClick: (group: Tables<'Groupe'>) => void;
     onEdit: (group: Tables<'Groupe'>) => void;
     onDelete: (group: Tables<'Groupe'>) => void;
 }
 
-export function SortableGroupItem({ group, selectedGroup, onClick, onEdit, onDelete }: SortableGroupItemProps) {
+export function SortableGroupItem({ group, index, selectedGroup, onClick, onEdit, onDelete }: SortableGroupItemProps) {
     const {
         attributes,
         listeners,
@@ -26,12 +27,14 @@ export function SortableGroupItem({ group, selectedGroup, onClick, onEdit, onDel
     const style = {
         transform: CSS.Transform.toString(transform),
         transition,
-        zIndex: isDragging ? 50 : 'auto',
-        position: 'relative' as const,
     };
 
     return (
-        <div ref={setNodeRef} style={style}>
+        <div
+            ref={setNodeRef}
+            style={style}
+            className={clsx("relative", isDragging ? "z-50" : "z-auto")}
+        >
             <ListItem
                 id={group.id}
                 title={group.nom}
@@ -48,13 +51,18 @@ export function SortableGroupItem({ group, selectedGroup, onClick, onEdit, onDel
                     className: group.photo_url ? "bg-[#D9B981]" : "bg-background"
                 }}
                 left={
-                    <div
-                        {...attributes}
-                        {...listeners}
-                        className="p-2 -ml-2 text-grey-dark hover:text-white cursor-grab active:cursor-grabbing touch-none flex items-center justify-center transition-colors"
-                        title="Déplacer"
-                    >
-                        <GripVertical size={16} />
+                    <div className="flex items-center">
+                        <span className="text-[10px] font-bold text-grey-medium w-4 text-center select-none opacity-50">
+                            {index + 1}
+                        </span>
+                        <div
+                            {...attributes}
+                            {...listeners}
+                            className="p-2 text-grey-dark hover:text-white cursor-grab active:cursor-grabbing touch-none flex items-center justify-center transition-colors"
+                            title="Déplacer"
+                        >
+                            <GripVertical size={16} />
+                        </div>
                     </div>
                 }
             />

@@ -97,7 +97,7 @@ export const TrackingDashboard: React.FC<TrackingDashboardProps> = ({
                     className="h-full bg-surface/5 flex flex-col transition-colors duration-300 shrink-0 relative"
                     {...withStyle(column1Style)}
                 >
-                    <div className="flex flex-col overflow-hidden shrink-0" {...withStyle(row1Style)}>
+                    <div className="flex flex-col shrink-0 relative" {...withStyle(row1Style)}>
                         <StudentColumnWrapper
                             currentView={currentView}
                             selectedStudent={groupsHook.states.selectedStudent}
@@ -155,7 +155,7 @@ export const TrackingDashboard: React.FC<TrackingDashboardProps> = ({
                     className="h-full bg-surface/5 flex flex-col shrink-0"
                     {...withStyle(column2Style)}
                 >
-                    <div className="flex flex-col overflow-hidden shrink-0" {...withStyle(row2Style)}>
+                    <div className="flex flex-col shrink-0 relative" {...withStyle(row2Style)}>
                         <HelpColumnWrapper
                             helpRequests={helpHook.states.helpRequests}
                             expandedRequestId={helpHook.states.expandedRequestId}

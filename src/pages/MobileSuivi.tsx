@@ -4,6 +4,7 @@ import { useMobileTracking } from '../features/tracking/hooks/useMobileTracking'
 import MobileHeader from '../features/tracking/components/mobile/MobileHeader';
 import MobileRequestCard from '../features/tracking/components/mobile/MobileRequestCard';
 import MobileFilterBar from '../features/tracking/components/mobile/MobileFilterBar';
+import MobileModuleGroup from '../features/tracking/components/mobile/MobileModuleGroup';
 
 const MobileSuivi: React.FC = () => {
     const { states, actions } = useMobileTracking();
@@ -100,17 +101,70 @@ const MobileSuivi: React.FC = () => {
                         <p className="text-xs font-bold uppercase tracking-widest">Rien à signaler</p>
                     </div>
                 ) : (
-                    states.helpRequests.map((req: any) => (
-                        <MobileRequestCard
-                            key={req.id}
-                            req={req}
-                            isExpanded={states.expandedRequestId === req.id}
-                            helpers={states.helpersCache[req.id]}
-                            onExpand={actions.handleExpandHelp}
-                            onStatusUpdate={actions.handleStatusUpdate}
-                            onClear={actions.handleClear}
-                        />
-                    ))
+                    states.selectedModuleFilter ? (
+                        // MODULE VIEW: Grouped by Student
+                        (() => {
+                            const groupedByStudent: Record<string, typeof states.helpRequests> = {};
+                            states.helpRequests.forEach((req: any) => {
+                                if (req.eleve_id) {
+                                    if (!groupedByStudent[req.eleve_id]) groupedByStudent[req.eleve_id] = [];
+                                    groupedByStudent[req.eleve_id].push(req);
+                                }
+                            });
+
+                            const sortedStudentIds = Object.keys(groupedByStudent).sort((a, b) => {
+                                const studentA = states.uniqueStudents.find((s: any) => s.id === a);
+                                const studentB = states.uniqueStudents.find((s: any) => s.id === b);
+                                return (studentA?.prenom || '').localeCompare(studentB?.prenom || '');
+                            });
+
+                            if (sortedStudentIds.length === 0) {
+                                return (
+                                    <div className="flex flex-col items-center justify-center py-20 opacity-50 space-y-4">
+                                        <div className="w-16 h-16 bg-white/5 rounded-full flex items-center justify-center border border-white/5">
+                                            <Check size={32} className="text-primary" />
+                                        </div>
+                                        <p className="text-xs font-bold uppercase tracking-widest">Aucune activité pour ce module</p>
+                                    </div>
+                                );
+                            }
+
+                            return sortedStudentIds.map(studentId => {
+                                const studentRequests = groupedByStudent[studentId].sort((a: any, b: any) => {
+                                    return (a.activite?.ordre ?? 0) - (b.activite?.ordre ?? 0);
+                                });
+                                const student = states.uniqueStudents.find((s: any) => s.id === studentId);
+                                const studentName = student ? `${student.prenom} ${student.nom}` : 'Élève inconnu';
+
+                                return (
+                                    <MobileModuleGroup
+                                        key={studentId}
+                                        studentId={studentId}
+                                        studentName={studentName}
+                                        requests={studentRequests}
+                                        expandedRequestId={states.expandedRequestId}
+                                        helpersCache={states.helpersCache}
+                                        onExpandHelp={actions.handleExpandHelp}
+                                        onStatusUpdate={actions.handleStatusUpdate}
+                                        onClear={actions.handleClear}
+                                    />
+                                );
+                            });
+                        })()
+                    ) : (
+                        // STANDARD VIEW: Flat List
+                        states.helpRequests.map((req: any) => (
+                            <MobileRequestCard
+                                key={req.id}
+                                req={req}
+                                isExpanded={states.expandedRequestId === req.id}
+                                helpers={states.helpersCache[req.id]}
+                                onExpand={actions.handleExpandHelp}
+                                onStatusUpdate={actions.handleStatusUpdate}
+                                onClear={actions.handleClear}
+                            />
+                        ))
+                    )
                 )}
             </div>
 
@@ -120,8 +174,11 @@ const MobileSuivi: React.FC = () => {
 
             <MobileFilterBar
                 students={states.uniqueStudents}
+                modules={states.uniqueModules}
                 selectedFilter={states.selectedStudentFilter}
+                selectedModuleFilter={states.selectedModuleFilter}
                 onFilterChange={actions.setSelectedStudentFilter}
+                onModuleFilterChange={actions.setSelectedModuleFilter}
             />
         </div>
     );

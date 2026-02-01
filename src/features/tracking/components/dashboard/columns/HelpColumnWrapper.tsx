@@ -33,7 +33,7 @@ export const HelpColumnWrapper: React.FC<HelpColumnWrapperProps> = ({
                 </span>
             </div>
 
-            <div className="flex-1 overflow-hidden">
+            <div className="flex-1 overflow-hidden flex flex-col">
                 <HelpRequestsPanel
                     helpRequests={helpRequests}
                     expandedRequestId={expandedRequestId}

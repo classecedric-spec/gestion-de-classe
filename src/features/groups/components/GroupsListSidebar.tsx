@@ -113,9 +113,10 @@ export const GroupsListSidebar: React.FC<GroupsListSidebarProps> = ({
                             strategy={verticalListSortingStrategy}
                         >
                             <div className="space-y-1 flex-1">
-                                {filteredGroups.map((group) => (
+                                {filteredGroups.map((group, index) => (
                                     <SortableGroupItem
                                         key={group.id}
+                                        index={index}
                                         group={group}
                                         selectedGroup={selectedGroup}
                                         onClick={() => onSelectGroup(group)}

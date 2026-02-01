@@ -194,11 +194,20 @@ const AttendancePDF: React.FC<AttendancePDFProps> = ({
         return allAbsent;
     };
 
+    const isEmptyDay = (date: string, period: string) => {
+        if (sortedStudents.length === 0) return false;
+
+        return sortedStudents.every(student => {
+            const symbol = getStatusSymbol(student.id, date, period);
+            return symbol === '-';
+        });
+    };
+
     const calculateStudentTotal = (studentId: string) => {
         let count = 0;
         dates.forEach(date => {
             ['matin', 'apres_midi'].forEach(period => {
-                if (isNoSchoolDay(date, period)) return;
+                if (isNoSchoolDay(date, period) || isEmptyDay(date, period)) return;
                 const symbol = getStatusSymbol(studentId, date, period);
                 if (symbol === 'I') count++;
             });
@@ -210,7 +219,7 @@ const AttendancePDF: React.FC<AttendancePDFProps> = ({
         let count = 0;
         dates.forEach(date => {
             ['matin', 'apres_midi'].forEach(period => {
-                if (isNoSchoolDay(date, period)) return;
+                if (isNoSchoolDay(date, period) || isEmptyDay(date, period)) return;
                 const symbol = getStatusSymbol(studentId, date, period);
                 if (symbol === 'O') count++;
             });
@@ -219,7 +228,7 @@ const AttendancePDF: React.FC<AttendancePDFProps> = ({
     };
 
     const calculateDayTotal = (date: string, period: string) => {
-        if (isNoSchoolDay(date, period)) return null;
+        if (isNoSchoolDay(date, period) || isEmptyDay(date, period)) return null;
         let count = 0;
         sortedStudents.forEach(student => {
             const symbol = getStatusSymbol(student.id, date, period);
@@ -229,7 +238,7 @@ const AttendancePDF: React.FC<AttendancePDFProps> = ({
     };
 
     const calculateDayAbsent = (date: string, period: string) => {
-        if (isNoSchoolDay(date, period)) return null;
+        if (isNoSchoolDay(date, period) || isEmptyDay(date, period)) return null;
         let count = 0;
         sortedStudents.forEach(student => {
             const symbol = getStatusSymbol(student.id, date, period);
@@ -287,7 +296,7 @@ const AttendancePDF: React.FC<AttendancePDFProps> = ({
                     </View>
 
                     {sortedStudents.map((student, idx) => {
-                        const isNewLevel = idx > 0 && (student.Niveau?.id !== sortedStudents[idx - 1].Niveau?.id);
+                        const isNewLevel = idx > 0 && (student.Niveau?.ordre !== sortedStudents[idx - 1].Niveau?.ordre);
                         const studentTotal = calculateStudentTotal(student.id);
                         const studentAbsent = calculateStudentAbsent(student.id);
 
@@ -309,18 +318,24 @@ const AttendancePDF: React.FC<AttendancePDFProps> = ({
                                         {['matin', 'apres_midi'].map((period, pIdx) => {
                                             const symbol = getStatusSymbol(student.id, date, period);
                                             const noSchool = isNoSchoolDay(date, period);
+                                            const emptyDay = isEmptyDay(date, period);
+
+                                            // Logic for background color
+                                            let bgColor = 'transparent';
+                                            if (noSchool) bgColor = '#FFF9C4'; // Yellow for "All Absent"
+                                            else if (emptyDay) bgColor = 'rgba(255, 165, 0, 0.2)'; // Orange for "No Data"
 
                                             return (
                                                 <View
                                                     key={period}
                                                     style={[
                                                         styles.dateCol,
-                                                        { width: dateColWidth, backgroundColor: noSchool ? 'rgba(255, 165, 0, 0.2)' : 'transparent' },
+                                                        { width: dateColWidth, backgroundColor: bgColor },
                                                         pIdx === 1 ? { borderRightWidth: 0 } : {}
                                                     ]}
                                                 >
                                                     <Text style={[styles.cellText, { fontSize }]}>
-                                                        {noSchool ? '' : (symbol !== '-' ? symbol : '')}
+                                                        {(noSchool || emptyDay) ? '' : (symbol !== '-' ? symbol : '')}
                                                     </Text>
                                                 </View>
                                             );

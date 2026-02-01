@@ -157,7 +157,7 @@ export class SupabaseStudentRepository implements IStudentRepository {
                         Adulte (id, nom, prenom)
                     )
                 ),
-                Niveau (nom),
+                Niveau (nom, ordre),
                 EleveGroupe (
                     Groupe (id, nom)
                 )
