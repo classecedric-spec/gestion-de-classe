@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Activity, Plus, Edit, X, Save } from 'lucide-react';
 import { ActivityType } from '../services/adultService';
-import { Badge, Button, Avatar, EmptyState, ConfirmModal } from '../../../components/ui';
+import { Badge, Button, Avatar, EmptyState, ConfirmModal } from '../../../core';
 
 interface ActivityTypesPanelProps {
     activityTypes: ActivityType[];

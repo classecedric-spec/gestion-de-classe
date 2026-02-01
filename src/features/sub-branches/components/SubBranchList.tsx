@@ -2,7 +2,7 @@ import React from 'react';
 import { Layers, Plus } from 'lucide-react';
 import SubBranchItem from './SubBranchItem';
 import { SubBranchWithParent } from '../services/subBranchService';
-import { CardList, Avatar, EmptyState } from '../../../components/ui';
+import { CardList, Avatar, EmptyState } from '../../../core';
 
 interface SubBranchListProps {
     subBranches: SubBranchWithParent[];

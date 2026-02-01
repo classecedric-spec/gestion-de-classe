@@ -1,12 +1,12 @@
 import React, { useState, useRef, useLayoutEffect } from 'react';
-import { Sparkles, Plus, Clock, SlidersHorizontal, Folder, Check, AlertCircle, X } from 'lucide-react';
+import { Check, AlertCircle, X } from 'lucide-react';
 import clsx from 'clsx';
-
 
 // Modals
 import AddModuleModal from '../../components/AddModuleModal';
 import AddActivityModal from '../../features/activities/components/AddActivityModal';
 import CreateActivitySeriesModal from '../../components/CreateActivitySeriesModal';
+import { ConfirmModal } from '../../core';
 
 // Hooks
 import { useNotifications } from './hooks/useNotifications';
@@ -16,11 +16,9 @@ import { useGroupSelection } from './hooks/useGroupSelection';
 import { useProgressionGeneration } from './hooks/useProgressionGeneration';
 import { useProgressionTracking } from './hooks/useProgressionTracking';
 
-// Components
-import ActivitiesTab from './components/ActivitiesTab';
-import GroupsTab from './components/GroupsTab';
-import ProgressionKanban from './components/ProgressionKanban';
-import { Badge, Avatar, EmptyState, ConfirmModal, SearchBar, FilterSelect, CardInfo, CardList, CardTabs, ListItem } from '../../components/ui';
+// Layout Components
+import { ModulesListSidebar } from './components/ModulesListSidebar';
+import { ModuleDetailView } from './components/ModuleDetailView';
 
 const Modules: React.FC = () => {
     // --- Height Synchronization ---
@@ -126,269 +124,36 @@ const Modules: React.FC = () => {
 
     return (
         <div className="flex h-full gap-6 animate-in fade-in duration-500 relative">
-            {/* Left Sidebar Column */}
-            <div className="w-1/4 flex flex-col gap-6 overflow-hidden">
-                <CardInfo
-                    ref={leftContentRef}
-                    height={headerHeight}
-                    contentClassName="space-y-5"
-                >
-                    <div className="flex items-center justify-between">
-                        <h2 className="text-cq-xl font-bold text-text-main flex items-center gap-2">
-                            <Folder className="text-primary" size={24} />
-                            Liste des Modules
-                        </h2>
-                        <Badge variant="primary" size="xs">
-                            {moduleHook.states.filteredModules.length} Modules
-                        </Badge>
-                    </div>
 
-                    <div className="border-t border-white/10" />
+            <ModulesListSidebar
+                moduleHook={moduleHook}
+                showFilters={showFilters}
+                setShowFilters={setShowFilters}
+                onModuleSelect={handleModuleSelect}
+                onEdit={handleEdit}
+                onAddClick={() => setIsAddModalOpen(true)}
+                contentRef={leftContentRef}
+                headerHeight={headerHeight}
+            />
 
-                    <div className="space-y-4">
-                        <div className="flex gap-3">
-                            <SearchBar
-                                placeholder="Rechercher un module..."
-                                value={moduleHook.states.searchTerm}
-                                onChange={(e) => moduleHook.actions.setSearchTerm(e.target.value)}
-                                iconColor="text-primary"
-                            />
+            <ModuleDetailView
+                moduleHook={moduleHook}
+                detailTab={detailTab}
+                setDetailTab={setDetailTab}
+                activityHook={activityHook}
+                groupHook={groupHook}
+                progressionGenHook={progressionGenHook}
+                progressionHook={progressionHook}
+                handleAddActivity={handleAddActivity}
+                handleEditActivity={handleEditActivity}
+                setActivityToDelete={setActivityToDelete}
+                handleCreateSeries={() => setIsCreateSeriesModalOpen(true)}
+                contentRef={rightContentRef}
+                headerHeight={headerHeight}
+            />
 
-                            {/* Filters Toggle Button */}
-                            <button
-                                onClick={() => setShowFilters(!showFilters)}
-                                className={clsx(
-                                    "p-2.5 rounded-xl border transition-all flex items-center justify-center shrink-0",
-                                    showFilters
-                                        ? "bg-primary text-text-dark border-primary shadow-lg shadow-primary/20"
-                                        : "bg-surface/50 border-white/10 text-grey-medium hover:text-white hover:border-white/20"
-                                )}
-                                title="Afficher les filtres"
-                            >
-                                <SlidersHorizontal size={20} />
-                            </button>
-                        </div>
+            {/* --- MODALS --- */}
 
-                        {showFilters && (
-                            <div className="space-y-2 animate-in slide-in-from-top-2 fade-in duration-200">
-                                {/* Filters Grid */}
-                                <div className="grid grid-cols-2 gap-2">
-                                    <FilterSelect
-                                        options={[
-                                            { value: 'all', label: 'Statuts: Tous' },
-                                            { value: 'en_preparation', label: 'En préparation' },
-                                            { value: 'en_cours', label: 'En cours' },
-                                            { value: 'archive', label: 'Archive' }
-                                        ]}
-                                        value={moduleHook.states.statusFilter}
-                                        onChange={(e) => moduleHook.actions.setStatusFilter(e.target.value)}
-                                        icon={Clock}
-                                        className="text-[10px]"
-                                    />
-                                    <FilterSelect
-                                        options={[
-                                            { value: 'all', label: 'Branches: Tous' },
-                                            ...moduleHook.states.availableBranches.map(b => ({ value: b.id, label: b.nom }))
-                                        ]}
-                                        value={moduleHook.states.branchFilter}
-                                        onChange={(e) => moduleHook.actions.setBranchFilter(e.target.value)}
-                                        icon={Folder}
-                                        className="text-[10px]"
-                                    />
-                                    {moduleHook.states.branchFilter !== 'all' && (
-                                        <FilterSelect
-                                            options={[
-                                                { value: 'all', label: 'Sous-Br.: Tous' },
-                                                ...moduleHook.states.availableSubBranches.map(sb => ({ value: sb.id, label: sb.nom }))
-                                            ]}
-                                            value={moduleHook.states.subBranchFilter}
-                                            onChange={(e) => moduleHook.actions.setSubBranchFilter(e.target.value)}
-                                            icon={Folder}
-                                            className="text-[10px] col-span-2 animate-in slide-in-from-left-2 duration-200"
-                                        />
-                                    )}
-                                </div>
-                            </div>
-                        )}
-                    </div>
-                </CardInfo>
-
-                <CardList
-                    actionLabel="Nouveau Module"
-                    onAction={() => setIsAddModalOpen(true)}
-                    actionIcon={Plus}
-                >
-                    {moduleHook.states.loading && moduleHook.states.filteredModules.length === 0 ? (
-                        <div className="flex-1 flex flex-col items-center justify-center py-12 gap-3">
-                            <Avatar size="lg" loading initials="" />
-                            <p className="text-grey-medium animate-pulse text-sm">Chargement...</p>
-                        </div>
-                    ) : moduleHook.states.filteredModules.length === 0 ? (
-                        <EmptyState
-                            icon={Folder}
-                            title="Aucun module"
-                            description={moduleHook.states.searchTerm ? "Aucun module ne correspond à votre recherche." : "Commencez par créer votre premier module."}
-                            size="sm"
-                        />
-                    ) : (
-                        <div className="space-y-1">
-                            {moduleHook.states.filteredModules.map((module) => {
-                                const isExpired = module.date_fin && new Date(module.date_fin) < new Date();
-                                return (
-                                    <ListItem
-                                        key={module.id}
-                                        id={module.id}
-                                        title={module.nom}
-                                        subtitle={`${module.SousBranche?.Branche?.nom} - ${module.SousBranche?.nom}`}
-                                        isSelected={moduleHook.states.selectedModule?.id === module.id}
-                                        onClick={() => handleModuleSelect(module)}
-                                        onEdit={() => handleEdit(module)}
-                                        onDelete={() => moduleHook.actions.setModuleToDelete(module)}
-                                        deleteTitle="Supprimer le module"
-                                        className={clsx(isExpired && moduleHook.states.selectedModule?.id !== module.id && "border-danger/30")}
-                                        avatar={{
-                                            icon: Folder,
-                                            className: clsx(
-                                                moduleHook.states.selectedModule?.id === module.id
-                                                    ? "bg-white/20 text-inherit"
-                                                    : "bg-background text-primary"
-                                            )
-                                        }}
-                                        badges={[
-                                            module.date_fin && (
-                                                <Badge
-                                                    key="date"
-                                                    variant={isExpired ? (moduleHook.states.selectedModule?.id === module.id ? 'default' : 'danger') : 'default'}
-                                                    size="xs"
-                                                >
-                                                    {new Date(module.date_fin).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' })}
-                                                </Badge>
-                                            ),
-                                            <Badge
-                                                key="progress"
-                                                variant={isExpired ? (moduleHook.states.selectedModule?.id === module.id ? 'default' : 'danger') : 'success'}
-                                                size="xs"
-                                            >
-                                                {module.percent || 0}%
-                                            </Badge>
-                                        ].filter(Boolean)}
-                                    />
-                                );
-                            })}
-                        </div>
-                    )}
-                </CardList>
-            </div>
-
-            {/* Main Detail Area */}
-            <div className="flex-1 flex flex-col gap-6 overflow-hidden relative">
-                {!moduleHook.states.selectedModule ? (
-                    <div className="flex-1 card-flat overflow-hidden">
-                        <EmptyState
-                            icon={Folder}
-                            title="Sélectionnez un module"
-                            description="Cliquez sur un module dans la liste pour afficher ses détails, activités et progression."
-                            size="md"
-                        />
-                    </div>
-                ) : (
-                    <>
-                        {/* Module Header Area */}
-                        <CardInfo
-                            ref={rightContentRef}
-                            height={headerHeight}
-                        >
-                            <div className="flex gap-6 items-center">
-                                <div className="w-20 h-20 rounded-2xl bg-surface border border-white/10 flex items-center justify-center text-primary shadow-xl shrink-0">
-                                    <Folder size={40} />
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                    <div className="flex items-center gap-3 mb-1">
-                                        <h1 className="text-3xl font-bold text-text-main truncate">{moduleHook.states.selectedModule.nom}</h1>
-                                        <button
-                                            onClick={() => moduleHook.actions.toggleStatus(moduleHook.states.selectedModule as any)}
-                                            className="transition-transform active:scale-95 focus:outline-none"
-                                        >
-                                            <Badge
-                                                variant={
-                                                    moduleHook.states.selectedModule.statut === 'en_cours' ? 'success' :
-                                                        moduleHook.states.selectedModule.statut === 'archive' ? 'danger' :
-                                                            'primary'
-                                                }
-                                                size="xs"
-                                                className="cursor-pointer hover:opacity-80"
-                                            >
-                                                {moduleHook.states.selectedModule.statut === 'en_cours' ? 'En cours' :
-                                                    moduleHook.states.selectedModule.statut === 'archive' ? 'Archive' :
-                                                        'En préparation'}
-                                            </Badge>
-                                        </button>
-                                    </div>
-                                    <p className="text-sm text-grey-medium">
-                                        {moduleHook.states.selectedModule.SousBranche && (
-                                            <>
-                                                {moduleHook.states.selectedModule.SousBranche.Branche && `${moduleHook.states.selectedModule.SousBranche.Branche.nom} - `}
-                                                {moduleHook.states.selectedModule.SousBranche.nom}
-                                            </>
-                                        )}
-                                    </p>
-                                </div>
-                            </div>
-                        </CardInfo>
-
-                        {/* Content Section - Tabs */}
-                        <CardTabs
-                            tabs={[
-                                { id: 'activities', label: 'Ateliers' },
-                                { id: 'groups', label: 'Ciblage Groupes' },
-                                { id: 'progression', label: 'Suivi & Progression' }
-                            ]}
-                            activeTab={detailTab}
-                            onChange={setDetailTab as any}
-                            actionLabel={detailTab === 'activities' ? "Ajouter une activité" : undefined}
-                            onAction={detailTab === 'activities' ? handleAddActivity : undefined}
-                            actionIcon={detailTab === 'activities' ? Plus : undefined}
-                            secondaryActionLabel={detailTab === 'activities' ? "Créer une série" : undefined}
-                            onSecondaryAction={detailTab === 'activities' ? () => setIsCreateSeriesModalOpen(true) : undefined}
-                            secondaryActionIcon={detailTab === 'activities' ? Sparkles : undefined}
-                        >
-                            {detailTab === 'activities' ? (
-                                <ActivitiesTab
-                                    activities={activityHook.states.moduleActivities}
-                                    onDragEnd={activityHook.actions.handleDragEnd}
-                                    onEditActivity={handleEditActivity}
-                                    onDelete={setActivityToDelete}
-                                />
-                            ) : detailTab === 'groups' ? (
-                                <GroupsTab
-                                    groups={groupHook.states.groups}
-                                    selectedGroups={groupHook.states.selectedGroups}
-                                    onToggleGroup={groupHook.actions.handleToggleGroup}
-                                    onGenerate={() => progressionGenHook.actions.generateProgressions(
-                                        groupHook.states.selectedGroups,
-                                        moduleHook.states.selectedModule
-                                    )}
-                                    generatingProgressions={progressionGenHook.states.generatingProgressions}
-                                    progress={progressionGenHook.states.progress}
-                                    progressText={progressionGenHook.states.progressText}
-                                />
-                            ) : (
-                                <ProgressionKanban
-                                    activities={activityHook.states.moduleActivities}
-                                    selectedActivity={progressionHook.states.selectedProgressionActivity}
-                                    onSelectActivity={progressionHook.actions.setSelectedProgressionActivity}
-                                    progressions={progressionHook.states.progressions}
-                                    stats={activityHook.states.stats}
-                                    loading={progressionHook.states.loadingProgressions}
-                                    onDragEnd={progressionHook.actions.handleProgressionDragEnd}
-                                />
-                            )}
-                        </CardTabs>
-                    </>
-                )}
-            </div>
-
-            {/* Add Module Modal */}
             <AddModuleModal
                 isOpen={isAddModalOpen}
                 onClose={() => { setIsAddModalOpen(false); moduleHook.actions.setModuleToEdit(null); }}
@@ -396,7 +161,6 @@ const Modules: React.FC = () => {
                 moduleToEdit={moduleHook.states.moduleToEdit as any}
             />
 
-            {/* Add Activity Modal */}
             <AddActivityModal
                 isOpen={isAddActivityModalOpen}
                 onClose={() => setIsAddActivityModalOpen(false)}
@@ -409,7 +173,6 @@ const Modules: React.FC = () => {
                     : 0}
             />
 
-            {/* Create Activity Series Modal */}
             <CreateActivitySeriesModal
                 isOpen={isCreateSeriesModalOpen}
                 onClose={() => setIsCreateSeriesModalOpen(false)}
@@ -417,7 +180,7 @@ const Modules: React.FC = () => {
                 moduleId={moduleHook.states.selectedModule?.id || ''}
             />
 
-            {/* Floating Notification */}
+            {/* Notification Toast */}
             {notification && (
                 <div className={clsx(
                     "fixed bottom-8 right-8 z-[200] flex items-center gap-4 px-6 py-4 rounded-2xl shadow-2xl animate-in slide-in-from-right-10 duration-500 border backdrop-blur-md",
@@ -447,7 +210,6 @@ const Modules: React.FC = () => {
                 </div>
             )}
 
-            {/* Delete Confirmation Modal */}
             <ConfirmModal
                 isOpen={!!moduleHook.states.moduleToDelete}
                 onClose={() => moduleHook.actions.setModuleToDelete(null)}
@@ -458,7 +220,6 @@ const Modules: React.FC = () => {
                 variant="danger"
             />
 
-            {/* Delete Activity Confirmation Modal */}
             <ConfirmModal
                 isOpen={!!activityToDelete}
                 onClose={() => setActivityToDelete(null)}

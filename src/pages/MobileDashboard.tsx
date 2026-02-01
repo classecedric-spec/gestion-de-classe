@@ -20,7 +20,7 @@ import { SupabaseTrackingRepository } from '../features/tracking/repositories/Su
 import { SupabaseUserRepository } from '../features/users/repositories/SupabaseUserRepository';
 // Using generic tables types for state where specific service types aren't available/matching perfectly yet, or keeping existing types if compatible
 import { Tables } from '../types/supabase';
-import { StatCard, Button } from '../components/ui';
+import { StatCard, Button } from '../core';
 
 // Instantiate repositories
 const attendanceRepository = new SupabaseAttendanceRepository();

@@ -17,7 +17,7 @@ import {
 } from '@dnd-kit/sortable';
 import SortableSubBranchItem from './SortableSubBranchItem';
 import type { Database } from '../../../types/supabase';
-import { Avatar, EmptyState, Badge, CardInfo, CardTabs } from '../../../components/ui';
+import { Avatar, EmptyState, Badge, CardInfo, CardTabs } from '../../../core';
 
 type BrancheRow = Database['public']['Tables']['Branche']['Row'];
 type SousBrancheRow = Database['public']['Tables']['SousBranche']['Row'];

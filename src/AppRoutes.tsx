@@ -2,7 +2,7 @@ import { Suspense, lazy } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import ProtectedRoute from './components/ProtectedRoute';
 import PublicRoute from './components/PublicRoute';
-import { PageLoader, DashboardLoader } from './components/Loading';
+import { PageLoader, DashboardLoader } from './core';
 import { ROUTES } from "./routes";
 
 // Lazy load all pages
@@ -12,7 +12,7 @@ const Landing = lazy(() => import('./pages/Landing'));
 const Auth = lazy(() => import('./pages/Auth'));
 const Students = lazy(() => import('./pages/Students'));
 const Classes = lazy(() => import('./pages/Classes'));
-const Groups = lazy(() => import('./pages/Groups'));
+const Groups = lazy(() => import('./features/groups/components/GroupsPage'));
 const UserManagement = lazy(() => import('./pages/UserManagement'));
 const ActivitiesLayout = lazy(() => import('./pages/ActivitiesLayout'));
 const Branches = lazy(() => import('./pages/Branches'));
@@ -25,7 +25,7 @@ const Presence = lazy(() => import('./pages/Presence'));
 const Settings = lazy(() => import('./pages/Settings'));
 const SuiviGlobal = lazy(() => import('./pages/SuiviGlobal'));
 const SuiviGlobalTBI = lazy(() => import('./pages/SuiviGlobalTBI'));
-const Adults = lazy(() => import('./pages/Adults'));
+const Adults = lazy(() => import('./features/adults/components/AdultsPage'));
 const MobileSuivi = lazy(() => import('./pages/MobileSuivi'));
 const Features = lazy(() => import('./pages/Features'));
 const Privacy = lazy(() => import('./pages/Privacy'));

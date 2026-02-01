@@ -1,8 +1,7 @@
 import React, { Fragment } from 'react';
-import { Plus, User as UserIcon, Check } from 'lucide-react';
+import { Plus, User as UserIcon } from 'lucide-react';
 import clsx from 'clsx';
-import Modal from '../../../components/ui/Modal';
-import Button from '../../../components/ui/Button';
+import { FormModal } from '../../../core';
 import { TablesInsert } from '../../../types/supabase';
 
 import AddClassModal from '../../classes/components/AddClassModal';
@@ -23,80 +22,47 @@ const StudentModal: React.FC<StudentModalProps> = (props) => {
 
     // Custom Hook Usage
     const {
-        // State
         student,
         loading,
         activeTab, setActiveTab,
-
-        // Lists
         classesList,
         groupsList,
         niveauxList,
-
-        // Modals Controls
         showAddClassModal, setShowAddClassModal,
         showAddGroupModal, setShowAddGroupModal,
         showAddNiveauModal, setShowAddNiveauModal,
-
-        // Input Handlers
         handleInputChange,
         updateField,
         handleClassChange,
         handleNiveauChange,
         handleToggleGroup,
-
-        // Callbacks
         handleClassAdded,
         handleGroupAdded,
         handleLevelSubmit,
-
-        // Submit
         submitForm
     } = useStudentForm(props);
 
-    const handleSubmit = async (e?: React.FormEvent | React.MouseEvent) => {
-        if (e) e.preventDefault();
-
-        // Basic HTML5 validation trigger
-        const form = document.getElementById('student-form') as HTMLFormElement | null;
-        if (form && !form.checkValidity()) {
-            form.reportValidity();
-            return;
-        }
-
+    const handleSubmit = async () => {
         await submitForm();
     };
 
-    if (!showModal) return null;
-
     return (
         <Fragment>
-            <Modal
+            <FormModal
                 isOpen={showModal}
                 onClose={onClose}
+                onSubmit={handleSubmit}
                 title={isEditing ? "Modifier l'élève" : "Ajouter un élève"}
-                icon={isEditing ? <UserIcon size={24} /> : <Plus size={24} />}
-                className="max-w-2xl"
+                icon={isEditing ? UserIcon : Plus}
+                loading={loading}
+                confirmText={isEditing ? "Enregistrer" : "Créer l'élève"}
+                size="md"
                 noPadding
-                footer={
-                    <>
-                        <Button onClick={onClose} variant="secondary" className="flex-1">
-                            Annuler
-                        </Button>
-                        <Button
-                            onClick={handleSubmit}
-                            loading={loading}
-                            className="flex-1"
-                            icon={Check}
-                        >
-                            {isEditing ? "Enregistrer" : "Créer l'élève"}
-                        </Button>
-                    </>
-                }
             >
                 {/* Tabs Header */}
                 <div className="flex px-6 border-b border-border/5 bg-surface sticky top-0 z-10">
                     <button
+                        type="button"
                         onClick={() => setActiveTab('enfant')}
                         className={clsx(
                             "px-4 py-3 text-sm font-medium border-b-2 transition-colors",
@@ -106,6 +72,7 @@ const StudentModal: React.FC<StudentModalProps> = (props) => {
                         Enfant
                     </button>
                     <button
+                        type="button"
                         onClick={() => setActiveTab('parents')}
                         className={clsx(
                             "px-4 py-3 text-sm font-medium border-b-2 transition-colors",
@@ -116,9 +83,9 @@ const StudentModal: React.FC<StudentModalProps> = (props) => {
                     </button>
                 </div>
 
-                {/* Form Content */}
+                {/* Content */}
                 <div className="p-6">
-                    <form id="student-form" onSubmit={handleSubmit} className="space-y-6">
+                    <div className="space-y-6">
                         {activeTab === 'enfant' && (
                             <StudentGeneralInfo
                                 student={student}
@@ -140,9 +107,9 @@ const StudentModal: React.FC<StudentModalProps> = (props) => {
                                 handleInputChange={handleInputChange}
                             />
                         )}
-                    </form>
+                    </div>
                 </div>
-            </Modal>
+            </FormModal>
 
             {/* Sub Modals */}
             <AddClassModal
@@ -170,5 +137,6 @@ const StudentModal: React.FC<StudentModalProps> = (props) => {
         </Fragment>
     );
 };
+
 
 export default StudentModal;

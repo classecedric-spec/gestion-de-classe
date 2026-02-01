@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../lib/database';
 import { Search, Loader2, Archive, Clock, PlayCircle } from 'lucide-react';
 import clsx from 'clsx';
-import Modal from './ui/Modal';
+import { Modal } from '../core';
 
 interface SelectModuleModalProps {
     isOpen: boolean;

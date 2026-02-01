@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { DndContext, DragOverlay, useSensor, useSensors, MouseSensor, TouchSensor, DragStartEvent, DragEndEvent } from '@dnd-kit/core';
 import { Settings } from 'lucide-react';
 import { toast } from 'sonner';
-import { SmartTabs, Button, EmptyState } from '../components/ui';
+import { Tabs, Button, EmptyState } from '../core';
 import PageLayout from '../components/layout/PageLayout';
 
 import useAttendance from '../features/attendance/hooks/useAttendance';
@@ -84,7 +84,7 @@ const Presence: React.FC = () => {
     // --- Header Content Props ---
     const centerContent = (
         <div className="hidden md:block">
-            <SmartTabs
+            <Tabs
                 tabs={[
                     { id: 'matin', label: 'Matin' },
                     { id: 'apres_midi', label: 'Après-midi' }
@@ -94,6 +94,7 @@ const Presence: React.FC = () => {
                 level={3}
                 className="min-w-[200px]"
                 disableCompact={true}
+                smart
             />
         </div>
     );
@@ -139,7 +140,7 @@ const Presence: React.FC = () => {
         >
             {/* Mobile Period Selector (visible only on small screens) */}
             <div className="md:hidden flex justify-center mb-6">
-                <SmartTabs
+                <Tabs
                     tabs={[
                         { id: 'matin', label: 'Matin' },
                         { id: 'apres_midi', label: 'Après-midi' }
@@ -148,6 +149,7 @@ const Presence: React.FC = () => {
                     onChange={(id) => setCurrentPeriod(id as 'matin' | 'apres_midi')}
                     level={3}
                     fullWidth
+                    smart
                 />
             </div>
 

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { User, Plus, Search, Edit, X, ChevronDown, Save } from 'lucide-react';
 import type { Database } from '../../../types/supabase';
-import { Badge, Button, Avatar, EmptyState, ConfirmModal } from '../../../components/ui';
+import { Badge, Button, Avatar, EmptyState, ConfirmModal } from '../../../core';
 
 type AdultRow = Database['public']['Tables']['Adulte']['Row'];
 type AdultInsert = Database['public']['Tables']['Adulte']['Insert'];

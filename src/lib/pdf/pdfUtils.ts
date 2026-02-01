@@ -5,6 +5,8 @@ export interface PdfActivity {
     order: number;
     etat: string;
     dateLimite?: string | null;
+    material?: string;
+    level?: string;
 }
 
 export interface PdfModule {

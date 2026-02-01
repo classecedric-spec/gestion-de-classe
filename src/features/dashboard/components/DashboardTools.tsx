@@ -1,6 +1,6 @@
 import React from 'react';
 import { Settings2, CheckSquare, LayoutList, GraduationCap, FileText, Users, Zap } from 'lucide-react';
-import { Button, Select } from '../../../components/ui';
+import { Button, Select } from '../../../core';
 import clsx from 'clsx';
 import { useNavigate } from 'react-router-dom';
 import { Group } from '../../attendance/services/attendanceService';

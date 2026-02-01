@@ -11,7 +11,7 @@ export type Update<T extends TableName> = Database['public']['Tables'][T]['Updat
  * We use 'any' for the schema mapping to avoid complex internal type mismatches
  * while maintaining the ability to use the builder in our utility functions.
  */
-export type FilterBuilder<_T extends TableName> = any;
+export type FilterBuilder<T extends TableName> = any; // PostgrestFilterBuilder is complex to mirror here perfectly without full Supabase types
 
 export interface FetchOptions {
     select?: string;
@@ -88,13 +88,12 @@ export async function updateData<T extends TableName>(
     id: string | number,
     updates: Update<T>
 ): Promise<Row<T>> {
-    // @ts-ignore
     const promise = supabase.from(table)
-        .update(updates)
+        .update(updates as any)
         .eq('id', id)
         .select()
         .single();
-    return fetchWithErrorHandling(promise as unknown as Promise<{ data: Row<T> | null; error: any }>);
+    return fetchWithErrorHandling(promise as any);
 }
 
 /**

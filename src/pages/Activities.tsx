@@ -3,7 +3,7 @@ import { Plus, SlidersHorizontal, Puzzle, Folder, Clock, Check, AlertCircle, X, 
 import { useActivities } from '../features/activities/hooks/useActivities';
 import ActivityDetails from '../features/activities/components/ActivityDetails';
 import AddActivityModal from '../features/activities/components/AddActivityModal';
-import { ConfirmModal, CardInfo, CardList, ListItem, SearchBar, FilterSelect, Avatar, Badge, EmptyState, CardTabs } from '../components/ui';
+import { ConfirmModal, CardInfo, CardList, ListItem, SearchBar, FilterSelect, Avatar, Badge, EmptyState, CardTabs } from '../core';
 import clsx from 'clsx';
 import { useNotifications } from './Modules/hooks/useNotifications';
 

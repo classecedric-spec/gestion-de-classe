@@ -1,6 +1,7 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { Plus, Check, X, Trash2, Pencil } from 'lucide-react';
 import clsx from 'clsx';
+import { Button } from '../../../core';
 import { useMaterialTypes } from '../hooks/useMaterialTypes';
 
 /**
@@ -73,13 +74,14 @@ const ActivityMaterialSelector: React.FC<ActivityMaterialSelectorProps> = ({ sel
             <div className="flex items-center justify-between border-b border-white/10 pb-2 mb-4">
                 <h4 className="text-sm font-bold text-white uppercase tracking-wider">Matériel Requis</h4>
                 {!isAdding && (
-                    <button
-                        type="button"
+                    <Button
                         onClick={() => setIsAdding(true)}
-                        className="text-[10px] bg-white/5 hover:bg-white/10 text-primary px-2 py-1 rounded border border-primary/20 transition-colors flex items-center gap-1 font-bold uppercase"
+                        variant="secondary"
+                        size="sm"
+                        className="text-[10px] items-center gap-1 uppercase border-primary/20 text-primary"
                     >
                         <Plus size={10} /> Nouveau
-                    </button>
+                    </Button>
                 )}
             </div>
 
@@ -95,12 +97,12 @@ const ActivityMaterialSelector: React.FC<ActivityMaterialSelectorProps> = ({ sel
                             placeholder="Ex: Règle, Compas..."
                             autoFocus
                         />
-                        <button type="button" onClick={handleCreate} title="Confirmer la création" className="bg-primary text-text-dark p-2 rounded-lg hover:brightness-110">
+                        <Button onClick={handleCreate} title="Confirmer la création" variant="primary" size="sm" className="p-2 h-auto rounded-lg">
                             <Check size={16} strokeWidth={3} />
-                        </button>
-                        <button type="button" onClick={() => setIsAdding(false)} title="Annuler" className="bg-danger text-white p-2 rounded-lg hover:bg-danger/90">
+                        </Button>
+                        <Button onClick={() => setIsAdding(false)} title="Annuler" variant="danger" size="sm" className="p-2 h-auto rounded-lg">
                             <X size={16} strokeWidth={3} />
-                        </button>
+                        </Button>
                     </div>
                 </div>
             )}
@@ -132,7 +134,7 @@ const ActivityMaterialSelector: React.FC<ActivityMaterialSelectorProps> = ({ sel
                                         autoFocus
                                         title="Nom du type de matériel"
                                     />
-                                    <button type="button" onClick={handleUpdate} className="text-primary p-1" title="Confirmer"><Check size={14} /></button>
+                                    <Button onClick={handleUpdate} variant="ghost" size="sm" className="text-primary p-1 h-auto" title="Confirmer"><Check size={14} /></Button>
                                 </div>
                             ) : (
                                 <>
@@ -140,26 +142,28 @@ const ActivityMaterialSelector: React.FC<ActivityMaterialSelectorProps> = ({ sel
                                         {mt.nom}
                                     </div>
                                     <div className="flex opacity-0 group-hover:opacity-100 transition-opacity">
-                                        <button
-                                            type="button"
-                                            onClick={(e) => {
+                                        <Button
+                                            onClick={(e: any) => {
                                                 e.stopPropagation();
                                                 setEditingId(mt.id);
                                                 setEditingName(mt.nom);
                                             }}
-                                            className="p-1.5 text-gray-500 hover:text-white"
+                                            variant="ghost"
+                                            size="sm"
+                                            className="p-1.5 h-auto text-gray-500 hover:text-white"
                                             title="Renommer"
                                         >
                                             <Pencil size={12} />
-                                        </button>
-                                        <button
-                                            type="button"
-                                            onClick={(e) => handleDelete(mt.id, e)}
-                                            className="p-1.5 text-gray-500 hover:text-danger"
+                                        </Button>
+                                        <Button
+                                            onClick={(e: any) => handleDelete(mt.id, e)}
+                                            variant="ghost"
+                                            size="sm"
+                                            className="p-1.5 h-auto text-gray-500 hover:text-danger"
                                             title="Supprimer"
                                         >
                                             <Trash2 size={12} />
-                                        </button>
+                                        </Button>
                                     </div>
                                 </>
                             )}

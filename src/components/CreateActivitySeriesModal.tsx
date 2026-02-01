@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/database';
 import { Sparkles, Check, Plus, Trash2 } from 'lucide-react';
-import Modal from './ui/Modal';
-import Button from './ui/Button';
+import { Modal, Button } from '../core';
 import { Tables } from '../types/supabase';
 import { SupabaseActivityRepository } from '../features/activities/repositories/SupabaseActivityRepository';
 

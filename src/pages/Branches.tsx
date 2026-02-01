@@ -5,7 +5,7 @@ import BranchList from '../features/branches/components/BranchList';
 import BranchDetails from '../features/branches/components/BranchDetails';
 import AddBranchModal from '../features/branches/components/AddBranchModal';
 import { useInAppMigration } from '../hooks/useInAppMigration';
-import { ConfirmModal, CardInfo, SearchBar, Badge } from '../components/ui';
+import { ConfirmModal, CardInfo, SearchBar, Badge } from '../core';
 
 const Branches: React.FC = () => {
     const {

@@ -6,6 +6,7 @@ export type Student = Tables<'Eleve'> & {
     Niveau: { nom: string; ordre: number | null } | null;
     importance_suivi?: number | null;
     trust_trend?: 'up' | 'down' | 'stable' | null;
+    photo_base64?: string | null;
 };
 export type SetupPresence = Tables<'SetupPresence'>;
 export type CategoriePresence = Tables<'CategoriePresence'>;

@@ -1,7 +1,7 @@
 import React from 'react';
 import { useNavigate, useOutletContext } from 'react-router-dom';
 import { Users, CheckSquare, LayoutList, Loader2 } from 'lucide-react';
-import PdfProgress from '../../../components/ui/PdfProgress';
+import PdfProgress from '../../../core/PdfProgress';
 import { DashboardContextType } from '../DashboardContext';
 import WeeklyPlannerModal from '../../../components/WeeklyPlannerModal';
 const DashboardOverview: React.FC = () => {

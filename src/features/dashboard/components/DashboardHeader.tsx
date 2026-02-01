@@ -1,6 +1,6 @@
 import React from 'react';
 import { Search, LayoutList, Users, AlertCircle } from 'lucide-react';
-import { SmartTabs, Input } from '../../../components/ui';
+import { Tabs, Input } from '../../../core';
 
 interface DashboardHeaderProps {
     userName: string | null;
@@ -52,11 +52,12 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({
 
             {/* Center: Tabs (Absolute on Desktop for perfect centering) */}
             <div className="w-full md:w-auto md:absolute md:left-1/2 md:-translate-x-1/2 md:z-10 overflow-x-auto no-scrollbar">
-                <SmartTabs
+                <Tabs
                     tabs={tabs}
                     activeTab={currentTab}
                     onChange={setCurrentTab}
                     disableCompact={true}
+                    smart
                 />
             </div>
 

@@ -2,10 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { getCurrentUser } from '../lib/database';
 import { groupService } from '../features/groups/services/groupService';
 import { Plus, Layers } from 'lucide-react';
-import Modal from './ui/Modal';
-import Button from './ui/Button';
-import ImageUpload from './ui/ImageUpload';
-import Input from './ui/Input';
+import { Modal, Button, ImageUpload, Input } from '../core';
 import { Tables } from '../types/supabase';
 
 interface AddGroupModalProps {

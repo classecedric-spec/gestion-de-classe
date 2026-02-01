@@ -67,6 +67,7 @@ export function Sidebar({
                 <button
                     onClick={onClose}
                     className="p-1.5 hover:bg-white/5 rounded-lg text-grey-medium hover:text-white transition-colors"
+                    title="Fermer le menu"
                 >
                     <ChevronLeft size={20} />
                 </button>
@@ -92,7 +93,10 @@ export function Sidebar({
                         return (
                             <button
                                 key={navItem.label}
-                                onClick={() => handleExternalNavClick(navItem)}
+                                onClick={() => {
+                                    handleExternalNavClick(navItem);
+                                    onClose();
+                                }}
                                 className="flex items-center w-full px-4 py-3 rounded-lg transition-colors group text-text-main hover:bg-input"
                             >
                                 <Icon className="w-5 h-5 mr-3 text-primary shrink-0" />
@@ -105,6 +109,7 @@ export function Sidebar({
                         <Link
                             key={navItem.path}
                             to={navItem.path}
+                            onClick={onClose}
                             className={clsx(
                                 "flex items-center px-4 py-3 rounded-lg transition-colors group",
                                 isActive

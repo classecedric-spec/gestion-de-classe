@@ -1,38 +1,27 @@
 import React, { useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
-import { fetchStudentPdfData } from '../../lib/pdf';
-import { calculateAge } from '../../lib/helpers';
-import {
-    Search, User as UserIcon, Calendar, GraduationCap, ShieldCheck, Loader2, ChevronRight, ChevronDown,
-    Filter, Plus, BookOpen, Layers, Users, CheckCircle2, Clock, AlertCircle,
-    LayoutList, GitGraph, FileText, Activity, GitBranch, SlidersHorizontal,
-    TrendingUp, TrendingDown, Minus, QrCode
-} from 'lucide-react';
-import clsx from 'clsx';
+import PageLayout from '../../components/layout/PageLayout';
+import { Badge, ConfirmModal } from '../../core';
+
+// Components
 import StudentModal from '../../features/students/components/StudentModal';
 import StudentQRModal from '../../features/students/components/StudentQRModal';
-import { format } from 'date-fns';
-import { fr } from 'date-fns/locale';
-import StudentTrackingPDFModern from '../../components/StudentTrackingPDFModern';
-import { downloadFile } from '../../lib/helpers/download';
-import PageLayout from '../../components/layout/PageLayout';
+import { StudentListColumn } from '../../features/students/components/StudentListColumn';
+import { StudentDetailsColumn } from '../../features/students/components/StudentDetailsColumn';
 
-// Nouveaux composants UI
-import { Badge, Avatar, EmptyState, ConfirmModal, SearchBar, FilterSelect, CardInfo, CardList, CardTabs, SmartTabs, InfoSection, InfoRow, InfoSectionEditable, InfoRowEditable, ListItem } from '../../components/ui';
-
-// Hooks extraits
-import { useStudentsData } from './hooks/useStudentsData';
-import { useStudentProgress } from './hooks/useStudentProgress';
-import { useStudentPhoto } from './hooks/useStudentPhoto';
-import { useBranchIndices } from './hooks/useBranchIndices';
-import { useUrgentWork } from './hooks/useUrgentWork';
+// Hooks
+import { useStudentsData } from '../../features/students/hooks/useStudentsData';
+import { useStudentPhoto } from '../../features/students/hooks/useStudentPhoto';
 
 const Students: React.FC = () => {
     const location = useLocation();
     const initialStudentId = location.state?.selectedStudentId;
+
+    // UI State
     const [showFilters, setShowFilters] = React.useState(false);
     const [showQRModal, setShowQRModal] = React.useState(false);
 
+    // Data Hooks
     const {
         students, setStudents, selectedStudent, setSelectedStudent, loading,
         searchQuery, setSearchQuery, filterClass, setFilterClass, filterGroup, setFilterGroup,
@@ -42,265 +31,14 @@ const Students: React.FC = () => {
     } = useStudentsData(initialStudentId);
 
     const {
-        studentProgress, loadingProgress, currentTab, setCurrentTab,
-        suiviMode, setSuiviMode, showPendingOnly, setShowPendingOnly,
-        expandedModules,
-        fetchStudentProgress, resetProgress,
-        toggleModuleExpansion,
-        handleUrgentValidation
-    } = useStudentProgress();
-
-    const {
         isDraggingPhoto, draggingPhotoId, updatingPhotoId, setDraggingPhotoId,
         processAndSavePhoto, handlePhotoDrop, handlePhotoDragOver, handlePhotoDragLeave
     } = useStudentPhoto(setSelectedStudent, setStudents);
 
-    const {
-        branches, studentIndices, fetchBranches, loadUserPreferences, handleUpdateBranchIndex
-    } = useBranchIndices();
-
-    const { modules: sortedModules, count: totalOverdueCount, hasWork: hasOverdueWork } = useUrgentWork(studentProgress);
-
-    // --- Effects ---
+    // Initial Load
     useEffect(() => {
         fetchStudents();
-        fetchBranches();
-        loadUserPreferences();
     }, []);
-
-    useEffect(() => {
-        if (selectedStudent) {
-            fetchStudentProgress(selectedStudent.id, students, selectedStudent);
-
-            if (location.state?.initialTab && location.state?.selectedStudentId === selectedStudent.id) {
-                setCurrentTab(location.state.initialTab);
-            } else {
-                setCurrentTab('infos');
-            }
-
-            resetProgress();
-        } else {
-            resetProgress();
-        }
-    }, [selectedStudent, location.state]);
-
-    // --- Logging Overdue Work ---
-    useEffect(() => {
-        if (!loadingProgress && selectedStudent && studentProgress.length > 0) {
-            const now = new Date();
-            interface OverdueModule {
-                id: string;
-                nom: string;
-                date_fin: string | null;
-                SousBranche: {
-                    ordre: number | null;
-                    Branche: {
-                        nom: string;
-                        ordre: number | null;
-                    } | null;
-                } | null;
-                activities: string[];
-            }
-            const overdueModules: Record<string, OverdueModule> = {};
-            let hasOverdueWork = false;
-
-            studentProgress.forEach(p => {
-                const module = p.Activite?.Module;
-                const status = p.etat;
-
-                if (!module || !module.date_fin || status === 'termine') return;
-
-                const endDate = new Date(module.date_fin);
-                if (endDate >= now) return;
-
-                if (!overdueModules[module.id]) {
-                    overdueModules[module.id] = {
-                        ...module,
-                        activities: []
-                    };
-                }
-                overdueModules[module.id].activities.push(p.Activite?.titre || 'Activité sans titre');
-                hasOverdueWork = true;
-            });
-
-            if (hasOverdueWork) {
-                const sortedModules = Object.values(overdueModules).sort((a, b) => {
-                    if (!a.date_fin && !b.date_fin) return 0;
-                    if (!a.date_fin) return 1;
-                    if (!b.date_fin) return -1;
-                    const dateA = new Date(a.date_fin);
-                    const dateB = new Date(b.date_fin);
-                    const dateDiff = dateA.getTime() - dateB.getTime();
-                    if (dateDiff !== 0) return dateDiff;
-                    const branchA = a.SousBranche?.Branche?.nom || '';
-                    const branchB = b.SousBranche?.Branche?.nom || '';
-                    if (branchA.localeCompare(branchB) !== 0) return branchA.localeCompare(branchB);
-                    return a.nom.localeCompare(b.nom);
-                });
-
-                const totalOverdueActivities = sortedModules.reduce((acc, mod) => acc + mod.activities.length, 0);
-                console.groupCollapsed(`%c📅 Travaux en retard pour ${selectedStudent.prenom} ${selectedStudent.nom} (${totalOverdueActivities} ateliers)`, 'font-size: 14px; font-weight: bold; color: #e11d48; background: #ffe4e6; padding: 4px 8px; border-radius: 4px;');
-                sortedModules.forEach(mod => {
-                    const dateStr = mod.date_fin ? new Date(mod.date_fin).toLocaleDateString('fr-FR') : 'Date inconnue';
-                    const branchName = mod.SousBranche?.Branche?.nom ? `[${mod.SousBranche.Branche.nom}] ` : '';
-                    console.groupCollapsed(`%c${branchName}${mod.nom} %c(${dateStr}) - ${mod.activities.length} atelier(s) restant(s)`, 'font-weight: bold; color: #2563eb;', 'color: #dc2626; font-weight: bold;');
-                    mod.activities.forEach((actName: string) => { console.log(`%c• ${actName}`, 'color: #4b5563; margin-left: 10px;'); });
-                    console.groupEnd();
-                });
-                console.groupEnd();
-            }
-        }
-    }, [loadingProgress, selectedStudent, studentProgress]);
-
-    // --- PDF Generation ---
-    const generatePDF = async () => {
-        if (!selectedStudent) {
-            alert("Aucun élève sélectionné.");
-            return;
-        }
-
-        try {
-            const pdfResult = await fetchStudentPdfData(selectedStudent.id, selectedStudent.Niveau?.id || '');
-            if (!pdfResult || pdfResult.modules.length === 0) {
-                alert("Aucune activité à faire trouvée.");
-                return;
-            }
-
-            const pdfData = {
-                studentName: `${selectedStudent.prenom} ${selectedStudent.nom}`,
-                printDate: new Date().toLocaleDateString('fr-FR'),
-                modules: pdfResult.modules
-            };
-
-            const { pdf } = await import('@react-pdf/renderer');
-            const blob = await pdf(React.createElement(StudentTrackingPDFModern, { data: pdfData }) as any).toBlob();
-            const fileName = `ToDoList_Suivi_${selectedStudent.prenom} _${selectedStudent.nom}.pdf`;
-
-            await downloadFile(blob, fileName, "Document PDF");
-        } catch (error) {
-            console.error(error);
-            alert("Erreur lors de la génération du PDF.");
-        }
-    };
-
-    // --- Render Helper Functions ---
-    const renderJournalView = () => {
-        const moduleGroups = Object.values(studentProgress.reduce((acc: any, p) => {
-            const mod = p.Activite?.Module;
-            if (!mod) return acc;
-            if (!acc[mod.id]) acc[mod.id] = { ...mod, activities: [] };
-            acc[mod.id].activities.push(p);
-            return acc;
-        }, {}));
-
-        return moduleGroups
-            .sort((a: any, b: any) => {
-                if (a.date_fin && b.date_fin) {
-                    if (a.date_fin !== b.date_fin) return new Date(a.date_fin).getTime() - new Date(b.date_fin).getTime();
-                } else if (a.date_fin) return -1;
-                else if (b.date_fin) return 1;
-                const aBOrder = a.SousBranche?.Branche?.ordre || 0;
-                const bBOrder = b.SousBranche?.Branche?.ordre || 0;
-                if (aBOrder !== bBOrder) return aBOrder - bBOrder;
-                const aSBOrder = a.SousBranche?.ordre || 0;
-                const bSBOrder = b.SousBranche?.ordre || 0;
-                if (aSBOrder !== bSBOrder) return aSBOrder - bSBOrder;
-                return a.nom.localeCompare(b.nom);
-            })
-            .map((module: any) => {
-                const activities = module.activities;
-                const completedCount = activities.filter((a: any) => a.etat === 'termine').length;
-                const totalCount = activities.length;
-                const percent = Math.round((completedCount / totalCount) * 100);
-                const isExpanded = expandedModules[module.id];
-                const isModuleOverdue = module.date_fin && new Date(module.date_fin) < new Date() && completedCount < totalCount;
-
-                if (showPendingOnly && completedCount === totalCount) return null;
-
-                return (
-                    <div key={module.id} className="bg-surface/50 border border-transparent rounded-xl overflow-hidden hover:border-white/10 hover:bg-surface transition-all group">
-                        <div
-                            onClick={() => toggleModuleExpansion(module.id)}
-                            className="py-2.5 px-4 cursor-pointer hover:bg-white/5 transition-colors flex items-center justify-between gap-6"
-                        >
-                            {/* Left: Title & Chevron (Takes remaining space) */}
-                            <div className="flex items-center gap-4 min-w-0 flex-1">
-                                <div className={clsx(
-                                    "transition-all duration-300",
-                                    isExpanded ? "rotate-90 text-primary" : "rotate-0 text-grey-dark group-hover:text-grey-medium"
-                                )}>
-                                    <ChevronRight size={18} />
-                                </div>
-                                <h3 className={clsx(
-                                    "font-bold text-text-main text-lg truncate tracking-tight group-hover:text-white transition-all w-fit",
-                                    isModuleOverdue && "border-b-2 border-danger/60 hover:border-danger text-danger/90 hover:text-danger"
-                                )}>
-                                    {module.nom}
-                                </h3>
-                            </div>
-
-                            {/* Right: Metrics Block (40% width, anchored right) */}
-                            <div className="flex items-center gap-6 w-[40%] shrink-0">
-                                {/* Date Badge (Before the bar) */}
-                                <div className="shrink-0">
-                                    {module.date_fin ? (
-                                        <Badge variant="primary" size="xs" className="px-2 py-0.5 font-black">
-                                            {format(new Date(module.date_fin), 'dd/MM', { locale: fr })}
-                                        </Badge>
-                                    ) : (
-                                        <span className="text-[10px] font-bold text-grey-dark uppercase tracking-widest italic opacity-20 px-2">N/A</span>
-                                    )}
-                                </div>
-
-                                {/* Progress Bar Area */}
-                                <div className="flex-1 flex items-center gap-4">
-                                    <div className="flex-1 h-1.5 bg-background/50 rounded-full overflow-hidden border border-white/5">
-                                        <div
-                                            className="h-full bg-primary transition-all duration-1000 ease-out shadow-[0_0_10px_rgba(var(--primary-rgb),0.5)]"
-                                            style={{ width: `${percent}%` }}
-                                        />
-                                    </div>
-                                    <span className="text-xs font-black text-grey-medium min-w-[35px] text-right tabular-nums">
-                                        {completedCount}/{totalCount}
-                                    </span>
-                                </div>
-                            </div>
-                        </div>
-
-                        {isExpanded && (
-                            <div className="border-t border-white/5 bg-black/20">
-                                {activities.sort((a: any, b: any) => (a.Activite?.ordre || 0) - (b.Activite?.ordre || 0)).map((p: any) => (
-                                    <div key={p.id} className="p-3 pl-16 border-b border-white/5 last:border-0 flex items-center justify-between hover:bg-white/5 transition-colors group">
-                                        <h4 className="text-sm text-grey-light font-medium group-hover:text-white transition-colors">{p.Activite?.titre}</h4>
-                                        <div className="flex items-center gap-3">
-                                            <span className="text-[10px] text-grey-dark font-mono">{new Date(p.updated_at).toLocaleDateString()}</span>
-                                            <Badge
-                                                variant={
-                                                    p.etat === 'termine' ? 'success' :
-                                                        p.etat === 'besoin_d_aide' ? 'danger' :
-                                                            'primary'
-                                                }
-                                                size="xs"
-                                                icon={
-                                                    p.etat === 'termine' ? <CheckCircle2 size={12} /> :
-                                                        p.etat === 'besoin_d_aide' ? <AlertCircle size={12} /> :
-                                                            <Clock size={12} />
-                                                }
-                                                className={p.etat === 'besoin_d_aide' ? 'animate-pulse' : ''}
-                                            >
-                                                {p.etat === 'termine' ? 'Terminé' :
-                                                    p.etat === 'besoin_d_aide' ? "Besoin d'aide" :
-                                                        'En cours'}
-                                            </Badge>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        )}
-                    </div>
-                );
-            });
-    };
 
     const rightContent = (
         <Badge variant="primary" size="sm" className="font-bold">
@@ -316,470 +54,46 @@ const Students: React.FC = () => {
             containerClassName="p-6"
         >
             <div className="h-full flex gap-6 animate-in fade-in duration-500 relative">
-                {/* List Column - Split into 2 cards */}
-                <div className="w-1/4 flex flex-col gap-6 overflow-hidden">
-                    {/* Card 1: Title & Controls */}
-                    <CardInfo
-                        contentClassName="space-y-5"
-                    >
-                        {/* Header Row: Title & Badge */}
-                        <div className="flex items-center justify-between">
-                            <h2 className="text-cq-xl font-bold text-text-main flex items-center gap-2">
-                                <GraduationCap className="text-primary" size={24} />
-                                Liste
-                            </h2>
-                            <Badge variant="default" size="xs">{filteredStudents.length} / {students.length}</Badge>
-                        </div>
+                {/* 1. List Column */}
+                <StudentListColumn
+                    students={students}
+                    filteredStudents={filteredStudents}
+                    loading={loading}
+                    searchQuery={searchQuery}
+                    setSearchQuery={setSearchQuery}
+                    showFilters={showFilters}
+                    setShowFilters={setShowFilters}
+                    filterGroup={filterGroup}
+                    setFilterGroup={setFilterGroup}
+                    filterClass={filterClass}
+                    setFilterClass={setFilterClass}
+                    selectedStudent={selectedStudent}
+                    setSelectedStudent={setSelectedStudent}
+                    handleOpenCreate={handleOpenCreate}
+                    handleEdit={handleEdit}
+                    setStudentToDelete={setStudentToDelete}
+                    // Photo Logic
+                    updatingPhotoId={updatingPhotoId}
+                    draggingPhotoId={draggingPhotoId}
+                    setDraggingPhotoId={setDraggingPhotoId}
+                    processAndSavePhoto={processAndSavePhoto}
+                />
 
-                        {/* Separator */}
-                        <div className="border-t border-white/10" />
+                {/* 2. Detail Column */}
+                <StudentDetailsColumn
+                    selectedStudent={selectedStudent}
+                    students={students}
+                    isDraggingPhoto={isDraggingPhoto}
+                    updatingPhotoId={updatingPhotoId}
+                    handlePhotoDragOver={handlePhotoDragOver}
+                    handlePhotoDragLeave={handlePhotoDragLeave}
+                    handlePhotoDrop={handlePhotoDrop}
+                    processAndSavePhoto={processAndSavePhoto}
+                    setShowQRModal={setShowQRModal}
+                    handleUpdateImportance={handleUpdateImportance}
+                />
 
-                        {/* Search & Filters */}
-                        <div className="space-y-4">
-                            {/* Search & Toggle Row */}
-                            <div className="flex gap-3">
-                                <SearchBar
-                                    placeholder="Rechercher un élève..."
-                                    value={searchQuery}
-                                    onChange={(e) => setSearchQuery(e.target.value)}
-                                    iconColor="text-primary"
-                                />
-
-                                {/* Filters Toggle Button */}
-                                <button
-                                    onClick={() => setShowFilters(!showFilters)}
-                                    className={clsx(
-                                        "p-2.5 rounded-xl border transition-all flex items-center justify-center shrink-0",
-                                        showFilters
-                                            ? "bg-primary text-text-dark border-primary shadow-lg shadow-primary/20"
-                                            : "bg-surface/50 border-white/10 text-grey-medium hover:text-white hover:border-white/20"
-                                    )}
-                                    title="Afficher les filtres"
-                                >
-                                    <SlidersHorizontal size={20} />
-                                </button>
-                            </div>
-
-                            {/* Filters Row - Collapsible */}
-                            {showFilters && (
-                                <div className="flex gap-2 animate-in slide-in-from-top-2 fade-in duration-200">
-                                    <FilterSelect
-                                        options={[
-                                            { value: 'all', label: 'Groupes: Tous' },
-                                            ...Array.from(new Set(students.flatMap(s => s.EleveGroupe?.map(eg => eg.Groupe?.nom)).filter(Boolean)))
-                                                .sort()
-                                                .map(g => ({ value: g as string, label: g as string }))
-                                        ]}
-                                        value={filterGroup}
-                                        onChange={(e) => setFilterGroup(e.target.value)}
-                                        icon={Users}
-                                        className="flex-1"
-                                    />
-
-                                    <FilterSelect
-                                        options={[
-                                            { value: 'all', label: 'Classes: Tous' },
-                                            ...Array.from(new Set(students.map(s => s.Classe?.nom).filter(Boolean)))
-                                                .map(c => ({ value: c as string, label: c as string }))
-                                        ]}
-                                        value={filterClass}
-                                        onChange={(e) => setFilterClass(e.target.value)}
-                                        icon={Filter}
-                                        className="flex-1"
-                                    />
-                                </div>
-                            )}
-                        </div>
-                    </CardInfo>
-
-                    {/* Card 2: List Only */}
-                    <CardList
-                        actionLabel="Ajouter un élève"
-                        onAction={handleOpenCreate}
-                        actionIcon={Plus}
-                    >
-                        {loading ? (
-                            <div className="flex items-center justify-center h-32">
-                                <Loader2 className="text-primary animate-spin" size={32} />
-                            </div>
-                        ) : filteredStudents.length > 0 ? (
-                            filteredStudents.map(student => (
-                                <ListItem
-                                    key={student.id}
-                                    id={student.id}
-                                    title={`${student.prenom} ${student.nom}`}
-                                    // Subtitle removed as requested
-                                    isSelected={selectedStudent?.id === student.id}
-                                    onClick={() => setSelectedStudent(student)}
-                                    onEdit={() => handleEdit(student)}
-                                    onDelete={() => setStudentToDelete(student)}
-                                    rightElement={
-                                        student.trust_trend && (
-                                            <div className={clsx(
-                                                "p-1 rounded-full",
-                                                student.trust_trend === 'up' && "text-success bg-success/10",
-                                                student.trust_trend === 'down' && "text-danger bg-danger/10",
-                                                student.trust_trend === 'stable' && "text-grey-dark bg-grey-dark/10"
-                                            )}>
-                                                {student.trust_trend === 'up' && <TrendingUp size={14} />}
-                                                {student.trust_trend === 'down' && <TrendingDown size={14} />}
-                                                {student.trust_trend === 'stable' && <Minus size={14} />}
-                                            </div>
-                                        )
-                                    }
-                                    deleteTitle="Supprimer l'élève"
-                                    avatar={{
-                                        src: student.photo_url,
-                                        initials: `${student.prenom[0]}${student.nom[0]}`,
-                                        editable: true,
-                                        loading: updatingPhotoId === student.id,
-                                        onImageChange: (file) => processAndSavePhoto(file, student),
-                                        onDragOver: (e) => { e.preventDefault(); e.stopPropagation(); setDraggingPhotoId(student.id); },
-                                        onDragLeave: (e) => { e.preventDefault(); e.stopPropagation(); setDraggingPhotoId(null); },
-                                        onDrop: (e, file) => {
-                                            e.preventDefault();
-                                            e.stopPropagation();
-                                            setDraggingPhotoId(null);
-                                            processAndSavePhoto(file, student);
-                                        },
-                                        className: clsx(
-                                            draggingPhotoId === student.id && "ring-2 ring-primary scale-110 bg-primary/20"
-                                        )
-                                    }}
-                                />
-                            ))
-                        ) : (
-                            <EmptyState
-                                icon={Search}
-                                title="Aucun élève trouvé"
-                                description="Essayez d'ajuster vos filtres de recherche"
-                                size="sm"
-                            />
-                        )}
-                    </CardList>
-                </div>
-
-                {/* Detail Column - Split into 2 cards */}
-                <div className="flex-1 flex flex-col gap-6 overflow-hidden relative">
-                    {!selectedStudent ? (
-                        <div className="flex-1 card-flat overflow-hidden">
-                            <EmptyState
-                                icon={UserIcon}
-                                title="Sélectionnez un élève"
-                                description="Cliquez sur un nom dans la liste pour afficher ses informations détaillées."
-                                size="md"
-                            />
-                        </div>
-                    ) : (
-                        <>
-                            {/* Card 1: Student Info */}
-                            <CardInfo>
-                                <div className="flex gap-5 items-center">
-                                    <Avatar
-                                        size="xl"
-                                        src={selectedStudent.photo_url}
-                                        initials={`${selectedStudent.prenom[0]}${selectedStudent.nom[0]}`}
-                                        editable
-                                        onImageChange={(file) => processAndSavePhoto(file, selectedStudent)}
-                                        loading={updatingPhotoId === selectedStudent.id}
-                                        onDragOver={handlePhotoDragOver}
-                                        onDragLeave={handlePhotoDragLeave}
-                                        onDrop={(e, _file) => handlePhotoDrop(e, selectedStudent)}
-                                        className={clsx(
-                                            isDraggingPhoto && "border-primary bg-primary/20 scale-105"
-                                        )}
-                                    />
-                                    <div className="flex-1 min-w-0">
-                                        <div className="flex items-start justify-between">
-                                            <h2 className="text-cq-xl font-bold text-text-main truncate">
-                                                {selectedStudent.prenom} {selectedStudent.nom}
-                                            </h2>
-                                            <button
-                                                onClick={() => setShowQRModal(true)}
-                                                className="p-2 ml-2 bg-white/5 hover:bg-white/10 text-white rounded-lg transition-colors group"
-                                                title="Afficher le Magic QR Code"
-                                            >
-                                                <QrCode size={20} className="group-hover:text-primary transition-colors" />
-                                            </button>
-                                        </div>
-                                        <p className="text-cq-base text-grey-medium mt-0.5">
-                                            {selectedStudent.Classe?.nom || 'Sans classe'} • {selectedStudent.Niveau?.nom || 'Niveau non défini'}
-                                        </p>
-                                        <div className="flex flex-wrap gap-1.5 mt-3">
-                                            {selectedStudent.EleveGroupe && selectedStudent.EleveGroupe.length > 0 ? (
-                                                selectedStudent.EleveGroupe.map(eg => eg.Groupe && (
-                                                    <Badge key={eg.Groupe.id} variant="primary" size="xs" icon={<span>🏆</span>}>
-                                                        {eg.Groupe.nom}
-                                                    </Badge>
-                                                ))
-                                            ) : (
-                                                <span className="text-xs text-grey-medium italic">Aucun groupe</span>
-                                            )}
-                                        </div>
-                                    </div>
-                                </div>
-                            </CardInfo>
-
-                            {/* Card 2: Tabs & Content */}
-                            <CardTabs
-                                tabs={[
-                                    { id: 'infos', label: 'Informations' },
-                                    { id: 'suivi', label: 'Suivi Pédagogique' },
-                                    { id: 'todo', label: 'To-Do List' },
-                                    { id: 'urgent', label: 'Suivi Urgent' }
-                                ]}
-                                activeTab={currentTab}
-                                onChange={setCurrentTab}
-                                actionLabel={currentTab === 'todo' ? "Créer le PDF" : undefined}
-                                onAction={currentTab === 'todo' ? generatePDF : undefined}
-                                actionIcon={FileText}
-                            >
-                                {currentTab === 'infos' && (
-                                    <div className="grid md:grid-cols-2 gap-8 animate-in fade-in slide-in-from-bottom-2 duration-300">
-                                        {/* Parcours Scolaire */}
-                                        <InfoSection title="Parcours Scolaire">
-                                            <InfoRow
-                                                icon={BookOpen}
-                                                value={selectedStudent.Classe?.nom || 'Non affecté'}
-                                            />
-                                            <InfoRow
-                                                icon={Layers}
-                                                value={selectedStudent.Niveau?.nom || 'Non renseigné'}
-                                            />
-                                            <InfoRow
-                                                icon={Calendar}
-                                                value={calculateAge(selectedStudent.date_naissance)}
-                                            />
-                                        </InfoSection>
-
-                                        {/* Informations & Responsables */}
-                                        <InfoSection title="Informations & Responsables">
-                                            <InfoRow
-                                                icon={ShieldCheck}
-                                                label="Équipe Enseignante"
-                                                value={
-                                                    <div className="space-y-1 mt-1">
-                                                        {(selectedStudent.Classe?.ClasseAdulte?.length || 0) > 0 ? (
-                                                            selectedStudent.Classe?.ClasseAdulte?.map((ca, idx) => (
-                                                                <div key={idx} className="flex items-center gap-2 text-sm">
-                                                                    <p className="text-text-main font-bold truncate">{ca.Adulte.prenom} {ca.Adulte.nom}</p>
-                                                                    <Badge
-                                                                        variant={ca.role === 'principal' ? 'primary' : 'default'}
-                                                                        size="xs"
-                                                                        style="outline"
-                                                                    >
-                                                                        {ca.role === 'principal' ? 'Titulaire' : ca.role === 'coenseignant' ? 'Co-Ens.' : 'Support'}
-                                                                    </Badge>
-                                                                </div>
-                                                            ))
-                                                        ) : (
-                                                            <p className="text-text-main font-bold italic opacity-50">Aucun membre assigné</p>
-                                                        )}
-                                                    </div>
-                                                }
-                                            />
-                                            <InfoRow
-                                                icon={UserIcon}
-                                                label="Parents"
-                                                value={selectedStudent.nom_parents || [
-                                                    `${selectedStudent.parent1_prenom} ${selectedStudent.parent1_nom}`,
-                                                    `${selectedStudent.parent2_prenom} ${selectedStudent.parent2_nom}`
-                                                ].filter(p => p.trim() !== "").join(' & ') || 'Non renseignés'}
-                                            />
-                                        </InfoSection>
-
-                                        {/* Branch Indices */}
-                                        <div className="md:col-span-2">
-                                            <InfoSectionEditable title="Indices de Branche (Performance)">
-                                                <InfoRowEditable
-                                                    icon={Activity}
-                                                    label="Global"
-                                                    value={selectedStudent.importance_suivi ?? ''}
-                                                    onChange={(val) => handleUpdateImportance(val)}
-                                                    placeholder="50"
-                                                />
-                                                {branches.map(branch => (
-                                                    <InfoRowEditable
-                                                        key={branch.id}
-                                                        icon={GitBranch}
-                                                        label={branch.nom}
-                                                        value={studentIndices[selectedStudent.id]?.[branch.id] ?? ''}
-                                                        onChange={(val) => handleUpdateBranchIndex(selectedStudent.id, branch.id, val)}
-                                                        placeholder="50"
-                                                    />
-                                                ))}
-                                            </InfoSectionEditable>
-                                        </div>
-                                    </div>
-                                )}
-
-                                {currentTab === 'suivi' && (
-                                    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
-                                        <div className="flex flex-col items-start gap-2 mb-6">
-                                            <SmartTabs
-                                                tabs={[
-                                                    { id: 'journal', label: 'Journal', icon: LayoutList },
-                                                    { id: 'progression', label: 'Progression', icon: GitGraph }
-                                                ]}
-                                                activeTab={suiviMode}
-                                                onChange={(tabId) => setSuiviMode(tabId as 'journal' | 'progression')}
-                                                level={3}
-                                            />
-
-                                            {suiviMode === 'journal' && (
-                                                <div className="animate-in fade-in slide-in-from-top-1 duration-300">
-                                                    <SmartTabs
-                                                        tabs={[
-                                                            { id: 'pending', label: 'En cours', icon: Activity, variant: 'warning' },
-                                                            { id: 'all', label: 'Tout voir', icon: LayoutList, variant: 'primary' }
-                                                        ]}
-                                                        activeTab={showPendingOnly ? 'pending' : 'all'}
-                                                        onChange={(tabId) => setShowPendingOnly(tabId === 'pending')}
-                                                        level={3}
-                                                    />
-                                                </div>
-                                            )}
-                                        </div>
-
-                                        {loadingProgress ? (
-                                            <div className="flex justify-center p-8"><Loader2 className="animate-spin text-primary" size={32} /></div>
-                                        ) : studentProgress.length === 0 ? (
-                                            <div className="text-center p-8 text-grey-medium opacity-60 italic">Aucune activité commencée.</div>
-                                        ) : (
-                                            <div className="space-y-6">
-                                                {suiviMode === 'journal' && <div className="space-y-1">{renderJournalView()}</div>}
-                                            </div>
-                                        )}
-                                    </div>
-                                )}
-
-                                {currentTab === 'urgent' && (
-                                    <div className="space-y-2 animate-in fade-in slide-in-from-bottom-2 duration-300">
-                                        <h3 className="text-xl font-bold text-text-main flex items-center gap-2 mb-4">
-                                            <div className="flex items-center gap-2">
-                                                <AlertCircle size={24} className="text-primary" />
-                                                <span>Travaux à terminer</span>
-                                            </div>
-                                            <span className="text-sm font-normal text-grey-medium ml-2 bg-white/5 px-2 py-0.5 rounded-full">
-                                                {totalOverdueCount} ateliers
-                                            </span>
-                                        </h3>
-
-                                        {!hasOverdueWork ? (
-                                            <div className="flex flex-col items-center justify-center p-12 text-center text-grey-medium opacity-60">
-                                                <CheckCircle2 size={48} className="mb-4 text-success" />
-                                                <p className="text-lg font-medium">Aucun travail en cours !</p>
-                                                <p className="text-sm">Tout est à jour.</p>
-                                            </div>
-                                        ) : (
-                                            sortedModules.map((module: any) => {
-                                                const isExpanded = expandedModules[module.id];
-                                                const activities = module.activities;
-                                                const completedCount = activities.filter((a: any) => a.etat === 'termine').length; // Will be 0
-                                                const totalCount = activities.length;
-                                                const percent = Math.round((completedCount / totalCount) * 100);
-
-                                                // We can flag if it's strictly overdue for styling if needed, but we are using standard style now.
-                                                // const isModuleOverdue = module.date_fin && new Date(module.date_fin) < new Date() && completedCount < totalCount;
-
-                                                return (
-                                                    <div key={module.id} className="bg-surface/50 border border-transparent rounded-xl overflow-hidden hover:border-white/10 hover:bg-surface transition-all group">
-                                                        <div
-                                                            onClick={() => toggleModuleExpansion(module.id)}
-                                                            className="py-1.5 px-4 cursor-pointer hover:bg-white/5 transition-colors flex items-center justify-between gap-6"
-                                                        >
-                                                            {/* Left: Title & Chevron (Takes remaining space) */}
-                                                            <div className="flex items-center gap-4 min-w-0 flex-1">
-                                                                <div className={clsx(
-                                                                    "transition-all duration-300",
-                                                                    isExpanded ? "rotate-90 text-primary" : "rotate-0 text-grey-dark group-hover:text-grey-medium"
-                                                                )}>
-                                                                    <ChevronRight size={18} />
-                                                                </div>
-                                                                <h3 className={clsx(
-                                                                    "font-bold text-text-main text-lg truncate tracking-tight group-hover:text-white transition-all w-fit"
-                                                                    // removed danger style override as requested
-                                                                )}>
-                                                                    {module.nom}
-                                                                </h3>
-                                                            </div>
-
-                                                            {/* Right: Metrics Block (40% width, anchored right) - COPIED FROM JOURNAL */}
-                                                            <div className="flex items-center gap-6 w-[40%] shrink-0">
-                                                                {/* Date Badge */}
-                                                                <div className="shrink-0">
-                                                                    {module.date_fin ? (
-                                                                        <Badge variant="primary" size="xs" className="px-2 py-0.5 font-black">
-                                                                            {format(new Date(module.date_fin), 'dd/MM', { locale: fr })}
-                                                                        </Badge>
-                                                                    ) : (
-                                                                        <span className="text-[10px] font-bold text-grey-dark uppercase tracking-widest italic opacity-20 px-2">N/A</span>
-                                                                    )}
-                                                                </div>
-
-                                                                {/* Progress Bar Area */}
-                                                                <div className="flex-1 flex items-center gap-4">
-                                                                    <div className="flex-1 h-1.5 bg-background/50 rounded-full overflow-hidden border border-white/5">
-                                                                        <div
-                                                                            className="h-full bg-primary transition-all duration-1000 ease-out shadow-[0_0_10px_rgba(var(--primary-rgb),0.5)]"
-                                                                            style={{ width: `${percent}%` }}
-                                                                        />
-                                                                    </div>
-                                                                    <span className="text-xs font-black text-grey-medium min-w-[35px] text-right tabular-nums">
-                                                                        {completedCount}/{totalCount}
-                                                                    </span>
-                                                                </div>
-                                                            </div>
-                                                        </div>
-
-                                                        {isExpanded && (
-                                                            <div className="border-t border-white/5 bg-black/20">
-                                                                {module.activities.sort((a: any, b: any) => (a.Activite?.ordre || 0) - (b.Activite?.ordre || 0)).map((p: any) => (
-                                                                    <div key={p.id} className="p-3 pl-16 border-b border-white/5 last:border-0 flex items-center justify-between hover:bg-white/5 transition-colors group">
-                                                                        <h4 className="text-sm text-grey-light font-medium group-hover:text-white transition-colors">
-                                                                            <span className="text-xs text-grey-dark mr-2">#{p.Activite?.ordre}</span>
-                                                                            {p.Activite?.titre}
-                                                                        </h4>
-                                                                        <div className="flex items-center gap-3">
-                                                                            <div
-                                                                                onClick={(e) => {
-                                                                                    e.stopPropagation();
-                                                                                    handleUrgentValidation(p.Activite.id, selectedStudent.id, studentIndices);
-                                                                                }}
-                                                                                className={clsx(
-                                                                                    "px-2 py-1 rounded text-[10px] font-black uppercase tracking-wider flex items-center gap-1.5 transition-all cursor-pointer hover:scale-105",
-                                                                                    p.etat === 'besoin_d_aide'
-                                                                                        ? "bg-amber-500/20 text-amber-500 hover:bg-amber-500/30 animate-pulse"
-                                                                                        : "bg-blue-500/20 text-blue-500 hover:bg-blue-500/30"
-                                                                                )}
-                                                                            >
-                                                                                <Clock size={10} />
-                                                                                {p.etat === 'besoin_d_aide' ? "Besoin d'aide" : "En cours"}
-                                                                            </div>
-                                                                        </div>
-                                                                    </div>
-                                                                ))}
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                );
-                                            })
-                                        )}
-                                    </div>
-                                )}
-
-                                {currentTab === 'todo' && (
-                                    <div className="h-full flex flex-col items-center justify-center p-12 text-center text-grey-medium opacity-60">
-                                        <FileText size={48} className="mb-4 text-primary opacity-40" />
-                                        <p className="text-lg font-medium">Prêt pour l'impression</p>
-                                        <p className="text-sm italic">Cliquez sur le bouton ci-dessous pour générer la liste des activités à faire pour {selectedStudent.prenom}.</p>
-                                    </div>
-                                )}
-                            </CardTabs>
-                        </>
-                    )}
-                </div>
-
+                {/* Modals */}
                 <ConfirmModal
                     isOpen={!!studentToDelete}
                     onClose={() => setStudentToDelete(null)}

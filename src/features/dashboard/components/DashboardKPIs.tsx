@@ -3,7 +3,7 @@ import { Users, CheckCircle2, Calendar } from 'lucide-react';
 import { getInitials } from '../../../lib/helpers';
 import { Student } from '../../attendance/services/attendanceService';
 import { DashboardStats } from '../hooks/useDashboardData';
-import { StatCard, Avatar, Badge, Button } from '../../../components/ui';
+import { StatCard, Avatar, Badge, Button } from '../../../core';
 
 interface DashboardKPIsProps {
     stats: DashboardStats;

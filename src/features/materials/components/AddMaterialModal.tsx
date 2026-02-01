@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import Modal from '../../../components/ui/Modal';
-import Button from '../../../components/ui/Button';
+import { FormModal } from '../../../core';
 import { Save } from 'lucide-react';
 import { TypeMateriel } from '../services/materialService';
 
@@ -28,8 +27,7 @@ const AddMaterialModal: React.FC<AddMaterialModalProps> = ({ isOpen, onClose, on
         }
     }, [isOpen, materielToEdit]);
 
-    const handleSubmit = async (e: React.FormEvent | React.MouseEvent) => {
-        e.preventDefault();
+    const handleSubmit = async () => {
         if (!nom.trim()) return;
 
         setLoading(true);
@@ -47,27 +45,16 @@ const AddMaterialModal: React.FC<AddMaterialModalProps> = ({ isOpen, onClose, on
     };
 
     return (
-        <Modal
+        <FormModal
             isOpen={isOpen}
             onClose={onClose}
+            onSubmit={handleSubmit}
             title={materielToEdit ? 'Modifier le matériel' : 'Nouveau matériel'}
-            footer={
-                <>
-                    <Button onClick={onClose} variant="secondary" className="flex-1">
-                        Annuler
-                    </Button>
-                    <Button
-                        onClick={handleSubmit}
-                        loading={loading}
-                        className="flex-1"
-                        icon={Save}
-                    >
-                        Enregistrer
-                    </Button>
-                </>
-            }
+            icon={Save}
+            loading={loading}
+            size="sm"
         >
-            <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="space-y-4">
                 <div className="space-y-2">
                     <label htmlFor="nom" className="text-sm font-medium text-gray-300">
                         Nom du matériel <span className="text-danger">*</span>
@@ -98,8 +85,8 @@ const AddMaterialModal: React.FC<AddMaterialModalProps> = ({ isOpen, onClose, on
                     />
                     <p className="text-xs text-grey-medium">Sera affiché dans le titre de l'activité (ex: Titre [ACR])</p>
                 </div>
-            </form>
-        </Modal>
+            </div>
+        </FormModal>
     );
 };
 

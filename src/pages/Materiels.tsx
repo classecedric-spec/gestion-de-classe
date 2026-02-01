@@ -5,7 +5,7 @@ import MaterialList from '../features/materials/components/MaterialList';
 import MaterialDetails from '../features/materials/components/MaterialDetails';
 import AddMaterialModal from '../features/materials/components/AddMaterialModal';
 import { TypeMateriel } from '../features/materials/services/materialService';
-import { ConfirmModal, CardInfo, Badge, SearchBar } from '../components/ui';
+import { ConfirmModal, CardInfo, Badge, SearchBar } from '../core';
 
 const Materiels: React.FC = () => {
     const {

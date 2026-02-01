@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, Edit, BookOpen, X } from 'lucide-react';
-import { Modal, Button, Input, Select } from '../../../components/ui';
-import ImageUpload from '../../../components/ui/ImageUpload';
+import { Modal, Button, Input, Select } from '../../../core';
+import ImageUpload from '../../../core/ImageUpload';
 import { useClassForm } from '../hooks/useClassForm';
 import ImportStudentsSection, { ImportedStudent } from './ImportStudentsSection';
 import { Tables, TablesInsert } from '../../../types/supabase';

@@ -2,7 +2,7 @@ import React from 'react';
 import { Package, Plus } from 'lucide-react';
 import MaterialItem from './MaterialItem';
 import { TypeMateriel } from '../services/materialService';
-import { CardList, Avatar, EmptyState } from '../../../components/ui';
+import { CardList, Avatar, EmptyState } from '../../../core';
 
 interface MaterialListProps {
     materiels: TypeMateriel[];

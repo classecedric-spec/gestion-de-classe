@@ -1,7 +1,7 @@
 import React from 'react';
 import { AlertCircle, Calendar, FileText, Folder, BookOpen, Clock } from 'lucide-react';
 import { getInitials } from '../../../lib/helpers';
-import { Avatar } from '../../../components/ui';
+import { Avatar } from '../../../core';
 
 interface DashboardLateWorksProps {
     overdueStudents: any[];

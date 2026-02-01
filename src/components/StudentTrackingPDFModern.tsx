@@ -1,14 +1,14 @@
-import { Page, Text, View, Document, StyleSheet, Image } from '@react-pdf/renderer';
-import { PdfData, PdfModule } from '../lib/pdf';
-import logo from '../assets/logo_tbi.png';
+import { Page, Text, View, Document, StyleSheet } from '@react-pdf/renderer';
+import { PdfData } from '../lib/pdf';
+import { PDF_THEME } from '../core/pdf/theme';
 // Modern Styles - Condensed & Optimized
 const styles = StyleSheet.create({
     page: {
         padding: 30,
-        fontFamily: 'Helvetica',
-        fontSize: 10,
+        fontFamily: PDF_THEME.fonts.main,
+        fontSize: PDF_THEME.sizes.text.base,
         color: '#333',
-        backgroundColor: '#FFFFFF',
+        backgroundColor: PDF_THEME.colors.background.white,
     },
     headerWrapper: {
         flexDirection: 'row',
@@ -23,30 +23,30 @@ const styles = StyleSheet.create({
         flexDirection: 'column',
     },
     title: {
-        fontSize: 18,
+        fontSize: PDF_THEME.sizes.text.xl,
         fontWeight: 'bold', // 'extrabold' not standard in Helvetica
-        color: '#1a1a1a',
+        color: PDF_THEME.colors.text.main,
         textTransform: 'uppercase',
     },
     subTitle: {
-        fontSize: 10,
+        fontSize: PDF_THEME.sizes.text.base,
         fontWeight: 'bold',
-        color: '#444',
+        color: PDF_THEME.colors.text.secondary,
     },
     headerRight: {
-        fontSize: 10,
-        color: '#666',
+        fontSize: PDF_THEME.sizes.text.base,
+        color: PDF_THEME.colors.text.light,
         marginBottom: 2,
     },
 
     // Module Card
     moduleContainer: {
-        backgroundColor: '#FFFFFF',
+        backgroundColor: PDF_THEME.colors.background.white,
         borderRadius: 6,
         padding: 0,
         marginBottom: 5,
         borderWidth: 0.5,
-        borderColor: '#CCC',
+        borderColor: PDF_THEME.colors.border,
     },
     moduleHeader: {
         paddingVertical: 6,
@@ -58,16 +58,16 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     moduleTitle: {
-        fontSize: 14,
+        fontSize: PDF_THEME.sizes.text.lg,
         fontWeight: 'bold',
     },
     moduleDate: {
-        fontSize: 10,
+        fontSize: PDF_THEME.sizes.text.base,
     },
 
     // Status Colors
-    headerLate: { backgroundColor: '#D2AE6D' },
-    headerUpcoming: { backgroundColor: '#244154' },
+    headerLate: { backgroundColor: PDF_THEME.colors.accent },
+    headerUpcoming: { backgroundColor: PDF_THEME.colors.status.info },
 
     // Activity List
     activityList: {
@@ -104,13 +104,13 @@ const styles = StyleSheet.create({
         paddingRight: 8,
     },
     activityName: {
-        fontSize: 14,
+        fontSize: PDF_THEME.sizes.text.lg,
         fontWeight: 'normal',
         color: '#000',
     },
     activityMeta: {
-        fontSize: 10,
-        color: '#666',
+        fontSize: PDF_THEME.sizes.text.base,
+        color: PDF_THEME.colors.text.light,
         marginLeft: 6,
     },
 
@@ -123,7 +123,7 @@ const styles = StyleSheet.create({
         width: 16,
         height: 16,
         borderRadius: 3,
-        backgroundColor: '#FFFFFF',
+        backgroundColor: PDF_THEME.colors.background.white,
         justifyContent: 'center',
         alignItems: 'center',
         borderWidth: 1,
@@ -132,7 +132,7 @@ const styles = StyleSheet.create({
     },
     weekText: {
         fontSize: 8,
-        color: '#444',
+        color: PDF_THEME.colors.text.secondary,
         fontWeight: 'bold',
     },
 
@@ -146,7 +146,7 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
         alignItems: 'center',
         borderTopWidth: 0.5,
-        borderTopColor: '#CCC',
+        borderTopColor: PDF_THEME.colors.border,
         paddingTop: 8,
     },
     footerSectionLeft: {
@@ -171,7 +171,7 @@ const styles = StyleSheet.create({
     },
     footerPageText: {
         fontSize: 8,
-        color: '#444',
+        color: PDF_THEME.colors.text.secondary,
     },
     dot: {
         width: 5,

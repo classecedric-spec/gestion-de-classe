@@ -2,7 +2,7 @@ import React from 'react';
 import { Layers, GraduationCap, User } from 'lucide-react';
 import { LevelWithStudentCount } from '../../../types';
 import { Tables } from '../../../types/supabase';
-import { Badge, Avatar, EmptyState } from '../../../components/ui';
+import { Badge, Avatar, EmptyState } from '../../../core';
 
 interface LevelDetailsProps {
     selectedLevel: LevelWithStudentCount | null;

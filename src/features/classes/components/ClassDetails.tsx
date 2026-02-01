@@ -2,7 +2,7 @@ import React, { ChangeEvent } from 'react';
 import { BookOpen, GraduationCap, LayoutGrid, Table as TableIcon, ArrowUp, ArrowDown, ArrowUpDown, Edit, Trash2, Plus } from 'lucide-react';
 import clsx from 'clsx';
 import { ClassWithAdults, StudentWithRelations } from '../services/classService';
-import { Badge, Button, EmptyState, Avatar, Tabs, ListItem } from '../../../components/ui';
+import { Badge, Button, EmptyState, Avatar, Tabs, ListItem } from '../../../core';
 
 export interface ClassDetailsProps {
     selectedClass: ClassWithAdults | null;

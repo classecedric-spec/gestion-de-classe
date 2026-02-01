@@ -2,13 +2,14 @@ import React from 'react';
 import { Document, Page, Text, View, StyleSheet } from '@react-pdf/renderer';
 import { Student } from '../features/attendance/services/attendanceService';
 import { AvancementActivity, ProgressionMap } from '../pages/AvancementAteliers/hooks/useStudentsAndActivities';
+import { PDF_THEME } from '../core/pdf/theme';
 
 // Status colors matching the app
 const STATUS_COLORS: Record<string, string> = {
-    termine: '#22c55e', // success green
-    besoin_d_aide: '#A0A8AD', // grey
-    en_cours: '#D9B981', // primary yellow
-    a_domicile: '#ef4444', // red/danger
+    termine: PDF_THEME.colors.status.success,
+    besoin_d_aide: PDF_THEME.colors.status.grey,
+    en_cours: PDF_THEME.colors.status.warning,
+    a_domicile: PDF_THEME.colors.status.danger,
 };
 
 const STATUS_LABELS: Record<string, string> = {
@@ -20,46 +21,46 @@ const STATUS_LABELS: Record<string, string> = {
 
 const styles = StyleSheet.create({
     page: {
-        padding: 20,
-        backgroundColor: '#ffffff',
-        fontFamily: 'Helvetica',
+        padding: PDF_THEME.sizes.spacing.xl,
+        backgroundColor: PDF_THEME.colors.background.white,
+        fontFamily: PDF_THEME.fonts.main,
     },
     header: {
         marginBottom: 15,
-        borderBottom: '2px solid #D9B981',
+        borderBottom: `2px solid ${PDF_THEME.colors.accent}`,
         paddingBottom: 10,
     },
     title: {
-        fontSize: 18,
+        fontSize: PDF_THEME.sizes.text.xl,
         fontWeight: 'bold',
-        color: '#1a1a1a',
+        color: PDF_THEME.colors.text.main,
         marginBottom: 4,
     },
     subtitle: {
-        fontSize: 10,
-        color: '#666666',
+        fontSize: PDF_THEME.sizes.text.base,
+        color: PDF_THEME.colors.text.light,
     },
     table: {
         display: 'flex',
         flexDirection: 'column',
-        marginBottom: 20,
+        marginBottom: PDF_THEME.sizes.spacing.xl,
     },
     tableRow: {
         display: 'flex',
         flexDirection: 'row',
-        borderBottom: '1px solid #e5e5e5',
+        borderBottom: `1px solid ${PDF_THEME.colors.background.grey}`,
     },
     tableHeaderRow: {
         display: 'flex',
         flexDirection: 'row',
-        backgroundColor: '#f5f5f5',
-        borderBottom: '2px solid #cccccc',
+        backgroundColor: PDF_THEME.colors.background.grey,
+        borderBottom: `2px solid ${PDF_THEME.colors.border}`,
     },
     tableCell: {
         padding: 4,
         fontSize: 7,
         textAlign: 'center',
-        borderRight: '1px solid #e5e5e5',
+        borderRight: `1px solid ${PDF_THEME.colors.background.grey}`,
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
@@ -67,18 +68,18 @@ const styles = StyleSheet.create({
     studentCell: {
         width: 100,
         padding: 6,
-        fontSize: 8,
+        fontSize: PDF_THEME.sizes.text.sm,
         textAlign: 'left',
         fontWeight: 'bold',
-        borderRight: '1px solid #cccccc',
-        backgroundColor: '#fafafa',
+        borderRight: `1px solid ${PDF_THEME.colors.border}`,
+        backgroundColor: PDF_THEME.colors.background.light,
     },
     headerCell: {
         padding: 4,
         fontSize: 6,
         textAlign: 'center',
         fontWeight: 'bold',
-        borderRight: '1px solid #cccccc',
+        borderRight: `1px solid ${PDF_THEME.colors.border}`,
         backgroundColor: '#f0f0f0',
     },
     activityHeader: {
@@ -90,14 +91,14 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
     },
     activityNumber: {
-        fontSize: 8,
+        fontSize: PDF_THEME.sizes.text.sm,
         fontWeight: 'bold',
-        color: '#D9B981',
+        color: PDF_THEME.colors.accent,
         marginBottom: 2,
     },
     activityTitle: {
         fontSize: 5,
-        color: '#666666',
+        color: PDF_THEME.colors.text.light,
         textAlign: 'center',
     },
     statusCell: {
@@ -121,7 +122,7 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         justifyContent: 'center',
         gap: 20,
-        borderTop: '1px solid #e5e5e5',
+        borderTop: `1px solid ${PDF_THEME.colors.background.grey}`,
         paddingTop: 10,
     },
     legendItem: {
@@ -136,8 +137,8 @@ const styles = StyleSheet.create({
         borderRadius: 5,
     },
     legendText: {
-        fontSize: 8,
-        color: '#666666',
+        fontSize: PDF_THEME.sizes.text.sm,
+        color: PDF_THEME.colors.text.light,
     },
     footer: {
         position: 'absolute',
@@ -145,15 +146,15 @@ const styles = StyleSheet.create({
         left: 20,
         right: 20,
         fontSize: 7,
-        color: '#999999',
+        color: PDF_THEME.colors.text.muted,
         textAlign: 'center',
     },
     emptyDot: {
         width: 12,
         height: 12,
         borderRadius: 6,
-        border: '1px solid #cccccc',
-        backgroundColor: '#fafafa',
+        border: `1px solid ${PDF_THEME.colors.border}`,
+        backgroundColor: PDF_THEME.colors.background.light,
     }
 });
 

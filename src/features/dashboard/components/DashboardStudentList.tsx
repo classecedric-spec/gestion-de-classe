@@ -2,7 +2,7 @@ import React, { useMemo } from 'react';
 import { Users, ChevronRight, Search, Filter } from 'lucide-react';
 import { getInitials } from '../../../lib/helpers';
 import { Student, Group } from '../../attendance/services/attendanceService';
-import { Avatar, EmptyState, Badge, Input, Select } from '../../../components/ui';
+import { Avatar, EmptyState, Badge, Input, Select } from '../../../core';
 
 interface DashboardStudentListProps {
     students: Student[];

@@ -4,7 +4,7 @@ import clsx from 'clsx';
 import { getInitials } from '../../../lib/helpers';
 import { Student } from '../../attendance/services/attendanceService';
 import { DashboardData } from '../hooks/useDashboardData';
-import { Avatar, Badge } from '../../../components/ui';
+import { Avatar, Badge } from '../../../core';
 
 interface DashboardPriorityTrackingProps {
     priorityData: DashboardData['priorityStudents'];

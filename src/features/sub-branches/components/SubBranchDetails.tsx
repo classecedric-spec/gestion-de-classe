@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Layers, GitBranch, Info, FileText } from 'lucide-react';
 import { SubBranchWithParent } from '../services/subBranchService';
-import { Avatar, EmptyState, Badge, CardInfo, CardTabs } from '../../../components/ui';
+import { Avatar, EmptyState, Badge, CardInfo, CardTabs } from '../../../core';
 
 interface SubBranchDetailsProps {
     selectedSubBranch: SubBranchWithParent | null;

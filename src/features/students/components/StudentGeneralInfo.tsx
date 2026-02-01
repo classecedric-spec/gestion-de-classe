@@ -1,7 +1,8 @@
 import React, { ChangeEvent } from 'react';
 import { User, Users, Plus } from 'lucide-react';
 import clsx from 'clsx';
-import ImageUpload from '../../../components/ui/ImageUpload';
+import ImageUpload from '../../../core/ImageUpload';
+import { Input, Button } from '../../../core';
 import { StudentFormState } from '../hooks/useStudentForm';
 import { Tables } from '../../../types/supabase';
 
@@ -51,46 +52,35 @@ const StudentGeneralInfo: React.FC<StudentGeneralInfoProps> = ({
             </div>
 
             <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1">
-                    <label className="text-xs font-semibold text-gray-400 uppercase">Prénom <span className="text-red-400">*</span></label>
-                    <input
-                        type="text"
-                        name="prenom"
-                        value={student.prenom}
-                        onChange={handleInputChange}
-                        className="w-full bg-input border border-border/10 rounded-xl p-3 text-text-main focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all placeholder:text-grey-medium"
-                        placeholder="Ex: Jean"
-                        required
-                    />
-                </div>
-                <div className="space-y-1">
-                    <label className="text-xs font-semibold text-gray-400 uppercase">Nom <span className="text-red-400">*</span></label>
-                    <input
-                        type="text"
-                        name="nom"
-                        value={student.nom}
-                        onChange={handleInputChange}
-                        className="w-full bg-input border border-border/10 rounded-xl p-3 text-text-main focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all placeholder:text-grey-medium"
-                        placeholder="Ex: Dupont"
-                        required
-                    />
-                </div>
-            </div>
-
-            <div className="space-y-1">
-                <label className="text-xs font-semibold text-gray-400 uppercase">Date de naissance</label>
-                <input
-                    type="date"
-                    name="date_naissance"
-                    title="Date de naissance"
-                    placeholder="Date de naissance"
-                    value={student.date_naissance}
+                <Input
+                    label="Prénom"
+                    name="prenom"
+                    value={student.prenom}
                     onChange={handleInputChange}
-                    onClick={(e) => { try { (e.target as HTMLInputElement).showPicker(); } catch (err) { } }}
-                    onFocus={(e) => { try { (e.target as HTMLInputElement).showPicker(); } catch (err) { } }}
-                    className="w-full bg-input border border-border/10 rounded-xl p-3 text-text-main focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all [&::-webkit-calendar-picker-indicator]:hidden cursor-pointer"
+                    placeholder="Ex: Jean"
+                    required
+                />
+                <Input
+                    label="Nom"
+                    name="nom"
+                    value={student.nom}
+                    onChange={handleInputChange}
+                    placeholder="Ex: Dupont"
+                    required
                 />
             </div>
+
+            <Input
+                label="Date de naissance"
+                type="date"
+                name="date_naissance"
+                title="Date de naissance"
+                value={student.date_naissance}
+                onChange={handleInputChange}
+                onClick={(e: any) => { try { e.target.showPicker(); } catch (err) { } }}
+                onFocus={(e: any) => { try { e.target.showPicker(); } catch (err) { } }}
+                className="cursor-pointer [&::-webkit-calendar-picker-indicator]:hidden"
+            />
 
             <div className="space-y-1">
                 <label className="text-xs font-semibold text-gray-400 uppercase">Sexe</label>
@@ -173,28 +163,30 @@ const StudentGeneralInfo: React.FC<StudentGeneralInfoProps> = ({
                 </label>
                 <div className="flex flex-wrap gap-2 p-3 bg-input border border-border/10 rounded-xl min-h-[60px]">
                     {groupsList.map(g => (
-                        <button
+                        <Button
                             key={g.id}
-                            type="button"
                             onClick={() => handleToggleGroup(g.id)}
+                            variant={student.groupe_ids?.includes(g.id) ? 'primary' : 'secondary'}
+                            size="sm"
                             className={clsx(
-                                "px-3 py-1.5 rounded-lg text-xs font-bold transition-all border user-select-none",
+                                "text-xs font-bold transition-all border user-select-none",
                                 student.groupe_ids?.includes(g.id)
                                     ? "bg-primary text-text-dark border-primary shadow-sm ring-1 ring-primary/20"
                                     : "bg-surface text-grey-medium border-border/10 hover:border-border/30 hover:bg-input"
                             )}
                         >
                             {g.nom}
-                        </button>
+                        </Button>
                     ))}
-                    <button
-                        type="button"
+                    <Button
                         onClick={() => setShowAddGroupModal(true)}
-                        className="px-3 py-1.5 rounded-lg text-xs font-bold transition-all border border-dashed border-primary/50 text-primary hover:bg-primary/10 flex items-center gap-1"
+                        variant="secondary"
+                        size="sm"
+                        className="text-xs font-bold border-dashed border-primary/50 text-primary hover:bg-primary/10 flex items-center gap-1"
                     >
                         <Plus size={12} />
                         Nouveau
-                    </button>
+                    </Button>
                 </div>
             </div>
         </div>

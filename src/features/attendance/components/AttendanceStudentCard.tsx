@@ -4,7 +4,7 @@ import { CSS } from '@dnd-kit/utilities';
 import clsx from 'clsx';
 import { GripVertical } from 'lucide-react';
 import { Student } from '../services/attendanceService';
-import { Avatar } from '../../../components/ui';
+import { Avatar } from '../../../core';
 
 interface AttendanceStudentCardProps {
     student: Student;

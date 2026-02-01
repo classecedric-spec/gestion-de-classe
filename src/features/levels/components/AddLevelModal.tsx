@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Check, Layers } from 'lucide-react';
-import Modal from '../../../components/ui/Modal';
-import Button from '../../../components/ui/Button';
+import { Layers } from 'lucide-react';
+import { FormModal } from '../../../core';
 import { Tables, TablesInsert } from '../../../types/supabase';
 
 export interface AddLevelModalProps {
@@ -22,18 +21,11 @@ const AddLevelModal: React.FC<AddLevelModalProps> = ({
 
     useEffect(() => {
         if (isOpen) {
-            if (levelToEdit) {
-                setNom(levelToEdit.nom);
-            } else {
-                setNom('');
-            }
+            setNom(levelToEdit?.nom || '');
         }
     }, [isOpen, levelToEdit]);
 
-    if (!isOpen) return null;
-
-    const handleSubmit = async (e?: React.FormEvent) => {
-        if (e) e.preventDefault();
+    const handleSubmit = async () => {
         if (!nom.trim()) return;
 
         setLoading(true);
@@ -48,30 +40,18 @@ const AddLevelModal: React.FC<AddLevelModalProps> = ({
     };
 
     return (
-        <Modal
+        <FormModal
             isOpen={isOpen}
             onClose={onClose}
+            onSubmit={handleSubmit}
             title={levelToEdit ? 'Modifier le Niveau' : 'Nouveau Niveau'}
-            icon={<Layers size={24} />}
-            className="max-w-sm"
-            footer={
-                <>
-                    <Button onClick={onClose} variant="secondary" className="flex-1">
-                        Annuler
-                    </Button>
-                    <Button
-                        onClick={handleSubmit}
-                        loading={loading}
-                        disabled={!nom.trim()}
-                        className="flex-1"
-                        icon={Check}
-                    >
-                        {levelToEdit ? 'Enregistrer' : 'Créer'}
-                    </Button>
-                </>
-            }
+            icon={Layers}
+            loading={loading}
+            confirmDisabled={!nom.trim()}
+            confirmText={levelToEdit ? 'Enregistrer' : 'Créer'}
+            size="sm"
         >
-            <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="space-y-4">
                 <div>
                     <label className="text-xs font-semibold text-gray-400 uppercase block mb-2" htmlFor="level-name">
                         Nom du niveau
@@ -87,9 +67,10 @@ const AddLevelModal: React.FC<AddLevelModalProps> = ({
                         autoFocus
                     />
                 </div>
-            </form>
-        </Modal>
+            </div>
+        </FormModal>
     );
 };
+
 
 export default AddLevelModal;

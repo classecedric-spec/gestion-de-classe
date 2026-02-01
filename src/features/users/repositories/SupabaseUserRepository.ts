@@ -8,7 +8,7 @@ export class SupabaseUserRepository implements IUserRepository {
     async getProfile(userId: string): Promise<Tables<'CompteUtilisateur'> | null> {
         const { data, error } = await supabase
             .from('CompteUtilisateur')
-            .select('prenom, nom, validation_admin, last_selected_group_id, nom_ecole, photo_url')
+            .select('prenom, nom, validation_admin, last_selected_group_id, nom_ecole, photo_url, photo_base64')
             .eq('id', userId)
             .maybeSingle();
 

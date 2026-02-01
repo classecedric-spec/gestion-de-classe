@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
-import { Menu, Loader2 } from 'lucide-react';
+import { Menu } from 'lucide-react';
+import { Button, PageLoader } from '../core';
 import clsx from 'clsx';
 import { MAIN_NAV_ITEMS } from '../config/navigation';
 import { useAuth } from '../hooks/useAuth';
@@ -28,6 +29,13 @@ const Layout: React.FC = () => {
         }
     }, [session]);
 
+    // Close sidebar on navigation (mobile)
+    useEffect(() => {
+        if (isOpen && window.innerWidth < 768) {
+            setIsOpen(false);
+        }
+    }, [location.pathname]);
+
     // Page type detection
     const isSuiviPage = location.pathname === '/dashboard/suivi';
     const isPresencePage = location.pathname === '/dashboard/presence';
@@ -42,11 +50,7 @@ const Layout: React.FC = () => {
         : MAIN_NAV_ITEMS.filter(item => 'label' in item && item.label === 'Accueil');
 
     if (loading) {
-        return (
-            <div className="flex items-center justify-center h-screen bg-background text-primary">
-                <Loader2 className="animate-spin" size={32} />
-            </div>
-        );
+        return <PageLoader />;
     }
 
     return (
@@ -55,16 +59,19 @@ const Layout: React.FC = () => {
 
             {/* Burger Menu */}
             {!isOpen && (
-                <button
+                <Button
                     onClick={() => setIsOpen(true)}
+                    variant="secondary"
                     className={clsx(
-                        "fixed z-[100] h-[46px] w-[46px] bg-surface text-primary border border-white/10 rounded-xl shadow-xl flex items-center justify-center animate-in fade-in slide-in-from-left-2 burger-3d",
+                        "fixed z-[100] h-[46px] w-[46px] p-0 rounded-xl shadow-xl flex items-center justify-center animate-in fade-in slide-in-from-left-2 burger-3d",
                         isFullPage ? "top-[11px] left-4" : "top-[33px] left-6"
                     )}
                     title="Afficher le menu"
+                    aria-label="Ouvrir le menu"
+                    aria-expanded={isOpen}
                 >
                     <Menu size={22} strokeWidth={2.5} />
-                </button>
+                </Button>
             )}
 
             {/* Sidebar */}

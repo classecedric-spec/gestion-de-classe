@@ -1,7 +1,7 @@
 import React from 'react';
 import { Outlet, useLocation, useOutletContext, useNavigate } from 'react-router-dom';
 import { USER_MANAGEMENT_TABS } from '../config/navigation';
-import { SmartTabs } from '../components/ui';
+import { Tabs } from '../core';
 
 const UserManagement: React.FC = () => {
     const navigate = useNavigate();
@@ -15,10 +15,11 @@ const UserManagement: React.FC = () => {
             {/* Tabs Header - Hide if pending validation */}
             {!pendingValidation && (
                 <div className="bg-surface/50 border-b border-white/5 px-6 py-3 flex items-center justify-center sticky top-0 z-40 backdrop-blur-md">
-                    <SmartTabs
+                    <Tabs
                         tabs={tabs.map(t => ({ id: t.path, label: t.label, icon: t.icon }))}
                         activeTab={tabs.find(t => location.pathname.includes(t.path))?.path || tabs[0].path}
                         onChange={(path: string) => navigate(path)}
+                        smart
                     />
                 </div>
             )}

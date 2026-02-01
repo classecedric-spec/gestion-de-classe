@@ -1,7 +1,7 @@
 import React, { ChangeEvent } from 'react';
 import { Search, BookOpen, Plus } from 'lucide-react';
 import { ClassWithAdults } from '../services/classService';
-import { Badge, Button, EmptyState, Avatar, Input, ListItem } from '../../../components/ui';
+import { Badge, Button, EmptyState, Avatar, Input, ListItem } from '../../../core';
 
 export interface ClassListProps {
     classes: ClassWithAdults[];

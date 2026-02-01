@@ -9,7 +9,7 @@ import { DatabaseStatusAlert } from '../components/auth/DatabaseStatusAlert';
 import { AuthHeader } from '../components/auth/AuthHeader';
 import { AuthFooter } from '../components/auth/AuthFooter';
 import { AuthFormFields } from '../components/auth/AuthFormFields';
-import { Button } from '../components/ui';
+import { Button } from '../core';
 
 const Auth: React.FC = () => {
     // Hooks

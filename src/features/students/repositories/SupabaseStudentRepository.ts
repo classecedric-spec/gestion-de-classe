@@ -7,12 +7,12 @@ export class SupabaseStudentRepository implements IStudentRepository {
     async findById(id: string): Promise<Tables<'Eleve'> | null> {
         const { data, error } = await supabase
             .from('Eleve')
-            .select('*')
+            .select('id, nom, prenom, photo_url, sex, date_naissance, niveau_id, classe_id, titulaire_id, importance_suivi, trust_trend, updated_at')
             .eq('id', id)
             .single();
 
         if (error) throw error;
-        return data;
+        return data as Tables<'Eleve'> | null;
     }
 
     async findAll(): Promise<Tables<'Eleve'>[]> {
@@ -109,12 +109,12 @@ export class SupabaseStudentRepository implements IStudentRepository {
     async findByClass(classId: string): Promise<Tables<'Eleve'>[]> {
         const { data, error } = await supabase
             .from('Eleve')
-            .select('*')
+            .select('id, nom, prenom, photo_url, sex, niveau_id, importance_suivi, trust_trend')
             .eq('classe_id', classId)
             .order('nom');
 
         if (error) throw error;
-        return data || [];
+        return data as Tables<'Eleve'>[] || [];
     }
 
     async findByGroup(groupId: string): Promise<any[]> {
@@ -172,7 +172,7 @@ export class SupabaseStudentRepository implements IStudentRepository {
     async updateImportance(id: string, importance: number | null): Promise<void> {
         const { error } = await supabase
             .from('Eleve')
-            .update({ importance_suivi: importance } as any)
+            .update({ importance_suivi: importance })
             .eq('id', id);
 
         if (error) throw error;

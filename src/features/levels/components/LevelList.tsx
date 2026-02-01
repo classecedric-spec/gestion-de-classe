@@ -16,7 +16,7 @@ import {
     verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
 import SortableLevelItem from './SortableLevelItem';
-import { Badge, Button, Avatar, EmptyState } from '../../../components/ui';
+import { Badge, Button, Avatar, EmptyState } from '../../../core';
 
 interface LevelListProps {
     levels: any[];

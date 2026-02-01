@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { useLocation } from 'react-router-dom';
 
-export type Theme = 'light' | 'dark' | 'system' | 'default';
+export type Theme = 'light' | 'dark' | 'system' | 'default' | 'neumo-2' | 'glass';
 
 interface ThemeContextType {
     theme: Theme;

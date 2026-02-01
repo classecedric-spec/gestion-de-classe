@@ -1,8 +1,7 @@
 import React, { useState } from 'react';
 import { Play, Clock } from 'lucide-react';
 import clsx from 'clsx';
-import Modal from './ui/Modal';
-import Button from './ui/Button';
+import { Modal, Button } from '../core';
 
 interface TimerModalProps {
     isOpen: boolean;

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Package, Sparkles, FileText, Info } from 'lucide-react';
 import { TypeMateriel, MaterialActivity } from '../services/materialService';
-import { Badge, Avatar, EmptyState, CardInfo, CardTabs } from '../../../components/ui';
+import { Badge, Avatar, EmptyState, CardInfo, CardTabs } from '../../../core';
 
 interface MaterialDetailsProps {
     selectedMateriel: TypeMateriel | null;

@@ -8,7 +8,7 @@ import { DashboardContextType } from '../DashboardContext';
 import { useGroupUrgentWork, UrgentStudent, UrgentModule, UrgentActivity } from '../../../features/dashboard/hooks/useGroupUrgentWork';
 import { trackingService } from '../../../features/tracking/services/trackingService';
 import { toast } from 'react-hot-toast';
-import { Badge } from '../../../components/ui';
+import { Badge } from '../../../core';
 
 const VisionUrgente: React.FC = () => {
     const { groups, selectedGroup: globalSelectedGroup } = useOutletContext<DashboardContextType>();

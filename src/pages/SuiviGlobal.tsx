@@ -5,7 +5,7 @@ import { ROUTES } from '../routes';
 import SuiviPedagogique from './SuiviPedagogique';
 import AvancementAteliers from './AvancementAteliers';
 import TimerModal from '../components/TimerModal';
-import { SmartTabs, Button } from '../components/ui';
+import { Tabs, Button } from '../core';
 import PageLayout from '../components/layout/PageLayout';
 
 import { supabase } from '../lib/database';
@@ -59,7 +59,7 @@ const SuiviGlobal: React.FC = () => {
     const checkKioskStatus = async () => {
         if (!userId) return;
         try {
-            const { data, error } = await supabase
+            const { data } = await supabase
                 .from('CompteUtilisateur')
                 .select('kiosk_is_open')
                 .eq('id', userId)
@@ -132,7 +132,7 @@ const SuiviGlobal: React.FC = () => {
     );
 
     const centerContent = (
-        <SmartTabs
+        <Tabs
             tabs={[
                 { id: 'suivi', label: 'Encodage', icon: Users },
                 { id: 'avancement', label: 'Suivi des groupes', icon: Table }
@@ -144,6 +144,7 @@ const SuiviGlobal: React.FC = () => {
             }}
             level={1}
             disableCompact={true}
+            smart
         />
     );
 

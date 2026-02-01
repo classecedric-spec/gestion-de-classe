@@ -4,7 +4,7 @@ import { Layers, ChevronRight, CheckCircle2, Star, ShieldCheck, Zap, Sparkles } 
 import Footer from '../components/Footer';
 import PublicHeader from '../components/PublicHeader';
 import { isMobilePhone } from '../lib/helpers';
-import { Badge, Button } from '../components/ui';
+import { Badge, Button } from '../core';
 
 const Landing: React.FC = () => {
     // Redirect mobile phone users to the mobile version

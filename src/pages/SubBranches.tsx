@@ -6,7 +6,7 @@ import SubBranchList from '../features/sub-branches/components/SubBranchList';
 import SubBranchDetails from '../features/sub-branches/components/SubBranchDetails';
 import AddSubBranchModal from '../features/branches/components/AddSubBranchModal';
 import { useInAppMigration } from '../hooks/useInAppMigration';
-import { ConfirmModal, CardInfo, Badge, SearchBar } from '../components/ui';
+import { ConfirmModal, CardInfo, Badge, SearchBar } from '../core';
 
 const SubBranches: React.FC = () => {
     const {
