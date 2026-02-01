@@ -60,11 +60,10 @@ const Landing: React.FC = () => {
                     </div>
 
                     <div className="mt-24 relative max-w-5xl mx-auto perspective-1000 animate-in fade-in slide-in-from-bottom-16 duration-1000 delay-300">
-                        <div className="relative rounded-[2rem] overflow-hidden border border-white/10 shadow-2xl shadow-primary/20 bg-surface">
+                        <div className="relative rounded-[2rem] overflow-hidden shadow-2xl bg-surface">
                             <img src="/assets/documentation/dashboard.png" alt="Dashboard" className="w-full h-auto opacity-90 hover:opacity-100 transition-opacity duration-700" />
                             <div className="absolute inset-0 bg-gradient-to-tr from-white/10 to-transparent pointer-events-none"></div>
                         </div>
-                        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[120%] h-[120%] bg-primary/10 rounded-full blur-[100px] -z-10"></div>
                     </div>
                 </section>
 
@@ -118,8 +117,7 @@ const Landing: React.FC = () => {
                         </ul>
                     </div>
                     <div className="flex-1 relative group">
-                        <div className="absolute inset-0 bg-primary/20 rounded-[2rem] blur-[60px] opacity-0 group-hover:opacity-100 transition-opacity duration-700"></div>
-                        <div className="relative rounded-[2rem] overflow-hidden border border-white/10 shadow-2xl bg-surface transform group-hover:scale-[1.02] transition-transform duration-500">
+                        <div className="relative rounded-[2rem] overflow-hidden shadow-2xl bg-surface transform group-hover:scale-[1.02] transition-transform duration-500">
                             <img src="/assets/documentation/eleves.png" alt="Gestion Élèves" className="w-full h-auto" />
                         </div>
                     </div>
@@ -142,8 +140,7 @@ const Landing: React.FC = () => {
                         </Link>
                     </div>
                     <div className="flex-1 relative group">
-                        <div className="absolute inset-0 bg-blue-500/20 rounded-[2rem] blur-[60px] opacity-0 group-hover:opacity-100 transition-opacity duration-700"></div>
-                        <div className="relative rounded-[2rem] overflow-hidden border border-white/10 shadow-2xl bg-surface transform group-hover:scale-[1.02] transition-transform duration-500">
+                        <div className="relative rounded-[2rem] overflow-hidden shadow-2xl bg-surface transform group-hover:scale-[1.02] transition-transform duration-500">
                             <img src="/assets/documentation/suivi.png" alt="Suivi Global" className="w-full h-auto" />
                         </div>
                     </div>
@@ -159,8 +156,7 @@ const Landing: React.FC = () => {
                         </p>
                     </div>
                     <div className="relative group max-w-4xl mx-auto">
-                        <div className="absolute -inset-1 bg-gradient-to-r from-primary via-white/20 to-primary rounded-[2.5rem] blur opacity-20 group-hover:opacity-40 transition-opacity duration-700"></div>
-                        <div className="relative rounded-[2rem] overflow-hidden border border-white/10 shadow-2xl bg-surface">
+                        <div className="relative rounded-[2rem] overflow-hidden shadow-2xl bg-surface">
                             <img src="/assets/documentation/activites.png" alt="Activités" className="w-full h-auto" />
                         </div>
                     </div>
