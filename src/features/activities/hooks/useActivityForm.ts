@@ -182,6 +182,11 @@ export const useActivityForm = ({
     const submitForm = async () => {
         if (!title.trim() || !moduleId) return false;
 
+        if (activityLevels.length === 0) {
+            setError("Veuillez lier au moins un niveau à cette activité.");
+            return false;
+        }
+
         setLoading(true);
         setError(null);
 

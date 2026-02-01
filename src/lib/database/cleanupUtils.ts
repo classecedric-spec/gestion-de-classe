@@ -14,23 +14,35 @@ export const cleanupOrphanProgressions = async (): Promise<void> => {
     try {
         // 1. Fetch all needed data
         // Parallel fetch for speed
-        const [progResponse, studentResponse, actLevelResponse] = await Promise.all([
+        const [progResponse, studentResponse, actResponse, moduleResponse, actLevelResponse] = await Promise.all([
             supabase.from('Progression').select('id, eleve_id, activite_id'),
             supabase.from('Eleve').select('id, niveau_id'),
+            supabase.from('Activite').select('id, module_id'),
+            supabase.from('Module').select('id'),
             supabase.from('ActiviteNiveau').select('activite_id, niveau_id')
         ]);
 
         if (progResponse.error) throw progResponse.error;
         if (studentResponse.error) throw studentResponse.error;
+        if (actResponse.error) throw actResponse.error;
+        if (moduleResponse.error) throw moduleResponse.error;
         if (actLevelResponse.error) throw actLevelResponse.error;
 
         const progressions = progResponse.data || [];
         const students = studentResponse.data || [];
+        const activities = actResponse.data || [];
+        const modules = moduleResponse.data || [];
         const activityLevels = actLevelResponse.data || [];
 
         // 2. Build Lookup Maps
-        const studentLevelMap = new Map<string, string | null>(); // studentId -> niveauId
-        students.forEach(s => studentLevelMap.set(s.id, s.niveau_id));
+        const studentMap = new Map<string, string | null>(); // studentId -> niveauId
+        students.forEach(s => studentMap.set(s.id, s.niveau_id));
+
+        const activityMap = new Map<string, string | null>(); // activityId -> module_id
+        activities.forEach(a => activityMap.set(a.id, a.module_id));
+
+        const moduleSet = new Set<string>(); // moduleId
+        modules.forEach(m => moduleSet.add(m.id));
 
         const activityAllowedLevelsMap = new Map<string, Set<string>>(); // activityId -> Set<niveauId>
         activityLevels.forEach(al => {
@@ -42,19 +54,47 @@ export const cleanupOrphanProgressions = async (): Promise<void> => {
             }
         });
 
-        // 3. Identify Orphans
+        // 3. Identify Orphans to Delete
         const idsToDelete: string[] = [];
 
         for (const prog of progressions) {
-            const studentLevel = studentLevelMap.get(prog.eleve_id);
+            // Retrieve related data
+            const studentExists = studentMap.has(prog.eleve_id);
+            const studentLevel = studentMap.get(prog.eleve_id);
+
+            const activityExists = activityMap.has(prog.activite_id);
+            const activityModuleId = activityMap.get(prog.activite_id);
+
             const allowedLevels = activityAllowedLevelsMap.get(prog.activite_id);
 
-            // Case 1: Student has no level or we don't know it
+            // --- Integrity Checks (Referential Integrity) ---
+
+            // 1. Check if Student exists
+            if (!studentExists) {
+                idsToDelete.push(prog.id);
+                continue;
+            }
+
+            // 2. Check if Activity exists
+            if (!activityExists) {
+                idsToDelete.push(prog.id);
+                continue;
+            }
+
+            // 3. Check if Module exists (if linked)
+            if (activityModuleId && !moduleSet.has(activityModuleId)) {
+                idsToDelete.push(prog.id);
+                continue;
+            }
+
+            // --- Logic Checks (Business Rules) ---
+
+            // Case 1: Student has no level assigned (valid case, keep data)
             if (!studentLevel) {
                 continue;
             }
 
-            // Case 2: Activity has NO allowed levels defined (means open to all OR strict hidden)
+            // Case 2: Activity has NO allowed levels defined (Open to all)
             if (!allowedLevels || allowedLevels.size === 0) {
                 continue;
             }
@@ -74,8 +114,11 @@ export const cleanupOrphanProgressions = async (): Promise<void> => {
             if (error) throw error;
 
             // Optional: Notify user if significant cleanup happened
-            if (idsToDelete.length > 5) {
-                toast.info(`Nettoyage: ${idsToDelete.length} suivis obsolètes supprimés.`);
+            if (idsToDelete.length > 0) {
+                console.log(`Nettoyage: ${idsToDelete.length} suivis obsolètes ou orphelins supprimés.`);
+                if (idsToDelete.length > 5) {
+                    toast.info(`Nettoyage: ${idsToDelete.length} suivis obsolètes supprimés.`);
+                }
             }
         }
     } catch (error) {

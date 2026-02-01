@@ -41,6 +41,9 @@ const Modules: React.FC = () => {
     const [isAddActivityModalOpen, setIsAddActivityModalOpen] = useState<boolean>(false);
     const [isCreateSeriesModalOpen, setIsCreateSeriesModalOpen] = useState<boolean>(false);
 
+    // Deletion States
+    const [activityToDelete, setActivityToDelete] = useState<any | null>(null);
+
     // Activity Management
     const activityHook = useActivityManagement(
         moduleHook.states.selectedModule,
@@ -354,6 +357,7 @@ const Modules: React.FC = () => {
                                     activities={activityHook.states.moduleActivities}
                                     onDragEnd={activityHook.actions.handleDragEnd}
                                     onEditActivity={handleEditActivity}
+                                    onDelete={setActivityToDelete}
                                 />
                             ) : detailTab === 'groups' ? (
                                 <GroupsTab
@@ -399,7 +403,7 @@ const Modules: React.FC = () => {
                 onAdded={handleActivityAdded}
                 activityToEdit={activityHook.states.activityToEdit as any}
                 defaultModuleId={moduleHook.states.selectedModule?.id || ''}
-                defaultModuleName={moduleHook.states.selectedModule?.titre || ''}
+                defaultModuleName={moduleHook.states.selectedModule?.nom || ''}
                 nextOrder={activityHook.states.moduleActivities?.length > 0
                     ? Math.max(...activityHook.states.moduleActivities.map((a: any) => a.ordre || 0)) + 1
                     : 0}
@@ -450,6 +454,22 @@ const Modules: React.FC = () => {
                 onConfirm={moduleHook.actions.handleDelete}
                 title="Supprimer le module ?"
                 message={`Êtes-vous sûr de vouloir supprimer le module "${moduleHook.states.moduleToDelete?.nom}" ? Cette action est irréversible.`}
+                confirmText="Supprimer"
+                variant="danger"
+            />
+
+            {/* Delete Activity Confirmation Modal */}
+            <ConfirmModal
+                isOpen={!!activityToDelete}
+                onClose={() => setActivityToDelete(null)}
+                onConfirm={async () => {
+                    if (activityToDelete) {
+                        await activityHook.actions.deleteActivity(activityToDelete.id);
+                        setActivityToDelete(null);
+                    }
+                }}
+                title="Supprimer l'activité ?"
+                message={`Êtes-vous sûr de vouloir supprimer l'activité "${activityToDelete?.titre}" ? Cette action est irréversible.`}
                 confirmText="Supprimer"
                 variant="danger"
             />

@@ -139,6 +139,28 @@ export class SupabaseActivityRepository implements IActivityRepository {
     }
 
     async deleteActivity(id: string): Promise<void> {
+        // 1. Delete Progressions
+        const { error: errorProg } = await supabase
+            .from('Progression')
+            .delete()
+            .eq('activite_id', id);
+        if (errorProg) throw errorProg;
+
+        // 2. Delete Activity Levels (ActiviteNiveau)
+        const { error: errorLevels } = await supabase
+            .from('ActiviteNiveau')
+            .delete()
+            .eq('activite_id', id);
+        if (errorLevels) throw errorLevels;
+
+        // 3. Delete Activity Materials (ActiviteMateriel)
+        const { error: errorMat } = await supabase
+            .from('ActiviteMateriel')
+            .delete()
+            .eq('activite_id', id);
+        if (errorMat) throw errorMat;
+
+        // 4. Finally Delete the Activity
         const { error } = await supabase
             .from('Activite')
             .delete()

@@ -1,5 +1,5 @@
 import React from 'react';
-import { GripVertical } from 'lucide-react';
+import { GripVertical, X } from 'lucide-react';
 import { DndContext, closestCenter, PointerSensor, KeyboardSensor, useSensor, useSensors, DragEndEvent } from '@dnd-kit/core';
 import { SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
@@ -13,9 +13,10 @@ type Activity = Tables<'Activite'> & { ActiviteNiveau?: any[] };
 interface SortableItemProps {
     activity: Activity;
     onEdit: (activity: Activity) => void;
+    onDelete?: (activity: Activity) => void;
 }
 
-const SortableActivityItem: React.FC<SortableItemProps> = ({ activity, onEdit }) => {
+const SortableActivityItem: React.FC<SortableItemProps> = ({ activity, onEdit, onDelete }) => {
     const {
         attributes,
         listeners,
@@ -38,7 +39,7 @@ const SortableActivityItem: React.FC<SortableItemProps> = ({ activity, onEdit })
             style={style}
             onClick={() => onEdit(activity)}
             className={clsx(
-                "flex items-center gap-3 p-2 bg-surface/40 hover:bg-surface/60 transition-colors rounded-lg border border-white/5 group cursor-pointer",
+                "flex items-center gap-3 p-2 bg-surface/40 hover:bg-surface/60 transition-colors rounded-lg border border-white/5 group cursor-pointer pr-14 relative",
                 isDragging && "opacity-50 border-primary dashed"
             )}
         >
@@ -69,6 +70,20 @@ const SortableActivityItem: React.FC<SortableItemProps> = ({ activity, onEdit })
                 </div>
                 {activity.description && <p className="text-grey-medium text-sm truncate select-none">{activity.description}</p>}
             </div>
+
+            {/* Delete Button - Positioned absolutely to ensure it's clickable and doesn't interfere with layout */}
+            {onDelete && (
+                <button
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        onDelete(activity);
+                    }}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 p-2 hover:bg-danger/10 text-grey-medium hover:text-danger rounded-lg transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100 focus:outline-none"
+                    title="Supprimer l'activité"
+                >
+                    <X size={18} />
+                </button>
+            )}
         </div>
     );
 };
@@ -81,9 +96,10 @@ interface ActivitiesTabProps {
     activities: Activity[];
     onDragEnd: (event: DragEndEvent) => void;
     onEditActivity: (activity: Activity) => void;
+    onDelete?: (activity: Activity) => void;
 }
 
-const ActivitiesTab: React.FC<ActivitiesTabProps> = ({ activities, onDragEnd, onEditActivity }) => {
+const ActivitiesTab: React.FC<ActivitiesTabProps> = ({ activities, onDragEnd, onEditActivity, onDelete }) => {
     const sensors = useSensors(
         useSensor(PointerSensor, {
             activationConstraint: {
@@ -119,6 +135,7 @@ const ActivitiesTab: React.FC<ActivitiesTabProps> = ({ activities, onDragEnd, on
                             key={activity.id}
                             activity={activity}
                             onEdit={onEditActivity}
+                            onDelete={onDelete}
                         />
                     ))}
                 </SortableContext>

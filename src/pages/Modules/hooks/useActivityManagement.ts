@@ -23,6 +23,7 @@ interface ActivityManagementReturn {
         setModuleActivities: Dispatch<SetStateAction<Activite[]>>;
         setStats: Dispatch<SetStateAction<Record<string, ActivityStats>>>;
         handleDragEnd: (event: any) => Promise<void>;
+        deleteActivity: (id: string) => Promise<void>;
     };
 }
 
@@ -121,6 +122,29 @@ export function useActivityManagement(
         await updateActivitiesOrder(updates);
     };
 
+    // Delete activity
+    const deleteActivity = async (id: string) => {
+        try {
+            await activityService.deleteActivity(id);
+
+            // Update local state
+            setModuleActivities(prev => prev.filter(a => a.id !== id));
+
+            // Update global state
+            if (selectedModule) {
+                const updatedActivities = moduleActivities.filter(a => a.id !== id);
+                const updatedModule = { ...selectedModule, Activite: updatedActivities };
+                setSelectedModule(updatedModule);
+                setModules(prev => prev.map(m => m.id === selectedModule.id ? updatedModule : m));
+            }
+
+            toast.success("Activité supprimée avec succès");
+        } catch (error) {
+            console.error('Error deleting activity:', error);
+            toast.error("Erreur lors de la suppression de l'activité");
+        }
+    };
+
     // Update activities order in database
     const updateActivitiesOrder = async (updates: any[]) => {
         try {
@@ -141,7 +165,8 @@ export function useActivityManagement(
             setActivityToEdit,
             setModuleActivities,
             setStats,
-            handleDragEnd
+            handleDragEnd,
+            deleteActivity
         }
     };
 }
