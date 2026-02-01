@@ -29,6 +29,7 @@ const PublicHeader: React.FC<PublicHeaderProps> = ({ solidBackground = false }) 
     const navLinks = [
         { label: 'Accueil', to: '/' },
         { label: 'Fonctionnalités', to: '/features' },
+        { label: 'Mode d\'emploi', to: '/mode-d-emploi' },
         { label: 'Fonctionnement', to: '/fonctionnement' },
         { label: 'Confidentialité', to: '/privacy' },
     ];

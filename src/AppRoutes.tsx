@@ -36,6 +36,7 @@ const MobileEncodage = lazy(() => import('./pages/MobileEncodage'));
 const MobilePresence = lazy(() => import('./pages/MobilePresence'));
 const StudentKiosk = lazy(() => import('./pages/StudentKiosk'));
 const MobileVisionUrgente = lazy(() => import('./pages/MobileVisionUrgente'));
+const UserGuide = lazy(() => import('./pages/UserGuide'));
 
 // New Dashboard Tabs
 const DashboardOverview = lazy(() => import('./pages/Home/tabs/DashboardOverview'));
@@ -152,6 +153,12 @@ const AppRoutes = () => {
             <Route path="/kiosk/*" element={
                 <Suspense fallback={<PageLoader />}>
                     <StudentKiosk />
+                </Suspense>
+            } />
+
+            <Route path="/mode-d-emploi" element={
+                <Suspense fallback={<PageLoader />}>
+                    <UserGuide />
                 </Suspense>
             } />
 
