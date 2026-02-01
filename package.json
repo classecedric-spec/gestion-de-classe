@@ -10,7 +10,8 @@
     "preview": "vite preview",
     "test": "vitest",
     "test:ui": "vitest --ui",
-    "test:coverage": "vitest --coverage"
+    "test:coverage": "vitest --coverage",
+    "sync": "git add -A && git commit -m \"chore: auto-sync $(date)\" && git push"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
