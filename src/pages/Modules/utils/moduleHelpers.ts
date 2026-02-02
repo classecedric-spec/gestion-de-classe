@@ -75,7 +75,8 @@ export const filterModules = (
     subBranchFilter: string
 ): ModuleWithRelations[] => {
     return modules.filter(m => {
-        const matchesSearch = (m.titre || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+        const matchesSearch = (m.nom || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+            (m.titre || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
             (m.SousBranche?.nom && m.SousBranche.nom.toLowerCase().includes(searchTerm.toLowerCase()));
 
         const matchesStatus = statusFilter === 'all' ||

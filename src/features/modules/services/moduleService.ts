@@ -51,7 +51,7 @@ export class ModuleService {
         return await this.repository.getBranches();
     }
 
-    async getModuleDetails(moduleId: string): Promise<any> {
+    async getModuleDetails(moduleId: string): Promise<ModuleWithRelations> {
         return await this.repository.getModuleWithDetails(moduleId);
     }
 

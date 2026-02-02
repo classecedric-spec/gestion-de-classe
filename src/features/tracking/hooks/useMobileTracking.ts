@@ -38,6 +38,15 @@ export function useMobileTracking() {
     const [manualIndices, setManualIndices] = useState<Record<string, Record<string, number>>>({});
     const [isIndicesLoaded, setIsIndicesLoaded] = useState<boolean>(false);
 
+    // Validation Debug Logic
+    const [pendingValidation, setPendingValidation] = useState<{
+        req: ProgressionWithDetails;
+        action: 'non_valide' | 'status_quo' | 'valide';
+        initialScore: number;
+        adjustment: number;
+        finalScore: number;
+    } | null>(null);
+
     // --- Initialization ---
 
     useEffect(() => {
@@ -234,6 +243,48 @@ export function useMobileTracking() {
         }
     };
 
+    // Calculate pending changes and open modal
+    const initiateStatusUpdate = (req: ProgressionWithDetails, action: 'non_valide' | 'status_quo' | 'valide') => {
+        let indexAdjustment = 0;
+        let currentVal = 50;
+
+        // Try getting current probability
+        if (req.activite?.Module?.SousBranche?.branche_id && req.eleve_id) {
+            const branchId = req.activite.Module.SousBranche.branche_id;
+            const eleveId = req.eleve_id;
+            const studentData = manualIndices[eleveId] || {};
+            currentVal = Number(studentData[branchId] ?? 50);
+        }
+
+        if (action === 'non_valide') {
+            indexAdjustment = 5;
+        } else if (action === 'valide') {
+            indexAdjustment = -2;
+        }
+
+        const newVal = Math.max(0, Math.min(100, currentVal + indexAdjustment));
+
+        setPendingValidation({
+            req,
+            action,
+            initialScore: currentVal,
+            adjustment: indexAdjustment,
+            finalScore: newVal
+        });
+    };
+
+    const confirmStatusUpdate = async () => {
+        if (!pendingValidation) return;
+        const { req, action } = pendingValidation;
+
+        setPendingValidation(null); // Close Modal immediately
+        await handleStatusUpdate(req, action);
+    };
+
+    const cancelStatusUpdate = () => {
+        setPendingValidation(null);
+    };
+
     const handleStatusUpdate = async (req: ProgressionWithDetails, action: 'non_valide' | 'status_quo' | 'valide') => {
         try {
             let newStatus = '';
@@ -264,6 +315,10 @@ export function useMobileTracking() {
                 });
             }
 
+            // Optimistic Update: Remove immediately from UI
+            setHelpRequests(prev => prev.filter(r => r.id !== req.id));
+            setExpandedRequestId(null);
+
             // Offline or Online update
             if (!isOnline) {
                 let payload: any = { etat: newStatus, updated_at: new Date().toISOString() };
@@ -274,18 +329,16 @@ export function useMobileTracking() {
                     payload, match: { id: req.id },
                     contextDescription: `Maj statut ${req.eleve?.prenom}`
                 });
-                // Optimistic
-                setHelpRequests(prev => prev.filter(r => r.id !== req.id));
                 toast.success("Action sauvegardée (Hors ligne)");
             } else {
                 await trackingService.updateProgressionStatus(req.id, newStatus, req.is_suivi || false);
                 toast.success("Mis à jour");
-                setExpandedRequestId(null);
-                fetchRequests();
+                fetchRequests(); // Sync with server consistency
             }
 
         } catch (err) {
             toast.error("Erreur de mise à jour");
+            fetchRequests(); // Restore state/Consistency on error
         }
     };
 
@@ -372,12 +425,15 @@ export function useMobileTracking() {
             expandedRequestId,
             helpersCache,
             isAutoGenerating,
-            isOnline
+            isOnline,
+            pendingValidation
         },
         actions: {
             handleGroupChange,
             handleExpandHelp,
-            handleStatusUpdate,
+            handleStatusUpdate: initiateStatusUpdate, // Override with initiate
+            confirmStatusUpdate,
+            cancelStatusUpdate,
             handleClear,
             handleAutoSuivi,
             setSelectedStudentFilter: (id: string | null) => {

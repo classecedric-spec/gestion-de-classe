@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/database';
-import { Sparkles, Check, Plus, Trash2 } from 'lucide-react';
+import { Sparkles, Check, Trash2 } from 'lucide-react';
 import { Modal, Button } from '../core';
 import { Tables } from '../types/supabase';
 import { SupabaseActivityRepository } from '../features/activities/repositories/SupabaseActivityRepository';
@@ -271,22 +271,21 @@ const CreateActivitySeriesModal: React.FC<CreateActivitySeriesModalProps> = ({ i
                     </div>
 
                     <div className="space-y-4 pt-2">
-                        <div className="flex items-center justify-between border-b border-white/5 pb-2">
-                            <h4 className="text-sm font-bold text-text-main flex items-center gap-2">
-                                <Plus size={16} className="text-primary" />
-                                Niveaux & Paramètres
-                            </h4>
-                            <select
-                                onChange={(e) => { handleAddLevel(e.target.value); e.target.value = ''; }}
-                                className="bg-surface/50 border border-border/10 rounded-lg text-xs py-1 px-2 focus:outline-none focus:ring-1 focus:ring-primary transition-all cursor-pointer"
-                                value=""
-                                aria-label="Ajouter un niveau"
-                            >
-                                <option value="" disabled>Ajouter un niveau...</option>
-                                {levels.filter(l => !selectedLevels.some(sl => sl.id === l.id)).map(lv => (
-                                    <option key={lv.id} value={lv.id}>{lv.nom}</option>
-                                ))}
-                            </select>
+                        <div className="flex items-center justify-between border-b border-white/10 pb-2 mb-4">
+                            <h4 className="text-sm font-bold text-white uppercase tracking-wider">Objectifs par Niveau</h4>
+                            <div className="relative">
+                                <select
+                                    onChange={(e) => { handleAddLevel(e.target.value); e.target.value = ''; }}
+                                    className="bg-white/5 text-[10px] font-black uppercase tracking-wider text-primary border border-primary/20 rounded-lg py-1.5 px-3 outline-none focus:ring-1 focus:ring-primary/50 cursor-pointer hover:bg-white/10 transition-colors"
+                                    value=""
+                                    aria-label="Ajouter une activité"
+                                >
+                                    <option value="" disabled>+ Ajouter une activité</option>
+                                    {levels.filter(l => !selectedLevels.some(sl => sl.id === l.id)).map(lv => (
+                                        <option key={lv.id} value={lv.id}>{lv.nom}</option>
+                                    ))}
+                                </select>
+                            </div>
                         </div>
 
                         {selectedLevels.length === 0 ? (

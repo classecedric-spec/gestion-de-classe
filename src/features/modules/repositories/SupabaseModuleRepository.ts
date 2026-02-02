@@ -53,10 +53,16 @@ export class SupabaseModuleRepository implements IModuleRepository {
             .from('Module')
             .select(this.selectQuery)
             .eq('id', moduleId)
+            .order('ordre', { foreignTable: 'Activite', ascending: true }) // Ensure activities are returned
             .single();
 
         if (error) throw error;
-        return data;
+
+        // Ensure we return the same shape as getAllModulesWithDetails
+        return {
+            ...data,
+            ...calculateModuleProgress(data)
+        };
     }
 
     async deleteModule(moduleId: string): Promise<void> {

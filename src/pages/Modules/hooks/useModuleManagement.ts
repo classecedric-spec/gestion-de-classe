@@ -190,7 +190,17 @@ export function useModuleManagement() {
             fetchModules,
             handleDelete,
             toggleStatus,
-            handleCreated
+            handleCreated,
+            refreshCurrentModule: async () => {
+                if (selectedModuleId) {
+                    try {
+                        const updated = await moduleService.getModuleDetails(selectedModuleId);
+                        setModules(prev => prev.map(m => m.id === selectedModuleId ? updated : m));
+                    } catch (err) {
+                        console.error("Error refreshing module", err);
+                    }
+                }
+            }
         }
     };
 }

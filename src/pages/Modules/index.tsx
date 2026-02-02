@@ -115,11 +115,7 @@ const Modules: React.FC = () => {
     };
 
     const handleActivityAdded = async () => {
-        await moduleHook.actions.fetchModules();
-        if (moduleHook.states.selectedModule) {
-            const updated = moduleHook.states.modules.find(m => m.id === moduleHook.states.selectedModule?.id);
-            if (updated) moduleHook.actions.setSelectedModule(updated as any);
-        }
+        await moduleHook.actions.refreshCurrentModule();
     };
 
     return (
@@ -176,7 +172,7 @@ const Modules: React.FC = () => {
             <CreateActivitySeriesModal
                 isOpen={isCreateSeriesModalOpen}
                 onClose={() => setIsCreateSeriesModalOpen(false)}
-                onAdded={moduleHook.actions.fetchModules}
+                onAdded={moduleHook.actions.refreshCurrentModule}
                 moduleId={moduleHook.states.selectedModule?.id || ''}
             />
 

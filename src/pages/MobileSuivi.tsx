@@ -5,6 +5,7 @@ import MobileHeader from '../features/tracking/components/mobile/MobileHeader';
 import MobileRequestCard from '../features/tracking/components/mobile/MobileRequestCard';
 import MobileFilterBar from '../features/tracking/components/mobile/MobileFilterBar';
 import MobileModuleGroup from '../features/tracking/components/mobile/MobileModuleGroup';
+import ValidationDebugModal from '../features/tracking/components/mobile/ValidationDebugModal';
 
 const MobileSuivi: React.FC = () => {
     const { states, actions } = useMobileTracking();
@@ -179,6 +180,18 @@ const MobileSuivi: React.FC = () => {
                 selectedModuleFilter={states.selectedModuleFilter}
                 onFilterChange={actions.setSelectedStudentFilter}
                 onModuleFilterChange={actions.setSelectedModuleFilter}
+            />
+
+            {/* Debug Modal */}
+            <ValidationDebugModal
+                isOpen={!!states.pendingValidation}
+                onClose={actions.cancelStatusUpdate}
+                onConfirm={actions.confirmStatusUpdate}
+                studentName={states.pendingValidation?.req.eleve?.prenom || 'Élève'}
+                action={states.pendingValidation?.action || ''}
+                initialScore={states.pendingValidation?.initialScore || 0}
+                adjustment={states.pendingValidation?.adjustment || 0}
+                finalScore={states.pendingValidation?.finalScore || 0}
             />
         </div>
     );
