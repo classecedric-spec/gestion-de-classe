@@ -98,7 +98,7 @@ const SuiviGlobal: React.FC = () => {
 
     // --- Header Content Components ---
     const leftContent = (
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 pl-20">
             <Button
                 variant="ghost"
                 onClick={() => window.open('/suivi-tbi', '_blank')}

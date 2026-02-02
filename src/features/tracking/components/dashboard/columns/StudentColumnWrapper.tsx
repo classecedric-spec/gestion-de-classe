@@ -26,7 +26,7 @@ interface StudentColumnWrapperProps {
     progressions: any;
     // Actions
     onStudentSelect: (student: any) => void;
-    onStatusClick: (activityId: string, currentStatus: string) => void;
+    onStatusClick: (activityId: string, status: string, currentStatus?: string) => void;
     onSelectModule: (module: any) => void;
 }
 

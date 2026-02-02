@@ -132,8 +132,16 @@ const Presence: React.FC = () => {
 
     return (
         <PageLayout
-            title="Présence"
-            subtitle="Gérez les présences et l'organisation de la classe"
+            leftContent={
+                <div className="z-10 truncate pr-4 pl-20">
+                    <h1 className="text-2xl md:text-3xl font-black text-white uppercase tracking-wider mb-0.5 truncate drop-shadow-sm">
+                        Présence
+                    </h1>
+                    <p className="text-sm font-medium text-grey-medium truncate opacity-80 uppercase tracking-widest">
+                        Gérez les présences et l'organisation de la classe
+                    </p>
+                </div>
+            }
             centerContent={centerContent}
             rightContent={rightContent}
             containerClassName="p-6"

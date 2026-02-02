@@ -112,9 +112,15 @@ export const TrackingDashboard: React.FC<TrackingDashboardProps> = ({
                             loadingActivities={branchesHook.states.loadingActivities}
                             progressions={progressionsHook.states.progressions}
                             onStudentSelect={groupsHook.actions.setSelectedStudent}
-                            onStatusClick={(activityId: string, currentStatus: string) => {
-                                const newStatus = getNextStatus(currentStatus);
-                                progressionsHook.actions.handleStatusClick(activityId, newStatus, currentStatus);
+                            onStatusClick={(activityId: string, statusOrCurrent: string, previousStatus?: string) => {
+                                if (previousStatus) {
+                                    // Explicit update from ProgressionCell (id, newStatus, currentStatus)
+                                    progressionsHook.actions.handleStatusClick(activityId, statusOrCurrent, previousStatus);
+                                } else {
+                                    // Toggle/Cycle update (id, currentStatus)
+                                    const newStatus = getNextStatus(statusOrCurrent);
+                                    progressionsHook.actions.handleStatusClick(activityId, newStatus, statusOrCurrent);
+                                }
                             }}
                             onSelectModule={(module: any) => { // Wrapper logic for toggle
                                 if (!module) { // Collapsed
@@ -166,9 +172,15 @@ export const TrackingDashboard: React.FC<TrackingDashboardProps> = ({
                                 const req = helpHook.states.helpRequests.find(r => r.id === requestId);
                                 if (req?.activite?.id) helpHook.actions.handleExpandHelp(requestId, req.activite.id);
                             }}
-                            onStatusClick={(activityId: string, currentStatus: string) => {
-                                const newStatus = getNextStatus(currentStatus);
-                                progressionsHook.actions.handleStatusClick(activityId, newStatus, currentStatus);
+                            onStatusClick={(activityId: string, statusOrCurrent: string, previousStatus?: string, studentId?: string) => {
+                                if (previousStatus) {
+                                    // Explicit update (id, newStatus, currentStatus, studentId)
+                                    progressionsHook.actions.handleStatusClick(activityId, statusOrCurrent, previousStatus, studentId || null);
+                                } else {
+                                    // Cycle update
+                                    const newStatus = getNextStatus(statusOrCurrent);
+                                    progressionsHook.actions.handleStatusClick(activityId, newStatus, statusOrCurrent, studentId || null);
+                                }
                             }}
                             onSetItemToDelete={progressionsHook.actions.setItemToDelete}
                             onGenerateAutoSuivi={() => progressionsHook.actions.handleAddStudentsForSuivi()}

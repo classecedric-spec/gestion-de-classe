@@ -34,7 +34,7 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({
         <header className="relative flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div className="flex-1 flex items-center">
                 {!isSidebarOpen && (
-                    <h1 className="text-2xl font-black text-text-main uppercase tracking-tight leading-none animate-in fade-in">
+                    <h1 className="text-2xl font-black text-text-main uppercase tracking-tight leading-none animate-in fade-in pl-16">
                         {userName ? `Bonjour ${userName}` : (userEmail ? `Bonjour ${userEmail.split('@')[0]}` : 'Bienvenue')}
                     </h1>
                 )}

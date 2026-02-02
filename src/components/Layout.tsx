@@ -1,7 +1,7 @@
 import React, { useEffect } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
 import { Menu } from 'lucide-react';
-import { Button, PageLoader } from '../core';
+import { PageLoader } from '../core';
 import clsx from 'clsx';
 import { MAIN_NAV_ITEMS } from '../config/navigation';
 import { useAuth } from '../hooks/useAuth';
@@ -59,19 +59,18 @@ const Layout: React.FC = () => {
 
             {/* Burger Menu */}
             {!isOpen && (
-                <Button
+                <button
                     onClick={() => setIsOpen(true)}
-                    variant="secondary"
                     className={clsx(
-                        "fixed z-[100] h-[46px] w-[46px] p-0 rounded-xl shadow-xl flex items-center justify-center animate-in fade-in slide-in-from-left-2 burger-3d",
+                        "fixed z-[100] h-[46px] w-[46px] rounded-xl shadow-xl flex items-center justify-center transition-all active:scale-95 bg-[#D9B981] text-black hover:bg-[#cdaf76]",
                         isFullPage ? "top-[11px] left-4" : "top-[33px] left-6"
                     )}
                     title="Afficher le menu"
                     aria-label="Ouvrir le menu"
                     aria-expanded={isOpen}
                 >
-                    <Menu size={22} strokeWidth={2.5} />
-                </Button>
+                    <Menu size={24} strokeWidth={2.5} />
+                </button>
             )}
 
             {/* Sidebar */}

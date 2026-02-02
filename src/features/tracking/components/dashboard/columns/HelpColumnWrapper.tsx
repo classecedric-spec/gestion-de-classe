@@ -8,7 +8,7 @@ interface HelpColumnWrapperProps {
     helpersCache: any;
     itemToDelete: any;
     onExpand: (id: string | null) => void;
-    onStatusClick: (activityId: string, status: any) => void;
+    onStatusClick: (activityId: string, status: string, currentStatus?: string, studentId?: string) => void;
     onSetItemToDelete: (item: any) => void;
     onGenerateAutoSuivi: () => void;
 }
