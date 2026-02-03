@@ -44,13 +44,14 @@ export interface UrgentStudent {
     totalOverdue: number;
 }
 
-export const useGroupUrgentWork = (groupId: string | null) => {
+export const useGroupUrgentWork = (groupId: string | null, teacherId?: string) => {
     const [data, setData] = useState<UrgentStudent[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<Error | null>(null);
 
     const fetchUrgentWork = async () => {
-        if (!groupId) {
+        // If neither group nor teacher, we can't fetch meaningful data
+        if (!groupId && !teacherId) {
             setData([]);
             setLoading(false);
             return;
@@ -58,13 +59,10 @@ export const useGroupUrgentWork = (groupId: string | null) => {
 
         setLoading(true);
         try {
-            // 1. Fetch overdue progressions for the group
+            // 1. Fetch overdue progressions
             // Rules: etat != 'termine' AND module.date_fin < now AND module.statut == 'en_cours'
-            const now = new Date().toISOString();
 
-            // We fetch all progressions for students in the group, we'll filter levels in JS if needed
-            // but the query will focus on overdue status.
-            const { data: progressions, error: progError } = await supabase
+            let query = supabase
                 .from('Progression')
                 .select(`
                     id,
@@ -73,7 +71,8 @@ export const useGroupUrgentWork = (groupId: string | null) => {
                     eleve_id,
                     Eleve (
                         id, prenom, nom, photo_url,
-                        EleveGroupe!inner(groupe_id)
+                        titulaire_id,
+                        EleveGroupe (groupe_id)
                     ),
                     Activite (
                         id, titre, ordre,
@@ -86,9 +85,19 @@ export const useGroupUrgentWork = (groupId: string | null) => {
                         )
                     )
                 `)
-                .eq('Eleve.EleveGroupe.groupe_id', groupId)
                 .neq('etat', 'termine')
-                .neq('etat', 'valide'); // Assuming 'valide' is also a terminal state
+                .neq('etat', 'valide');
+
+            // Apply filters
+            if (groupId) {
+                // Specific group selected
+                query = query.eq('Eleve.EleveGroupe.groupe_id', groupId);
+            } else if (teacherId) {
+                // "All Groups" -> Filter by Teacher
+                query = query.eq('Eleve.titulaire_id', teacherId);
+            }
+
+            const { data: progressions, error: progError } = await query;
 
             if (progError) throw progError;
 

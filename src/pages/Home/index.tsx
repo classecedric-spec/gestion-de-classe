@@ -14,12 +14,15 @@ import DashboardHeader from '../../features/dashboard/components/DashboardHeader
 import RandomPickerModal from '../../components/RandomPickerModal';
 import WeeklyPlannerModal from '../../components/WeeklyPlannerModal';
 
-
-
 const Home: React.FC = () => {
     const navigate = useNavigate();
 
-    // Use extracted hooks
+    // Context from Layout
+    const { isSidebarOpen, session } = useOutletContext<{ isSidebarOpen: boolean; session?: any }>() || { isSidebarOpen: false };
+    const sessionUserId = session?.user?.id;
+
+    // Use extracted hooks - NOW using React Query internally
+    // We pass sessionUserId to allow immediate fetching without waiting for async getCurrentUser
     const {
         user,
         userName,
@@ -28,8 +31,8 @@ const Home: React.FC = () => {
         selectedGroup,
         setSelectedGroup,
         loading,
-        fetchInitialData
-    } = useHomeData();
+        refetch
+    } = useHomeData(sessionUserId);
 
     const {
         dashboardData,
@@ -45,7 +48,12 @@ const Home: React.FC = () => {
         progressText
     } = useGroupPdfGenerator();
 
-
+    // Trigger dashboard stats fetch when students are loaded
+    useEffect(() => {
+        if (sessionUserId && students?.length > 0) {
+            fetchDashboardDetails(sessionUserId, students);
+        }
+    }, [sessionUserId, students, fetchDashboardDetails]);
 
     // Local state
     // Derived state from URL or default to 'overview'
@@ -87,20 +95,6 @@ const Home: React.FC = () => {
         return () => window.removeEventListener('keydown', handleEsc);
     }, [isGenerating, cancelGeneration]);
 
-    // Fetch data on mount
-    useEffect(() => {
-        const loadData = async () => {
-            const result = await fetchInitialData();
-            if (result.user && result.studentsData) {
-                await fetchDashboardDetails(result.user.id, result.studentsData);
-            }
-        };
-        loadData();
-    }, []);
-
-    // Context from Layout - MOVED UP before early returns to strictly follow Hook Rules
-    const { isSidebarOpen } = useOutletContext<{ isSidebarOpen: boolean }>() || { isSidebarOpen: false };
-
     if (loading) {
         return (
             <div className="flex items-center justify-center h-full">
@@ -123,7 +117,8 @@ const Home: React.FC = () => {
         loading: loadingStats,
         searchQuery,
         setSearchQuery,
-        setIsWeeklyPlannerOpen
+        setIsWeeklyPlannerOpen,
+        refetch
     };
 
 

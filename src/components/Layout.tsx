@@ -16,7 +16,7 @@ import { cleanupOrphanProgressions } from '../lib/database/cleanupUtils';
 
 const Layout: React.FC = () => {
     const location = useLocation();
-    const { session, loading, logout } = useAuth();
+    const { session, loading, logout, isLoggingOut } = useAuth();
     const { profileIncomplete, pendingValidation } = useProfile(session?.user.id);
     const { canInstall, handleInstall } = usePWAInstall();
     const { isOpen, setIsOpen } = useSidebar();
@@ -55,6 +55,18 @@ const Layout: React.FC = () => {
 
     return (
         <div className="flex h-screen bg-background text-text-main font-sans overflow-hidden">
+            {/* Logout Loading Overlay */}
+            {isLoggingOut && (
+                <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-[99999] flex flex-col items-center justify-center animate-in fade-in duration-200">
+                    <div className="w-64 space-y-4 text-center">
+                        <div className="h-2 w-full bg-grey-light/30 rounded-full overflow-hidden">
+                            <div className="h-full bg-primary animate-progress-indeterminate"></div>
+                        </div>
+                        <p className="text-lg font-medium text-text-main animate-pulse">Déconnexion sécurisée...</p>
+                    </div>
+                </div>
+            )}
+
             <div className="sidebar-reveal-zone" />
 
             {/* Burger Menu */}
@@ -107,7 +119,7 @@ const Layout: React.FC = () => {
                 )}
 
                 {session ? (
-                    <Outlet context={{ pendingValidation, isSidebarOpen: isOpen }} />
+                    <Outlet context={{ pendingValidation, isSidebarOpen: isOpen, session }} />
                 ) : (
                     <UnauthenticatedScreen />
                 )}

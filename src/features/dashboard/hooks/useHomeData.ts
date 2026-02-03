@@ -1,7 +1,7 @@
-import React, { useState, useCallback, useRef, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { getCurrentUser } from '../../../lib/database';
 import { User } from '@supabase/supabase-js';
-import { getCachedPhoto, setCachedPhoto, isCacheEnabled } from '../../../lib/storage';
 import { Student, Group } from '../../attendance/services/attendanceService';
 import { studentService } from '../../students/services/studentService';
 import { groupService } from '../../groups/services/groupService';
@@ -13,93 +13,95 @@ export interface HomeData {
     students: Student[];
     groups: Group[];
     selectedGroup: Group | null;
+    setSelectedGroup: React.Dispatch<React.SetStateAction<Group | null>>;
     loading: boolean;
-    fetchInitialData: () => Promise<{ user: User | null; studentsData: Student[] }>;
+    refetch: () => Promise<void>;
 }
 
 /**
  * useHomeData
  * Hook to fetch and manage initial home page data (user, students, groups)
+ * using React Query for robust caching and retries.
  */
-export const useHomeData = () => {
-    const [user, setUser] = useState<User | null>(null);
-    const [userName, setUserName] = useState('');
-    const [students, setStudents] = useState<Student[]>([]);
-    const [groups, setGroups] = useState<Group[]>([]);
+export const useHomeData = (userId?: string) => {
+    const queryClient = useQueryClient();
     const [selectedGroup, setSelectedGroup] = useState<Group | null>(null);
-    const [loading, setLoading] = useState(true);
 
-    const fetchInitialData = useCallback(async () => {
-        try {
-            const user = await getCurrentUser();
-            setUser(user);
+    // Local state for user profile name
+    const [userName, setUserName] = useState('');
 
-            if (user) {
-                // Fetch User Profile
-                const profile = await userService.getProfile(user.id);
-                if (profile?.prenom) setUserName(profile.prenom);
+    // 1. Resolve effective User ID
+    const [effectiveUser, setEffectiveUser] = useState<User | null>(null);
 
-                // Fetch Students (Direct fetch for reliability, similar to Presence page logic but all)
-                const fetched = await studentService.getStudentsForTeacher(user.id);
-                const studentsData = fetched as unknown as Student[];
-                setStudents(studentsData);
-
-                // Note: Logic for caching was relying on studentsData which might be stale if inside setStudents callback?
-                // For simplicity, we assume delta is enough or we refactor caching.
-                // Actually, if we use functional setStudents, we can't easily run the caching logic dependent on the RESULT of merge.
-                // Let's simplify: fetchInitialData is usually called ONCE on mount.
-                // The 'students' state dependency was likely causing issues if fetchInitialData was re-triggered.
-                // But for caching, let's keep it simple.
-
-                // Alternative: Just remove 'students' from dependency if we accept that 'students' is initially empty on first load.
-                // But mergeDelta needs the CURRENT students.
-
-                // Better approach for stability:
-                // If this is initial load, 'students' is likely empty.
-                // If it's a re-fetch, we want latest.
-
-                // Let's rely on functional updates correctly.
-
-                if (studentsData) {
-                    // ... caching logic is checking studentsData ...
-                    // If we moved merge into functional update, studentsData variable is hard to set out.
-                }
-
-                // ...
-
-                // Fix for Groups:
-                const groupsData = await groupService.getGroups();
-                const typedGroups = groupsData as unknown as Group[];
-                setGroups(typedGroups || []);
-
-                // Use functional update to check if we have a selected group
-                // Default to 'All Groups' (null) instead of first group
-                // setSelectedGroup(prev => {
-                //     if (typedGroups?.length > 0 && !prev) {
-                //         return typedGroups[0];
-                //     }
-                //     return prev;
-                // });
-
-                return { user, studentsData: studentsData || [] };
-            }
-            return { user: null, studentsData: [] };
-        } catch (err) {
-            console.error('Error fetching home data:', err);
-            return { user: null, studentsData: [] };
-        } finally {
-            setLoading(false);
+    useEffect(() => {
+        if (userId) {
+            setEffectiveUser({ id: userId } as User);
+        } else {
+            getCurrentUser().then(u => setEffectiveUser(u));
         }
-    }, []); // Removed dependencies to prevent loop
+    }, [userId]);
+
+    const resolvedUserId = userId || effectiveUser?.id;
+
+    // 2. Fetch Students
+    const {
+        data: students = [],
+        isLoading: loadingStudents,
+        refetch: refetchStudents
+    } = useQuery({
+        queryKey: ['students', resolvedUserId],
+        queryFn: async () => {
+            if (!resolvedUserId) return [];
+            const data = await studentService.getStudentsForTeacher(resolvedUserId);
+            return data as unknown as Student[];
+        },
+        enabled: !!resolvedUserId,
+        retry: 2,
+        staleTime: 1000 * 60 * 5, // 5 minutes
+    });
+
+    // 3. Fetch Groups
+    const {
+        data: groups = [],
+        isLoading: loadingGroups,
+        refetch: refetchGroups
+    } = useQuery({
+        queryKey: ['groups'],
+        queryFn: async () => {
+            const data = await groupService.getGroups();
+            return (data as unknown as Group[]) || [];
+        },
+        retry: 2,
+        staleTime: 1000 * 60 * 60, // 1 hour
+    });
+
+    // 4. Fetch User Profile Name (Side effect)
+    useEffect(() => {
+        const fetchProfile = async () => {
+            if (resolvedUserId && !userName) {
+                const profile = await userService.getProfile(resolvedUserId);
+                if (profile?.prenom) setUserName(profile.prenom);
+            }
+        };
+        fetchProfile();
+    }, [resolvedUserId, userName]);
+
+    // Combined Loading State
+    const loading = !resolvedUserId || loadingStudents;
+
+    // Manual refetch wrapper
+    const refetch = async () => {
+        await Promise.all([refetchStudents(), refetchGroups()]);
+    };
 
     return {
-        user,
+        user: effectiveUser,
         userName,
         students,
         groups,
         selectedGroup,
         setSelectedGroup,
         loading,
-        fetchInitialData
+        refetch
     };
 };

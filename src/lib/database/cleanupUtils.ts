@@ -106,12 +106,20 @@ export const cleanupOrphanProgressions = async (): Promise<void> => {
         }
 
         if (idsToDelete.length > 0) {
-            const { error } = await supabase
-                .from('Progression')
-                .delete()
-                .in('id', idsToDelete);
+            // Batch deletions to avoid URL length limits (400 Bad Request)
+            const BATCH_SIZE = 50;
+            for (let i = 0; i < idsToDelete.length; i += BATCH_SIZE) {
+                const batch = idsToDelete.slice(i, i + BATCH_SIZE);
+                const { error } = await supabase
+                    .from('Progression')
+                    .delete()
+                    .in('id', batch);
 
-            if (error) throw error;
+                if (error) {
+                    console.error(`Error deleting batch ${i / BATCH_SIZE + 1}:`, error);
+                    // Continue with other batches even if one fails
+                }
+            }
 
             // Optional: Notify user if significant cleanup happened
             if (idsToDelete.length > 0) {

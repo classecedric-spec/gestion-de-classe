@@ -47,10 +47,9 @@ const PublicRoute: React.FC<PublicRouteProps> = ({ children }) => {
         };
     }, []);
 
-    if (loading) {
-        // Optionnel: On peut retourner null ou un petit loader pour éviter le flash
-        return null;
-    }
+    // if (loading) {
+    //     return null;
+    // }
 
     if (session) {
         // Rediriger vers le dashboard approprié

@@ -68,13 +68,43 @@ const DashboardOverview: React.FC = () => {
                 </div>
 
                 {/* Card 3: Birthdays */}
-                <div className="p-6 bg-surface/50 border border-white/5 rounded-3xl">
+                <div className="p-6 bg-surface/50 border border-white/5 rounded-3xl flex flex-col">
                     <div className="flex items-center justify-between mb-2">
                         <h3 className="text-sm font-bold text-grey-medium uppercase tracking-wider">Anniversaires</h3>
-                        <span className="text-2xl">🎂</span>
+                        <div className="flex items-center gap-2">
+                            <span className="text-xl font-black text-white">{dashboardData.birthdays?.length || 0}</span>
+                            <span className="text-2xl">🎂</span>
+                        </div>
                     </div>
-                    <p className="text-3xl font-black text-white">{dashboardData.birthdays?.length || 0}</p>
-                    <p className="text-xs text-grey-medium mt-1">Ce mois-ci</p>
+                    {(dashboardData.birthdays?.length || 0) > 0 ? (
+                        <div className="flex-1 flex flex-col justify-center">
+                            <div className="space-y-1">
+                                {dashboardData.birthdays?.slice(0, 3).map((student: any) => (
+                                    <div key={student.id} className="flex items-baseline gap-2">
+                                        <span className="text-lg font-black text-white leading-tight truncate">
+                                            {student.prenom}
+                                        </span>
+                                        <span className="text-[10px] font-bold text-primary bg-primary/10 px-1.5 rounded">
+                                            {new Date(student.date_naissance).getDate()}
+                                        </span>
+                                    </div>
+                                ))}
+                            </div>
+                            {dashboardData.birthdays && dashboardData.birthdays.length > 3 && (
+                                <p className="text-[10px] text-grey-medium font-bold uppercase mt-2">
+                                    + {dashboardData.birthdays.length - 3} autres
+                                </p>
+                            )}
+                            <p className="text-[10px] text-grey-medium font-bold uppercase tracking-wider mt-2 opacity-60">
+                                Ce mois-ci
+                            </p>
+                        </div>
+                    ) : (
+                        <div className="flex-1 flex flex-col justify-center">
+                            <p className="text-sm text-grey-medium">Aucun anniversaire</p>
+                            <p className="text-xs text-grey-medium mt-1">Ce mois-ci</p>
+                        </div>
+                    )}
                 </div>
 
                 {/* Card 4: Création des listes (Integrated Selector) */}

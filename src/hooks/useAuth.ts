@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/database';
 import type { Session } from '@supabase/supabase-js';
+import { useQueryClient } from '@tanstack/react-query';
+import { useNavigate } from 'react-router-dom';
 
 /**
  * Hook for managing authentication state
@@ -8,6 +10,9 @@ import type { Session } from '@supabase/supabase-js';
 export function useAuth() {
     const [session, setSession] = useState<Session | null>(null);
     const [loading, setLoading] = useState(true);
+    const [isLoggingOut, setIsLoggingOut] = useState(false);
+    const queryClient = useQueryClient();
+    const navigate = useNavigate();
 
     useEffect(() => {
         // Get initial session
@@ -28,8 +33,25 @@ export function useAuth() {
     }, []);
 
     const logout = async () => {
-        await supabase.auth.signOut();
+        try {
+            setIsLoggingOut(true);
+
+            // 1. Clear all application cache immediately to prevent data leaks
+            // This is critical for security when switching users
+            queryClient.clear();
+
+            // 2. Sign out from Supabase
+            await supabase.auth.signOut();
+
+            // 3. Force redirect to login (optional, but safer)
+            navigate('/login');
+
+        } catch (error) {
+            console.error('Error during logout:', error);
+        } finally {
+            setIsLoggingOut(false);
+        }
     };
 
-    return { session, loading, logout };
+    return { session, loading, logout, isLoggingOut };
 }

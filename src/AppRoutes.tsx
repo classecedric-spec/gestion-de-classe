@@ -8,7 +8,7 @@ import { ROUTES } from "./routes";
 // Lazy load all pages
 const Layout = lazy(() => import('./components/Layout'));
 const Home = lazy(() => import('./pages/Home'));
-const Landing = lazy(() => import('./pages/Landing'));
+import Landing from './pages/Landing';
 const Auth = lazy(() => import('./pages/Auth'));
 const Students = lazy(() => import('./pages/Students'));
 const Classes = lazy(() => import('./pages/Classes'));

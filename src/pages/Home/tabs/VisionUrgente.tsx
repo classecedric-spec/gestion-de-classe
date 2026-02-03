@@ -11,13 +11,14 @@ import { toast } from 'react-hot-toast';
 import { Badge } from '../../../core';
 
 const VisionUrgente: React.FC = () => {
-    const { groups, selectedGroup: globalSelectedGroup } = useOutletContext<DashboardContextType>();
+    const { groups, selectedGroup: globalSelectedGroup, user } = useOutletContext<DashboardContextType>();
 
     // Local filter state
     const [localGroupId, setLocalGroupId] = useState<string>(globalSelectedGroup?.id || '');
 
     // Custom hook for strict business logic
-    const { data: students, loading, refresh } = useGroupUrgentWork(localGroupId);
+    // We pass user?.id as teacherId to support "All Groups" mode
+    const { data: students, loading, refresh } = useGroupUrgentWork(localGroupId, user?.id);
 
     // State for accordions
     const [expandedStudents, setExpandedStudents] = useState<Record<string, boolean>>({});

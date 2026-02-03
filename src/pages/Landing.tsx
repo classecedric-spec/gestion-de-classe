@@ -59,7 +59,7 @@ const Landing: React.FC = () => {
                         </Button>
                     </div>
 
-                    <div className="mt-24 relative max-w-5xl mx-auto perspective-1000 animate-in fade-in slide-in-from-bottom-16 duration-1000 delay-300">
+                    <div className="mt-24 relative max-w-5xl mx-auto perspective-1000 animate-in fade-in slide-in-from-bottom-16 duration-700">
                         <div className="relative rounded-[2rem] overflow-hidden shadow-2xl bg-surface">
                             <img src="/assets/documentation/dashboard.png" alt="Dashboard" className="w-full h-auto opacity-90 hover:opacity-100 transition-opacity duration-700" />
                             <div className="absolute inset-0 bg-gradient-to-tr from-white/10 to-transparent pointer-events-none"></div>
