@@ -2,6 +2,8 @@ import React from 'react';
 import QRCode from "react-qr-code";
 import { X, Printer, QrCode } from 'lucide-react';
 import { getAppBaseUrl } from '../../../utils/urlUtils';
+import { pdf } from '@react-pdf/renderer';
+import GroupQRPDF from './GroupQRPDF';
 
 interface GroupQRModalProps {
     isOpen: boolean;
@@ -15,106 +17,19 @@ const GroupQRModal: React.FC<GroupQRModalProps> = ({ isOpen, onClose, groupName,
 
     const baseUrl = getAppBaseUrl();
 
-    const handlePrint = () => {
-        const printWindow = window.open('', '', 'width=1000,height=800');
-        if (printWindow) {
-
-            const cards = students.map(student => {
-                const svg = document.getElementById(`qr-${student.id}`);
-                const svgHtml = svg ? svg.outerHTML : '<div>QR Error</div>';
-                return `
-                    <div class="cut-cell">
-                        <div class="card">
-                            <h1>${student.prenom} ${student.nom}</h1>
-                            <div class="qr-container">${svgHtml}</div>
-                            <p class="footer-text">Connexion à Gestion de Classe</p>
-                        </div>
-                    </div>
-                `;
-            }).join('');
-
-            printWindow.document.write(`
-                <html>
-                    <head>
-                        <title>QR Codes - ${groupName}</title>
-                        <style>
-                            body { 
-                                font-family: system-ui, -apple-system, sans-serif; 
-                                padding: 20px;
-                                margin: 0; 
-                            }
-                            .grid {
-                                display: flex;
-                                flex-wrap: wrap;
-                                justify-content: flex-start;
-                                width: 100%;
-                            }
-                            .cut-cell {
-                                width: 33.33%;
-                                box-sizing: border-box;
-                                border: 1px dashed #ccc; /* Cutting line */
-                                padding: 20px;
-                                display: flex;
-                                justify-content: center;
-                                page-break-inside: avoid;
-                            }
-                            .card {
-                                border: 2px solid #000;
-                                border-radius: 20px;
-                                display: flex;
-                                flex-direction: column;
-                                align-items: center;
-                                width: 100%;
-                                max-width: 220px;
-                                overflow: hidden;
-                            }
-                            .card h1 { 
-                                margin: 0 0 15px 0; 
-                                font-size: 20px; 
-                                text-align: center;
-                                background-color: #254154; /* Site Blue-Grey */
-                                color: white;
-                                width: 100%;
-                                padding: 15px 0;
-                                font-weight: 800;
-                            }
-                            .qr-container { 
-                                width: 100%; 
-                                display: flex; 
-                                justify-content: center; 
-                                padding-bottom: 20px;
-                            }
-                            .qr-container svg { width: 150px; height: 150px; }
-                            .footer-text {
-                                margin: 0 0 15px 0;
-                                font-size: 12px;
-                                color: #666;
-                                font-weight: 500;
-                            }
-                            @media print {
-                                body { 
-                                    padding: 0; 
-                                    -webkit-print-color-adjust: exact;
-                                    print-color-adjust: exact;
-                                }
-                                .no-print { display: none; }
-                            }
-                        </style>
-                    </head>
-                    <body>
-                        <div class="grid">
-                            ${cards}
-                        </div>
-                    </body>
-                </html>
-            `);
-
-            printWindow.document.close();
-            printWindow.focus();
-            setTimeout(() => {
-                printWindow.print();
-                printWindow.close();
-            }, 500);
+    const handlePrint = async () => {
+        try {
+            const blob = await pdf(
+                <GroupQRPDF
+                    groupName={groupName}
+                    students={students}
+                    baseUrl={baseUrl}
+                />
+            ).toBlob();
+            const url = URL.createObjectURL(blob);
+            window.open(url, '_blank');
+        } catch (error) {
+            console.error('Error generating PDF:', error);
         }
     };
 

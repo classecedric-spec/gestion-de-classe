@@ -65,13 +65,15 @@ const Home: React.FC = () => {
     const pathToTab: Record<string, string> = {
         'vue-d-ensemble': 'overview',
         'eleves': 'students',
-        'vision-urgente': 'urgent'
+        'avant-mail': 'avant-mail',
+        'vue-retard': 'vue-retard'
     };
 
     const tabToPath: Record<string, string> = {
         'overview': 'vue-d-ensemble',
         'students': 'eleves',
-        'urgent': 'vision-urgente'
+        'avant-mail': 'avant-mail',
+        'vue-retard': 'vue-retard'
     };
 
     const currentTab = pathToTab[currentPath] || 'overview';

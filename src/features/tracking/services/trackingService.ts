@@ -174,6 +174,10 @@ export class TrackingService {
     async getProgressionsForStudentsAndActivities(studentIds: string[], activityIds: string[]): Promise<any[]> {
         return await this.repository.getProgressionsForStudentsAndActivities(studentIds, activityIds);
     }
+
+    async getUnfinishedModulesByDate(studentId: string, date: string): Promise<any[]> {
+        return await this.repository.getUnfinishedModulesByDate(studentId, date);
+    }
 }
 
 // Export singleton instance

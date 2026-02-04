@@ -31,4 +31,5 @@ export interface IModuleRepository {
     getModuleWithDetails(moduleId: string): Promise<any>;
     createModule(data: TablesInsert<'Module'>): Promise<Tables<'Module'>>;
     updateModule(id: string, data: TablesUpdate<'Module'>): Promise<void>;
+    getDetailedLateActivities(classId: string): Promise<any[]>;
 }

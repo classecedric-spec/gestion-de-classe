@@ -1,47 +1,63 @@
-import React from 'react';
-import { AlertCircle, Calendar, FileText, Folder, BookOpen, Clock } from 'lucide-react';
+import React, { useState } from 'react';
+import { AlertCircle, Calendar, FileText, ChevronDown, BookOpen, Clock, Layers } from 'lucide-react';
 import { getInitials } from '../../../lib/helpers';
 import { Avatar } from '../../../core';
 
+interface Activity {
+    id: string;
+    titre: string;
+    etat: string;
+}
+
+interface OverdueModule {
+    id: string;
+    nom: string;
+    date_fin: string;
+    SousBranche?: {
+        nom: string;
+        Branche?: {
+            nom: string;
+            couleur: string;
+        };
+    };
+    activities: Activity[];
+}
+
+interface Student {
+    id: string;
+    prenom: string;
+    nom: string;
+    photo_url: string;
+    overdueModules: OverdueModule[];
+    overdueCount: number;
+}
+
+interface LevelGroup {
+    name: string;
+    students: Student[];
+}
+
 interface DashboardLateWorksProps {
-    overdueStudents: any[];
+    overdueStudents: LevelGroup[];
     onStudentClick: (student: any) => void;
 }
 
 const DashboardLateWorks: React.FC<DashboardLateWorksProps> = ({ overdueStudents, onStudentClick }) => {
+    const [expandedStudents, setExpandedStudents] = useState<Record<string, boolean>>({});
 
-    // Helper to format date
+    const toggleStudent = (studentId: string) => {
+        setExpandedStudents(prev => ({
+            ...prev,
+            [studentId]: !prev[studentId]
+        }));
+    };
+
     const formatDate = (dateStr: string) => {
         if (!dateStr) return '-';
         return new Date(dateStr).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' });
     };
 
-    // Helper to get relative time status
-    const getDelayStatus = (dateStr: string) => {
-        const diffTime = Math.abs(new Date().getTime() - new Date(dateStr).getTime());
-        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-        if (diffDays > 14) return { label: '> 2 semaines', color: 'text-danger' };
-        if (diffDays > 7) return { label: '> 1 semaine', color: 'text-warning' };
-        return { label: `${diffDays} jours`, color: 'text-grey-medium' };
-    };
-
-    // Flatten all overdue items into a single list
-    const allOverdueItems = overdueStudents.flatMap(student =>
-        (student.overdueItems || []).map((item: any) => ({
-            ...item,
-            student: student // Keep reference to student
-        }))
-    );
-
-    // Sort by Date (ASC) -> Student Name
-    const sortedItems = allOverdueItems.sort((a, b) => {
-        const dateA = new Date(a.Activite?.Module?.date_fin || 0).getTime();
-        const dateB = new Date(b.Activite?.Module?.date_fin || 0).getTime();
-        if (dateA !== dateB) return dateA - dateB;
-        return (a.student.prenom || '').localeCompare(b.student.prenom || '');
-    });
-
-    if (sortedItems.length === 0) {
+    if (overdueStudents.length === 0) {
         return (
             <div className="flex flex-col items-center justify-center py-20 bg-surface/30 rounded-3xl border border-white/5 border-dashed text-grey-medium space-y-4">
                 <div className="p-4 bg-emerald-500/10 rounded-full text-emerald-500">
@@ -58,95 +74,125 @@ const DashboardLateWorks: React.FC<DashboardLateWorksProps> = ({ overdueStudents
     }
 
     return (
-        <div className="bg-surface rounded-2xl border border-white/5 overflow-hidden shadow-sm">
-            <div className="overflow-x-auto">
-                <table className="w-full text-left text-sm">
-                    <thead className="bg-background/50 text-grey-medium text-xs uppercase tracking-wider border-b border-white/5">
-                        <tr>
-                            <th className="px-6 py-4 font-bold">Élève</th>
-                            <th className="px-6 py-4 font-bold">Module</th>
-                            <th className="px-6 py-4 font-bold">Activité</th>
-                            <th className="px-6 py-4 font-bold">Date de fin</th>
-                            <th className="px-6 py-4 font-bold text-center">Statut</th>
-                        </tr>
-                    </thead>
-                    <tbody className="divide-y divide-white/5">
-                        {sortedItems.map((item) => {
-                            const module = item.Activite?.Module;
-                            const dateFin = module?.date_fin;
-                            const delay = getDelayStatus(dateFin);
+        <div className="space-y-8">
+            {overdueStudents.map((level) => (
+                <div key={level.name} className="space-y-4">
+                    {/* Level Separator */}
+                    <div className="flex items-center gap-3 py-2 px-1 border-b border-white/5">
+                        <Layers size={18} className="text-primary" />
+                        <h2 className="text-lg font-bold text-white uppercase tracking-wider">
+                            {level.name}
+                        </h2>
+                        <span className="text-xs text-grey-medium font-medium px-2 py-0.5 bg-white/5 rounded-full">
+                            {level.students.length} élève{level.students.length > 1 ? 's' : ''}
+                        </span>
+                    </div>
+
+                    <div className="grid grid-cols-1 gap-4">
+                        {level.students.map((student) => {
+                            const isExpanded = expandedStudents[student.id];
 
                             return (
-                                <tr key={`${item.id}_${item.student.id}`} className="hover:bg-white/[0.02] transition-colors group">
-                                    <td className="px-6 py-4 whitespace-nowrap">
-                                        <div
-                                            className="flex items-center gap-3 cursor-pointer"
-                                            onClick={() => onStudentClick(item.student)}
-                                        >
+                                <div
+                                    key={student.id}
+                                    className={`bg-surface border border-white/5 rounded-2xl overflow-hidden transition-all duration-300 ${isExpanded ? 'ring-1 ring-primary/20 shadow-lg' : 'hover:border-white/10'}`}
+                                >
+                                    {/* Student Card Header */}
+                                    <div
+                                        className="p-4 flex items-center justify-between cursor-pointer group"
+                                        onClick={() => toggleStudent(student.id)}
+                                    >
+                                        <div className="flex items-center gap-4">
                                             <Avatar
-                                                size="sm"
-                                                src={item.student.photo_url}
-                                                initials={getInitials(item.student)}
-                                                className="border border-white/10"
+                                                size="md"
+                                                src={student.photo_url}
+                                                initials={getInitials(student)}
+                                                className={`border-2 transition-colors ${isExpanded ? 'border-primary' : 'border-white/10'}`}
                                             />
-                                            <span className="font-bold text-white group-hover:text-primary transition-colors">
-                                                {item.student.prenom} {item.student.nom}
-                                            </span>
-                                        </div>
-                                    </td>
-                                    <td className="px-6 py-4">
-                                        <div className="flex items-center gap-2 text-white">
-                                            <BookOpen size={14} className="text-grey-medium" />
-                                            {module?.nom}
-                                        </div>
-                                        {module?.SousBranche?.Branche && (
-                                            <div className="mt-1 flex">
-                                                <span
-                                                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold border"
-                                                    style={{
-                                                        backgroundColor: `${module.SousBranche.Branche.couleur}15`,
-                                                        color: module.SousBranche.Branche.couleur,
-                                                        borderColor: `${module.SousBranche.Branche.couleur}20`
-                                                    }}
-                                                >
-                                                    {module.SousBranche.Branche.nom}
-                                                </span>
+                                            <div>
+                                                <h3 className="text-base font-bold text-white group-hover:text-primary transition-colors">
+                                                    {student.prenom} {student.nom}
+                                                </h3>
+                                                <div className="flex items-center gap-2 mt-0.5">
+                                                    <span className="flex items-center gap-1 text-danger text-sm font-bold">
+                                                        <AlertCircle size={14} />
+                                                        {student.overdueCount} atelier{student.overdueCount > 1 ? 's' : ''} en retard
+                                                    </span>
+                                                </div>
                                             </div>
-                                        )}
-                                    </td>
-                                    <td className="px-6 py-4">
-                                        <div className="flex items-center gap-2 text-grey-light">
-                                            <FileText size={14} />
-                                            {item.Activite?.titre}
                                         </div>
-                                    </td>
-                                    <td className="px-6 py-4 whitespace-nowrap">
-                                        <div className="flex flex-col">
-                                            <div className="flex items-center gap-2 text-danger font-bold">
-                                                <Calendar size={14} />
-                                                {formatDate(dateFin)}
+
+                                        <div className="flex items-center gap-2">
+                                            <button
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    onStudentClick(student);
+                                                }}
+                                                className="p-2 text-grey-medium hover:text-white hover:bg-white/5 rounded-xl transition-all"
+                                                title="Voir le suivi complet"
+                                            >
+                                                <Clock size={18} />
+                                            </button>
+                                            <div className={`p-2 rounded-xl bg-white/5 text-grey-light transition-transform duration-300 ${isExpanded ? 'rotate-180 text-primary' : ''}`}>
+                                                <ChevronDown size={20} />
                                             </div>
-                                            <span className={`text-xs ${delay.color} mt-0.5`}>
-                                                Retard: {delay.label}
-                                            </span>
                                         </div>
-                                    </td>
-                                    <td className="px-6 py-4 text-center">
-                                        <span className={`
-                                            inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold border
-                                            ${item.etat === 'en_cours'
-                                                ? 'bg-blue-500/10 text-blue-400 border-blue-500/20'
-                                                : 'bg-grey-medium/10 text-grey-medium border-grey-medium/20'}
-                                        `}>
-                                            {item.etat === 'en_cours' ? 'En cours' : 'Non commencé'}
-                                        </span>
-                                    </td>
-                                </tr>
+                                    </div>
+
+                                    {/* Expanded Details (Accordion) */}
+                                    {isExpanded && (
+                                        <div className="px-4 pb-4 border-t border-white/5 bg-white/[0.01]">
+                                            <div className="mt-4 space-y-6">
+                                                {student.overdueModules.map((module) => (
+                                                    <div key={module.id} className="space-y-3 pl-2 border-l-2 border-white/10">
+                                                        {/* Module Header */}
+                                                        <div className="flex flex-col md:flex-row md:items-center justify-between gap-2">
+                                                            <div className="space-y-1">
+                                                                <div className="flex items-center gap-2">
+                                                                    <BookOpen size={16} className="text-grey-medium" />
+                                                                    <span className="font-bold text-white">{module.nom}</span>
+                                                                </div>
+                                                                {/* Breadcrumb: Branche > Sous-branche */}
+                                                                <div className="text-[10px] text-grey-medium flex items-center gap-1 uppercase tracking-wider">
+                                                                    <span className="font-bold" style={{ color: module.SousBranche?.Branche?.couleur }}>
+                                                                        {module.SousBranche?.Branche?.nom}
+                                                                    </span>
+                                                                    <span>&gt;</span>
+                                                                    <span>{module.SousBranche?.nom}</span>
+                                                                </div>
+                                                            </div>
+                                                            <div className="flex items-center gap-2 px-3 py-1 bg-danger/10 text-danger rounded-lg border border-danger/20 self-start md:self-center">
+                                                                <Calendar size={14} />
+                                                                <span className="text-xs font-bold">{formatDate(module.date_fin)}</span>
+                                                            </div>
+                                                        </div>
+
+                                                        {/* Activity List */}
+                                                        <ul className="space-y-2 ml-6">
+                                                            {module.activities.map((act) => (
+                                                                <li key={act.id} className="flex items-center gap-2 text-sm text-grey-light">
+                                                                    <div className="w-1.5 h-1.5 rounded-full bg-grey-medium/30" />
+                                                                    <FileText size={12} className="text-grey-medium" />
+                                                                    <span>{act.titre}</span>
+                                                                    {act.etat === 'en_cours' && (
+                                                                        <span className="text-[10px] px-1.5 py-0.5 bg-blue-500/10 text-blue-400 border border-blue-500/20 rounded font-bold uppercase">
+                                                                            En cours
+                                                                        </span>
+                                                                    )}
+                                                                </li>
+                                                            ))}
+                                                        </ul>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
                             );
                         })}
-                    </tbody>
-                </table>
-            </div>
+                    </div>
+                </div>
+            ))}
         </div>
     );
 };

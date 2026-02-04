@@ -1,7 +1,9 @@
 import { useState, useCallback } from 'react';
 import { supabase } from '../../../lib/database';
 import { Student } from '../../attendance/services/attendanceService';
-import { compareUrgentItems } from '../../progression/utils/urgentSorting';
+import { SupabaseModuleRepository } from '../../modules/repositories/SupabaseModuleRepository';
+
+const moduleRepo = new SupabaseModuleRepository();
 
 // Level Colors for Charts
 export const LEVEL_COLORS: Record<string, string> = {
@@ -151,7 +153,7 @@ export const useDashboardData = () => {
         const lastActiveDayISO = lastActiveDay.toISOString().split('T')[0];
         const lastActiveDayName = lastActiveDay.toLocaleDateString('fr-FR', { weekday: 'long' });
         const lastActiveDayFormatted = lastActiveDay.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' });
-        const lastActiveDayLabel = `${lastActiveDayName.charAt(0).toUpperCase() + lastActiveDayName.slice(1)} ${lastActiveDayFormatted}`;
+        const lastActiveDayLabel = `${lastActiveDayName.charAt(0).toUpperCase() + lastActiveDayName.slice(1)} ${lastActiveDayFormatted} `;
 
         const firstOfMonth = new Date();
         firstOfMonth.setDate(1);
@@ -293,11 +295,11 @@ export const useDashboardData = () => {
                         const count = stats.byLevel[level];
                         const levelRate = (count / stats.total) * 100;
                         const color = LEVEL_COLORS[level] || LEVEL_COLORS['Autre'];
-                        segments.push(`${color} ${currentPos}% ${currentPos + levelRate}%`);
+                        segments.push(`${color} ${currentPos}% ${currentPos + levelRate}% `);
                         currentPos += levelRate;
                     });
 
-                    segments.push(`#3f3f46 ${currentPos}% 100%`);
+                    segments.push(`#3f3f46 ${currentPos}% 100 % `);
 
                     return {
                         name,
@@ -305,7 +307,7 @@ export const useDashboardData = () => {
                         done: stats.done,
                         notDone: stats.total - stats.done,
                         rate: doneRate,
-                        gradient: `conic-gradient(${segments.join(', ')})`
+                        gradient: `conic - gradient(${segments.join(', ')})`
                     };
                 })
                 .sort((a, b) => b.count - a.count);
@@ -320,8 +322,8 @@ export const useDashboardData = () => {
             enCoursStudents.forEach(s => {
                 suggestions.push({
                     type: 'presentation',
-                    title: `Présentation à valider: ${s.prenom}`,
-                    desc: `${s.enCoursCount} activités en cours. Un petit coup de pouce ?`,
+                    title: `Présentation à valider: ${s.prenom} `,
+                    desc: `${s.enCoursCount} activités en cours.Un petit coup de pouce ? `,
                     student: s
                 });
             });
@@ -330,7 +332,7 @@ export const useDashboardData = () => {
                 const leastActive = branchStats[branchStats.length - 1];
                 suggestions.push({
                     type: 'focus',
-                    title: `Focus: ${leastActive.name}`,
+                    title: `Focus: ${leastActive.name} `,
                     desc: `C'est le domaine le moins travaillé actuellement.`,
                     color: 'text-amber-500'
                 });
@@ -496,115 +498,96 @@ export const useDashboardData = () => {
                 .neq('day_of_week', 'DOCK');
 
             // 12. Overdue Students Logic (via Secure View)
-            // 12. Overdue Students Logic (Detailed)
-            // 12. Overdue Students Logic (Detailed & Robust)
-            // Fetch ALL 'en_cours' items and filter in JS to match exactly the logic of the Student View
-            // 1. Fetch Active Modules Hierarchy (Depth 2: Module -> SousBranche -> Branche)
-            // 1. Fetch Active Modules Hierarchy
-            const { data: activeModules, error: modError } = await supabase
-                .from('Module')
-                .select(`
-                    id, nom, date_fin, statut,
-                    SousBranche:sous_branche_id (
-                        nom,
-                        ordre,
-                        Branche:branche_id (
-                            nom, ordre
-                        )
-                    )
-                `)
-                .eq('statut', 'en_cours');
+            // 12. Overdue Students Logic (Optimized SQL)
+            const classId = allStudents[0]?.classe_id;
+            const rawLateActivities = classId ? await moduleRepo.getDetailedLateActivities(classId) : [];
 
-            if (modError) console.error("Module query error:", modError);
+            // Group by Level -> Student -> Module
+            const overdueByLevel: Record<string, any> = {};
 
-            const modulesMap = new Map((activeModules || []).map(m => [m.id, m]));
+            rawLateActivities.forEach(item => {
+                const student = item.Eleve;
+                const level = student?.Niveau || { nom: 'Sans Niveau', ordre: 999 };
+                const levelKey = level.nom;
 
-            // 2. Fetch Progressions (Depth 1: Progression -> Activite)
-            const { data: allEnCoursItems, error: progError } = await supabase
-                .from('Progression')
-                .select(`
-                    id, 
-                    etat, 
-                    updated_at,
-                    eleve_id,
-                    activite_id,
-                    Activite (
-                        titre,
-                        module_id
-                    )
-                `)
-                .in('etat', ['en_cours', 'non_commence']);
-
-            if (progError) console.error("Progression query error:", progError);
-
-            const now = new Date();
-
-            const overdueItems = (allEnCoursItems || []).filter(item => {
-                // Enrich manually
-                const act = item.Activite as any;
-                const moduleId = act?.module_id;
-
-                if (!moduleId) return false;
-
-                const module = modulesMap.get(moduleId);
-
-                // Attach the full module object to the item for downstream logic
-                if (act) {
-                    act.Module = module;
+                if (!overdueByLevel[levelKey]) {
+                    overdueByLevel[levelKey] = {
+                        name: levelKey,
+                        ordre: level.ordre,
+                        students: {}
+                    };
                 }
 
-                if (!module || !module.date_fin) return false;
-
-                // Only active modules
-                if (module.statut !== 'en_cours') return false;
-
-                // Check deadline strictly < now
-                const deadline = new Date(module.date_fin);
-                return deadline < now;
-            });
-
-            console.log("Modules found:", activeModules?.length);
-            console.log("Progressions found:", allEnCoursItems?.length);
-            console.log("Overdue calculated:", overdueItems.length);
-            console.log("Filtered Overdue:", overdueItems.length);
-
-            // Group by Student
-            const overdueByStudent: Record<string, any[]> = {};
-            (overdueItems || []).forEach(item => {
-                if (!overdueByStudent[item.eleve_id]) overdueByStudent[item.eleve_id] = [];
-                overdueByStudent[item.eleve_id].push(item);
-            });
-
-            const sortedOverdueStudents = Object.entries(overdueByStudent)
-                .map(([eleveId, items]) => {
-                    const student = allStudents.find(s => s.id === eleveId);
-                    if (!student) return null;
-
-                    // Sort items: Date (ASC) > Branch > Module
-                    // Use shared logic factorized in urgentSorting.ts
-                    const sortedItems = items.sort(compareUrgentItems);
-
-                    return {
+                const studentId = student.id;
+                if (!overdueByLevel[levelKey].students[studentId]) {
+                    overdueByLevel[levelKey].students[studentId] = {
                         ...student,
-                        overdueCount: items.length,
-                        overdueItems: sortedItems
+                        overdueModules: {}
                     };
-                })
-                .filter(Boolean)
-                // Sort Students: Count (DESC) > Name (ASC)
-                .sort((a: any, b: any) => {
-                    if (b.overdueCount !== a.overdueCount) return b.overdueCount - a.overdueCount;
-                    return (a.prenom || '').localeCompare(b.prenom || '');
-                });
+                }
 
-            console.log("Sorted Overdue Students (Fixed):", sortedOverdueStudents?.map(s => `${s.prenom} (${s.overdueCount})`));
+                const module = item.Activite?.Module;
+                const moduleId = module?.id;
+                if (!moduleId) return;
+
+                if (!overdueByLevel[levelKey].students[studentId].overdueModules[moduleId]) {
+                    overdueByLevel[levelKey].students[studentId].overdueModules[moduleId] = {
+                        ...module,
+                        activities: []
+                    };
+                }
+
+                overdueByLevel[levelKey].students[studentId].overdueModules[moduleId].activities.push({
+                    id: item.id,
+                    titre: item.Activite?.titre,
+                    etat: item.etat
+                });
+            });
+
+            // Convert and Sort everything
+            const finalOverdueData = Object.values(overdueByLevel)
+                .sort((a: any, b: any) => (a.ordre || 0) - (b.ordre || 0))
+                .map((level: any) => ({
+                    ...level,
+                    students: Object.values(level.students)
+                        .sort((a: any, b: any) => (a.prenom || '').localeCompare(b.prenom || ''))
+                        .map((student: any) => {
+                            const modulesList = Object.values(student.overdueModules)
+                                .sort((a: any, b: any) => {
+                                    // Sort modules: Date -> Branch -> SubBranch -> Name
+                                    const dateA = new Date(a.date_fin || 0).getTime();
+                                    const dateB = new Date(b.date_fin || 0).getTime();
+                                    if (dateA !== dateB) return dateA - dateB;
+
+                                    const bA = a.SousBranche?.Branche?.ordre || 0;
+                                    const bB = b.SousBranche?.Branche?.ordre || 0;
+                                    if (bA !== bB) return bA - bB;
+
+                                    const sbA = a.SousBranche?.ordre || 0;
+                                    const sbB = b.SousBranche?.ordre || 0;
+                                    if (sbA !== sbB) return sbA - sbB;
+
+                                    return (a.nom || '').localeCompare(b.nom || '');
+                                });
+
+                            const totalActivities = modulesList.reduce((sum: number, mod: any) => sum + (mod.activities?.length || 0), 0);
+
+                            return {
+                                ...student,
+                                overdueModules: modulesList,
+                                overdueCount: totalActivities
+                            };
+                        })
+                }));
+
+
 
             setDashboardData({
                 planning: {
                     count: plannedActivitiesCount || 0,
                     label: weekLabel
                 },
-                overdueStudents: sortedOverdueStudents,
+                overdueStudents: finalOverdueData,
                 stats: {
                     totalStudents: allStudents.length,
                     studentBreakdown,

@@ -88,6 +88,9 @@ export interface ITrackingRepository {
     getActivitiesByModules(moduleIds: string[]): Promise<any[]>;
     getProgressionsForStudentsAndActivities(studentIds: string[], activityIds: string[]): Promise<any[]>;
     updateStudentTrust(eleveId: string, branchId: string, adjustment: number, trend: 'up' | 'down' | 'stable'): Promise<void>;
+
+    // Avant Mail
+    getUnfinishedModulesByDate(studentId: string, date: string): Promise<any[]>;
 }
 
 // Re-export types for convenience

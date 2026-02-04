@@ -551,4 +551,58 @@ export class SupabaseTrackingRepository implements ITrackingRepository {
 
         if (error) throw error;
     }
+
+    // Avant Mail Implementation
+    async getUnfinishedModulesByDate(studentId: string, date: string): Promise<any[]> {
+        // Fetch modulesENDING ON specific date
+        const { data, error } = await supabase
+            .from('Module')
+            .select(`
+                id, nom, date_fin, sous_branche_id, statut,
+                SousBranche:sous_branche_id (
+                    nom, ordre,
+                    Branche:branche_id (nom, ordre)
+                ),
+                Activite (
+                    id, titre, nombre_exercices, nombre_erreurs, statut_exigence,
+                    Progression (etat, eleve_id)
+                )
+            `)
+            .eq('date_fin', date)
+            .eq('statut', 'en_cours');
+
+        if (error) throw error;
+
+        // Note: Supabase doesn't easily support deep filtering on nested collections to Filter the Parent Row 
+        // entirely based on child state in a single select query without complex syntax or RPC.
+        // However, by filtering by DATE first, we have drastically reduced the dataset to usually 0-5 items,
+        // so filtering the "unfinished" status in memory is now extremely efficient and scalable.
+
+        // Filter progressions for specific student in memory 
+        // AND check if unfinished
+        if (data) {
+            const unfinishedModules = data.filter((m: any) => {
+                // Ensure activities rely on this student's progression
+                if (m.Activite) {
+                    m.Activite.forEach((act: any) => {
+                        if (act.Progression) {
+                            act.Progression = act.Progression.filter((p: any) => p.eleve_id === studentId);
+                        }
+                    });
+                }
+
+                // Check unfinished logic
+                const hasUnfinishedActivity = m.Activite?.some((activity: any) => {
+                    const progression = activity.Progression?.[0];
+                    return !progression || progression.etat !== 'valide';
+                });
+
+                return hasUnfinishedActivity;
+            });
+
+            return unfinishedModules;
+        }
+
+        return [];
+    }
 }

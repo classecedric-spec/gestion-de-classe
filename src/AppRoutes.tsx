@@ -35,13 +35,13 @@ const MobileDashboard = lazy(() => import('./pages/MobileDashboard'));
 const MobileEncodage = lazy(() => import('./pages/MobileEncodage'));
 const MobilePresence = lazy(() => import('./pages/MobilePresence'));
 const StudentKiosk = lazy(() => import('./pages/StudentKiosk'));
-const MobileVisionUrgente = lazy(() => import('./pages/MobileVisionUrgente'));
 const UserGuide = lazy(() => import('./pages/UserGuide'));
 
 // New Dashboard Tabs
 const DashboardOverview = lazy(() => import('./pages/Home/tabs/DashboardOverview'));
 const DashboardStudentsPage = lazy(() => import('./pages/Home/tabs/DashboardStudentsPage'));
-const VisionUrgente = lazy(() => import('./pages/Home/tabs/VisionUrgente'));
+const AvantMail = lazy(() => import('./pages/Home/tabs/AvantMail'));
+const VueRetard = lazy(() => import('./pages/Home/tabs/VueRetard'));
 
 const AppRoutes = () => {
     return (
@@ -103,7 +103,8 @@ const AppRoutes = () => {
                     <Route index element={<Navigate to="vue-d-ensemble" replace />} />
                     <Route path="vue-d-ensemble" element={<Suspense fallback={<PageLoader />}><DashboardOverview /></Suspense>} />
                     <Route path="eleves" element={<Suspense fallback={<PageLoader />}><DashboardStudentsPage /></Suspense>} />
-                    <Route path="vision-urgente" element={<Suspense fallback={<PageLoader />}><VisionUrgente /></Suspense>} />
+                    <Route path="avant-mail" element={<Suspense fallback={<PageLoader />}><AvantMail /></Suspense>} />
+                    <Route path="vue-retard" element={<Suspense fallback={<PageLoader />}><VueRetard /></Suspense>} />
                     <Route path="*" element={<div className="p-8 text-center text-grey-medium">Page en construction</div>} />
                 </Route>
 
@@ -144,11 +145,6 @@ const AppRoutes = () => {
                 </Suspense>
             } />
 
-            <Route path="/mobile-vision-urgente/:groupId" element={
-                <Suspense fallback={<PageLoader />}>
-                    <ProtectedRoute><MobileVisionUrgente /></ProtectedRoute>
-                </Suspense>
-            } />
 
             <Route path="/kiosk/*" element={
                 <Suspense fallback={<PageLoader />}>

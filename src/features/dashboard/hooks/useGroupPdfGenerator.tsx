@@ -43,6 +43,24 @@ export const useGroupPdfGenerator = () => {
             }
         }
 
+        // If no file handle (e.g. Safari), open window immediately to bypass popup blockers
+        let printWindow: Window | null = null;
+        if (!fileHandle) {
+            printWindow = window.open('', '_blank');
+            if (printWindow) {
+                printWindow.document.write(`
+                    <html>
+                        <head><title>Génération en cours...</title></head>
+                        <body style="font-family: sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; background: #f0f2f5;">
+                            <h2>Génération du PDF en cours...</h2>
+                            <p>Veuillez patienter, le document s'ouvrira automatiquement ici.</p>
+                            <div style="margin-top: 20px; font-size: 12px; color: #666;">Ne fermez pas cette fenêtre.</div>
+                        </body>
+                    </html>
+                `);
+            }
+        }
+
         setIsGenerating(true);
         abortRef.current = false;
         setProgress(5);
@@ -61,6 +79,7 @@ export const useGroupPdfGenerator = () => {
             if (studentIds.length === 0) {
                 alert("Aucun élève dans ce groupe.");
                 setIsGenerating(false);
+                if (printWindow) printWindow.close();
                 return;
             }
 
@@ -72,6 +91,7 @@ export const useGroupPdfGenerator = () => {
 
             if (!studentsInGroup) {
                 setIsGenerating(false);
+                if (printWindow) printWindow.close();
                 return;
             }
 
@@ -116,10 +136,11 @@ export const useGroupPdfGenerator = () => {
             if (bulkData.length === 0) {
                 alert("Aucun travail à faire trouvé pour ce groupe.");
                 setIsGenerating(false);
+                if (printWindow) printWindow.close();
                 return;
             }
 
-            setProgress(10);
+            setProgress(50);
             setProgressText('Préparation de la fusion...');
 
             // Dynamic import PDF libraries
@@ -133,11 +154,11 @@ export const useGroupPdfGenerator = () => {
             for (const studentData of bulkData) {
                 if (abortRef.current) throw new Error('ABORTED');
                 processed++;
-                const percentage = 10 + Math.round((processed / bulkData.length) * 70);
+                const percentage = 50 + Math.round((processed / bulkData.length) * 30);
                 setProgress(percentage);
                 setProgressText(`Génération : ${studentData.studentName}...`);
 
-                const blob = await renderer.pdf(<StudentTrackingPDFModern data={ studentData } />).toBlob();
+                const blob = await renderer.pdf(<StudentTrackingPDFModern data={studentData} />).toBlob();
                 const arrayBuffer = await blob.arrayBuffer();
                 const studentDoc = await PDFDocument.load(arrayBuffer);
                 const copiedPages = await mergedPdf.copyPages(studentDoc, studentDoc.getPageIndices());
@@ -145,7 +166,7 @@ export const useGroupPdfGenerator = () => {
             }
 
             // Eco Mode Assembly
-            setProgress(82);
+            setProgress(85);
             setProgressText('Mise en page LIVRET A5...');
             const bookletPdf = await PDFDocument.create();
             const mergedPdfBytes = await mergedPdf.save();
@@ -155,7 +176,7 @@ export const useGroupPdfGenerator = () => {
 
             for (let i = 0; i < pageCount; i += 2) {
                 if (abortRef.current) throw new Error('ABORTED');
-                const assemblyPercentage = 82 + Math.round((i / pageCount) * 13);
+                const assemblyPercentage = 85 + Math.round((i / pageCount) * 10);
                 setProgress(assemblyPercentage);
                 setProgressText(`Assemblage page ${Math.floor(i / 2) + 1}...`);
 
@@ -177,19 +198,24 @@ export const useGroupPdfGenerator = () => {
 
             const finalPdfBlob = new Blob([await bookletPdf.save()], { type: 'application/pdf' });
 
-            setProgress(95);
-            setProgressText('Sauvegarde...');
+            setProgress(100);
+            setProgressText('Terminé !');
 
             if (fileHandle) {
                 const writable = await fileHandle.createWritable();
                 await writable.write(finalPdfBlob);
                 await writable.close();
             } else {
-                saveAs(finalPdfBlob, finalPdfBlob);
+                // Should now work for Safari: redirect the pre-opened window
+                if (printWindow) {
+                    const url = URL.createObjectURL(finalPdfBlob);
+                    printWindow.location.href = url;
+                } else {
+                    // Fallback using saveAs if window failed to open
+                    saveAs(finalPdfBlob, filename);
+                }
             }
 
-            setProgress(100);
-            setProgressText('Terminé !');
             setTimeout(() => {
                 setIsGenerating(false);
                 setProgress(0);
@@ -201,9 +227,12 @@ export const useGroupPdfGenerator = () => {
                 console.error(error);
                 alert("Erreur lors de la génération du PDF.");
             }
+            if (printWindow) printWindow.close();
         } finally {
             if (!abortRef.current) setIsGenerating(false);
         }
+
+
     }, [isGenerating]);
 
     return {
