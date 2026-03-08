@@ -35,6 +35,7 @@ const MobileRequestCard: React.FC<MobileRequestCardProps> = ({
                 <button
                     onClick={(e) => { e.stopPropagation(); onClear(req); }}
                     className="absolute -top-2 -right-2 w-8 h-8 bg-danger text-white rounded-full flex items-center justify-center shadow-lg border-2 border-background z-10"
+                    title="Supprimer la demande"
                 >
                     <X size={16} strokeWidth={3} />
                 </button>
@@ -67,7 +68,7 @@ const MobileRequestCard: React.FC<MobileRequestCardProps> = ({
                     )}
 
                     {!req.is_suivi && req.activite?.titre && (
-                        <div className="ml-[20%] w-[80%]">
+                        <div className="ml-[20%] w-[80%] flex items-center justify-between gap-1 overflow-hidden pr-2">
                             <p className="text-[10px] text-grey-light font-medium truncate">
                                 {req.activite.titre}
                             </p>
@@ -76,7 +77,18 @@ const MobileRequestCard: React.FC<MobileRequestCardProps> = ({
                 </div>
 
                 {/* Badge Status */}
-                <div className="shrink-0 flex items-center justify-end">
+                <div className="shrink-0 flex flex-col items-end justify-center gap-1.5">
+                    {req.updated_at && (
+                        <span className="text-[9px] text-[#FFD700] font-bold whitespace-nowrap drop-shadow-sm">
+                            {new Intl.DateTimeFormat('fr-FR', {
+                                weekday: 'long',
+                                day: 'numeric',
+                                month: 'short',
+                                hour: '2-digit',
+                                minute: '2-digit'
+                            }).format(new Date(req.updated_at))}
+                        </span>
+                    )}
                     <div className={clsx(
                         "px-2 py-1 rounded-md font-black uppercase tracking-wider text-[10px] whitespace-nowrap",
                         req.is_suivi

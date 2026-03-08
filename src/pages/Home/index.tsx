@@ -13,6 +13,7 @@ import DashboardHeader from '../../features/dashboard/components/DashboardHeader
 // Modals
 import RandomPickerModal from '../../components/RandomPickerModal';
 import WeeklyPlannerModal from '../../components/WeeklyPlannerModal';
+import ResponsibilityOverviewModal from '../../features/responsibilities/components/ResponsibilityOverviewModal';
 
 const Home: React.FC = () => {
     const navigate = useNavigate();
@@ -36,9 +37,8 @@ const Home: React.FC = () => {
 
     const {
         dashboardData,
-        loading: loadingStats,
-        fetchDashboardDetails
-    } = useDashboardData();
+        loading: loadingStats
+    } = useDashboardData(sessionUserId, students);
 
     const {
         generateGroupTodoList,
@@ -47,13 +47,6 @@ const Home: React.FC = () => {
         progress: pdfProgress,
         progressText
     } = useGroupPdfGenerator();
-
-    // Trigger dashboard stats fetch when students are loaded
-    useEffect(() => {
-        if (sessionUserId && students?.length > 0) {
-            fetchDashboardDetails(sessionUserId, students);
-        }
-    }, [sessionUserId, students, fetchDashboardDetails]);
 
     // Local state
     // Derived state from URL or default to 'overview'
@@ -87,6 +80,7 @@ const Home: React.FC = () => {
     const [searchQuery, setSearchQuery] = useState('');
     const [isRandomPickerOpen, setIsRandomPickerOpen] = useState(false);
     const [isWeeklyPlannerOpen, setIsWeeklyPlannerOpen] = useState(false);
+    const [isResponsibilityOverviewOpen, setIsResponsibilityOverviewOpen] = useState(false);
 
     // ESC key handler for PDF generation
     useEffect(() => {
@@ -120,6 +114,7 @@ const Home: React.FC = () => {
         searchQuery,
         setSearchQuery,
         setIsWeeklyPlannerOpen,
+        setIsResponsibilityOverviewOpen,
         refetch
     };
 
@@ -156,6 +151,10 @@ const Home: React.FC = () => {
             <WeeklyPlannerModal
                 isOpen={isWeeklyPlannerOpen}
                 onClose={() => setIsWeeklyPlannerOpen(false)}
+            />
+            <ResponsibilityOverviewModal
+                isOpen={isResponsibilityOverviewOpen}
+                onClose={() => setIsResponsibilityOverviewOpen(false)}
             />
         </div>
     );

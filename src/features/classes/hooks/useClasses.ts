@@ -1,5 +1,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { classService, ClassWithAdults, StudentWithRelations } from '../services/classService';
+import { getCurrentUser } from '../../../lib/database';
 import { getCachedPhoto, setCachedPhoto, isCacheEnabled } from '../../../lib/storage';
 
 export interface ClassesState {
@@ -25,11 +27,8 @@ export interface ClassesState {
 }
 
 export const useClasses = () => {
-    const [classes, setClasses] = useState<ClassWithAdults[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [selectedClass, setSelectedClass] = useState<ClassWithAdults | null>(null);
-    const [studentsInClass, setStudentsInClass] = useState<StudentWithRelations[]>([]);
-    const [loadingStudents, setLoadingStudents] = useState(false);
+    const queryClient = useQueryClient();
+    const [selectedClassId, setSelectedClassId] = useState<string | null>(null);
 
     // Filters & Sort
     const [searchQuery, setSearchQuery] = useState('');
@@ -55,17 +54,40 @@ export const useClasses = () => {
         classToDelete: null
     });
 
-    // --- Data Fetching ---
+    // 0. User fetching
+    const { data: user } = useQuery({
+        queryKey: ['user'],
+        queryFn: getCurrentUser,
+        staleTime: Infinity,
+    });
 
-    const fetchStudents = useCallback(async (classId: string) => {
-        if (!classId) return;
-        setLoadingStudents(true);
-        try {
-            const data = await classService.getStudentsByClass(classId);
+    // 1. Fetching des classes
+    const { data: classes = [], isLoading: loading } = useQuery({
+        queryKey: ['classes', user?.id],
+        queryFn: async () => {
+            if (!user) return [];
+            return await classService.getClasses();
+        },
+        enabled: !!user,
+        staleTime: 1000 * 60 * 5,
+    });
 
-            // Apply photo caching logic
+    // 2. Sélection de la classe courante
+    const selectedClass = useMemo(() => {
+        if (!selectedClassId && classes.length > 0) return classes[0];
+        return classes.find(c => c.id === selectedClassId) || (classes.length > 0 ? classes[0] : null);
+    }, [classes, selectedClassId]);
+
+    // 3. Fetching des élèves de la classe sélectionnée
+    const { data: studentsInClass = [], isLoading: loadingStudents } = useQuery({
+        queryKey: ['students-in-class', user?.id, selectedClass?.id],
+        queryFn: async () => {
+            if (!selectedClass || !user) return [];
+            const data = await classService.getStudentsByClass(selectedClass.id);
+
+            // Fetching & caching photo logic stays similar but encapsulated in queryFn
             if (isCacheEnabled() && data) {
-                const studentsWithCachedPhotos = await Promise.all(
+                return await Promise.all(
                     data.map(async (student) => {
                         if (student.photo_hash) {
                             const cachedPhoto = await getCachedPhoto(student.id, student.photo_hash);
@@ -77,57 +99,24 @@ export const useClasses = () => {
                         return student as StudentWithRelations;
                     })
                 );
-                setStudentsInClass(studentsWithCachedPhotos || []);
-            } else {
-                setStudentsInClass((data as any) || []);
             }
-        } catch (error) {
-            console.error("Error fetching students:", error);
-        } finally {
-            setLoadingStudents(false);
-        }
-    }, []);
+            return (data as any) || [];
+        },
+        enabled: !!selectedClass && !!user,
+        staleTime: 1000 * 60 * 5,
+    });
 
-    const fetchClasses = useCallback(async (keepSelection = false) => {
-        setLoading(true);
-        try {
-            const data = await classService.getClasses();
-            setClasses(data);
-
-            // Re-sync selected class if it was updated
-            if (keepSelection && selectedClass) {
-                const updated = data.find(c => c.id === selectedClass.id);
-                if (updated) setSelectedClass(updated);
-            } else if (data.length > 0 && !selectedClass) {
-                // Default select first class if none selected
-                setSelectedClass(data[0]);
-            }
-        } catch (error) {
-            console.error("Error fetching classes:", error);
-        } finally {
-            setLoading(false);
-        }
-    }, [selectedClass]);
-
-    // Initial Load
+    // Sync selectedClassId if current selection disappears
     useEffect(() => {
-        fetchClasses();
-    }, [fetchClasses]);
-
-    // Load students when a class is selected
-    useEffect(() => {
-        if (selectedClass) {
-            fetchStudents(selectedClass.id);
-        } else {
-            setStudentsInClass([]);
+        if (selectedClass && selectedClass.id !== selectedClassId) {
+            setSelectedClassId(selectedClass.id);
         }
-    }, [selectedClass, fetchStudents]);
+    }, [selectedClass, selectedClassId]);
 
     // --- Actions ---
 
     const handleSelectClass = (classe: ClassWithAdults) => {
-        setSelectedClass(classe);
-        fetchStudents(classe.id);
+        setSelectedClassId(classe.id);
     };
 
     const handleSort = (key: string) => {
@@ -152,104 +141,108 @@ export const useClasses = () => {
         }
     };
 
-    const handleAddClass = useCallback((newClass: ClassWithAdults) => {
-        // Optimistic update: add new class to local state immediately
-        setClasses(prev => {
-            const updated = [...prev, newClass];
-            return updated.sort((a, b) => (a.nom || '').localeCompare(b.nom || ''));
-        });
+    const deleteClassMutation = useMutation({
+        mutationFn: (id: string) => classService.deleteClass(id),
+        onMutate: async (id) => {
+            const queryKey = ['classes', user?.id];
+            await queryClient.cancelQueries({ queryKey });
+            const previousClasses = queryClient.getQueryData<ClassWithAdults[]>(queryKey) || [];
 
-        // Select the newly created class
-        setSelectedClass(newClass);
-    }, []);
+            queryClient.setQueryData<ClassWithAdults[]>(queryKey,
+                previousClasses.filter(c => c.id !== id)
+            );
 
-    const handleUpdateClass = useCallback((updatedClass: ClassWithAdults) => {
-        // Optimistic update: replace old class with updated data
-        setClasses(prev =>
-            prev.map(c => c.id === updatedClass.id ? updatedClass : c)
-                .sort((a, b) => (a.nom || '').localeCompare(b.nom || ''))
-        );
+            if (selectedClassId === id) {
+                const remaining = previousClasses.filter(c => c.id !== id);
+                setSelectedClassId(remaining.length > 0 ? remaining[0].id : null);
+            }
 
-        // Sync selection if the updated class is current
-        if (selectedClass?.id === updatedClass.id) {
-            setSelectedClass(updatedClass);
+            return { previousClasses, queryKey };
+        },
+        onError: (_err, _variables, context) => {
+            if (context?.previousClasses) queryClient.setQueryData(context.queryKey, context.previousClasses);
+        },
+        onSettled: () => {
+            queryClient.invalidateQueries({ queryKey: ['classes', user?.id] });
         }
-    }, [selectedClass]);
+    });
+
+    const addClassMutation = useMutation({
+        mutationFn: (newClass: any) => classService.createClass(newClass),
+        onSettled: () => {
+            queryClient.invalidateQueries({ queryKey: ['classes', user?.id] });
+        }
+    });
+
+    const removeStudentMutation = useMutation({
+        mutationFn: (studentId: string) => classService.removeStudentFromClass(studentId),
+        onMutate: async (studentId) => {
+            const queryKey = ['students-in-class', user?.id, selectedClass?.id];
+            await queryClient.cancelQueries({ queryKey });
+            const previous = queryClient.getQueryData<StudentWithRelations[]>(queryKey) || [];
+
+            queryClient.setQueryData<StudentWithRelations[]>(queryKey,
+                previous.filter(s => s.id !== studentId)
+            );
+            return { previous, queryKey };
+        },
+        onError: (_err, _variables, context) => {
+            if (context?.previous) queryClient.setQueryData(context.queryKey, context.previous);
+        },
+        onSettled: () => {
+            queryClient.invalidateQueries({ queryKey: ['students-in-class', user?.id, selectedClass?.id] });
+            queryClient.invalidateQueries({ queryKey: ['students', user?.id] });
+        }
+    });
+
+    const updateStudentMutation = useMutation({
+        mutationFn: ({ studentId, field, value }: { studentId: string, field: string, value: any }) =>
+            classService.updateStudentField(studentId, field as any, value),
+        onMutate: async ({ studentId, field, value }) => {
+            const queryKey = ['students-in-class', user?.id, selectedClass?.id];
+            await queryClient.cancelQueries({ queryKey });
+            const previous = queryClient.getQueryData<StudentWithRelations[]>(queryKey) || [];
+
+            queryClient.setQueryData<StudentWithRelations[]>(queryKey,
+                previous.map(s => s.id === studentId ? { ...s, [field]: value } : s)
+            );
+            return { previous, queryKey };
+        },
+        onError: (_err, _variables, context) => {
+            if (context?.previous) queryClient.setQueryData(context.queryKey, context.previous);
+        },
+        onSettled: () => {
+            queryClient.invalidateQueries({ queryKey: ['students-in-class', user?.id, selectedClass?.id] });
+            queryClient.invalidateQueries({ queryKey: ['students', user?.id] });
+        }
+    });
+
+    const handleAddClass = useCallback((classData: any) => {
+        addClassMutation.mutate(classData);
+    }, [addClassMutation]);
+
+    const handleUpdateClass = useCallback((_updatedClass: ClassWithAdults) => {
+        queryClient.invalidateQueries({ queryKey: ['classes', user?.id] });
+    }, [queryClient, user?.id]);
 
     const handleDeleteClass = async () => {
         const target = activeItem.classToDelete;
         if (!target) return;
-
-        const previousClasses = [...classes];
-        const previousSelection = selectedClass;
-
-        // Optimistic UI Update: remove class from local state immediately
-        const remainingClasses = classes.filter(c => c.id !== target.id);
-        setClasses(remainingClasses);
-
-        // If the deleted class was selected, select first remaining class
-        if (selectedClass?.id === target.id) {
-            setSelectedClass(remainingClasses.length > 0 ? remainingClasses[0] : null);
-            setStudentsInClass([]);
-        }
-
+        deleteClassMutation.mutate(target.id);
         toggleModal('deleteConfirm', false);
-
-        try {
-            await classService.deleteClass(target.id);
-        } catch (error: any) {
-            alert('Erreur suppression: ' + error.message);
-            // Revert on error
-            setClasses(previousClasses);
-            setSelectedClass(previousSelection);
-            if (previousSelection?.id === target.id) {
-                fetchStudents(target.id);
-            }
-        }
     };
 
-
-
-    const handleAddStudent = useCallback((newStudent: StudentWithRelations) => {
-        // Optimistic Check: Does this student belong to the currently selected class?
-        if (selectedClass && newStudent.classe_id === selectedClass.id) {
-            setStudentsInClass(prev => {
-                // Prevent duplicates just in case
-                if (prev.some(s => s.id === newStudent.id)) return prev;
-
-                const updated = [...prev, newStudent];
-                // Sort by name (simple default sort)
-                return updated.sort((a, b) => (a.nom || '').localeCompare(b.nom || ''));
-            });
-        }
-    }, [selectedClass]);
+    const handleAddStudent = useCallback((_newStudent: StudentWithRelations) => {
+        queryClient.invalidateQueries({ queryKey: ['students-in-class', user?.id, selectedClass?.id] });
+        queryClient.invalidateQueries({ queryKey: ['students', user?.id] });
+    }, [queryClient, selectedClass?.id, user?.id]);
 
     const handleRemoveStudent = async (studentId: string) => {
-        // Optimistic update
-        const previousStudents = [...studentsInClass];
-        setStudentsInClass(prev => prev.filter(s => s.id !== studentId));
-
-        try {
-            await classService.removeStudentFromClass(studentId);
-        } catch (error: any) {
-            alert('Erreur: ' + error.message);
-            // Revert on error
-            setStudentsInClass(previousStudents);
-        }
+        removeStudentMutation.mutate(studentId);
     };
 
     const handleUpdateStudent = async (studentId: string, field: string, value: any) => {
-        // Optimistic update
-        setStudentsInClass(prev => prev.map(s =>
-            s.id === studentId ? { ...s, [field]: value } : s
-        ));
-
-        try {
-            await classService.updateStudentField(studentId, field as any, value);
-        } catch (error) {
-            console.error('Error updating student:', error);
-            if (selectedClass) fetchStudents(selectedClass.id);
-        }
+        updateStudentMutation.mutate({ studentId, field, value });
     };
 
     // --- Computed ---
@@ -297,8 +290,8 @@ export const useClasses = () => {
         handleAddStudent,
         handleRemoveStudent,
         handleUpdateStudent,
-        refreshClasses: fetchClasses,
-        refreshStudents: () => fetchStudents(selectedClass?.id || ''),
+        refreshClasses: () => queryClient.invalidateQueries({ queryKey: ['classes', user?.id] }),
+        refreshStudents: () => queryClient.invalidateQueries({ queryKey: ['students-in-class', user?.id, selectedClass?.id] }),
 
         // Modals / Active Items
         modals,

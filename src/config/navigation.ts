@@ -40,6 +40,7 @@ export const MAIN_NAV_ITEMS: MainNavItem[] = [
     { type: 'separator' } as NavSeparator,
     { icon: Users, label: 'Utilisateurs', path: ROUTES.DASHBOARD_USER },
     { icon: Puzzle, label: 'Activités', path: ROUTES.DASHBOARD_ACTIVITIES },
+    { icon: FileText, label: 'Responsabilités', path: ROUTES.DASHBOARD_RESPONSABILITES },
     { icon: Mail, label: 'Communications', path: ROUTES.DASHBOARD_COMMUNICATIONS },
     { type: 'separator' } as NavSeparator,
     { icon: Smartphone, label: 'Suivi Mobile', path: '/mobile-suivi', isExternal: true },

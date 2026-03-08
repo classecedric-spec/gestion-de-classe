@@ -42,7 +42,8 @@ const Layout: React.FC = () => {
     const isUserPage = location.pathname.startsWith('/dashboard/user');
     const isActivitiesPage = location.pathname.startsWith('/dashboard/activities');
     const isSettingsPage = location.pathname.startsWith('/dashboard/settings');
-    const isFullPage = isSuiviPage || isPresencePage || isUserPage || isActivitiesPage || isSettingsPage;
+    const isResponsabilitesPage = location.pathname.startsWith('/dashboard/responsabilities');
+    const isFullPage = isSuiviPage || isPresencePage || isUserPage || isActivitiesPage || isSettingsPage || isResponsabilitesPage;
 
     // Filter nav items based on session and validation status
     const displayedNavItems = session

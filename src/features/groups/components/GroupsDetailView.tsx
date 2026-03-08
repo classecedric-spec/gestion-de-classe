@@ -90,7 +90,7 @@ export const GroupsDetailView: React.FC<GroupsDetailViewProps> = ({
                         <div className="flex-1 overflow-y-auto px-2 pt-2 custom-scrollbar">
                             <h3 className="text-sm font-bold uppercase tracking-widest text-grey-dark border-b border-white/5 pb-4 mb-6 flex items-center gap-2">
                                 <GraduationCap size={18} className="text-primary" />
-                                Les enfants de ce groupe
+                                Les enfants de ce groupe ({studentsInGroup.length})
                             </h3>
 
                             {loadingStudents ? (

@@ -26,10 +26,11 @@ export interface StudentFormState {
 }
 
 export interface UseStudentFormProps {
+    studentId: string | null;
     isEditing: boolean;
-    editId: string | null;
-    onSaved: (student: any) => void;
     onClose: () => void;
+    onSaved: (studentData: any, groupIds: string[], photoBase64: string | null) => void;
+    editId: string | null;
 }
 
 export const useStudentForm = ({ isEditing, editId, onSaved, onClose }: UseStudentFormProps) => {
@@ -213,7 +214,6 @@ export const useStudentForm = ({ isEditing, editId, onSaved, onClose }: UseStude
                 date_naissance: student.date_naissance || null,
                 classe_id: student.classe_id || null,
                 niveau_id: student.niveau_id || null,
-                // user_id: user.id, // REMOVED: Column does not exist
                 parent1_nom: student.parent1_nom,
                 parent1_prenom: student.parent1_prenom,
                 parent1_email: student.parent1_email,
@@ -221,45 +221,13 @@ export const useStudentForm = ({ isEditing, editId, onSaved, onClose }: UseStude
                 parent2_prenom: student.parent2_prenom,
                 parent2_email: student.parent2_email,
                 nom_parents: student.nom_parents,
-                // photo_base64 removed from here
                 photo_url: student.photo_url,
                 sex: student.sex,
                 titulaire_id: user.id
             } as any;
 
-            const savedId = await studentService.saveStudent(
-                studentData,
-                student.groupe_ids,
-                user.id,
-                isEditing,
-                editId,
-                student.photo_base64 // Pass it here
-            );
-
-            // 2. Optimistic / Fallback Retrieval
-            let fullStudent: any = null;
-            try {
-                // Attempt to fetch real record
-                fullStudent = await studentService.getStudent(savedId);
-            } catch (e) {
-                console.warn("Could not fetch new student immediately due to latency/error", e);
-            }
-
-            // 3. Fallback Construction (if fetch failed or returned null)
-            if (!fullStudent) {
-                console.warn("Using local fallback for new student");
-                fullStudent = {
-                    id: savedId,
-                    created_at: new Date().toISOString(),
-                    ...studentData,
-                    // Hydrate Relations for UI display
-                    Classe: classesList.find(c => c.id === studentData.classe_id) || null,
-                    Niveau: niveauxList.find(n => n.id === studentData.niveau_id) || null,
-                    // Add other relations if necessary (like EleveGroupe if needed for UI)
-                };
-            }
-
-            onSaved(fullStudent as any);
+            // Delegate saving to the parent (useStudentsData mutation)
+            onSaved(studentData, student.groupe_ids, student.photo_base64 || null);
             onClose();
             return true;
         } catch (err: unknown) {

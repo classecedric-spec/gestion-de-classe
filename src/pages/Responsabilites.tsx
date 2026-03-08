@@ -1,0 +1,238 @@
+import React, { useState } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { Card, Button, Avatar, Input, SuspenseLoader } from '../core';
+import { ClipboardList, Plus, Search, Trash2, UserPlus, X } from 'lucide-react';
+import { responsabiliteService, ResponsabiliteWithEleves } from '../features/responsibilities/services/responsabiliteService';
+import AddStudentToTaskModal from '../features/responsibilities/components/AddStudentToTaskModal';
+import { useAuth } from '../hooks/useAuth';
+import { toast } from 'react-hot-toast';
+import { getInitials } from '../lib/helpers';
+
+const Responsabilites: React.FC = () => {
+    const { session } = useAuth();
+    const queryClient = useQueryClient();
+    const [newTaskTitle, setNewTaskTitle] = useState('');
+    const [searchQuery, setSearchQuery] = useState('');
+
+    // Assignment modal state
+    const [selectedTask, setSelectedTask] = useState<ResponsabiliteWithEleves | null>(null);
+
+    // 1. Fetch data
+    const { data: tasks = [], isLoading } = useQuery({
+        queryKey: ['responsibilities', session?.user.id],
+        queryFn: () => responsabiliteService.getResponsibilities(session!.user.id),
+        enabled: !!session?.user.id,
+    });
+
+    // 2. Mutations
+    const createTaskMutation = useMutation({
+        mutationFn: (titre: string) => responsabiliteService.createResponsibility(session!.user.id, titre),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['responsibilities', session?.user.id] });
+            setNewTaskTitle('');
+            toast.success("Responsabilité créée");
+        },
+        onError: () => toast.error("Erreur lors de la création")
+    });
+
+    const deleteTaskMutation = useMutation({
+        mutationFn: (id: string) => responsabiliteService.deleteResponsibility(id),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['responsibilities', session?.user.id] });
+            toast.success("Responsabilité supprimée");
+        },
+        onError: () => toast.error("Erreur lors de la suppression")
+    });
+
+    const assignMutation = useMutation({
+        mutationFn: ({ taskId, eleveIds }: { taskId: string, eleveIds: string[] }) =>
+            responsabiliteService.assignStudents(session!.user.id, taskId, eleveIds),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['responsibilities', session?.user.id] });
+            toast.success("Élèves assignés");
+            setSelectedTask(null);
+        },
+        onError: () => toast.error("Erreur lors de l'assignation")
+    });
+
+    const unassignMutation = useMutation({
+        mutationFn: (assignmentId: string) => responsabiliteService.unassignStudent(assignmentId),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['responsibilities', session?.user.id] });
+            toast.success("Assignation retirée");
+        },
+        onError: () => toast.error("Erreur lors du retrait")
+    });
+
+    // Handlers
+    const handleAddTask = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!newTaskTitle.trim()) return;
+        createTaskMutation.mutate(newTaskTitle.trim());
+    };
+
+    const filteredTasks = tasks.filter(task =>
+        task.titre.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+
+    if (isLoading) return <SuspenseLoader />;
+
+    return (
+        <div className="space-y-6 animate-in fade-in duration-500">
+            {/* Header */}
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+                <div className="flex items-center gap-3">
+                    <div className="p-3 bg-primary/10 rounded-xl">
+                        <ClipboardList className="w-8 h-8 text-primary" />
+                    </div>
+                    <div>
+                        <h1 className="text-3xl font-bold tracking-tight text-white">Responsabilités</h1>
+                        <p className="text-grey-medium">Attribuez des rôles et tâches aux élèves</p>
+                    </div>
+                </div>
+
+                <form onSubmit={handleAddTask} className="flex items-center gap-2">
+                    <Input
+                        placeholder="Nouvelle tâche (ex: Facteur)..."
+                        value={newTaskTitle}
+                        onChange={(e) => setNewTaskTitle(e.target.value)}
+                        className="w-full md:w-64"
+                    />
+                    <Button
+                        type="submit"
+                        variant="primary"
+                        disabled={!newTaskTitle.trim() || createTaskMutation.isPending}
+                        icon={Plus}
+                    >
+                        Ajouter
+                    </Button>
+                </form>
+            </div>
+
+            {/* Content Table */}
+            <Card variant="glass" className="overflow-hidden border-none shadow-premium">
+                <div className="p-4 border-b border-white/5 bg-white/5 flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                        <Search className="w-4 h-4 text-grey-medium" />
+                        <input
+                            type="text"
+                            placeholder="Filtrer les tâches..."
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            className="bg-transparent border-none text-sm text-white focus:ring-0 placeholder:text-grey-dark w-48 md:w-64"
+                        />
+                    </div>
+                    <div className="text-xs font-medium text-grey-medium uppercase tracking-widest hidden md:block">
+                        Total : {filteredTasks.length} tâches
+                    </div>
+                </div>
+
+                {filteredTasks.length === 0 ? (
+                    <div className="py-20 text-center flex flex-col items-center justify-center">
+                        <div className="p-4 bg-white/5 rounded-full mb-4">
+                            <ClipboardList className="w-12 h-12 text-grey-dark" />
+                        </div>
+                        <h3 className="text-xl font-bold text-white mb-2">Aucune responsabilité</h3>
+                        <p className="text-grey-medium max-w-xs mx-auto">
+                            Commencez par ajouter une tâche pour organiser votre classe.
+                        </p>
+                    </div>
+                ) : (
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-left">
+                            <thead className="bg-[#1a1a1a]/50 text-xs font-bold text-grey-medium uppercase tracking-wider">
+                                <tr>
+                                    <th className="px-6 py-4 w-1/3">Tâche / Responsabilité</th>
+                                    <th className="px-6 py-4">Élèves Assignés</th>
+                                    <th className="px-6 py-4 text-right">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-white/5">
+                                {filteredTasks.map((task) => (
+                                    <tr key={task.id} className="group hover:bg-white/5 transition-colors">
+                                        <td className="px-6 py-6 align-top">
+                                            <div className="flex flex-col gap-1">
+                                                <span className="text-lg font-bold text-white group-hover:text-primary transition-colors">
+                                                    {task.titre}
+                                                </span>
+                                                <span className="text-[10px] text-grey-dark font-medium uppercase tracking-tighter">
+                                                    Créé le {new Date(task.created_at).toLocaleDateString()}
+                                                </span>
+                                            </div>
+                                        </td>
+                                        <td className="px-6 py-6 align-top">
+                                            <div className="flex flex-wrap gap-2 min-h-[44px]">
+                                                {task.eleves && task.eleves.length > 0 ? (
+                                                    task.eleves.map((assignment) => (
+                                                        <div
+                                                            key={assignment.id}
+                                                            className="flex items-center gap-2 bg-white/5 pl-1 pr-2 py-1 rounded-full group/chip hover:bg-white/10 transition-all border border-white/5"
+                                                        >
+                                                            <Avatar
+                                                                size="xs"
+                                                                initials={getInitials(assignment.eleve as any)}
+                                                                src={assignment.eleve.photo_url}
+                                                            />
+                                                            <span className="text-sm font-medium text-white pr-1">
+                                                                {assignment.eleve.prenom} {assignment.eleve.nom}
+                                                            </span>
+                                                            <button
+                                                                onClick={() => unassignMutation.mutate(assignment.id)}
+                                                                className="p-0.5 hover:bg-danger/20 rounded-full text-grey-medium hover:text-danger transition-colors"
+                                                                title="Retirer"
+                                                            >
+                                                                <X className="w-3.5 h-3.5" />
+                                                            </button>
+                                                        </div>
+                                                    ))
+                                                ) : (
+                                                    <span className="text-sm text-grey-dark italic py-2">
+                                                        Aucun élève assigné
+                                                    </span>
+                                                )}
+
+                                                <button
+                                                    onClick={() => setSelectedTask(task)}
+                                                    className="flex items-center gap-1 text-xs font-bold text-primary hover:bg-primary/10 px-3 py-1.5 rounded-full transition-all border border-primary/20 hover:border-primary/50"
+                                                >
+                                                    <UserPlus className="w-3.5 h-3.5" />
+                                                    Assigner
+                                                </button>
+                                            </div>
+                                        </td>
+                                        <td className="px-6 py-6 text-right align-top">
+                                            <button
+                                                onClick={() => {
+                                                    if (confirm(`Supprimer la tâche "${task.titre}" ?`)) {
+                                                        deleteTaskMutation.mutate(task.id);
+                                                    }
+                                                }}
+                                                className="p-2 text-grey-dark hover:text-danger hover:bg-danger/10 rounded-lg transition-all"
+                                                title="Supprimer la tâche"
+                                            >
+                                                <Trash2 className="w-5 h-5" />
+                                            </button>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                )}
+            </Card>
+
+            {/* Modals */}
+            {selectedTask && (
+                <AddStudentToTaskModal
+                    isOpen={!!selectedTask}
+                    onClose={() => setSelectedTask(null)}
+                    taskTitle={selectedTask.titre}
+                    alreadyAssignedIds={selectedTask.eleves.map(e => e.eleve_id)}
+                    onSelect={(eleveIds) => assignMutation.mutate({ taskId: selectedTask.id, eleveIds })}
+                />
+            )}
+        </div>
+    );
+};
+
+export default Responsabilites;

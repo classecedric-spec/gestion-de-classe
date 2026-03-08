@@ -7,7 +7,7 @@ export class SupabaseStudentRepository implements IStudentRepository {
     async findById(id: string): Promise<Tables<'Eleve'> | null> {
         const { data, error } = await supabase
             .from('Eleve')
-            .select('id, nom, prenom, photo_url, sex, date_naissance, niveau_id, classe_id, titulaire_id, importance_suivi, trust_trend, updated_at')
+            .select('*')
             .eq('id', id)
             .single();
 
@@ -109,7 +109,7 @@ export class SupabaseStudentRepository implements IStudentRepository {
     async findByClass(classId: string): Promise<Tables<'Eleve'>[]> {
         const { data, error } = await supabase
             .from('Eleve')
-            .select('id, nom, prenom, photo_url, sex, niveau_id, importance_suivi, trust_trend')
+            .select('*')
             .eq('classe_id', classId)
             .order('nom');
 
@@ -137,7 +137,7 @@ export class SupabaseStudentRepository implements IStudentRepository {
         const { data, error } = await supabase
             .from('Eleve')
             .select(`
-                id, prenom, nom, niveau_id, trust_trend, EleveGroupe!inner(groupe_id)
+                *, EleveGroupe!inner(groupe_id)
             `)
             .in('EleveGroupe.groupe_id', groupIds);
 
@@ -181,7 +181,7 @@ export class SupabaseStudentRepository implements IStudentRepository {
     async getStudentsDelta(teacherId: string): Promise<{ delta: any[], isFirstSync: boolean }> {
         const { delta, isFirstSync } = await fetchDelta(
             'Eleve',
-            'id, nom, prenom, photo_url, photo_hash, sex, date_naissance, niveau_id, classe_id, updated_at, trust_trend, Niveau(nom, ordre), Classe(nom)',
+            'id, nom, prenom, photo_url, photo_hash, sex, date_naissance, niveau_id, classe_id, updated_at, trust_trend, parent1_nom, parent1_prenom, parent1_email, parent2_nom, parent2_prenom, parent2_email, nom_parents, Niveau(nom, ordre), Classe(nom)',
             { titulaire_id: teacherId }
         );
         return { delta, isFirstSync };

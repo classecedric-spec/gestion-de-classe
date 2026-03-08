@@ -29,6 +29,7 @@ const Presence: React.FC = () => {
         // Actions
         moveStudent,
         markUnassignedAbsent,
+        markUnassignedPresent,
 
         // Getters
         getStudentsForCategory,
@@ -191,16 +192,26 @@ const Presence: React.FC = () => {
                                 </AttendanceColumn>
                             </div>
 
-                            {/* Action: Mark rest as absent */}
+                            {/* Action: Mark rest as absent / present */}
                             {trulyUnassigned.length > 0 && !isSetupLocked && (
-                                <Button
-                                    onClick={markUnassignedAbsent}
-                                    variant="secondary"
-                                    className="w-full hover:text-danger hover:border-danger/30 group"
-                                >
-                                    <span className="w-2 h-2 rounded-full bg-danger group-hover:animate-pulse" />
-                                    Marquer restants comme absents
-                                </Button>
+                                <div className="flex flex-col gap-2">
+                                    <Button
+                                        onClick={markUnassignedPresent}
+                                        variant="secondary"
+                                        className="w-full hover:text-emerald-500 hover:border-emerald-500/30 group"
+                                    >
+                                        <span className="w-2 h-2 rounded-full bg-emerald-500 group-hover:animate-pulse" />
+                                        Marquer restants comme présents
+                                    </Button>
+                                    <Button
+                                        onClick={markUnassignedAbsent}
+                                        variant="secondary"
+                                        className="w-full hover:text-danger hover:border-danger/30 group"
+                                    >
+                                        <span className="w-2 h-2 rounded-full bg-danger group-hover:animate-pulse" />
+                                        Marquer restants comme absents
+                                    </Button>
+                                </div>
                             )}
                         </div>
 

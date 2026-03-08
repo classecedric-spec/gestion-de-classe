@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import ReactQuill from 'react-quill';
-import 'react-quill/dist/quill.snow.css';
-import { Send, Users, CheckCircle, AlertCircle, Loader2 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Send, Users, AlertCircle, Loader2, ExternalLink } from 'lucide-react';
+import clsx from 'clsx';
 import { Card, Button, Input } from '../core';
 import { supabase, getCurrentUser } from '../lib/database';
 import { SupabaseGroupRepository } from '../features/groups/repositories/SupabaseGroupRepository';
@@ -18,7 +18,6 @@ const Communications: React.FC = () => {
     const [message, setMessage] = useState('');
     const [loading, setLoading] = useState(true);
     const [sending, setSending] = useState(false);
-    const [userProfile, setUserProfile] = useState<any>(null);
 
     useEffect(() => {
         loadInitialData();
@@ -28,14 +27,6 @@ const Communications: React.FC = () => {
         try {
             const user = await getCurrentUser();
             if (!user) return;
-
-            // Load user profile to check for API Key
-            const { data: profile } = await supabase
-                .from('CompteUtilisateur')
-                .select('*')
-                .eq('id', user.id)
-                .single();
-            setUserProfile(profile);
 
             // Load groups
             const userGroups = await groupRepository.getUserGroups(user.id);
@@ -57,11 +48,6 @@ const Communications: React.FC = () => {
             return;
         }
 
-        if (!userProfile?.brevo_api_key) {
-            toast.error('Aucune clé API Brevo configurée dans votre profil');
-            return;
-        }
-
         setSending(true);
         try {
             // 1. Get students and parents emails
@@ -72,12 +58,12 @@ const Communications: React.FC = () => {
 
             students.forEach((student: any) => {
                 let hasEmail = false;
-                if (student.parent1_email) {
-                    recipients.add(student.parent1_email);
+                if (student.parent1_email?.trim()) {
+                    recipients.add(student.parent1_email.trim());
                     hasEmail = true;
                 }
-                if (student.parent2_email) {
-                    recipients.add(student.parent2_email);
+                if (student.parent2_email?.trim()) {
+                    recipients.add(student.parent2_email.trim());
                     hasEmail = true;
                 }
 
@@ -94,56 +80,14 @@ const Communications: React.FC = () => {
                 return;
             }
 
-            const recipientsList = Array.from(recipients).map(email => ({ email }));
+            // Create mailto link
+            const bccList = Array.from(recipients).join(',');
+            const mailtoLink = `mailto:?bcc=${bccList}&subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(message)}`;
 
-            // 2. Prepare Report for Sender
-            const senderReport = `
-                <hr />
-                <h3>Rapport d'envoi</h3>
-                <p><strong>Message envoyé à :</strong> ${recipients.size} destinataire(s)</p>
-                <ul>
-                    ${reportLines.map(line => `<li>${line}</li>`).join('')}
-                </ul>
-            `;
+            // Open local mail client
+            window.location.href = mailtoLink;
 
-            // 3. Send Email (Parents via BCC, Sender via TO + Report)
-            // We'll make two calls or one smart call? 
-            // The constraint: We want parents to NOT see each other. BCC does that.
-            // We want sender to see the report. Parents MUST NOT see the report.
-            // So we MUST make two separate calls.
-
-            // Call 1: To Parents
-            const { error: errorParents } = await supabase.functions.invoke('send-email', {
-                body: {
-                    to: [{ email: userProfile.email || 'no-reply@gestion-de-classe.com', name: 'Copie Professeur' }], // Brevo requires a TO
-                    bcc: recipientsList,
-                    subject: subject,
-                    htmlContent: message
-                }
-            });
-
-            if (errorParents) throw errorParents;
-
-            // Call 2: To Sender with Report
-            const { error: errorReport } = await supabase.functions.invoke('send-email', {
-                body: {
-                    to: [{ email: userProfile.email, name: `${userProfile.prenom} ${userProfile.nom}` }],
-                    subject: `[Rapport] ${subject}`,
-                    htmlContent: `
-                        <div style="background-color: #f0f9ff; padding: 15px; margin-bottom: 20px; border-left: 4px solid #0ea5e9;">
-                            Ceci est votre copie avec le rapport d'envoi.
-                        </div>
-                        ${message}
-                        ${senderReport}
-                    `
-                }
-            });
-
-            if (errorReport) console.error('Error sending report:', errorReport);
-
-            toast.success('Emails envoyés avec succès !');
-            setSubject('');
-            setMessage('');
+            toast.success('Ouverture de votre client mail local...');
 
         } catch (error: any) {
             console.error('Error sending emails:', error);
@@ -162,12 +106,10 @@ const Communications: React.FC = () => {
                     <h1 className="text-3xl font-black text-white tracking-tight">Communication</h1>
                     <p className="text-grey-medium mt-1">Envoyez des emails groupés aux parents.</p>
                 </div>
-                {!userProfile?.brevo_api_key && (
-                    <div className="flex items-center gap-2 px-4 py-2 bg-red-500/10 border border-red-500/20 rounded-lg text-red-400">
-                        <AlertCircle size={18} />
-                        <span className="text-sm font-bold">Clé API manquante dans votre profil</span>
-                    </div>
-                )}
+                <div className="flex items-center gap-2 px-4 py-2 bg-primary/10 border border-primary/20 rounded-lg text-primary">
+                    <AlertCircle size={18} />
+                    <span className="text-sm font-bold">Utilise votre client mail local</span>
+                </div>
             </header>
 
             <div className="grid lg:grid-cols-3 gap-6">
@@ -180,6 +122,7 @@ const Communications: React.FC = () => {
                                     value={selectedGroupId}
                                     onChange={(e) => setSelectedGroupId(e.target.value)}
                                     className="w-full h-11 bg-surface-light border border-white/10 rounded-xl px-4 text-white focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all"
+                                    title="Sélectionner un groupe"
                                 >
                                     {groups.map(g => (
                                         <option key={g.id} value={g.id}>{g.nom}</option>
@@ -198,29 +141,18 @@ const Communications: React.FC = () => {
 
                         <div className="space-y-2">
                             <label className="text-xs font-bold text-grey-light uppercase tracking-wide">Message</label>
-                            <div className="bg-white rounded-xl overflow-hidden text-black min-h-[300px]">
-                                <ReactQuill
-                                    theme="snow"
-                                    value={message}
-                                    onChange={setMessage}
-                                    className="h-[250px]"
-                                    modules={{
-                                        toolbar: [
-                                            [{ 'header': [1, 2, false] }],
-                                            ['bold', 'italic', 'underline', 'strike', 'blockquote'],
-                                            [{ 'list': 'ordered' }, { 'list': 'bullet' }],
-                                            ['link', 'clean']
-                                        ],
-                                    }}
-                                />
-                            </div>
+                            <textarea
+                                value={message}
+                                onChange={(e) => setMessage(e.target.value)}
+                                placeholder="Rédigez votre message ici..."
+                                className="w-full min-h-[300px] p-4 bg-surface-light border border-white/10 rounded-xl text-white placeholder-grey-dark focus:border-primary focus:ring-1 focus:ring-primary outline-none resize-y transition-all"
+                            />
                         </div>
 
                         <div className="flex justify-end pt-4">
                             <Button
                                 onClick={handleSend}
                                 loading={sending}
-                                disabled={!userProfile?.brevo_api_key}
                                 icon={Send}
                                 size="lg"
                             >
@@ -249,18 +181,22 @@ const Communications: React.FC = () => {
 };
 
 const RecipientsList = ({ groupId }: { groupId: string }) => {
+    const navigate = useNavigate();
     const [stats, setStats] = useState<{ total: number, valid: number }>({ total: 0, valid: 0 });
     const [loading, setLoading] = useState(true);
+    const [students, setStudents] = useState<any[]>([]);
+    const [expanded, setExpanded] = useState<'with' | 'without' | null>(null);
 
     useEffect(() => {
         const load = async () => {
             setLoading(true);
-            const students = await attendanceRepository.getStudentsByGroup(groupId);
+            const data = await attendanceRepository.getStudentsByGroup(groupId);
             let valid = 0;
-            students.forEach((s: any) => {
-                if (s.parent1_email || s.parent2_email) valid++;
+            data.forEach((s: any) => {
+                if (s.parent1_email?.trim() || s.parent2_email?.trim()) valid++;
             });
-            setStats({ total: students.length, valid });
+            setStudents(data);
+            setStats({ total: data.length, valid });
             setLoading(false);
         };
         load();
@@ -268,20 +204,85 @@ const RecipientsList = ({ groupId }: { groupId: string }) => {
 
     if (loading) return <div className="animate-pulse h-20 bg-white/5 rounded-xl" />;
 
+    const studentsWithEmail = students.filter(s => s.parent1_email?.trim() || s.parent2_email?.trim());
+    const studentsWithoutEmail = students.filter(s => !(s.parent1_email?.trim() || s.parent2_email?.trim()));
+
     return (
         <div className="space-y-4">
             <div className="flex items-center justify-between p-3 bg-white/5 rounded-lg">
                 <span className="text-grey-light">Total Élèves</span>
                 <span className="text-white font-bold">{stats.total}</span>
             </div>
-            <div className="flex items-center justify-between p-3 bg-green-500/10 border border-green-500/20 rounded-lg">
-                <span className="text-green-400">Avec Email Parent</span>
-                <span className="text-green-400 font-bold">{stats.valid}</span>
+
+            <div
+                onClick={() => setExpanded(expanded === 'with' ? null : 'with')}
+                className={clsx(
+                    "flex flex-col p-3 rounded-lg border cursor-pointer transition-all",
+                    expanded === 'with' ? "bg-green-500/10 border-green-500/40" : "bg-green-500/5 border-green-500/20 hover:bg-green-500/10"
+                )}
+            >
+                <div className="flex items-center justify-between">
+                    <span className="text-green-400">Avec Email Parent</span>
+                    <span className="text-green-400 font-bold">{stats.valid}</span>
+                </div>
+                {expanded === 'with' && studentsWithEmail.length > 0 && (
+                    <div className="mt-3 pt-3 border-t border-green-500/20 space-y-2">
+                        {studentsWithEmail.map(s => (
+                            <div key={s.id} className="text-sm pl-2 flex flex-col gap-1 group/student">
+                                <div className="flex items-center justify-between text-green-300">
+                                    <span className="font-bold">• {s.prenom} {s.nom}</span>
+                                    <button
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            navigate('/dashboard/user/students', { state: { selectedStudentId: s.id } });
+                                        }}
+                                        className="p-1 opacity-0 group-hover/student:opacity-100 hover:bg-green-500/20 rounded transition-all text-green-300 hover:text-green-200"
+                                        title="Voir la fiche de l'élève"
+                                    >
+                                        <ExternalLink size={14} />
+                                    </button>
+                                </div>
+                                <div className="pl-4 flex flex-col gap-0.5 text-xs text-green-400/60 font-medium">
+                                    {s.parent1_email?.trim() && <span>Parent 1 : {s.parent1_email.trim()}</span>}
+                                    {s.parent2_email?.trim() && <span>Parent 2 : {s.parent2_email.trim()}</span>}
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                )}
             </div>
+
             {stats.total - stats.valid > 0 && (
-                <div className="flex items-center justify-between p-3 bg-red-500/10 border border-red-500/20 rounded-lg">
-                    <span className="text-red-400">Sans Email</span>
-                    <span className="text-red-400 font-bold">{stats.total - stats.valid}</span>
+                <div
+                    onClick={() => setExpanded(expanded === 'without' ? null : 'without')}
+                    className={clsx(
+                        "flex flex-col p-3 rounded-lg border cursor-pointer transition-all",
+                        expanded === 'without' ? "bg-red-500/10 border-red-500/40" : "bg-red-500/5 border-red-500/20 hover:bg-red-500/10"
+                    )}
+                >
+                    <div className="flex items-center justify-between">
+                        <span className="text-red-400">Sans Email</span>
+                        <span className="text-red-400 font-bold">{stats.total - stats.valid}</span>
+                    </div>
+                    {expanded === 'without' && studentsWithoutEmail.length > 0 && (
+                        <div className="mt-3 pt-3 border-t border-red-500/20 space-y-1">
+                            {studentsWithoutEmail.map(s => (
+                                <div key={s.id} className="text-sm pl-2 text-red-300 flex items-center justify-between group/student">
+                                    <span>• {s.prenom} {s.nom}</span>
+                                    <button
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            navigate('/dashboard/user/students', { state: { selectedStudentId: s.id } });
+                                        }}
+                                        className="p-1 opacity-0 group-hover/student:opacity-100 hover:bg-red-500/20 rounded transition-all text-red-300 hover:text-red-200"
+                                        title="Voir la fiche de l'élève"
+                                    >
+                                        <ExternalLink size={14} />
+                                    </button>
+                                </div>
+                            ))}
+                        </div>
+                    )}
                 </div>
             )}
             <p className="text-xs text-grey-dark mt-2">

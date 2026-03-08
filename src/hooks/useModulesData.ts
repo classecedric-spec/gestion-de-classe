@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { trackingService } from '../features/tracking/services/trackingService';
 import { processModules } from '../lib/helpers/mobileEncodingHelpers';
 
@@ -6,60 +6,33 @@ import { processModules } from '../lib/helpers/mobileEncodingHelpers';
  * Hook for fetching modules and activities data for a specific student
  */
 export const useModulesData = (studentId: string | null, levelId: string | null) => {
-    const [modules, setModules] = useState<any[]>([]);
-    const [progressions, setProgressions] = useState<Record<string, string>>({});
-    const [loading, setLoading] = useState(false);
+    const queryClient = useQueryClient();
 
-    useEffect(() => {
-        if (studentId && levelId) {
-            fetchModulesAndActivities(studentId, levelId);
-        }
-    }, [studentId, levelId]);
+    // 1. Fetch modules and progressions map
+    const { data, isLoading: loading } = useQuery({
+        queryKey: ['modules', studentId, levelId],
+        queryFn: async () => {
+            if (!studentId || !levelId) return { modules: [], progressions: {} };
 
-    const fetchModulesAndActivities = async (sId: string, lId: string) => {
-        setLoading(true);
-
-        try {
-            // Fetch modules and progressions in parallel
             const [modulesData, progMap] = await Promise.all([
                 trackingService.getMobileModules(),
-                trackingService.fetchStudentProgressionsMap(sId)
+                trackingService.fetchStudentProgressionsMap(studentId)
             ]);
 
-            setProgressions(progMap);
+            const processedModules = processModules(modulesData || [], levelId, progMap);
+            return { modules: processedModules, progressions: progMap };
+        },
+        enabled: !!studentId && !!levelId,
+        staleTime: 1000 * 60 * 5,
+    });
 
-            // Process modules (filter by level, calculate stats)
-            const processedModules = processModules(modulesData || [], lId, progMap);
-            setModules(processedModules);
-        } catch (error) {
-            console.error("Error fetching mobile modules data:", error);
-        } finally {
-            setLoading(false);
-        }
-    };
+    const modules = data?.modules || [];
+    const progressions = data?.progressions || {};
 
-    const updateProgression = (activityId: string, newStatus: string) => {
-        setProgressions(prev => ({
-            ...prev,
-            [activityId]: newStatus
-        }));
-
-        // Update module stats
-        setModules(prev => prev.map(m => {
-            const isInModule = m.filteredActivities?.some((a: any) => a.id === activityId);
-            if (!isInModule) return m;
-
-            const newProgMap = { ...progressions, [activityId]: newStatus };
-            const completedActivities = m.filteredActivities.filter((act: any) =>
-                newProgMap[act.id] === 'termine' || newProgMap[act.id] === 'a_verifier'
-            ).length;
-
-            return {
-                ...m,
-                completedActivities,
-                percent: m.totalActivities > 0 ? Math.round((completedActivities / m.totalActivities) * 100) : 0
-            };
-        }));
+    const updateProgression = (_activityId: string, _newStatus: string) => {
+        // With global realtime, we just need to invalidate the query
+        // The actual DB update happened elsewhere
+        queryClient.invalidateQueries({ queryKey: ['modules', studentId, levelId] });
     };
 
     return { modules, progressions, loading, updateProgression };

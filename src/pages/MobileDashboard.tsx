@@ -403,51 +403,7 @@ const MobileDashboard: React.FC = () => {
                         linkState={{ period: attendanceSummary.period }}
                     />
 
-                    {/* Email Test Button (Temporary) */}
-                    <div className="col-span-2 mt-4 p-4 bg-surface border border-white/10 rounded-xl">
-                        <h3 className="text-sm font-bold text-white mb-2">Zone de Test Email (Brevo)</h3>
-                        <div className="flex gap-2">
-                            <Button
-                                variant="secondary"
-                                onClick={async () => {
-                                    if (!confirm('Générer ~15 tâches en retard pour Cedric Test ?')) return;
-                                    try {
-                                        const { seedOverdueData } = await import('../utils/seedData');
-                                        const result = await seedOverdueData(supabase);
-                                        if (result.error) throw new Error(result.error);
-                                        toast.success(`Succès ! ${result.count} retards créés pour Cedric Test.`);
-                                    } catch (e: any) {
-                                        console.error(e);
-                                        toast.error('Erreur data: ' + e.message);
-                                    }
-                                }}
-                            >
-                                1. Générer Data
-                            </Button>
-                            <Button
-                                variant="primary"
-                                onClick={async () => {
-                                    if (!confirm('Envoyer le mail de test à Cedric Test ?')) return;
-                                    try {
-                                        const { data, error } = await supabase.functions.invoke('send-email', {
-                                            body: {
-                                                to: [{ email: 'parent1@test.com', name: 'Parent 1' }], // Replace with real test targets or dynamic data
-                                                subject: 'Rapport de retard - Cedric Test',
-                                                htmlContent: '<h1>Retards</h1><p>Ceci est un test.</p>'
-                                            }
-                                        });
-                                        if (error) throw error;
-                                        toast.success('Email envoyé !');
-                                    } catch (e) {
-                                        console.error(e);
-                                        toast.error('Erreur envoi email');
-                                    }
-                                }}
-                            >
-                                2. Envoyer Email
-                            </Button>
-                        </div>
-                    </div>
+
                 </section>
 
             </main>

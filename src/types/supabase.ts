@@ -706,7 +706,6 @@ export interface Database {
                     photo_url: string | null
                     validation_admin: boolean | null
                     last_selected_group_id: string | null
-                    brevo_api_key: string | null
                     created_at: string
                     updated_at: string | null
                 }

@@ -1,113 +1,166 @@
 import { useState, useEffect, useCallback } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { arrayMove } from '@dnd-kit/sortable';
 import { Tables } from '../../../types/supabase';
 import { groupService } from '../../../features/groups/services/groupService';
 import { classService } from '../../../features/classes/services/classService';
+import { getCurrentUser } from '../../../lib/database';
 
 /**
  * useGroupsData - Hook pour la gestion des groupes
  */
 export const useGroupsData = () => {
-    const [groups, setGroups] = useState<Tables<'Groupe'>[]>([]);
+    const queryClient = useQueryClient();
     const [selectedGroup, setSelectedGroup] = useState<Tables<'Groupe'> | null>(null);
-    const [classes, setClasses] = useState<Partial<Tables<'Classe'>>[]>([]);
-    const [loading, setLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState('');
 
-    const fetchGroups = useCallback(async () => {
-        setLoading(true);
-        try {
+    // 0. User fetching
+    const { data: user } = useQuery({
+        queryKey: ['user'],
+        queryFn: getCurrentUser,
+        staleTime: Infinity,
+    });
+
+    // 1. Fetching des groupes
+    const { data: groups = [], isLoading: loading } = useQuery({
+        queryKey: ['groups', user?.id],
+        queryFn: async () => {
+            if (!user) return [];
             const data = await groupService.getGroups();
-            setGroups(data || []);
+            return data || [];
+        },
+        enabled: !!user,
+        staleTime: 1000 * 60 * 5,
+    });
 
-            // Re-sync selected group if it was updated
-            if (selectedGroup) {
-                const updated = data?.find(g => g.id === selectedGroup.id);
-                if (updated) setSelectedGroup(updated);
-            } else if (data && data.length > 0) {
-                setSelectedGroup(data[0]);
-            }
-        } catch (error: any) {
-            console.error(error);
-            // Fallback strategy previously existed but with service we expect standard returns
-        } finally {
-            setLoading(false);
-        }
-    }, [selectedGroup]);
 
-    const fetchClasses = useCallback(async () => {
-        try {
+    // 2. Fetching des classes
+    const { data: classes = [] } = useQuery({
+        queryKey: ['classes', user?.id],
+        queryFn: async () => {
+            if (!user) return [];
             const data = await classService.getClasses();
-            setClasses(data || []);
-        } catch (error) {
-            console.error('Error fetching classes:', error);
+            return data || [];
+        },
+        enabled: !!user,
+        staleTime: 1000 * 60 * 5,
+    });
+
+    // Set initial selected group
+    useEffect(() => {
+        if (!selectedGroup && groups.length > 0) {
+            setSelectedGroup(groups[0]);
+        } else if (selectedGroup) {
+            // Re-sync if the current group was updated in the list
+            const updated = groups.find(g => g.id === selectedGroup.id);
+            if (updated && JSON.stringify(updated) !== JSON.stringify(selectedGroup)) {
+                setSelectedGroup(updated);
+            }
         }
-    }, []);
+    }, [groups, selectedGroup]);
 
-    const handleDeleteGroup = useCallback(async (groupId: string) => {
-        // Optimistic UI Update: remove group from local state immediately
-        const previousGroups = [...groups];
-        const previousSelected = selectedGroup;
-        const remainingGroups = groups.filter(g => g.id !== groupId);
+    // 3. Mutations
+    const createGroupMutation = useMutation({
+        mutationFn: (groupData: { nom: string; acronyme?: string; photo_url?: string;[key: string]: any }) => groupService.createGroup(groupData as any),
+        onMutate: async (newGroupData) => {
+            const queryKey = ['groups', user?.id];
+            await queryClient.cancelQueries({ queryKey });
+            const previousGroups = queryClient.getQueryData<Tables<'Groupe'>[]>(queryKey) || [];
 
-        setGroups(remainingGroups);
+            const tempGroup = {
+                id: 'temp-' + Date.now(),
+                ...newGroupData,
+                created_at: new Date().toISOString()
+            } as Tables<'Groupe'>;
 
-        // If the deleted group was selected, select first remaining group
-        if (selectedGroup?.id === groupId) {
-            setSelectedGroup(remainingGroups.length > 0 ? remainingGroups[0] : null);
+            queryClient.setQueryData<Tables<'Groupe'>[]>(queryKey, [tempGroup, ...previousGroups]);
+            setSelectedGroup(tempGroup);
+
+            return { previousGroups, queryKey };
+        },
+        onError: (_err, _variables, context) => {
+            if (context?.previousGroups) {
+                queryClient.setQueryData(context.queryKey, context.previousGroups);
+            }
+        },
+        onSuccess: (data: any) => {
+            if (data && data.id) {
+                setSelectedGroup(data);
+                // Also update the temp item in the list if still there
+                queryClient.setQueryData<Tables<'Groupe'>[]>(['groups', user?.id], (old = []) =>
+                    old.map(g => g.id.startsWith('temp-') ? { ...g, ...data } : g)
+                );
+            }
+        },
+        onSettled: () => {
+            queryClient.invalidateQueries({ queryKey: ['groups', user?.id] });
         }
+    });
 
-        try {
-            await groupService.deleteGroup(groupId);
-        } catch (error) {
-            // Revert on error
-            setGroups(previousGroups);
-            setSelectedGroup(previousSelected);
-            throw error;
+    const deleteGroupMutation = useMutation({
+        mutationFn: (groupId: string) => groupService.deleteGroup(groupId),
+        onMutate: async (groupId) => {
+            const queryKey = ['groups', user?.id];
+            await queryClient.cancelQueries({ queryKey });
+            const previousGroups = queryClient.getQueryData<Tables<'Groupe'>[]>(queryKey) || [];
+
+            queryClient.setQueryData<Tables<'Groupe'>[]>(queryKey,
+                previousGroups.filter(g => g.id !== groupId)
+            );
+
+            if (selectedGroup?.id === groupId) {
+                const remaining = previousGroups.filter(g => g.id !== groupId);
+                setSelectedGroup(remaining.length > 0 ? remaining[0] : null);
+            }
+
+            return { previousGroups, queryKey };
+        },
+        onError: (_err, _variables, context) => {
+            if (context?.previousGroups) {
+                queryClient.setQueryData(context.queryKey, context.previousGroups);
+            }
+        },
+        onSettled: () => {
+            queryClient.invalidateQueries({ queryKey: ['groups', user?.id] });
         }
-    }, [selectedGroup, groups]);
+    });
 
-    const handleAddGroup = useCallback((newGroup: Tables<'Groupe'>) => {
-        // Optimistic update: add new group to local state immediately
-        setGroups(prev => {
-            const updated = [...prev, newGroup];
-            return updated.sort((a, b) => (a.nom || '').localeCompare(b.nom || ''));
-        });
+    const updateOrderMutation = useMutation({
+        mutationFn: async (newGroups: Tables<'Groupe'>[]) => {
+            await Promise.all(newGroups.map((g, index) =>
+                groupService.updateGroupOrder(g.id, index)
+            ));
+        },
+        onMutate: async (newGroups) => {
+            const queryKey = ['groups', user?.id];
+            await queryClient.cancelQueries({ queryKey });
+            const previousGroups = queryClient.getQueryData(queryKey);
+            queryClient.setQueryData(queryKey, newGroups);
+            return { previousGroups, queryKey };
+        },
+        onSettled: () => {
+            queryClient.invalidateQueries({ queryKey: ['groups', user?.id] });
+        }
+    });
 
-        // Select the newly created group
-        setSelectedGroup(newGroup);
-    }, []);
-
-    const handleDragEnd = useCallback(async (event: any) => {
+    const handleDragEnd = useCallback((event: any) => {
         const { active, over } = event;
         if (!over || active.id === over.id) return;
 
         const oldIndex = groups.findIndex(g => g.id === active.id);
         const newIndex = groups.findIndex(g => g.id === over.id);
 
-        // Optimistic Update
         const newGroups = arrayMove(groups, oldIndex, newIndex);
-        setGroups(newGroups);
+        updateOrderMutation.mutate(newGroups);
+    }, [groups, updateOrderMutation]);
 
-        // Update Backend
-        try {
-            await Promise.all(newGroups.map((g, index) =>
-                groupService.updateGroupOrder(g.id, index)
-            ));
-        } catch (error) {
-            // Revert on error
-            fetchGroups();
-        }
-    }, [groups, fetchGroups]);
+    const handleAddGroup = useCallback((groupData: { nom: string; acronyme?: string; photo_url?: string }) => {
+        createGroupMutation.mutate(groupData as any);
+    }, [createGroupMutation]);
 
     const filteredGroups = groups.filter(g =>
         g.nom.toLowerCase().includes(searchQuery.toLowerCase())
     );
-
-    useEffect(() => {
-        fetchGroups();
-        fetchClasses();
-    }, []);
 
     return {
         groups,
@@ -118,9 +171,10 @@ export const useGroupsData = () => {
         searchQuery,
         setSearchQuery,
         filteredGroups,
-        fetchGroups,
+        fetchGroups: () => queryClient.invalidateQueries({ queryKey: ['groups', user?.id] }),
         handleAddGroup,
-        handleDeleteGroup,
-        handleDragEnd
+        handleDeleteGroup: (id: string) => deleteGroupMutation.mutate(id),
+        handleDragEnd,
+        createGroupMutation // Export it for high-level control if needed
     };
 };

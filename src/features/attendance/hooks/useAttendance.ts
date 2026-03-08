@@ -1,216 +1,226 @@
-import { useState, useEffect, useCallback } from 'react';
-import { supabase } from '../../../lib/database';
-import { attendanceService, Group, Student, SetupPresence, CategoriePresence, Attendance } from '../services/attendanceService';
+import { useState, useEffect, useMemo } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { getCurrentUser } from '../../../lib/database';
+import { attendanceService, Group, SetupPresence, Attendance } from '../services/attendanceService';
 import { toast } from 'sonner';
 
 export const useAttendance = () => {
-    // Data State
-    const [groups, setGroups] = useState<Group[]>([]);
-    const [selectedGroup, setSelectedGroup] = useState<Group | null>(null);
-    const [students, setStudents] = useState<Student[]>([]);
-    const [setups, setSetups] = useState<SetupPresence[]>([]);
-    const [selectedSetup, setSelectedSetup] = useState<SetupPresence | null>(null);
-    const [categories, setCategories] = useState<CategoriePresence[]>([]);
-    const [attendances, setAttendances] = useState<Attendance[]>([]);
-    const [sessionSetups, setSessionSetups] = useState<{ [key: string]: SetupPresence | null }>({ matin: null, apres_midi: null });
+    const queryClient = useQueryClient();
 
-    // UI State
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
+    // UI Local State
     const [currentDate, setCurrentDate] = useState(new Date().toISOString().split('T')[0]);
     const [currentPeriod, setCurrentPeriod] = useState('matin');
     const [isEditing, setIsEditing] = useState(false);
     const [isSetupLocked, setIsSetupLocked] = useState(false);
 
-    // Initial Load
+    // Selection Local State (IDs)
+    const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
+    const [selectedSetupId, setSelectedSetupId] = useState<string | null>(null);
+
+    // 0. User fetching
+    const { data: user } = useQuery({
+        queryKey: ['user'],
+        queryFn: getCurrentUser,
+        staleTime: Infinity,
+    });
+
+    // 1. Groups fetching
+    const { data: groups = [] } = useQuery({
+        queryKey: ['groups', user?.id],
+        queryFn: async () => {
+            if (!user) return [];
+            return await attendanceService.fetchGroups();
+        },
+        enabled: !!user,
+        staleTime: 1000 * 60 * 5,
+    });
+
+    // Handle initial group selection and preference
     useEffect(() => {
-        const init = async () => {
-            setLoading(true);
-            try {
-                // Fetch Groups
-                const groupsData = await attendanceService.fetchGroups();
-                setGroups(groupsData);
-
-                // Fetch Setups
-                const setupsData = await attendanceService.fetchSetups();
-                setSetups(setupsData);
-                if (setupsData.length > 0) setSelectedSetup(setupsData[0]);
-
-                // Restore User Preference for Group
-                const { data: { user } } = await supabase.auth.getUser();
-                if (user && groupsData.length > 0) {
-                    const lastGroupId = await attendanceService.getUserPreferences(user.id, 'presence_last_group_id');
-                    const lastGroup = groupsData.find(g => g.id === lastGroupId);
-                    setSelectedGroup(lastGroup || groupsData[0]);
-                } else if (groupsData.length > 0) {
-                    setSelectedGroup(groupsData[0]);
-                }
-
-            } catch (err: any) {
-                console.error("Initialization error:", err);
-                setError(err.message);
-            } finally {
-                setLoading(false);
-            }
-        };
-        init();
-    }, []);
-
-    // Fetch Students when Group Changes
-    useEffect(() => {
-        if (!selectedGroup) return;
-        const loadStudents = async () => {
-            const { data: { user } } = await supabase.auth.getUser();
-            if (user) {
-                attendanceService.saveGroupPreference(user.id, selectedGroup.id);
-            }
-            const data = await attendanceService.fetchStudentsByGroup(selectedGroup.id);
-            setStudents(data);
-        };
-        loadStudents();
-    }, [selectedGroup]);
-
-    // Fetch Categories when Setup Changes
-    useEffect(() => {
-        if (!selectedSetup) {
-            setCategories([]);
-            return;
+        if (!selectedGroupId && groups.length > 0 && user) {
+            attendanceService.getUserPreferences(user.id, 'presence_last_group_id').then(lastGroupId => {
+                const lastGroup = groups.find(g => g.id === lastGroupId);
+                setSelectedGroupId(lastGroup?.id || groups[0].id);
+            });
         }
-        attendanceService.fetchCategories(selectedSetup.id).then(setCategories);
-    }, [selectedSetup]);
+    }, [groups, selectedGroupId, user]);
 
-    // Auto-select Setup based on Date/Period/Students
+    const selectedGroup = useMemo(() => groups.find(g => g.id === selectedGroupId) || null, [groups, selectedGroupId]);
+
+    // 2. Students fetching (by group)
+    const { data: students = [] } = useQuery({
+        queryKey: ['students', user?.id, selectedGroupId],
+        queryFn: async () => {
+            if (!selectedGroupId) return [];
+            return await attendanceService.fetchStudentsByGroup(selectedGroupId);
+        },
+        enabled: !!selectedGroupId && !!user,
+        staleTime: 1000 * 60 * 5,
+    });
+
+    // 3. Setups fetching
+    const { data: setups = [] } = useQuery({
+        queryKey: ['attendance-setup', user?.id],
+        queryFn: async () => {
+            if (!user) return [];
+            return await attendanceService.fetchSetups();
+        },
+        enabled: !!user,
+        staleTime: 1000 * 60 * 5,
+    });
+
+    // 4. Categories fetching (by setup)
+    const { data: categories = [] } = useQuery({
+        queryKey: ['attendance-categories', user?.id, selectedSetupId],
+        queryFn: async () => {
+            if (!selectedSetupId) return [];
+            return await attendanceService.fetchCategories(selectedSetupId);
+        },
+        enabled: !!selectedSetupId && !!user,
+        staleTime: 1000 * 60 * 5,
+    });
+
+    const selectedSetup = useMemo(() => setups.find(s => s.id === selectedSetupId) || (setups.length > 0 ? setups[0] : null), [setups, selectedSetupId]);
+
+    // 5. Existing setup check (Auto-select)
+    const { data: existingSetupId } = useQuery({
+        queryKey: ['attendance-check-setup', user?.id, currentDate, currentPeriod, selectedGroupId],
+        queryFn: async () => {
+            if (!selectedGroupId || students.length === 0) return null;
+            return await attendanceService.checkExistingSetup(currentDate, currentPeriod, students.map(s => s.id));
+        },
+        enabled: !!user && !!selectedGroupId && students.length > 0,
+    });
+
     useEffect(() => {
-        const autoSelect = async () => {
-            if (!selectedGroup || students.length === 0 || setups.length === 0) return;
-
-            try {
-                const existingSetupId = await attendanceService.checkExistingSetup(currentDate, currentPeriod, students.map(s => s.id));
-
-                if (existingSetupId) {
-                    const existingSetup = setups.find(s => s.id === existingSetupId);
-                    if (existingSetup) {
-                        setSelectedSetup(existingSetup);
-                        setIsSetupLocked(true);
-                        return;
-                    }
-                }
-
-                // Not found in DB, unlock and revert to session memory
-                setIsSetupLocked(false);
-                if (sessionSetups[currentPeriod]) {
-                    setSelectedSetup(sessionSetups[currentPeriod]);
-                }
-            } catch (err) {
-                console.error("Auto-select error:", err);
-                setIsSetupLocked(false);
-            }
-        };
-        autoSelect();
-    }, [selectedGroup, currentDate, currentPeriod, students, setups]); // sessionSetups omitted to avoid loop
-
-    // Fetch Attendances
-    const refreshAttendances = useCallback(async () => {
-        if (!selectedGroup || !selectedSetup || students.length === 0) return;
-        try {
-            const data = await attendanceService.fetchAttendances(currentDate, currentPeriod, students.map(s => s.id), selectedSetup.id);
-            setAttendances(data);
-        } catch (err) {
-            console.error("Fetch attendances error:", err);
+        if (existingSetupId) {
+            setSelectedSetupId(existingSetupId);
+            setIsSetupLocked(true);
+        } else {
+            setIsSetupLocked(false);
+            if (setups.length > 0 && !selectedSetupId) setSelectedSetupId(setups[0].id);
         }
-    }, [selectedGroup, selectedSetup, currentDate, currentPeriod, students]);
+    }, [existingSetupId, setups, selectedSetupId]);
 
-    useEffect(() => {
-        refreshAttendances();
-    }, [refreshAttendances]);
+    // 6. Attendances fetching
+    const { data: attendances = [], isLoading: loading } = useQuery({
+        queryKey: ['attendance', user?.id, currentDate, currentPeriod, selectedGroupId, selectedSetupId],
+        queryFn: async () => {
+            if (!selectedGroupId || !selectedSetupId || students.length === 0) return [];
+            return await attendanceService.fetchAttendances(currentDate, currentPeriod, students.map(s => s.id), selectedSetupId);
+        },
+        enabled: !!user && !!selectedGroupId && !!selectedSetupId && students.length > 0,
+        staleTime: 1000 * 60,
+    });
 
+    // 7. Mutations
+    const upsertMutation = useMutation({
+        mutationFn: (rec: Attendance) => attendanceService.upsertAttendance(rec),
+        onMutate: async (newRecord) => {
+            const queryKey = ['attendance', user?.id, currentDate, currentPeriod, selectedGroupId, selectedSetupId];
+            await queryClient.cancelQueries({ queryKey });
+            const previous = queryClient.getQueryData<Attendance[]>(queryKey) || [];
 
-    // Action: Move Student (Drag & Drop)
+            const exists = previous.find(a => a.eleve_id === newRecord.eleve_id);
+            if (exists) {
+                queryClient.setQueryData<Attendance[]>(queryKey, previous.map(a => a.eleve_id === newRecord.eleve_id ? { ...a, ...newRecord } : a));
+            } else {
+                queryClient.setQueryData<Attendance[]>(queryKey, [...previous, newRecord]);
+            }
+            return { previous, queryKey };
+        },
+        onError: (_err, _variables, context) => {
+            if (context?.previous) queryClient.setQueryData(context.queryKey, context.previous);
+        },
+        onSettled: () => {
+            queryClient.invalidateQueries({ queryKey: ['attendance', user?.id, currentDate, currentPeriod, selectedGroupId, selectedSetupId] });
+        }
+    });
+
+    const deleteMutation = useMutation({
+        mutationFn: (id: string | number) => attendanceService.deleteAttendance(id),
+        onMutate: async (id) => {
+            const queryKey = ['attendance', user?.id, currentDate, currentPeriod, selectedGroupId, selectedSetupId];
+            await queryClient.cancelQueries({ queryKey });
+            const previous = queryClient.getQueryData<Attendance[]>(queryKey) || [];
+            queryClient.setQueryData<Attendance[]>(queryKey, previous.filter(a => a.id !== id));
+            return { previous, queryKey };
+        },
+        onError: (_err, _variables, context) => {
+            if (context?.previous) queryClient.setQueryData(context.queryKey, context.previous);
+        },
+        onSettled: () => {
+            queryClient.invalidateQueries({ queryKey: ['attendance', user?.id, currentDate, currentPeriod, selectedGroupId, selectedSetupId] });
+        }
+    });
+
+    const bulkMutation = useMutation({
+        mutationFn: (recs: any[]) => attendanceService.bulkInsertAttendances(recs),
+        onSettled: () => {
+            queryClient.invalidateQueries({ queryKey: ['attendance', user?.id, currentDate, currentPeriod, selectedGroupId, selectedSetupId] });
+        }
+    });
+
+    // Actions
     const moveStudent = async (studentId: string, targetId: string) => {
-        if (!selectedSetup) return;
+        if (!selectedSetup || !user) return;
 
-        // Check if moving to same place
         const currentRecord = attendances.find(a => a.eleve_id === studentId);
         const currentCatId = currentRecord?.categorie_id || 'unassigned';
         if (currentCatId === targetId) return;
 
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) return;
-
-        // Optimistic Update
-        const newRecord: Attendance = {
-            id: currentRecord?.id || `temp-${Date.now()}`,
-            date: currentDate,
-            periode: currentPeriod,
-            eleve_id: studentId,
-            setup_id: selectedSetup.id,
-            categorie_id: targetId === 'unassigned' ? null : targetId,
-            status: 'present',
-            user_id: user.id,
-            created_at: currentRecord?.created_at || new Date().toISOString()
-        };
-
         if (targetId === 'unassigned') {
-            // Remove
-            setAttendances(prev => prev.filter(a => a.eleve_id !== studentId));
-            if (currentRecord?.id && !currentRecord.id.toString().startsWith('temp')) {
-                try {
-                    await attendanceService.deleteAttendance(currentRecord.id);
-                } catch (err) {
-                    toast.error("Erreur lors de la suppression");
-                    refreshAttendances();
-                }
-            }
+            if (currentRecord?.id) deleteMutation.mutate(currentRecord.id);
         } else {
-            // Upsert
-            if (currentRecord) {
-                setAttendances(prev => prev.map(a => a.eleve_id === studentId ? newRecord : a));
-            } else {
-                setAttendances(prev => [...prev, newRecord]);
-            }
-
-            try {
-                const result = await attendanceService.upsertAttendance(newRecord);
-                // Update real ID if insert
-                if (!currentRecord) {
-                    setAttendances(prev => prev.map(a => a.id === newRecord.id ? result : a));
-                }
-            } catch (err) {
-                toast.error("Erreur lors de l'enregistrement");
-                refreshAttendances();
-            }
+            const newRecord: Attendance = {
+                id: currentRecord?.id || `temp-${Date.now()}`,
+                date: currentDate,
+                periode: currentPeriod,
+                eleve_id: studentId,
+                setup_id: selectedSetup.id,
+                categorie_id: targetId === 'unassigned' ? null : targetId,
+                status: 'present',
+                user_id: user.id,
+                created_at: currentRecord?.created_at || new Date().toISOString()
+            };
+            upsertMutation.mutate(newRecord);
         }
     };
 
-    // Action: Mark Unassigned Absent
     const markUnassignedAbsent = async () => {
         const unassigned = students.filter(s => !attendances.find(a => a.eleve_id === s.id));
-        if (unassigned.length === 0) return;
+        if (unassigned.length === 0 || !user || !selectedSetup) return;
 
         const absentCat = categories.find(c => c.nom === 'Absent');
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) return;
-
         const newRecords = unassigned.map(s => ({
             date: currentDate,
             periode: currentPeriod,
             eleve_id: s.id,
-            setup_id: selectedSetup?.id || '',
+            setup_id: selectedSetup.id,
             categorie_id: absentCat?.id || null,
             status: 'absent',
             user_id: user.id
         }));
 
-        setLoading(true);
-        try {
-            const data = await attendanceService.bulkInsertAttendances(newRecords);
-            setAttendances(prev => [...prev, ...data]);
-            toast.success(`${data.length} élèves marqués absents`);
-        } catch (err) {
-            toast.error("Erreur lors de l'enregistrement");
-        } finally {
-            setLoading(false);
-        }
+        bulkMutation.mutate(newRecords);
+    };
+
+    const markUnassignedPresent = async () => {
+        const unassigned = students.filter(s => !attendances.find(a => a.eleve_id === s.id));
+        if (unassigned.length === 0 || !user || !selectedSetup) return;
+
+        const presentCat = categories.find(c => c.nom !== 'Absent');
+        const newRecords = unassigned.map(s => ({
+            date: currentDate,
+            periode: currentPeriod,
+            eleve_id: s.id,
+            setup_id: selectedSetup.id,
+            categorie_id: presentCat?.id || null,
+            status: 'present',
+            user_id: user.id
+        }));
+
+        bulkMutation.mutate(newRecords);
     };
 
     // Helpers used in UI
@@ -237,23 +247,21 @@ export const useAttendance = () => {
     };
 
     return {
-        // State
         groups, selectedGroup,
         students,
         setups, selectedSetup,
         categories,
         attendances,
         currentDate, currentPeriod,
-        loading, error,
+        loading, error: null,
         isEditing, isSetupLocked,
 
-        // Setters
-        setSelectedGroup,
+        setSelectedGroup: (group: Group | null) => {
+            setSelectedGroupId(group?.id || null);
+            if (group && user) attendanceService.saveGroupPreference(user.id, group.id);
+        },
         setSelectedSetup: (setup: SetupPresence | null) => {
-            setSelectedSetup(setup);
-            if (setup) {
-                setSessionSetups(prev => ({ ...prev, [currentPeriod]: setup }));
-            }
+            setSelectedSetupId(setup?.id || null);
         },
         setCurrentDate,
         setCurrentPeriod,
@@ -263,15 +271,14 @@ export const useAttendance = () => {
             toast.success("Édition réactivée");
         },
         refreshData: () => {
-            attendanceService.fetchSetups().then(setSetups);
-            if (selectedSetup) attendanceService.fetchCategories(selectedSetup.id).then(setCategories);
-        }, // For modal callbacks
+            queryClient.invalidateQueries({ queryKey: ['attendance-setup', user?.id] });
+            queryClient.invalidateQueries({ queryKey: ['attendance-categories', user?.id, selectedSetupId] });
+        },
 
-        // Actions
         moveStudent,
         markUnassignedAbsent,
+        markUnassignedPresent,
 
-        // Getters
         getStudentsForCategory,
         getUnassignedStudents,
         getPureUnassignedStudents,

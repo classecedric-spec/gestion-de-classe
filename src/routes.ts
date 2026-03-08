@@ -16,6 +16,7 @@ export const ROUTES = {
     DASHBOARD_PRESENCE: '/dashboard/presence',
     DASHBOARD_USER: '/dashboard/user',
     DASHBOARD_ACTIVITIES: '/dashboard/activities',
+    DASHBOARD_RESPONSABILITES: '/dashboard/responsabilities',
     DASHBOARD_COMMUNICATIONS: '/dashboard/communications',
     DASHBOARD_SETTINGS: '/dashboard/settings',
 

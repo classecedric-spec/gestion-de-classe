@@ -1,5 +1,7 @@
-import { useState, useEffect, useMemo, useCallback, Dispatch, SetStateAction } from 'react';
+import { useState, useMemo, Dispatch, SetStateAction } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { activityService, ActivityWithRelations } from '../services/activityService';
+import { getCurrentUser } from '../../../lib/database';
 
 interface AvailableModule {
     id: string;
@@ -17,47 +19,40 @@ interface UseActivitiesReturn {
     setModuleFilter: Dispatch<SetStateAction<string>>;
     filteredActivities: ActivityWithRelations[];
     availableModules: AvailableModule[];
-    fetchActivities: () => Promise<void>;
-    deleteActivity: (id: string) => Promise<boolean>;
-    setActivities: Dispatch<SetStateAction<ActivityWithRelations[]>>;
+    fetchActivities: () => void;
+    deleteActivity: (id: string) => void;
+    setActivities: (activities: ActivityWithRelations[]) => void;
 }
 
 export const useActivities = (): UseActivitiesReturn => {
-    const [activities, setActivities] = useState<ActivityWithRelations[]>([]);
-    const [loading, setLoading] = useState(true);
+    const queryClient = useQueryClient();
     const [searchTerm, setSearchTerm] = useState('');
     const [statusFilter, setStatusFilter] = useState('all'); // all, en_preparation, en_cours, archive
     const [moduleFilter, setModuleFilter] = useState('all'); // all or module_id
 
-    const fetchActivities = useCallback(async () => {
-        setLoading(true);
-        try {
-            const data = await activityService.fetchActivities();
-            setActivities(data);
-        } catch (error) {
-            console.error("Error fetching activities:", error);
-        } finally {
-            setLoading(false);
-        }
-    }, []);
+    // 0. User fetching
+    const { data: user } = useQuery({
+        queryKey: ['user'],
+        queryFn: getCurrentUser,
+        staleTime: Infinity,
+    });
 
-    useEffect(() => {
-        fetchActivities();
-    }, [fetchActivities]);
-
-    // Reset module filter when status filter changes
-    useEffect(() => {
-        setModuleFilter('all');
-    }, [statusFilter]);
+    // 1. Fetching des activités
+    const { data: activities = [], isLoading: loading } = useQuery({
+        queryKey: ['activities', user?.id],
+        queryFn: async () => {
+            if (!user) return [];
+            return await activityService.fetchActivities();
+        },
+        enabled: !!user,
+        staleTime: 1000 * 60 * 5,
+    });
 
     const filteredActivities = useMemo(() => {
         return activities.filter(a => {
             const matchesSearch = a.titre.toLowerCase().includes(searchTerm.toLowerCase()) ||
                 (a.Module?.nom && a.Module.nom.toLowerCase().includes(searchTerm.toLowerCase()));
 
-            // Note: Schema has isActive but JS code uses statut. 
-            // For now, we keep the logic but use any/cast if needed, 
-            // or adapt to schema. JS code: a.Module?.statut
             const moduleStatut = a.Module?.statut;
             const matchesStatus = statusFilter === 'all' ||
                 (moduleStatut === statusFilter) ||
@@ -89,22 +84,27 @@ export const useActivities = (): UseActivitiesReturn => {
             .sort((a, b) => a.nom.localeCompare(b.nom));
     }, [activities, statusFilter]);
 
-    const deleteActivity = async (id: string) => {
-        const previousActivities = [...activities];
+    const deleteMutation = useMutation({
+        mutationFn: (id: string) => activityService.deleteActivity(id),
+        onMutate: async (id) => {
+            const queryKey = ['activities', user?.id];
+            await queryClient.cancelQueries({ queryKey });
+            const previous = queryClient.getQueryData<ActivityWithRelations[]>(queryKey);
 
-        // Optimistic UI Update
-        setActivities(prev => prev.filter(a => a.id !== id));
-
-        try {
-            await activityService.deleteActivity(id);
-            return true;
-        } catch (error) {
-            console.error("Error deleting activity:", error);
-            // Revert on error
-            setActivities(previousActivities);
-            return false;
+            if (previous) {
+                queryClient.setQueryData<ActivityWithRelations[]>(queryKey,
+                    previous.filter(a => a.id !== id)
+                );
+            }
+            return { previous, queryKey };
+        },
+        onError: (_err, _variables, context) => {
+            if (context?.previous) queryClient.setQueryData(context.queryKey, context.previous);
+        },
+        onSettled: () => {
+            queryClient.invalidateQueries({ queryKey: ['activities', user?.id] });
         }
-    };
+    });
 
     return {
         activities,
@@ -117,8 +117,8 @@ export const useActivities = (): UseActivitiesReturn => {
         setModuleFilter,
         filteredActivities,
         availableModules,
-        fetchActivities,
-        deleteActivity,
-        setActivities
+        fetchActivities: () => queryClient.invalidateQueries({ queryKey: ['activities', user?.id] }),
+        deleteActivity: (id: string) => deleteMutation.mutate(id),
+        setActivities: (newActivities) => queryClient.setQueryData(['activities', user?.id], newActivities)
     };
 };

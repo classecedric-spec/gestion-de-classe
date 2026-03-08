@@ -152,6 +152,61 @@ const MobileSuivi: React.FC = () => {
                                 );
                             });
                         })()
+                    ) : states.selectedStudentFilter ? (
+                        // STUDENT VIEW: Grouped by Module
+                        (() => {
+                            const studentRequests = states.helpRequests;
+
+                            // Group studentRequests by Module
+                            const groupedByModule: Record<string, typeof states.helpRequests> = {};
+                            studentRequests.forEach((req: any) => {
+                                const modId = req.activite?.module_id || req.activite?.Module?.id || 'unknown';
+                                if (!groupedByModule[modId]) groupedByModule[modId] = [];
+                                groupedByModule[modId].push(req);
+                            });
+
+                            // Sort modules alphabetically or by some criteria
+                            const sortedModIds = Object.keys(groupedByModule).sort((a, b) => {
+                                const nameA = groupedByModule[a][0]?.activite?.Module?.nom || '';
+                                const nameB = groupedByModule[b][0]?.activite?.Module?.nom || '';
+                                return nameA.localeCompare(nameB);
+                            });
+
+                            return (
+                                <div className="space-y-6">
+                                    {sortedModIds.map(modId => {
+                                        const modRequests = groupedByModule[modId].sort((a: any, b: any) => {
+                                            return (a.activite?.ordre ?? 0) - (b.activite?.ordre ?? 0);
+                                        });
+                                        const modName = modRequests[0]?.activite?.Module?.nom || 'Module inconnu';
+
+                                        return (
+                                            <div key={modId} className="bg-surface/60 border border-white/10 rounded-xl overflow-hidden shadow-sm">
+                                                <div className="p-3 bg-[#1D2125]">
+                                                    <div className="flex items-center gap-2 mb-3 mt-1">
+                                                        <div className="w-1.5 h-4 bg-primary rounded-full"></div>
+                                                        <span className="text-sm font-bold text-white tracking-wide">{modName}</span>
+                                                    </div>
+                                                    <div className="space-y-3">
+                                                        {modRequests.map(req => (
+                                                            <MobileRequestCard
+                                                                key={req.id}
+                                                                req={req}
+                                                                isExpanded={states.expandedRequestId === req.id}
+                                                                helpers={states.helpersCache[req.id]}
+                                                                onExpand={actions.handleExpandHelp}
+                                                                onStatusUpdate={actions.handleStatusUpdate}
+                                                                onClear={actions.handleClear}
+                                                            />
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            );
+                        })()
                     ) : (
                         // STANDARD VIEW: Flat List
                         states.helpRequests.map((req: any) => (

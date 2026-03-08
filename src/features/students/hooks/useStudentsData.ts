@@ -48,17 +48,25 @@ export const useStudentsData = (initialStudentId: string | null = null) => {
     const [editId, setEditId] = useState<string | null>(null);
     const [studentToDelete, setStudentToDelete] = useState<StudentDetailed | null>(null);
 
+    // 0. User fetching (standardized for keys)
+    const { data: user } = useQuery({
+        queryKey: ['user'],
+        queryFn: getCurrentUser,
+        staleTime: Infinity,
+    });
+
     // 1. Fetching des élèves
     const { data: students = [], isLoading: loading } = useQuery({
-        queryKey: ['students'],
+        queryKey: ['students', user?.id],
         queryFn: async () => {
-            const user = await getCurrentUser();
             if (!user) return [];
             const data = await studentService.getStudentsForTeacher(user.id);
             return (data as any) as StudentDetailed[];
         },
+        enabled: !!user,
         staleTime: 1000 * 60 * 5, // 5 minutes
     });
+
 
     // 2. Sélection de l'élève courant
     const selectedStudent = useMemo(() => {
@@ -107,36 +115,63 @@ export const useStudentsData = (initialStudentId: string | null = null) => {
             );
         },
         onMutate: async (newStudent) => {
-            await queryClient.cancelQueries({ queryKey: ['students'] });
-            const previousStudents = queryClient.getQueryData<StudentDetailed[]>(['students']) || [];
+            const queryKey = ['students', user?.id];
+            await queryClient.cancelQueries({ queryKey });
+            const previousStudents = queryClient.getQueryData<StudentDetailed[]>(queryKey) || [];
 
             if (newStudent.isEdit && newStudent.editId) {
-                queryClient.setQueryData<StudentDetailed[]>(['students'],
+                queryClient.setQueryData<StudentDetailed[]>(queryKey,
                     previousStudents.map(s => s.id === newStudent.editId ? { ...s, ...newStudent.studentData } : s)
                 );
             } else {
+                // To avoid disappearing from filters, we try to match the Classe and Groupe
+                // from existing data in the cache if available.
+                const classes = queryClient.getQueryData<any[]>(['classes', user?.id]) || [];
+                const groups = queryClient.getQueryData<any[]>(['groups', user?.id]) || [];
+
+                const matchedClass = classes.find(c => c.id === newStudent.studentData.classe_id);
+                const matchedGroups = newStudent.groupIds.map(gid => ({
+                    Groupe: groups.find(g => g.id === gid) || { id: gid, nom: '...' }
+                }));
+
                 const tempStudent = {
                     id: 'temp-' + Date.now(),
                     ...newStudent.studentData,
+                    Classe: matchedClass ? { nom: matchedClass.nom } : undefined,
+                    EleveGroupe: matchedGroups.length > 0 ? matchedGroups : undefined,
                     created_at: new Date().toISOString()
                 } as StudentDetailed;
-                queryClient.setQueryData<StudentDetailed[]>(['students'], [tempStudent, ...previousStudents]);
+
+                queryClient.setQueryData<StudentDetailed[]>(queryKey, [tempStudent, ...previousStudents]);
+
+                // Selection optimization
+                if (!selectedStudentId) setSelectedStudentId(tempStudent.id);
             }
 
-            return { previousStudents };
+            return { previousStudents, queryKey };
         },
         onError: (_err, _variables, context) => {
             if (context?.previousStudents) {
-                queryClient.setQueryData(['students'], context.previousStudents);
+                queryClient.setQueryData(context.queryKey, context.previousStudents);
             }
             toast.error("Échec de l'enregistrement");
         },
-        onSuccess: () => {
+        onSuccess: (data: any, variables) => {
             toast.success("Élève enregistré");
             handleCloseModal();
+
+            // If it was a creation, we might have a real ID now. 
+            // We can replace the temp ID immediately in the cache to avoid a flicker
+            if (!variables.isEdit && data && typeof data === 'object' && data.id) {
+                const queryKey = ['students', user?.id];
+                queryClient.setQueryData<StudentDetailed[]>(queryKey, (old = []) =>
+                    old.map(s => s.id.startsWith('temp-') ? { ...s, ...data } : s)
+                );
+                setSelectedStudentId(data.id);
+            }
         },
         onSettled: () => {
-            queryClient.invalidateQueries({ queryKey: ['students'] });
+            queryClient.invalidateQueries({ queryKey: ['students', user?.id] });
         }
     });
 
@@ -156,25 +191,26 @@ export const useStudentsData = (initialStudentId: string | null = null) => {
             await studentService.updateStudentImportance(id, val);
         },
         onMutate: async ({ id, val }) => {
-            await queryClient.cancelQueries({ queryKey: ['students'] });
-            const previousStudents = queryClient.getQueryData<StudentDetailed[]>(['students']);
+            const queryKey = ['students', user?.id];
+            await queryClient.cancelQueries({ queryKey });
+            const previousStudents = queryClient.getQueryData<StudentDetailed[]>(queryKey);
 
             if (previousStudents) {
-                queryClient.setQueryData<StudentDetailed[]>(['students'],
+                queryClient.setQueryData<StudentDetailed[]>(queryKey,
                     previousStudents.map(s => s.id === id ? { ...s, importance_suivi: val } : s)
                 );
             }
-            return { previousStudents };
+            return { previousStudents, queryKey };
         },
         onError: (err, _variables, context) => {
-            if (context?.previousStudents) {
-                queryClient.setQueryData(['students'], context.previousStudents);
+            if (context?.previousStudents && context.queryKey) {
+                queryClient.setQueryData(context.queryKey, context.previousStudents);
             }
             console.error(err);
             toast.error("Échec de la mise à jour");
         },
         onSettled: () => {
-            queryClient.invalidateQueries({ queryKey: ['students'] });
+            queryClient.invalidateQueries({ queryKey: ['students', user?.id] });
         }
     });
 
@@ -194,19 +230,20 @@ export const useStudentsData = (initialStudentId: string | null = null) => {
             await studentService.deleteStudent(student.id);
         },
         onMutate: async (student) => {
-            await queryClient.cancelQueries({ queryKey: ['students'] });
-            const previousStudents = queryClient.getQueryData<StudentDetailed[]>(['students']);
+            const queryKey = ['students', user?.id];
+            await queryClient.cancelQueries({ queryKey });
+            const previousStudents = queryClient.getQueryData<StudentDetailed[]>(queryKey);
 
             if (previousStudents) {
-                queryClient.setQueryData<StudentDetailed[]>(['students'],
+                queryClient.setQueryData<StudentDetailed[]>(queryKey,
                     previousStudents.filter(s => s.id !== student.id)
                 );
             }
-            return { previousStudents };
+            return { previousStudents, queryKey };
         },
         onError: (_err, _student, context) => {
-            if (context?.previousStudents) {
-                queryClient.setQueryData(['students'], context.previousStudents);
+            if (context?.previousStudents && context.queryKey) {
+                queryClient.setQueryData(context.queryKey, context.previousStudents);
             }
             toast.error("Erreur lors de la suppression");
         },
@@ -217,7 +254,7 @@ export const useStudentsData = (initialStudentId: string | null = null) => {
             }
         },
         onSettled: () => {
-            queryClient.invalidateQueries({ queryKey: ['students'] });
+            queryClient.invalidateQueries({ queryKey: ['students', user?.id] });
             setStudentToDelete(null);
         }
     });
@@ -285,7 +322,7 @@ export const useStudentsData = (initialStudentId: string | null = null) => {
         studentToDelete,
         setStudentToDelete,
         filteredStudents,
-        fetchStudents: () => queryClient.invalidateQueries({ queryKey: ['students'] }),
+        fetchStudents: () => queryClient.invalidateQueries({ queryKey: ['students', user?.id] }),
         handleStudentSaved,
         handleUpdateImportance,
         handleEdit,

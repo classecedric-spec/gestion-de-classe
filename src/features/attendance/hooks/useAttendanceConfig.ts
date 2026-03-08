@@ -1,5 +1,6 @@
-import { useState, useCallback, useEffect } from 'react';
-import { supabase } from '../../../lib/database';
+import { useState, useMemo, useEffect } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { getCurrentUser } from '../../../lib/database';
 import { attendanceService, Group, SetupPresence, CategoriePresence } from '../services/attendanceService';
 import { toast } from 'sonner';
 
@@ -18,226 +19,79 @@ export interface CategoryWithTemp extends Partial<CategoriePresence> {
 }
 
 export const useAttendanceConfig = ({
-    selectedGroup,
     selectedSetup,
     currentDateForExport,
     isOpen
 }: UseAttendanceConfigProps) => {
-    const [sets, setSets] = useState<SetupPresence[]>([]);
-    const [loading, setLoading] = useState(false);
-
-    // Config Internal State
+    const queryClient = useQueryClient();
+    
+    // UI Local State
     const [view, setView] = useState<'list' | 'edit'>('list');
+    const [activeTab, setActiveTab] = useState<'general' | 'config' | 'export'>('general');
+    
+    // Edit Internal State
     const [currentSet, setCurrentSet] = useState<{ id: string | null; nom: string; description: string | null } | null>(null);
     const [categories, setCategories] = useState<CategoryWithTemp[]>([]);
 
     // Export Internal State
     const [exportMode, setExportMode] = useState<'day' | 'week' | 'month'>('day');
-    const [availablePeriods, setAvailablePeriods] = useState<{ label: string; value: string }[]>([]);
     const [selectedPeriod, setSelectedPeriod] = useState('');
-    const [exportData, setExportData] = useState<any[]>([]);
-    const [exportDates, setExportDates] = useState<string[]>([]);
     const [selectedDay, setSelectedDay] = useState(currentDateForExport);
-    const [distinctDates, setDistinctDates] = useState<string[]>([]);
 
-    // Tabs State
-    const [activeTab, setActiveTab] = useState<'general' | 'config' | 'export'>('general');
+    // 0. User fetching
+    const { data: user } = useQuery({
+        queryKey: ['user'],
+        queryFn: getCurrentUser,
+        staleTime: Infinity,
+    });
 
-    // --- FETCH DATA ---
-    const fetchDistinctDates = useCallback(async () => {
-        if (!selectedGroup || !selectedSetup) return [];
-        try {
-            const uniqueDates = await attendanceService.fetchDistinctDates(selectedSetup.id);
-            setDistinctDates(uniqueDates);
-            return uniqueDates;
-        } catch (err) {
-            console.error(err);
-            return [];
-        }
-    }, [selectedGroup, selectedSetup]);
+    // 1. Setups fetching
+    const { data: sets = [], isLoading: loadingSets } = useQuery({
+        queryKey: ['attendance-setup', user?.id],
+        queryFn: async () => {
+            if (!user) return [];
+            return await attendanceService.fetchSetups();
+        },
+        enabled: isOpen && !!user,
+        staleTime: 1000 * 60 * 5,
+    });
 
-    const fetchSets = useCallback(async () => {
-        setLoading(true);
-        try {
-            const data = await attendanceService.fetchSetups();
-            setSets(data);
-        } catch (error) {
-            console.error(error);
-        } finally {
-            setLoading(false);
-        }
-    }, []);
+    // 2. Distinct dates for export
+    const { data: distinctDates = [] } = useQuery({
+        queryKey: ['attendance-dates', user?.id, selectedSetup?.id],
+        queryFn: async () => {
+            if (!selectedSetup) return [];
+            return await attendanceService.fetchDistinctDates(selectedSetup.id);
+        },
+        enabled: activeTab === 'export' && !!selectedSetup && !!user,
+    });
 
-    const fetchAttendanceRange = useCallback(async (start: string, end: string) => {
-        if (!selectedGroup) return;
-        setLoading(true);
-        try {
-            const data = await attendanceService.fetchAttendanceRange(start, end);
-            setExportData(data || []);
-        } catch (err) {
-            console.error(err);
-        } finally {
-            setLoading(false);
-        }
-    }, [selectedGroup]);
+    // 3. Export data fetching
+    const [exportRange, setExportRange] = useState<{ start: string; end: string } | null>(null);
+    
+    const { data: exportData = [], isLoading: loadingExport } = useQuery({
+        queryKey: ['attendance-range', user?.id, exportRange?.start, exportRange?.end],
+        queryFn: async () => {
+            if (!exportRange) return [];
+            return await attendanceService.fetchAttendanceRange(exportRange.start, exportRange.end);
+        },
+        enabled: activeTab === 'export' && !!exportRange && !!user,
+    });
 
-    // --- EFFECTS ---
-    useEffect(() => {
-        if (isOpen) {
-            fetchSets();
-        }
-    }, [isOpen, fetchSets]);
-
-    // Fetch dates when entering export tab
-    useEffect(() => {
-        if (activeTab === 'export' && selectedGroup && selectedSetup) {
-            fetchDistinctDates();
-            setExportMode('day');
-            setSelectedDay(currentDateForExport);
-        }
-    }, [activeTab, selectedGroup, selectedSetup, currentDateForExport, fetchDistinctDates]);
-
-    // Generate Periods based on Export Mode & Distinct Dates
-    useEffect(() => {
-        if (activeTab === 'export' && exportMode !== 'day' && distinctDates.length > 0) {
-            const periods: { label: string; value: string }[] = [];
-            const seen = new Set<string>();
-
-            const toLocalISODate = (d: Date) => {
-                const year = d.getFullYear();
-                const month = String(d.getMonth() + 1).padStart(2, '0');
-                const day = String(d.getDate()).padStart(2, '0');
-                return `${year}-${month}-${day}`;
-            };
-
-            distinctDates.forEach((dateStr) => {
-                const [y, m, d] = dateStr.split('-').map(Number);
-                const date = new Date(y, m - 1, d, 12, 0, 0); // Noon to avoid timezone shifts
-                let value: string, label: string;
-
-                if (exportMode === 'week') {
-                    const day = date.getDay(); // 0=Sun
-                    const daysToMonday = day === 0 ? 6 : day - 1;
-                    const monday = new Date(date);
-                    monday.setDate(date.getDate() - daysToMonday);
-
-                    const friday = new Date(monday);
-                    friday.setDate(monday.getDate() + 4);
-
-                    const mStr = monday.toLocaleDateString('fr-FR');
-                    const fStr = friday.toLocaleDateString('fr-FR');
-
-                    value = `${toLocalISODate(monday)}:${toLocalISODate(friday)}`;
-                    label = `Semaine du ${mStr} au ${fStr}`;
-                } else { // Month
-                    const monthName = date.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' });
-                    const firstDay = new Date(y, m - 1, 1, 12, 0, 0);
-                    const lastDay = new Date(y, m, 0, 12, 0, 0);
-                    value = `${toLocalISODate(firstDay)}:${toLocalISODate(lastDay)}`;
-                    label = monthName.charAt(0).toUpperCase() + monthName.slice(1);
-                }
-
-                if (!seen.has(value)) {
-                    seen.add(value);
-                    periods.push({ label, value });
-                }
-            });
-
-            setAvailablePeriods(periods);
-            if (periods.length > 0) {
-                setSelectedPeriod(periods[0].value);
-            } else {
-                setSelectedPeriod('');
-                setExportData([]);
-                setExportDates([]);
-            }
-        }
-    }, [exportMode, distinctDates, activeTab]);
-
-    // Handle Period/Day Selection Change
-    useEffect(() => {
-        if (activeTab !== 'export') return;
-
-        if (exportMode === 'day') {
-            fetchAttendanceRange(selectedDay, selectedDay);
-            setExportDates([selectedDay]);
-            setSelectedPeriod('');
-        } else {
-            if (!selectedPeriod) {
-                setExportData([]);
-                setExportDates([]);
-                return;
-            }
-            const [start, end] = selectedPeriod.split(':');
-            fetchAttendanceRange(start, end);
-
-            // Generate fully inclusive date range
-            const dates: string[] = [];
-            const [startY, startM, startD] = start.split('-').map(Number);
-            const [endY, endM, endD] = end.split('-').map(Number);
-            const curr = new Date(startY, startM - 1, startD, 12, 0, 0);
-            const last = new Date(endY, endM - 1, endD, 12, 0, 0);
-
-            while (curr <= last) {
-                const day = curr.getDay();
-                if (day !== 0 && day !== 6) { // Exclude weekends if needed, or keep all
-                    const year = curr.getFullYear();
-                    const month = String(curr.getMonth() + 1).padStart(2, '0');
-                    const dayStr = String(curr.getDate()).padStart(2, '0');
-                    dates.push(`${year}-${month}-${dayStr}`);
-                }
-                curr.setDate(curr.getDate() + 1);
-            }
-            setExportDates(dates);
-        }
-    }, [selectedPeriod, exportMode, selectedDay, activeTab, fetchAttendanceRange]);
-
-    // --- ACTIONS ---
-
-    const handleCreateNew = () => {
-        setCurrentSet({ id: null, nom: '', description: '' });
-        setCategories([
-            { id: 'temp-1', nom: 'Présent', couleur: '#10B981', isTemp: true },
-            { id: 'temp-2', nom: 'En Retard', couleur: '#F59E0B', isTemp: true }
-        ]);
-        setView('edit');
-    };
-
-    const handleEdit = async (set: SetupPresence) => {
-        setCurrentSet(set);
-        setLoading(true);
-        try {
-            const data = await attendanceService.fetchCategories(set.id);
-            setCategories(data.filter((c: any) => c.nom !== 'Absent'));
-            setView('edit');
-        } catch (error) {
-            console.error(error);
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const handleDeleteSet = async (setId: string) => {
-        try {
-            await attendanceService.deleteSetup(setId);
-            fetchSets();
+    // 4. Mutations
+    const deleteSetupMutation = useMutation({
+        mutationFn: (id: string) => attendanceService.deleteSetup(id),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['attendance-setup', user?.id] });
             toast.success("Configuration supprimée");
-        } catch (error: any) {
-            toast.error('Erreur: ' + error.message);
-        }
-    };
+        },
+        onError: (err: any) => toast.error('Erreur: ' + err.message)
+    });
 
-    const handleSaveSet = async (onConfigSaved?: () => void) => {
-        if (!currentSet || !currentSet.nom.trim()) {
-            toast.error("Le nom du set est obligatoire");
-            return;
-        }
-
-        setLoading(true);
-        try {
-            const { data: { user } } = await supabase.auth.getUser();
+    const saveSetupMutation = useMutation({
+        mutationFn: async ({ currentSet, categories, onConfigSaved }: { currentSet: any, categories: CategoryWithTemp[], onConfigSaved?: () => void }) => {
             if (!user) throw new Error("Non authentifié");
-
+            
             let setupId = currentSet.id;
             if (setupId) {
                 await attendanceService.updateSetup(setupId, currentSet.nom, currentSet.description);
@@ -256,43 +110,138 @@ export const useAttendanceConfig = ({
 
             await attendanceService.upsertCategories(categoriesToUpsert);
             await attendanceService.ensureAbsentCategory(setupId!, user.id);
-
+            
+            return { setupId, onConfigSaved };
+        },
+        onSuccess: ({ onConfigSaved }) => {
+            queryClient.invalidateQueries({ queryKey: ['attendance-setup', user?.id] });
             setView('list');
-            fetchSets();
             if (onConfigSaved) onConfigSaved();
             toast.success("Configuration sauvegardée");
+        },
+        onError: (err: any) => toast.error('Erreur: ' + err.message)
+    });
 
-        } catch (error: any) {
-            toast.error('Erreur: ' + error.message);
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const handleCopyPeriod = async (source: string, target: string, onConfigSaved?: () => void) => {
-        if (!selectedGroup || !selectedSetup) {
-            toast.error("Sélectionnez un groupe et une configuration");
-            return;
-        }
-        try {
-            const { data: { user } } = await supabase.auth.getUser();
-            if (!user) throw new Error("Non authentifié");
-
-            await attendanceService.copyPeriodData(
-                currentDateForExport,
-                selectedSetup.id,
-                source,
-                target,
-                user.id
-            );
-            toast.success(`Données copiées`);
+    const copyPeriodMutation = useMutation({
+        mutationFn: async ({ source, target, onConfigSaved }: { source: string, target: string, onConfigSaved?: () => void }) => {
+            if (!selectedSetup || !user) throw new Error("Sélection manquante");
+            await attendanceService.copyPeriodData(currentDateForExport, selectedSetup.id, source, target, user.id);
+            return onConfigSaved;
+        },
+        onSuccess: (onConfigSaved) => {
+            toast.success("Données copiées");
             if (onConfigSaved) onConfigSaved();
-        } catch (error: any) {
-            toast.error("Erreur: " + error.message);
+            // Invalidate attendance queries in useAttendance's scope
+            queryClient.invalidateQueries({ queryKey: ['attendance', user?.id] });
+        },
+        onError: (err: any) => toast.error("Erreur: " + err.message)
+    });
+
+    // --- LOGIC FOR EXPORT PERIODS ---
+    const availablePeriods = useMemo(() => {
+        if (activeTab !== 'export' || exportMode === 'day' || distinctDates.length === 0) return [];
+        
+        const periods: { label: string; value: string }[] = [];
+        const seen = new Set<string>();
+
+        const toLocalISODate = (d: Date) => {
+            const year = d.getFullYear();
+            const month = String(d.getMonth() + 1).padStart(2, '0');
+            const day = String(d.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
+        };
+
+        distinctDates.forEach((dateStr) => {
+            const [y, m, d] = dateStr.split('-').map(Number);
+            const date = new Date(y, m - 1, d, 12, 0, 0);
+            let value: string, label: string;
+
+            if (exportMode === 'week') {
+                const day = date.getDay();
+                const daysToMonday = day === 0 ? 6 : day - 1;
+                const monday = new Date(date);
+                monday.setDate(date.getDate() - daysToMonday);
+                const friday = new Date(monday);
+                friday.setDate(monday.getDate() + 4);
+
+                value = `${toLocalISODate(monday)}:${toLocalISODate(friday)}`;
+                label = `Semaine du ${monday.toLocaleDateString('fr-FR')} au ${friday.toLocaleDateString('fr-FR')}`;
+            } else { // month
+                const monthName = date.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' });
+                const firstDay = new Date(y, m - 1, 1, 12, 0, 0);
+                const lastDay = new Date(y, m, 0, 12, 0, 0);
+                value = `${toLocalISODate(firstDay)}:${toLocalISODate(lastDay)}`;
+                label = monthName.charAt(0).toUpperCase() + monthName.slice(1);
+            }
+
+            if (!seen.has(value)) {
+                seen.add(value);
+                periods.push({ label, value });
+            }
+        });
+        return periods;
+    }, [activeTab, exportMode, distinctDates]);
+
+    useEffect(() => {
+        if (availablePeriods.length > 0 && !selectedPeriod) {
+            setSelectedPeriod(availablePeriods[0].value);
+        }
+    }, [availablePeriods, selectedPeriod]);
+
+    const exportDates = useMemo(() => {
+        if (exportMode === 'day') return [selectedDay];
+        if (!selectedPeriod) return [];
+        
+        const [start, end] = selectedPeriod.split(':');
+        const dates: string[] = [];
+        const [startY, startM, startD] = start.split('-').map(Number);
+        const [endY, endM, endD] = end.split('-').map(Number);
+        const curr = new Date(startY, startM - 1, startD, 12, 0, 0);
+        const last = new Date(endY, endM - 1, endD, 12, 0, 0);
+
+        while (curr <= last) {
+            const day = curr.getDay();
+            if (day !== 0 && day !== 6) {
+                const dayStr = String(curr.getDate()).padStart(2, '0');
+                const monthStr = String(curr.getMonth() + 1).padStart(2, '0');
+                dates.push(`${curr.getFullYear()}-${monthStr}-${dayStr}`);
+            }
+            curr.setDate(curr.getDate() + 1);
+        }
+        return dates;
+    }, [exportMode, selectedDay, selectedPeriod]);
+
+    useEffect(() => {
+        if (activeTab !== 'export') return;
+        if (exportMode === 'day') {
+            setExportRange({ start: selectedDay, end: selectedDay });
+        } else if (selectedPeriod) {
+            const [start, end] = selectedPeriod.split(':');
+            setExportRange({ start, end });
+        }
+    }, [activeTab, exportMode, selectedDay, selectedPeriod]);
+
+    // Actions
+    const handleCreateNew = () => {
+        setCurrentSet({ id: null, nom: '', description: '' });
+        setCategories([
+            { id: 'temp-1', nom: 'Présent', couleur: '#10B981', isTemp: true },
+            { id: 'temp-2', nom: 'En Retard', couleur: '#F59E0B', isTemp: true }
+        ]);
+        setView('edit');
+    };
+
+    const handleEdit = async (set: SetupPresence) => {
+        setCurrentSet(set);
+        try {
+            const data = await attendanceService.fetchCategories(set.id);
+            setCategories(data.filter((c: any) => c.nom !== 'Absent'));
+            setView('edit');
+        } catch (error) {
+            console.error(error);
         }
     };
 
-    // Category Management Local
     const addCategory = () => {
         setCategories([...categories, { id: `temp-${Date.now()}`, nom: '', couleur: '#3B82F6', isTemp: true }]);
     };
@@ -320,31 +269,31 @@ export const useAttendanceConfig = ({
     };
 
     return {
-        // State
         sets,
-        loading,
+        loading: loadingSets || loadingExport || saveSetupMutation.isPending || deleteSetupMutation.isPending || copyPeriodMutation.isPending,
         view, setView,
         currentSet, setCurrentSet,
         categories, setCategories,
         activeTab, setActiveTab,
-
-        // Export State
         exportMode, setExportMode,
         availablePeriods,
         selectedPeriod, setSelectedPeriod,
-        exportData,
+        exportData: exportData || [],
         exportDates,
         selectedDay, setSelectedDay,
 
-        // Actions
         handleCreateNew,
         handleEdit,
-        handleDeleteSet,
-        handleSaveSet,
+        handleDeleteSet: (id: string) => deleteSetupMutation.mutate(id),
+        handleSaveSet: (onConfigSaved?: () => void) => {
+            if (!currentSet) return;
+            saveSetupMutation.mutate({ currentSet, categories, onConfigSaved });
+        },
         addCategory,
         removeCategory,
         updateCategory,
-        handleCopyPeriod,
-        fetchSets
+        handleCopyPeriod: (source: string, target: string, onConfigSaved?: () => void) => 
+            copyPeriodMutation.mutate({ source, target, onConfigSaved }),
+        fetchSets: () => queryClient.invalidateQueries({ queryKey: ['attendance-setup', user?.id] })
     };
 };

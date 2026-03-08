@@ -1,8 +1,8 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useMobileEncodingFlow } from '../hooks/useMobileEncodingFlow';
-import { useGroupsData } from '../hooks/useGroupsData';
-import { useStudentsData } from '../hooks/useStudentsData';
+import { useGroupsData } from '../features/groups/hooks/useGroupsData';
+import { useStudentsData } from '../features/students/hooks/useStudentsData';
 import { useModulesData } from '../hooks/useModulesData';
 import { useActivityStatus } from '../hooks/useActivityStatus';
 import { MobileEncodingHeader } from '../components/mobile-encoding/MobileEncodingHeader';
@@ -31,7 +31,13 @@ const MobileEncodage: React.FC = () => {
 
     // Data fetching
     const { groups, loading: loadingGroups } = useGroupsData();
-    const { students, loading: loadingStudents } = useStudentsData(selectedGroup?.id || null);
+    const { students: allStudents, loading: loadingStudents } = useStudentsData();
+
+    // Filter students by group manually to match previous behavior
+    const students = React.useMemo(() => {
+        if (!selectedGroup) return [];
+        return allStudents.filter(s => s.EleveGroupe?.some(eg => eg.Groupe?.id === selectedGroup.id));
+    }, [allStudents, selectedGroup]);
     const {
         modules,
         progressions,

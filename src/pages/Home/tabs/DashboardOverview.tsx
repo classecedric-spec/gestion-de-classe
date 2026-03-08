@@ -1,6 +1,6 @@
 import React from 'react';
 import { useNavigate, useOutletContext } from 'react-router-dom';
-import { Users, CheckSquare, LayoutList, Loader2 } from 'lucide-react';
+import { Users, CheckSquare, LayoutList, Loader2, ClipboardList } from 'lucide-react';
 import PdfProgress from '../../../core/PdfProgress';
 import { DashboardContextType } from '../DashboardContext';
 import WeeklyPlannerModal from '../../../components/WeeklyPlannerModal';
@@ -15,6 +15,7 @@ const DashboardOverview: React.FC = () => {
         isGenerating,
         progress,
         progressText,
+        setIsResponsibilityOverviewOpen
     } = useOutletContext<DashboardContextType>();
 
     const [isWeeklyPlannerOpen, setIsWeeklyPlannerOpen] = React.useState(false);
@@ -191,6 +192,20 @@ const DashboardOverview: React.FC = () => {
                     <div className="text-left">
                         <span className="block text-sm font-black uppercase tracking-widest text-white leading-none mb-1">Suivi Groupe</span>
                         <span className="text-[10px] text-grey-medium font-bold uppercase tracking-wider">Par classe ou groupe</span>
+                    </div>
+                </button>
+
+                {/* Responsabilités Board (New) */}
+                <button
+                    onClick={() => setIsResponsibilityOverviewOpen(true)}
+                    className="flex items-center gap-4 p-5 bg-surface/50 hover:bg-surface border border-white/5 rounded-3xl transition-all group hover:scale-[1.02] active:scale-[0.98]"
+                >
+                    <div className="p-3 rounded-2xl bg-amber-500/10 text-amber-500 group-hover:bg-amber-500 group-hover:text-white transition-all">
+                        <ClipboardList size={24} />
+                    </div>
+                    <div className="text-left">
+                        <span className="block text-sm font-black uppercase tracking-widest text-white leading-none mb-1">Responsabilités</span>
+                        <span className="text-[10px] text-grey-medium font-bold uppercase tracking-wider">Récapitulatif des tâches</span>
                     </div>
                 </button>
             </div>
