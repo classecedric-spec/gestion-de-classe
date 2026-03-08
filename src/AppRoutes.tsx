@@ -22,6 +22,7 @@ const Activities = lazy(() => import('./pages/Activities'));
 const Niveaux = lazy(() => import('./pages/Niveaux'));
 const Materiels = lazy(() => import('./pages/Materiels'));
 const Presence = lazy(() => import('./pages/Presence'));
+const Communications = lazy(() => import('./pages/Communications'));
 const Settings = lazy(() => import('./pages/Settings'));
 const SuiviGlobal = lazy(() => import('./pages/SuiviGlobal'));
 const SuiviGlobalTBI = lazy(() => import('./pages/SuiviGlobalTBI'));
@@ -131,6 +132,7 @@ const AppRoutes = () => {
 
                 <Route path={ROUTES.DASHBOARD_SETTINGS} element={<Suspense fallback={<PageLoader />}><Settings /></Suspense>} />
                 <Route path={ROUTES.DASHBOARD_PRESENCE} element={<Suspense fallback={<PageLoader />}><Presence /></Suspense>} />
+                <Route path={ROUTES.DASHBOARD_COMMUNICATIONS} element={<Suspense fallback={<PageLoader />}><Communications /></Suspense>} />
             </Route>
 
             <Route path="/suivi-tbi" element={

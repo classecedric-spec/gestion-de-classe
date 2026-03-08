@@ -111,6 +111,19 @@ export const SettingsProfileTab: React.FC<SettingsProfileTabProps> = ({
                         />
                     </div>
 
+                    <div className="space-y-2">
+                        <label className="text-xs font-bold text-grey-light uppercase tracking-wide flex items-center gap-2">
+                            <Key size={14} /> Clé API Brevo (Emails)
+                        </label>
+                        <Input
+                            type="password"
+                            value={profile.brevo_api_key || ''}
+                            onChange={(e) => setProfile((prev: any) => ({ ...prev, brevo_api_key: e.target.value }))}
+                            placeholder="xkeysib-..."
+                            title="Votre clé API Brevo personnelle pour l'envoi d'emails"
+                        />
+                    </div>
+
                     <div className="pt-4 flex justify-between items-center border-t border-white/5 mt-8">
                         <button
                             type="button"
