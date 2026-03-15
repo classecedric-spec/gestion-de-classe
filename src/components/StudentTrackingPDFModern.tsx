@@ -96,6 +96,9 @@ const styles = StyleSheet.create({
         borderColor: '#555',
         marginRight: 4,
     },
+    checkboxFilled: {
+        backgroundColor: '#555',
+    },
 
     // Info
     activityInfo: {
@@ -258,9 +261,31 @@ const StudentTrackingPDFModern: React.FC<StudentTrackingPDFModernProps> = ({ dat
                                             >
                                                 {/* Checkboxes */}
                                                 <View style={styles.checklistContainer}>
-                                                    {[1, 2, 3, 4].map(i => (
-                                                        <View key={i} style={styles.checkbox} />
-                                                    ))}
+                                                    {[
+                                                        { key: 'demarre', index: 0 },
+                                                        { key: 'fini', index: 1 },
+                                                        { key: 'corrige', index: 2 },
+                                                        { key: 'valide', index: 3 }
+                                                    ].map((item, i) => {
+                                                        const currentStatut = activity.planning?.statut || 'non_demarre';
+                                                        
+                                                        // On remplit si le statut actuel est celui-ci OU un statut "plus avancé"
+                                                        const statusOrder = ['non_demarre', 'demarre', 'fini', 'corrige', 'valide'];
+                                                        const currentIndex = statusOrder.indexOf(currentStatut);
+                                                        const itemIndexInOrder = statusOrder.indexOf(item.key);
+                                                        
+                                                        const isFilled = currentIndex >= itemIndexInOrder && currentIndex > 0;
+
+                                                        return (
+                                                            <View 
+                                                                key={i} 
+                                                                style={[
+                                                                    styles.checkbox, 
+                                                                    isFilled ? styles.checkboxFilled : {}
+                                                                ]} 
+                                                            />
+                                                        );
+                                                    })}
                                                 </View>
 
                                                 {/* Info */}
@@ -274,11 +299,33 @@ const StudentTrackingPDFModern: React.FC<StudentTrackingPDFModernProps> = ({ dat
 
                                                 {/* Week Grid */}
                                                 <View style={styles.weekGrid}>
-                                                    {['L', 'M', 'M', 'J', 'V'].map((day, d) => (
-                                                        <View key={d} style={styles.weekBox}>
-                                                            <Text style={styles.weekText}>{day}</Text>
-                                                        </View>
-                                                    ))}
+                                                    {[
+                                                        { letter: 'L', full: 'Lundi' },
+                                                        { letter: 'M', full: 'Mardi' },
+                                                        { letter: 'M', full: 'Mercredi' },
+                                                        { letter: 'J', full: 'Jeudi' },
+                                                        { letter: 'V', full: 'Vendredi' },
+                                                    ].map((day, d) => {
+                                                        const isPlanned = activity.planning?.jour === day.full;
+                                                        const lieu = activity.planning?.lieu;
+                                                        
+                                                        let bgColor: string = PDF_THEME.colors.background.white;
+                                                        let textColor: string = PDF_THEME.colors.text.secondary;
+                                                        
+                                                        if (isPlanned && lieu === 'classe') {
+                                                            bgColor = '#4CAF50'; // Vert
+                                                            textColor = '#FFFFFF';
+                                                        } else if (isPlanned && lieu === 'domicile') {
+                                                            bgColor = '#FF6600'; // Orange
+                                                            textColor = '#FFFFFF';
+                                                        }
+                                                        
+                                                        return (
+                                                            <View key={d} style={[styles.weekBox, { backgroundColor: bgColor }]}>
+                                                                <Text style={[styles.weekText, { color: textColor }]}>{day.letter}</Text>
+                                                            </View>
+                                                        );
+                                                    })}
                                                 </View>
                                             </View>
                                         ))}

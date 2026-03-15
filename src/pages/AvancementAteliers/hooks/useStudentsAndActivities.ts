@@ -30,6 +30,7 @@ export const useStudentsAndActivities = (
     const [students, setStudents] = useState<Student[]>([]);
     const [activities, setActivities] = useState<AvancementActivity[]>([]);
     const [progressions, setProgressions] = useState<ProgressionMap>({});
+    const [relevantModuleIds, setRelevantModuleIds] = useState<Set<string>>(new Set());
     const [loading, setLoading] = useState<boolean>(false);
 
     const fetchStudents = useCallback(async (groupId: string) => {
@@ -96,24 +97,47 @@ export const useStudentsAndActivities = (
 
                 const allProgs = await trackingService.getProgressionsForStudentsAndActivities(studentIds, actIds);
 
-                const groupLevelIds = new Set(students.map(s => s.niveau_id).filter(Boolean));
-
-                const filteredActs = sortedActs.filter(a => {
-                    const actLevels = a.ActiviteNiveau?.map(an => an.niveau_id) || [];
-                    if (actLevels.length === 0) return false;
-                    return actLevels.some(id => groupLevelIds.has(id));
-                });
-
-                setActivities(filteredActs);
-
                 const progMap: ProgressionMap = {};
+                const modulesWithProgs = new Set<string>();
+                const studentModulesMap: Record<string, Set<string>> = {};
+
+                const actMap = new Map();
+                sortedActs.forEach(a => actMap.set(a.id, a));
+
                 allProgs.forEach(p => {
                     progMap[`${p.eleve_id}-${p.activite_id}`] = p.etat;
+                    const act = actMap.get(p.activite_id);
+                    if (act && act.module_id) {
+                        modulesWithProgs.add(act.module_id);
+                        if (!studentModulesMap[act.module_id]) {
+                            studentModulesMap[act.module_id] = new Set();
+                        }
+                        const student = students.find(s => s.id === p.eleve_id);
+                        if (student && student.prenom) {
+                            studentModulesMap[act.module_id].add(student.prenom);
+                        }
+                    }
                 });
+
+                // Console logs from user specification
+                console.log("=== [Filtrage Suivi Groupes] ===");
+                modulesWithProgs.forEach(modId => {
+                    const modName = sortedActs.find(a => a.module_id === modId)?.Module?.nom || modId;
+                    const studentNames = Array.from(studentModulesMap[modId] || []).join(', ');
+                    console.log(`Module AFFICHE : "${modName}" | Élèves liés :`, studentNames);
+                });
+                console.log("================================");
+
+                setRelevantModuleIds(modulesWithProgs);
+
+                // Afficher uniquement les activités appartenant aux modules pertinents
+                const filteredActs = sortedActs.filter(a => modulesWithProgs.has(a.module_id));
+                setActivities(filteredActs);
                 setProgressions(progMap);
             } else {
                 setActivities([]);
                 setProgressions({});
+                setRelevantModuleIds(new Set());
             }
         } catch (error) {
             console.error('Error fetching activities:', error);
@@ -142,10 +166,12 @@ export const useStudentsAndActivities = (
             } else {
                 setActivities([]);
                 setProgressions({});
+                setRelevantModuleIds(new Set());
             }
         } else {
             setActivities([]);
             setProgressions({});
+            setRelevantModuleIds(new Set());
         }
     }, [selectedModuleId, selectedDateFin, selectedBrancheId, students, getFilteredModules, fetchActivitiesAndProgress]);
 
@@ -153,6 +179,7 @@ export const useStudentsAndActivities = (
         students,
         activities,
         progressions,
+        relevantModuleIds,
         setProgressions,
         loading
     };

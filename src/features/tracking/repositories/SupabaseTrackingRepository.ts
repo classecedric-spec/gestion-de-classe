@@ -234,6 +234,7 @@ export class SupabaseTrackingRepository implements ITrackingRepository {
             .select(`
                 *,
                 ActiviteNiveau (niveau_id),
+                Progression (etat, eleve_id),
                 Module (
                     id,
                     SousBranche (

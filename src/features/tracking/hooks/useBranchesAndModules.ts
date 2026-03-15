@@ -67,7 +67,8 @@ export interface Activity {
 export function useBranchesAndModules(
     selectedStudent: Student | null,
     showPendingOnly: boolean,
-    selectedGroupId: string | null
+    selectedGroupId: string | null,
+    groupStudents: Student[] = []
 ) {
     // Branches
     const [branches, setBranches] = useState<Branch[]>([]);
@@ -125,13 +126,12 @@ export function useBranchesAndModules(
         );
     };
 
-    // Fetch modules for student
-    const fetchModules = async (studentId: string) => {
-        if (!studentId) return;
+    // Fetch modules for student or group
+    const fetchModules = async (studentId: string | null) => {
         setLoadingModules(true);
 
         await fetchWithCache(
-            `modules_pedago_${studentId}`,
+            `modules_pedago_${studentId || selectedGroupId}`,
             async () => {
                 // Pass null for levelId as service now fetches all active modules
                 const modules = await trackingService.fetchModulesForStudent(null);
@@ -139,28 +139,77 @@ export function useBranchesAndModules(
             },
             (data: any[]) => {
                 const modulesWithStats: ModuleWithStats[] = (data || []).map(m => {
-                    const studentLevelId = selectedStudent?.niveau_id;
+                    // Filter Logic: 
+                    // If student is selected, filter by student's level and progression existence.
+                    // If NO student is selected (but group is), filter by ALL group students' levels and progression existence.
+                    
+                    if (studentId) {
+                        const studentLevelId = selectedStudent?.niveau_id;
+                        const validActivities = m.Activite?.filter((act: any) => {
+                            if (studentLevelId) {
+                                const levels = act.ActiviteNiveau?.map((an: any) => an.niveau_id) || [];
+                                if (levels.length > 0 && !levels.includes(studentLevelId)) return false;
+                            }
+                            const hasProgression = act.Progression?.some((p: any) => p.eleve_id === studentId);
+                            if (!hasProgression) return false;
+                            return true;
+                        }) || [];
 
-                    const validActivities = m.Activite?.filter((act: any) => {
-                        if (!studentLevelId) return true;
-                        const levels = act.ActiviteNiveau?.map((an: any) => an.niveau_id) || [];
-                        return levels.length === 0 || levels.includes(studentLevelId);
-                    }) || [];
+                        const totalActivities = validActivities.length;
+                        const completedActivities = validActivities.filter((act: any) =>
+                            act.Progression?.some((p: any) => p.eleve_id === studentId && (p.etat === 'termine' || p.etat === 'a_verifier'))
+                        ).length;
 
-                    const totalActivities = validActivities.length;
-                    const completedActivities = validActivities.filter((act: any) =>
-                        act.Progression?.some((p: any) => p.eleve_id === studentId && (p.etat === 'termine' || p.etat === 'a_verifier'))
-                    ).length;
+                        return {
+                            ...m,
+                            totalActivities,
+                            completedActivities,
+                            percent: totalActivities > 0 ? Math.round((completedActivities / totalActivities) * 100) : 0
+                        };
+                    } else {
+                        // Group Mode Filtering
+                        // We only want modules that have at least one valid activity for the group
+                        let totalActs = 0;
+                        let keepModule = false;
+                        let studentsWithProgression = new Set<string>();
 
-                    return {
-                        ...m,
-                        totalActivities,
-                        completedActivities,
-                        percent: totalActivities > 0 ? Math.round((completedActivities / totalActivities) * 100) : 0
-                    };
+                        if (selectedGroupId && groupStudents && groupStudents.length > 0) {
+                            const groupStudentIds = groupStudents.map(s => s.id);
+                            
+                            m.Activite?.forEach((act: any) => {
+                                const pgs = act.Progression || [];
+                                pgs.forEach((p: any) => {
+                                    if (groupStudentIds.includes(p.eleve_id)) {
+                                        keepModule = true;
+                                        studentsWithProgression.add(p.eleve_id);
+                                    }
+                                });
+                            });
+                        }
+
+                        if (keepModule) {
+                            const studentNames = Array.from(studentsWithProgression)
+                                .map(id => {
+                                    const student = groupStudents.find(s => s.id === id);
+                                    return student ? student.prenom : id;
+                                })
+                                .filter(Boolean)
+                                .join(', ');
+
+                            console.log(`[Filtrage Groupe] Module AFFICHE : "${m.nom}" | Élèves liés :`, studentNames);
+                            totalActs = 1; // Just a truthy value to keep the module
+                        }
+
+                        return {
+                            ...m,
+                            totalActivities: totalActs,
+                            completedActivities: 0,
+                            percent: 0
+                        };
+                    }
                 });
 
-                const filteredByCompletion = modulesWithStats.filter(m => {
+                const filteredByCompletion = modulesWithStats.filter((m: any) => {
                     if (m.totalActivities === 0) return false;
                     if (showPendingOnly) {
                         return m.completedActivities < m.totalActivities;
@@ -168,7 +217,7 @@ export function useBranchesAndModules(
                     return true;
                 });
 
-                const sortedModules = filteredByCompletion.sort((a, b) => {
+                const sortedModules = filteredByCompletion.sort((a: any, b: any) => {
                     if (a.date_fin !== b.date_fin) {
                         if (!a.date_fin) return 1;
                         if (!b.date_fin) return -1;
@@ -188,7 +237,7 @@ export function useBranchesAndModules(
                 setModules(sortedModules);
                 setLoadingModules(false);
             },
-            (_err) => {
+            (_err: any) => {
                 setLoadingModules(false);
             }
         );
@@ -203,7 +252,22 @@ export function useBranchesAndModules(
                 return await trackingService.fetchActivitiesForModule(moduleId);
             },
             (data: any[]) => {
-                setActivities(data as Activity[]);
+                const filteredData = selectedStudent ? data.filter((act) => {
+                    const studentLevelId = selectedStudent.niveau_id;
+                    // Check level restriction
+                    if (studentLevelId) {
+                        const levels = act.ActiviteNiveau?.map((an: any) => an.niveau_id) || [];
+                        if (levels.length > 0 && !levels.includes(studentLevelId)) return false;
+                    }
+
+                    // Check progression existence
+                    const hasProgression = act.Progression?.some((p: any) => p.eleve_id === selectedStudent.id);
+                    if (!hasProgression) return false;
+
+                    return true;
+                }) : data;
+
+                setActivities(filteredData as Activity[]);
                 setLoadingActivities(false);
             },
             (_err) => {
@@ -224,14 +288,23 @@ export function useBranchesAndModules(
         }
     }, [selectedGroupId]);
 
-    // Fetch modules when student selected
+    // Fetch modules when student selected OR group selected (but no student)
     useEffect(() => {
         if (selectedStudent) {
             fetchModules(selectedStudent.id);
             setSelectedModule(null);
             setActivities([]);
+        } else if (selectedGroupId && groupStudents.length > 0) {
+            // Un étudiant n'est pas sélectionné, mais on a un groupe et ses élèves chargés
+            fetchModules(null);
+            setSelectedModule(null);
+            setActivities([]);
+        } else if (!selectedGroupId) {
+            setModules([]);
+            setSelectedModule(null);
+            setActivities([]);
         }
-    }, [selectedStudent, showPendingOnly]);
+    }, [selectedStudent, selectedGroupId, showPendingOnly, groupStudents]);
 
     // Fetch activities when module selected
     useEffect(() => {

@@ -5,6 +5,7 @@ import { Group } from '../../../features/attendance/services/attendanceService';
 interface AvancementFiltersProps {
     groups: Group[];
     modules: any[];
+    visibleModules: any[];
     branches: any[];
     selectedGroupId: string;
     setSelectedGroupId: (id: string) => void;
@@ -23,6 +24,7 @@ interface AvancementFiltersProps {
 export const AvancementFilters: React.FC<AvancementFiltersProps> = ({
     groups,
     modules,
+    visibleModules,
     branches,
     selectedGroupId,
     setSelectedGroupId,
@@ -153,10 +155,11 @@ export const AvancementFilters: React.FC<AvancementFiltersProps> = ({
                     >
                         <option value="">
                             {(selectedDateFin || selectedBrancheId)
-                                ? `Tous les modules (${getFilteredModules().length})`
+                                ? `Tous les modules (${getFilteredModules().filter(m => visibleModules.map(vm => vm.id).includes(m.id)).length})`
                                 : "Sélectionner un module..."}
                         </option>
                         {getFilteredModules()
+                            .filter(m => visibleModules.map(vm => vm.id).includes(m.id))
                             .sort((a, b) => {
                                 if (!a.date_fin) return 1;
                                 if (!b.date_fin) return -1;

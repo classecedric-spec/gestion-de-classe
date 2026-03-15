@@ -44,6 +44,8 @@ const DashboardOverview = lazy(() => import('./pages/Home/tabs/DashboardOverview
 const DashboardStudentsPage = lazy(() => import('./pages/Home/tabs/DashboardStudentsPage'));
 const AvantMail = lazy(() => import('./pages/Home/tabs/AvantMail'));
 const VueRetard = lazy(() => import('./pages/Home/tabs/VueRetard'));
+const HomeworkTracking = lazy(() => import('./pages/Home/tabs/HomeworkTracking'));
+const ClassroomTracking = lazy(() => import('./pages/Home/tabs/ClassroomTracking'));
 
 const AppRoutes = () => {
     return (
@@ -107,6 +109,8 @@ const AppRoutes = () => {
                     <Route path="eleves" element={<Suspense fallback={<PageLoader />}><DashboardStudentsPage /></Suspense>} />
                     <Route path="avant-mail" element={<Suspense fallback={<PageLoader />}><AvantMail /></Suspense>} />
                     <Route path="vue-retard" element={<Suspense fallback={<PageLoader />}><VueRetard /></Suspense>} />
+                    <Route path="travaux-domicile" element={<Suspense fallback={<PageLoader />}><HomeworkTracking /></Suspense>} />
+                    <Route path="travaux-classe" element={<Suspense fallback={<PageLoader />}><ClassroomTracking /></Suspense>} />
                     <Route path="*" element={<div className="p-8 text-center text-grey-medium">Page en construction</div>} />
                 </Route>
 

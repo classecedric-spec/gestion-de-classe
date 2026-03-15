@@ -67,6 +67,7 @@ interface GroupQRPDFProps {
     groupName: string;
     students: any[];
     baseUrl: string;
+    mode?: 'encodage' | 'planification';
 }
 
 interface StudentWithQR {
@@ -76,7 +77,7 @@ interface StudentWithQR {
     qrDataUrl: string;
 }
 
-const GroupQRPDF: React.FC<GroupQRPDFProps> = ({ groupName, students, baseUrl }) => {
+const GroupQRPDF: React.FC<GroupQRPDFProps> = ({ groupName, students, baseUrl, mode = 'encodage' }) => {
     const [studentsWithQR, setStudentsWithQR] = useState<StudentWithQR[]>([]);
     const [isGenerating, setIsGenerating] = useState(true);
 
@@ -84,7 +85,10 @@ const GroupQRPDF: React.FC<GroupQRPDFProps> = ({ groupName, students, baseUrl })
         const generateQRs = async () => {
             try {
                 const promises = students.map(async (student) => {
-                    const kioskUrl = `${baseUrl}/kiosk/${student.id}?token=${student.access_token || ''}`;
+                    const token = student.access_token || '';
+                    const kioskUrl = mode === 'planification'
+                        ? `${baseUrl}/kiosk/planning/${student.id}?token=${token}`
+                        : `${baseUrl}/kiosk/${student.id}?token=${token}`;
                     // Generate QR as Data URL (PNG)
                     const qrDataUrl = await QRCode.toDataURL(kioskUrl, {
                         width: 300,
@@ -143,7 +147,9 @@ const GroupQRPDF: React.FC<GroupQRPDFProps> = ({ groupName, students, baseUrl })
                             </View>
 
                             {/* Footer */}
-                            <Text style={styles.footer}>Connexion à Gestion de Classe</Text>
+                            <Text style={styles.footer}>
+                                {mode === 'planification' ? 'Kiosque Planification' : 'Kiosque Encodage'}
+                            </Text>
                         </View>
                     </View>
                 ))}

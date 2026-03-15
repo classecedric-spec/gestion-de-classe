@@ -1,8 +1,7 @@
 import React from 'react';
-import { Users, Settings2, Maximize, Minimize, Check, Loader2 } from 'lucide-react';
+import { Users, Settings2, Maximize, Minimize, Check, Loader2, Keyboard, CalendarDays } from 'lucide-react';
 import { Button } from '../../../../core';
 import clsx from 'clsx';
-import { Timer } from '../../hooks/useTimerIntegration';
 
 interface DashboardControlsProps {
     isFullScreen: boolean;
@@ -12,6 +11,12 @@ interface DashboardControlsProps {
     setIsEditMode: (edit: boolean) => void;
     isSaving: boolean;
     showSyncSuccess: boolean;
+    kioskOpen?: boolean;
+    toggleKiosk?: () => void;
+    loadingKiosk?: boolean;
+    kioskPlanningOpen?: boolean;
+    toggleKioskPlanning?: () => void;
+    loadingKioskPlanning?: boolean;
 }
 
 export const DashboardControls: React.FC<DashboardControlsProps> = ({
@@ -21,7 +26,13 @@ export const DashboardControls: React.FC<DashboardControlsProps> = ({
     isEditMode,
     setIsEditMode,
     isSaving,
-    showSyncSuccess
+    showSyncSuccess,
+    kioskOpen,
+    toggleKiosk,
+    loadingKiosk,
+    kioskPlanningOpen,
+    toggleKioskPlanning,
+    loadingKioskPlanning
 }) => {
 
     const handleFullScreenToggle = () => {
@@ -65,11 +76,8 @@ export const DashboardControls: React.FC<DashboardControlsProps> = ({
     };
 
     return (
-        <div className="absolute top-4 right-4 z-[90] flex flex-col items-end gap-2 group">
-            <div className={clsx("flex items-center gap-2 transition-opacity duration-300",
-                // Allow visibility if edit mode is active or on hover
-                isEditMode ? "opacity-100" : "opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto"
-            )}>
+        <div className="absolute bottom-8 right-6 z-[90] flex flex-col items-end gap-2 group translate-y-[-50%] md:translate-y-0">
+            <div className="flex items-center gap-2 transition-opacity duration-300">
                 <Button
                     onClick={handleFullScreenToggle}
                     variant="secondary"
@@ -104,6 +112,60 @@ export const DashboardControls: React.FC<DashboardControlsProps> = ({
                         <Settings2 size={20} />
                     )}
                 </Button>
+                
+                {toggleKiosk && (
+                    <Button
+                        onClick={toggleKiosk}
+                        variant="secondary"
+                        disabled={loadingKiosk}
+                        className={clsx(
+                            "p-2.5 h-auto backdrop-blur-xl border-white/10 transition-all active:scale-95",
+                            kioskOpen 
+                                ? "bg-success/20 text-success border-success/30 hover:bg-success/30" 
+                                : "bg-danger/20 text-danger border-danger/30 hover:bg-danger/30"
+                        )}
+                        title={kioskOpen ? "Kiosque Encodage Ouvert" : "Kiosque Encodage Fermé"}
+                    >
+                        {loadingKiosk ? (
+                            <Loader2 size={20} className="animate-spin" />
+                        ) : (
+                            <div className="relative">
+                                <Keyboard size={20} />
+                                <div className={clsx(
+                                    "absolute -top-1 -right-1 w-2 h-2 rounded-full border border-surface",
+                                    kioskOpen ? "bg-success animate-pulse" : "bg-danger"
+                                )} />
+                            </div>
+                        )}
+                    </Button>
+                )}
+                
+                {toggleKioskPlanning && (
+                    <Button
+                        onClick={toggleKioskPlanning}
+                        variant="secondary"
+                        disabled={loadingKioskPlanning}
+                        className={clsx(
+                            "p-2.5 h-auto backdrop-blur-xl border-white/10 transition-all active:scale-95",
+                            kioskPlanningOpen 
+                                ? "bg-success/20 text-success border-success/30 hover:bg-success/30" 
+                                : "bg-danger/20 text-danger border-danger/30 hover:bg-danger/30"
+                        )}
+                        title={kioskPlanningOpen ? "Kiosque Planification Ouvert" : "Kiosque Planification Fermé"}
+                    >
+                        {loadingKioskPlanning ? (
+                            <Loader2 size={20} className="animate-spin" />
+                        ) : (
+                            <div className="relative">
+                                <CalendarDays size={20} />
+                                <div className={clsx(
+                                    "absolute -top-1 -right-1 w-2 h-2 rounded-full border border-surface",
+                                    kioskPlanningOpen ? "bg-success animate-pulse" : "bg-danger"
+                                )} />
+                            </div>
+                        )}
+                    </Button>
+                )}
             </div>
 
             {/* SAVING INDICATOR */}

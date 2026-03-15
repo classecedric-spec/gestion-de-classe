@@ -19,6 +19,8 @@ export const ROUTES = {
     DASHBOARD_RESPONSABILITES: '/dashboard/responsabilities',
     DASHBOARD_COMMUNICATIONS: '/dashboard/communications',
     DASHBOARD_SETTINGS: '/dashboard/settings',
+    DASHBOARD_HOMEWORK: '/dashboard/travaux-domicile',
+    DASHBOARD_CLASSWORK: '/dashboard/travaux-classe',
 
     // Sub‑pages under user management
     USER_GROUPS: '/dashboard/user/groups',

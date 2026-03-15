@@ -31,8 +31,14 @@ const AvancementAteliers: React.FC = () => {
     } = useAvancementData();
 
     const {
-        students, activities, progressions, setProgressions, loading
+        students, activities, progressions, relevantModuleIds, setProgressions, loading
     } = useStudentsAndActivities(selectedGroupId, selectedModuleId, selectedDateFin, selectedBrancheId, getFilteredModules);
+
+    // Calcul des modules visibles (ceux qui ont des activités pour les élèves du groupe)
+    // Si selectedModuleId est défini, on le force.
+    const visibleModules = selectedModuleId 
+        ? modules.filter(m => m.id === selectedModuleId)
+        : modules.filter(m => selectedGroupId ? relevantModuleIds.has(m.id) : true);
 
     const { handleGeneratePDF } = useAvancementPDF();
     const { moduleSpans, lastActivityIds } = useModuleSpans(activities);
@@ -69,7 +75,7 @@ const AvancementAteliers: React.FC = () => {
 
     const onGeneratePDF = () => {
         handleGeneratePDF({
-            students, activities, progressions, groups, modules, branches,
+            students, activities, progressions, groups: groups as any, modules: visibleModules, branches: branches as any,
             selectedGroupId, selectedModuleId, selectedBrancheId, selectedDateFin, dateOperator
         });
     };
@@ -93,9 +99,10 @@ const AvancementAteliers: React.FC = () => {
 
             {/* FILTERS BAR */}
             <AvancementFilters
-                groups={groups}
+                groups={groups as any}
                 modules={modules}
-                branches={branches}
+                visibleModules={selectedGroupId ? visibleModules : modules}
+                branches={branches as any}
                 selectedGroupId={selectedGroupId}
                 setSelectedGroupId={setSelectedGroupId}
                 dateOperator={dateOperator}
@@ -117,7 +124,7 @@ const AvancementAteliers: React.FC = () => {
                 activities={activities}
                 progressions={progressions}
                 moduleSpans={moduleSpans}
-                modules={modules}
+                modules={visibleModules}
                 lastActivityIds={lastActivityIds}
                 onStatusClick={handleStatusClick}
                 selectedGroupId={selectedGroupId}

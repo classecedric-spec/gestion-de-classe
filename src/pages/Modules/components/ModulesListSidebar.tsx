@@ -1,5 +1,5 @@
 import React from 'react';
-import { Folder, Search, SlidersHorizontal, Clock, Plus, Loader2 } from 'lucide-react';
+import { Folder, Search, SlidersHorizontal, Clock, Plus, Loader2, Table } from 'lucide-react';
 import { CardInfo, SearchBar, FilterSelect, CardList, ListItem, EmptyState, Badge, Avatar } from '../../../core';
 import clsx from 'clsx';
 
@@ -12,6 +12,7 @@ interface ModulesListSidebarProps {
     onAddClick: () => void;
     contentRef?: React.Ref<HTMLDivElement>;
     headerHeight?: number;
+    onTableModeClick?: () => void;
 }
 
 export const ModulesListSidebar: React.FC<ModulesListSidebarProps> = ({
@@ -22,7 +23,8 @@ export const ModulesListSidebar: React.FC<ModulesListSidebarProps> = ({
     onEdit,
     onAddClick,
     contentRef,
-    headerHeight
+    headerHeight,
+    onTableModeClick
 }) => {
     return (
         <div className="w-1/4 flex flex-col gap-6 overflow-hidden">
@@ -35,6 +37,15 @@ export const ModulesListSidebar: React.FC<ModulesListSidebarProps> = ({
                     <h2 className="text-cq-xl font-bold text-text-main flex items-center gap-2">
                         <Folder className="text-primary" size={24} />
                         Liste des Modules
+                        {onTableModeClick && (
+                            <button 
+                                onClick={onTableModeClick}
+                                className="ml-2 p-1.5 rounded-lg hover:bg-white/5 text-grey-medium hover:text-white transition-colors"
+                                title="Vue Tableau Excel"
+                            >
+                                <Table size={18} />
+                            </button>
+                        )}
                     </h2>
                     <Badge variant="primary" size="xs">
                         {moduleHook.states.filteredModules.length} Modules

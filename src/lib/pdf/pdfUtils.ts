@@ -1,12 +1,18 @@
 import { supabase } from '../database';
 
 export interface PdfActivity {
+    activiteId: string;
     name: string;
     order: number;
     etat: string;
     dateLimite?: string | null;
     material?: string;
     level?: string;
+    planning?: {
+        jour: string;  // 'Lundi' | 'Mardi' | ... 
+        lieu: 'classe' | 'domicile';
+        statut?: string;
+    } | null;
 }
 
 export interface PdfModule {
@@ -36,7 +42,7 @@ export interface PdfData extends PdfDataRaw {
  * This ensures the child only sees what has been explicitly assigned/created.
  * (Now that Generation logic is fixed to create lines, this will show "To Do" items correctly).
  */
-export const fetchStudentPdfData = async (studentId: string, studentNiveauId?: string | null): Promise<PdfDataRaw | null> => {
+export const fetchStudentPdfData = async (studentId: string): Promise<PdfDataRaw | null> => {
     // 1. Fetch Progressions with Deep Relations
     const { data: progressionData, error: progError } = await supabase
         .from('Progression')
@@ -98,10 +104,43 @@ export const fetchStudentPdfData = async (studentId: string, studentNiveauId?: s
 
         // Add Activity
         moduleMap[mod.id].activities.push({
+            activiteId: p.Activite.id,
             name: p.Activite.titre,
             order: p.Activite.ordre || 0,
             etat: p.etat,
-            dateLimite: p.date_limite || mod.date_fin // Fallback to module date? Or keep p? Old logic: p.date_limite
+            dateLimite: p.date_limite || mod.date_fin,
+            planning: null, // Sera rempli après
+        });
+    });
+
+    // 2b. Charger la planification de la semaine en cours
+    const today = new Date();
+    const day = today.getDay();
+    const mondayDiff = today.getDate() - day + (day === 0 ? -6 : 1);
+    const monday = new Date(today);
+    monday.setDate(mondayDiff);
+    const weekStart = monday.toISOString().split('T')[0];
+
+    const { data: planData } = await supabase
+        .from('PlanificationHebdo')
+        .select('activite_id, jour, lieu, statut')
+        .eq('eleve_id', studentId)
+        .eq('semaine_debut', weekStart);
+
+    // Créer un map activite_id -> planning
+    const planMap: Record<string, { jour: string; lieu: 'classe' | 'domicile'; statut?: string }> = {};
+    if (planData) {
+        planData.forEach((p: any) => {
+            planMap[p.activite_id] = { jour: p.jour, lieu: p.lieu, statut: p.statut };
+        });
+    }
+
+    // Appliquer la planification via activiteId direct
+    Object.values(moduleMap).forEach(mod => {
+        mod.activities.forEach(act => {
+            if (planMap[act.activiteId]) {
+                act.planning = planMap[act.activiteId];
+            }
         });
     });
 

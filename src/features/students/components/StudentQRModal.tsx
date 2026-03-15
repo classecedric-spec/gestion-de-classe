@@ -1,8 +1,10 @@
-import React from 'react';
+import React, { useState } from 'react';
 import QRCode from "react-qr-code";
-import { X, Printer, Link, Copy } from 'lucide-react';
+import { X, Printer, Link, Copy, Keyboard, CalendarDays } from 'lucide-react';
 import { toast } from 'sonner';
+import clsx from 'clsx';
 import { getAppBaseUrl } from '../../../utils/urlUtils';
+import { copyToClipboard } from '../../../utils/clipboardUtils';
 
 interface StudentQRModalProps {
     isOpen: boolean;
@@ -14,16 +16,24 @@ interface StudentQRModalProps {
     } | null;
 }
 
+type QRTab = 'encodage' | 'planification';
+
 const StudentQRModal: React.FC<StudentQRModalProps> = ({ isOpen, onClose, student }) => {
+    const [activeTab, setActiveTab] = useState<QRTab>('encodage');
+
     if (!isOpen || !student) return null;
 
     // Dynamic base URL with network IP fallback
     const baseUrl = getAppBaseUrl();
-    const kioskUrl = `${baseUrl}/kiosk/${student.id}?token=${(student as any).access_token || ''}`;
+    const token = (student as any).access_token || '';
+    const encodageUrl = `${baseUrl}/kiosk/${student.id}?token=${token}`;
+    const planificationUrl = `${baseUrl}/kiosk/planning/${student.id}?token=${token}`;
+    const currentUrl = activeTab === 'encodage' ? encodageUrl : planificationUrl;
 
     const handlePrint = () => {
         const printWindow = window.open('', '', 'width=600,height=600');
         if (printWindow) {
+            const label = activeTab === 'encodage' ? 'Kiosque Encodage' : 'Kiosque Planification';
             printWindow.document.write(`
                 <html>
                     <head>
@@ -55,18 +65,12 @@ const StudentQRModal: React.FC<StudentQRModalProps> = ({ isOpen, onClose, studen
                         <div class="card">
                             <h1>${student.prenom} ${student.nom}</h1>
                             <div id="qr-target"></div>
-                            <p>Scannez pour accéder au Dashboard</p>
+                            <p>Scannez pour accéder au ${label}</p>
                         </div>
                     </body>
                 </html>
             `);
 
-            // We need to render the QR code into the print window or copy the SVG
-            // Simplified approach: Copy the SVG from the main window logic? 
-            // Better: just trigger window.print() on the current view styled with @media print?
-            // Or simpler: Just tell the user to command+P and use CSS to hide everything else.
-
-            // Implementing "Copy SVG" strategy for robust specific printing
             const svg = document.getElementById('student-qrcode-svg');
             if (svg && printWindow.document.getElementById('qr-target')) {
                 printWindow.document.getElementById('qr-target')!.innerHTML = svg.outerHTML;
@@ -78,14 +82,18 @@ const StudentQRModal: React.FC<StudentQRModalProps> = ({ isOpen, onClose, studen
                 }, 500);
             } else {
                 printWindow.close();
-                window.print(); // Fallback
+                window.print();
             }
         }
     };
 
-    const handleCopyLink = () => {
-        navigator.clipboard.writeText(kioskUrl);
-        toast.success("Lien copié dans le presse-papier");
+    const handleCopyLink = async () => {
+        const success = await copyToClipboard(currentUrl);
+        if (success) {
+            toast.success("Lien copié dans le presse-papier");
+        } else {
+            toast.error("Échec de la copie du lien");
+        }
     };
 
     return (
@@ -102,17 +110,47 @@ const StudentQRModal: React.FC<StudentQRModalProps> = ({ isOpen, onClose, studen
                     </button>
                 </div>
 
+                {/* Tabs */}
+                <div className="flex border-b border-white/10">
+                    <button
+                        onClick={() => setActiveTab('encodage')}
+                        className={clsx(
+                            'flex-1 flex items-center justify-center gap-2 py-3 text-sm font-bold transition-all',
+                            activeTab === 'encodage'
+                                ? 'bg-primary/10 text-primary border-b-2 border-primary'
+                                : 'text-grey-medium hover:text-white hover:bg-white/5'
+                        )}
+                    >
+                        <Keyboard size={16} />
+                        Encodage
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('planification')}
+                        className={clsx(
+                            'flex-1 flex items-center justify-center gap-2 py-3 text-sm font-bold transition-all',
+                            activeTab === 'planification'
+                                ? 'bg-emerald-500/10 text-emerald-400 border-b-2 border-emerald-400'
+                                : 'text-grey-medium hover:text-white hover:bg-white/5'
+                        )}
+                    >
+                        <CalendarDays size={16} />
+                        Planification
+                    </button>
+                </div>
+
                 {/* Content */}
                 <div className="p-8 flex flex-col items-center gap-6 bg-white">
                     <div className="text-center">
                         <h2 className="text-2xl font-black text-black mb-1">{student.prenom} {student.nom}</h2>
-                        <p className="text-sm text-gray-500">Accès direct au Kiosk</p>
+                        <p className="text-sm text-gray-500">
+                            {activeTab === 'encodage' ? 'Accès direct au Kiosque Encodage' : 'Accès direct au Kiosque Planification'}
+                        </p>
                     </div>
 
                     <div className="p-4 bg-white rounded-xl shadow-lg border-2 border-dashed border-gray-200">
                         <QRCode
                             id="student-qrcode-svg"
-                            value={kioskUrl}
+                            value={currentUrl}
                             size={200}
                             className="h-auto w-full max-w-[200px]"
                             viewBox={`0 0 256 256`}
@@ -121,7 +159,7 @@ const StudentQRModal: React.FC<StudentQRModalProps> = ({ isOpen, onClose, studen
 
                     <div className="w-full bg-gray-50 p-3 rounded-lg border border-gray-200 text-center">
                         <p className="text-xs text-gray-400 font-mono break-all line-clamp-2">
-                            {kioskUrl}
+                            {currentUrl}
                         </p>
                     </div>
                 </div>

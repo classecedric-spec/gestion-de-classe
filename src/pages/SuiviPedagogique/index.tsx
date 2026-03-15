@@ -7,6 +7,12 @@ interface SuiviPedagogiqueProps {
     setTimer: (timer: Timer) => void;
     timerFinished: boolean;
     setTimerFinished: (finished: boolean) => void;
+    kioskOpen?: boolean;
+    toggleKiosk?: () => void;
+    loadingKiosk?: boolean;
+    kioskPlanningOpen?: boolean;
+    toggleKioskPlanning?: () => void;
+    loadingKioskPlanning?: boolean;
 }
 
 /**

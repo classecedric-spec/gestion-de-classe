@@ -140,6 +140,21 @@ export function useModuleManagement() {
         // We TRUST the local update. No need to refetch immediately.
     };
 
+    // 5. Handle update (like inline editing)
+    const handleUpdateModule = async (moduleId: string, data: any) => {
+        // Optimistic update
+        setModules(prev => prev.map(m => m.id === moduleId ? { ...m, ...data } : m));
+        try {
+            await moduleService.updateModule(moduleId, data);
+        } catch (error) {
+            console.error('Error updating module:', error);
+            toast.error("Erreur lors de la mise à jour");
+            // Optionally, we could rollback here, but for simple fields like dates maybe it's fine
+            // or we force a refresh
+            fetchModules();
+        }
+    };
+
     const handleSetBranchFilter = (val: string) => {
         setBranchFilter(val);
         setSubBranchFilter('all');
@@ -191,6 +206,7 @@ export function useModuleManagement() {
             handleDelete,
             toggleStatus,
             handleCreated,
+            updateModule: handleUpdateModule,
             refreshCurrentModule: async () => {
                 if (selectedModuleId) {
                     try {

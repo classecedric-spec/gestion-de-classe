@@ -2,6 +2,7 @@ import React from 'react';
 import { Database } from 'lucide-react';
 import { SETUP_SQL } from '../../lib/database';
 import { toast } from 'react-hot-toast';
+import { copyToClipboard } from '../../utils/clipboardUtils';
 
 interface DatabaseStatusAlertProps {
     dbStatus: {
@@ -15,9 +16,13 @@ interface DatabaseStatusAlertProps {
 export const DatabaseStatusAlert: React.FC<DatabaseStatusAlertProps> = ({ dbStatus }) => {
     if (dbStatus.exists || !dbStatus.checked) return null;
 
-    const copySQL = () => {
-        navigator.clipboard.writeText(SETUP_SQL);
-        toast.success("SQL copié !");
+    const copySQL = async () => {
+        const success = await copyToClipboard(SETUP_SQL);
+        if (success) {
+            toast.success("SQL copié !");
+        } else {
+            toast.error("Échec de la copie");
+        }
     };
 
     return (

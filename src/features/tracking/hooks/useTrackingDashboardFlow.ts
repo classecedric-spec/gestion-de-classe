@@ -42,7 +42,8 @@ export function useTrackingDashboardFlow(
     const branchesHook = useBranchesAndModules(
         groupsHook.states.selectedStudent,
         showPendingOnly,
-        groupsHook.states.selectedGroupId
+        groupsHook.states.selectedGroupId,
+        groupsHook.states.students
     );
 
     const helpHook = useHelpRequests(

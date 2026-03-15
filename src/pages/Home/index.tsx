@@ -59,14 +59,18 @@ const Home: React.FC = () => {
         'vue-d-ensemble': 'overview',
         'eleves': 'students',
         'avant-mail': 'avant-mail',
-        'vue-retard': 'vue-retard'
+        'vue-retard': 'vue-retard',
+        'travaux-domicile': 'travaux-domicile',
+        'travaux-classe': 'travaux-classe'
     };
 
     const tabToPath: Record<string, string> = {
         'overview': 'vue-d-ensemble',
         'students': 'eleves',
         'avant-mail': 'avant-mail',
-        'vue-retard': 'vue-retard'
+        'vue-retard': 'vue-retard',
+        'travaux-domicile': 'travaux-domicile',
+        'travaux-classe': 'travaux-classe'
     };
 
     const currentTab = pathToTab[currentPath] || 'overview';

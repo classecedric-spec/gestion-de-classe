@@ -12,7 +12,7 @@ export const useStudentPDF = () => {
         }
 
         try {
-            const pdfResult = await fetchStudentPdfData(selectedStudent.id, selectedStudent.Niveau?.id || '');
+            const pdfResult = await fetchStudentPdfData(selectedStudent.id);
             if (!pdfResult || pdfResult.modules.length === 0) {
                 alert("Aucune activité à faire trouvée.");
                 return;

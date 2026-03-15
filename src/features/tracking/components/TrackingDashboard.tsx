@@ -24,6 +24,12 @@ import { getNextStatus } from '../../../lib/helpers/statusHelpers';
 interface TrackingDashboardProps {
     timer: Timer;
     setTimer: (timer: Timer) => void;
+    kioskOpen?: boolean;
+    toggleKiosk?: () => void;
+    loadingKiosk?: boolean;
+    kioskPlanningOpen?: boolean;
+    toggleKioskPlanning?: () => void;
+    loadingKioskPlanning?: boolean;
 }
 
 const withStyle = (style: React.CSSProperties) => ({ style });
@@ -37,9 +43,15 @@ const withStyle = (style: React.CSSProperties) => ({ style });
  * @example
  * <TrackingDashboard timer={globalTimer} setTimer={setGlobalTimer} />
  */
-export const TrackingDashboard: React.FC<TrackingDashboardProps> = ({
+const TrackingDashboard: React.FC<TrackingDashboardProps> = ({
     timer,
-    setTimer
+    setTimer,
+    kioskOpen,
+    toggleKiosk,
+    loadingKiosk,
+    kioskPlanningOpen,
+    toggleKioskPlanning,
+    loadingKioskPlanning
 }) => {
     const [showPendingOnly, setShowPendingOnly] = useState(true);
     const { states, actions } = useTrackingDashboardFlow(timer, setTimer, showPendingOnly);
@@ -83,6 +95,12 @@ export const TrackingDashboard: React.FC<TrackingDashboardProps> = ({
                     setIsEditMode={layoutHook.actions.setIsEditMode}
                     isSaving={layoutHook.states.isSaving}
                     showSyncSuccess={layoutHook.states.showSyncSuccess}
+                    kioskOpen={kioskOpen}
+                    toggleKiosk={toggleKiosk}
+                    loadingKiosk={loadingKiosk}
+                    kioskPlanningOpen={kioskPlanningOpen}
+                    toggleKioskPlanning={toggleKioskPlanning}
+                    loadingKioskPlanning={loadingKioskPlanning}
                 />
 
                 <GroupSelector

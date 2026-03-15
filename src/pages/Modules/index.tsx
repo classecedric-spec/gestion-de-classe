@@ -19,6 +19,7 @@ import { useProgressionTracking } from './hooks/useProgressionTracking';
 // Layout Components
 import { ModulesListSidebar } from './components/ModulesListSidebar';
 import { ModuleDetailView } from './components/ModuleDetailView';
+import { ModulesTableExcel } from './components/ModulesTableExcel';
 
 const Modules: React.FC = () => {
     // --- Height Synchronization ---
@@ -26,6 +27,7 @@ const Modules: React.FC = () => {
     const rightContentRef = useRef<HTMLDivElement>(null);
     const [headerHeight, setHeaderHeight] = useState<number | undefined>(undefined);
     const [showFilters, setShowFilters] = useState(false);
+    const [viewMode, setViewMode] = useState<'list' | 'table'>('list');
 
     // Notifications
     const { notification, showNotification, dismissNotification } = useNotifications();
@@ -120,33 +122,43 @@ const Modules: React.FC = () => {
 
     return (
         <div className="flex h-full gap-6 animate-in fade-in duration-500 relative">
+            {viewMode === 'table' ? (
+                <ModulesTableExcel
+                    modules={moduleHook.states.filteredModules}
+                    onClose={() => setViewMode('list')}
+                    updateModule={moduleHook.actions.updateModule}
+                />
+            ) : (
+                <>
+                    <ModulesListSidebar
+                        moduleHook={moduleHook}
+                        showFilters={showFilters}
+                        setShowFilters={setShowFilters}
+                        onModuleSelect={handleModuleSelect}
+                        onEdit={handleEdit}
+                        onAddClick={() => setIsAddModalOpen(true)}
+                        contentRef={leftContentRef}
+                        headerHeight={headerHeight}
+                        onTableModeClick={() => setViewMode('table')}
+                    />
 
-            <ModulesListSidebar
-                moduleHook={moduleHook}
-                showFilters={showFilters}
-                setShowFilters={setShowFilters}
-                onModuleSelect={handleModuleSelect}
-                onEdit={handleEdit}
-                onAddClick={() => setIsAddModalOpen(true)}
-                contentRef={leftContentRef}
-                headerHeight={headerHeight}
-            />
-
-            <ModuleDetailView
-                moduleHook={moduleHook}
-                detailTab={detailTab}
-                setDetailTab={setDetailTab}
-                activityHook={activityHook}
-                groupHook={groupHook}
-                progressionGenHook={progressionGenHook}
-                progressionHook={progressionHook}
-                handleAddActivity={handleAddActivity}
-                handleEditActivity={handleEditActivity}
-                setActivityToDelete={setActivityToDelete}
-                handleCreateSeries={() => setIsCreateSeriesModalOpen(true)}
-                contentRef={rightContentRef}
-                headerHeight={headerHeight}
-            />
+                    <ModuleDetailView
+                        moduleHook={moduleHook}
+                        detailTab={detailTab}
+                        setDetailTab={setDetailTab}
+                        activityHook={activityHook}
+                        groupHook={groupHook}
+                        progressionGenHook={progressionGenHook}
+                        progressionHook={progressionHook}
+                        handleAddActivity={handleAddActivity}
+                        handleEditActivity={handleEditActivity}
+                        setActivityToDelete={setActivityToDelete}
+                        handleCreateSeries={() => setIsCreateSeriesModalOpen(true)}
+                        contentRef={rightContentRef}
+                        headerHeight={headerHeight}
+                    />
+                </>
+            )}
 
             {/* --- MODALS --- */}
 

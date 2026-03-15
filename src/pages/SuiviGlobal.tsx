@@ -27,6 +27,8 @@ const SuiviGlobal: React.FC = () => {
     // Kiosk State
     const [kioskOpen, setKioskOpen] = useState(false);
     const [loadingKiosk, setLoadingKiosk] = useState(false);
+    const [kioskPlanningOpen, setKioskPlanningOpen] = useState(false);
+    const [loadingKioskPlanning, setLoadingKioskPlanning] = useState(false);
 
     const {
         timer,
@@ -61,12 +63,13 @@ const SuiviGlobal: React.FC = () => {
         try {
             const { data } = await supabase
                 .from('CompteUtilisateur')
-                .select('kiosk_is_open')
+                .select('kiosk_is_open, kiosk_planning_open')
                 .eq('id', userId)
                 .single();
 
             if (data) {
                 setKioskOpen(data.kiosk_is_open || false);
+                setKioskPlanningOpen(data.kiosk_planning_open || false);
             }
         } catch (e) {
             console.error('Error fetching kiosk status', e);
@@ -87,12 +90,35 @@ const SuiviGlobal: React.FC = () => {
             if (error) throw error;
 
             setKioskOpen(newState);
-            toast.success(newState ? "Kiosque OUVERT aux élèves" : "Kiosque FERMÉ aux élèves");
+            toast.success(newState ? "Kiosque d'encodage OUVERT aux élèves" : "Kiosque d'encodage FERMÉ aux élèves");
         } catch (e) {
             console.error(e);
             toast.error("Erreur lors de la modification du statut");
         } finally {
             setLoadingKiosk(false);
+        }
+    };
+
+    const toggleKioskPlanning = async () => {
+        if (!userId) return;
+        setLoadingKioskPlanning(true);
+        const newState = !kioskPlanningOpen;
+
+        try {
+            const { error } = await supabase
+                .from('CompteUtilisateur')
+                .update({ kiosk_planning_open: newState })
+                .eq('id', userId);
+
+            if (error) throw error;
+
+            setKioskPlanningOpen(newState);
+            toast.success(newState ? 'Kiosque Planification OUVERT' : 'Kiosque Planification FERMÉ');
+        } catch (e) {
+            console.error(e);
+            toast.error('Erreur lors de la modification du statut');
+        } finally {
+            setLoadingKioskPlanning(false);
         }
     };
 
@@ -109,25 +135,6 @@ const SuiviGlobal: React.FC = () => {
                 TBI
             </Button>
 
-            <div className="h-8 w-px bg-white/10 mx-1" />
-
-            <button
-                onClick={toggleKiosk}
-                disabled={loadingKiosk}
-                className={`
-                    flex items-center gap-3 px-4 py-2 rounded-xl border transition-all active:scale-95
-                    ${kioskOpen
-                        ? 'bg-success/10 border-success/30 hover:bg-success/20 text-success'
-                        : 'bg-danger/10 border-danger/30 hover:bg-danger/20 text-danger'
-                    }
-                `}
-                title={kioskOpen ? "Le kiosque est OUVERT. Tous les élèves peuvent accéder." : "Le kiosque est FERMÉ. L'accès est bloqué."}
-            >
-                <div className={`w-2.5 h-2.5 rounded-full ${kioskOpen ? 'bg-success animate-pulse' : 'bg-danger'}`} />
-                <span className="font-black uppercase tracking-wider text-sm">
-                    {loadingKiosk ? '...' : (kioskOpen ? 'Kiosque Ouvert' : 'Kiosque Fermé')}
-                </span>
-            </button>
         </div>
     );
 
@@ -196,6 +203,12 @@ const SuiviGlobal: React.FC = () => {
                         setTimer={setTimer as any}
                         timerFinished={timerFinished}
                         setTimerFinished={setTimerFinished}
+                        kioskOpen={kioskOpen}
+                        toggleKiosk={toggleKiosk}
+                        loadingKiosk={loadingKiosk}
+                        kioskPlanningOpen={kioskPlanningOpen}
+                        toggleKioskPlanning={toggleKioskPlanning}
+                        loadingKioskPlanning={loadingKioskPlanning}
                     />
                 ) : (
                     <AvancementAteliers />
