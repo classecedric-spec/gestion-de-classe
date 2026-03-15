@@ -1,6 +1,4 @@
-import React, { useEffect, useState } from 'react';
-import { Document, Page, Text, View, StyleSheet, Image, Font } from '@react-pdf/renderer';
-import QRCode from 'qrcode';
+import { Document, Page, Text, View, StyleSheet, Image } from '@react-pdf/renderer';
 
 // Register fonts if needed (optional, using standard fonts for now)
 // Font.register({ family: 'Roboto', src: 'https://cdnjs.cloudflare.com/ajax/libs/ink/3.1.10/fonts/Roboto/Roboto-Regular.ttf' });
@@ -13,10 +11,20 @@ const styles = StyleSheet.create({
         padding: 20,
         alignContent: 'flex-start', // Top aligned
     },
-    cutCell: {
-        width: '33.33%', // 3 columns
-        padding: 10, // Inner spacing
-        height: 260, // Reduced height to fit 3 rows (9 items) per page
+    cutCellSingle: {
+        width: '33.33%', // 3 columns for single QR
+        padding: 5,
+        height: 260,
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderStyle: 'dashed',
+        borderWidth: 1,
+        borderColor: '#cccccc',
+    },
+    cutCellBoth: {
+        width: '50%', // 2 columns for dual QR
+        padding: 10,
+        height: 260,
         alignItems: 'center',
         justifyContent: 'center',
         borderStyle: 'dashed',
@@ -33,6 +41,35 @@ const styles = StyleSheet.create({
         overflow: 'hidden',
         display: 'flex',
         flexDirection: 'column',
+    },
+    qrRow: {
+        flexDirection: 'row',
+        justifyContent: 'center',
+        alignItems: 'center',
+        width: '100%',
+        gap: 20, // Increased gap between QRs
+        paddingHorizontal: 10,
+    },
+    qrCol: {
+        alignItems: 'center',
+        gap: 5,
+    },
+    qrLabel: {
+        fontSize: 8,
+        fontWeight: 'bold',
+        color: '#254154',
+        textTransform: 'uppercase',
+    },
+    qrImageSmall: {
+        width: 100, // Increased size
+        height: 100, // Increased size
+    },
+    qrImageWrapper: {
+        borderWidth: 2,
+        borderColor: '#254154',
+        borderRadius: 8,
+        padding: 5,
+        backgroundColor: '#ffffff',
     },
     header: {
         backgroundColor: '#254154', // Site Blue-Grey
@@ -52,8 +89,8 @@ const styles = StyleSheet.create({
         padding: 10,
     },
     qrImage: {
-        width: 120,
-        height: 120,
+        width: 130, // Adjusted for 3 columns
+        height: 130,
     },
     footer: {
         marginBottom: 15,
@@ -63,76 +100,31 @@ const styles = StyleSheet.create({
     },
 });
 
-interface GroupQRPDFProps {
-    groupName: string;
-    students: any[];
-    baseUrl: string;
-    mode?: 'encodage' | 'planification';
+export interface QRData {
+    encodage: string;
+    planification: string;
 }
 
-interface StudentWithQR {
+export interface StudentWithQR {
     id: string;
     prenom: string;
     nom: string;
-    qrDataUrl: string;
+    qrData: QRData;
 }
 
-const GroupQRPDF: React.FC<GroupQRPDFProps> = ({ groupName, students, baseUrl, mode = 'encodage' }) => {
-    const [studentsWithQR, setStudentsWithQR] = useState<StudentWithQR[]>([]);
-    const [isGenerating, setIsGenerating] = useState(true);
+interface GroupQRPDFProps {
+    groupName: string;
+    studentsWithQR: StudentWithQR[];
+    mode?: 'encodage' | 'planification' | 'both';
+}
 
-    useEffect(() => {
-        const generateQRs = async () => {
-            try {
-                const promises = students.map(async (student) => {
-                    const token = student.access_token || '';
-                    const kioskUrl = mode === 'planification'
-                        ? `${baseUrl}/kiosk/planning/${student.id}?token=${token}`
-                        : `${baseUrl}/kiosk/${student.id}?token=${token}`;
-                    // Generate QR as Data URL (PNG)
-                    const qrDataUrl = await QRCode.toDataURL(kioskUrl, {
-                        width: 300,
-                        margin: 1,
-                        color: {
-                            dark: '#000000',
-                            light: '#ffffff',
-                        },
-                    });
-                    return {
-                        id: student.id,
-                        prenom: student.prenom,
-                        nom: student.nom,
-                        qrDataUrl,
-                    };
-                });
-
-                const results = await Promise.all(promises);
-                setStudentsWithQR(results);
-            } catch (error) {
-                console.error('Error generating PDF QR codes:', error);
-            } finally {
-                setIsGenerating(false);
-            }
-        };
-
-        generateQRs();
-    }, [students, baseUrl]);
-
-    if (isGenerating) {
-        return (
-            <Document>
-                <Page style={styles.page}>
-                    <Text>Génération des codes QR...</Text>
-                </Page>
-            </Document>
-        );
-    }
+const GroupQRPDF: React.FC<GroupQRPDFProps> = ({ groupName, studentsWithQR, mode = 'encodage' }) => {
 
     return (
         <Document title={`Codes QR - ${groupName}`}>
             <Page size="A4" style={styles.page}>
                 {studentsWithQR.map((student) => (
-                    <View style={styles.cutCell} key={student.id} wrap={false}>
+                    <View style={mode === 'both' ? styles.cutCellBoth : styles.cutCellSingle} key={student.id} wrap={false}>
                         <View style={styles.card}>
                             {/* Header */}
                             <View style={styles.header}>
@@ -141,14 +133,36 @@ const GroupQRPDF: React.FC<GroupQRPDFProps> = ({ groupName, students, baseUrl, m
                                 </Text>
                             </View>
 
-                            {/* QR Code */}
+                            {/* QR Codes */}
                             <View style={styles.qrContainer}>
-                                <Image src={student.qrDataUrl} style={styles.qrImage} />
+                                {mode === 'both' ? (
+                                    <View style={styles.qrRow}>
+                                        <View style={styles.qrCol}>
+                                            <Text style={styles.qrLabel}>Encodage</Text>
+                                            <View style={styles.qrImageWrapper}>
+                                                <Image src={student.qrData.encodage} style={styles.qrImageSmall} />
+                                            </View>
+                                        </View>
+                                        <View style={styles.qrCol}>
+                                            <Text style={styles.qrLabel}>Planification</Text>
+                                            <View style={styles.qrImageWrapper}>
+                                                <Image src={student.qrData.planification} style={styles.qrImageSmall} />
+                                            </View>
+                                        </View>
+                                    </View>
+                                ) : (
+                                    <View style={styles.qrImageWrapper}>
+                                        <Image 
+                                            src={mode === 'encodage' ? student.qrData.encodage : student.qrData.planification} 
+                                            style={styles.qrImage} 
+                                        />
+                                    </View>
+                                )}
                             </View>
 
                             {/* Footer */}
                             <Text style={styles.footer}>
-                                {mode === 'planification' ? 'Kiosque Planification' : 'Kiosque Encodage'}
+                                {mode === 'both' ? 'Kiosques' : mode === 'planification' ? 'Kiosque Planification' : 'Kiosque Encodage'}
                             </Text>
                         </View>
                     </View>

@@ -1,5 +1,5 @@
 import React from 'react';
-import { User as UserIcon, FileText } from 'lucide-react';
+import { User as UserIcon } from 'lucide-react';
 import { CardTabs, EmptyState } from '../../../core';
 
 // Hooks
@@ -21,7 +21,7 @@ interface StudentDetailsColumnProps {
     handlePhotoDragLeave: (e: React.DragEvent) => void;
     handlePhotoDrop: (e: React.DragEvent, student: any) => void;
     processAndSavePhoto: (file: File, student: any) => void;
-    setShowQRModal: (show: boolean) => void;
+    setShowQRModal: (show: boolean, tab?: 'encodage' | 'planification' | 'both') => void;
     handleUpdateImportance: (val: string) => void;
 }
 
@@ -94,7 +94,6 @@ export const StudentDetailsColumn: React.FC<StudentDetailsColumnProps> = ({
                 onPhotoDragLeave={handlePhotoDragLeave}
                 onPhotoDrop={(e) => handlePhotoDrop(e, selectedStudent)}
                 onPhotoChange={(file) => processAndSavePhoto(file, selectedStudent)}
-                onShowQR={() => setShowQRModal(true)}
             />
 
             {/* Content Tabs */}
@@ -102,14 +101,11 @@ export const StudentDetailsColumn: React.FC<StudentDetailsColumnProps> = ({
                 tabs={[
                     { id: 'infos', label: 'Informations' },
                     { id: 'suivi', label: 'Suivi Pédagogique' },
-                    { id: 'todo', label: 'To-Do List' },
+                    { id: 'todo', label: 'PDF' },
                     { id: 'urgent', label: 'Suivi Urgent' }
                 ]}
                 activeTab={currentTab}
                 onChange={setCurrentTab}
-                actionLabel={currentTab === 'todo' ? "Créer le PDF" : undefined}
-                onAction={currentTab === 'todo' ? () => generatePDF(selectedStudent) : undefined}
-                actionIcon={FileText}
             >
                 {currentTab === 'infos' && (
                     <StudentDetailsInfos
@@ -149,7 +145,10 @@ export const StudentDetailsColumn: React.FC<StudentDetailsColumnProps> = ({
                 )}
 
                 {currentTab === 'todo' && (
-                    <StudentDetailsTodo student={selectedStudent} />
+                    <StudentDetailsTodo 
+                        onShowQR={(tab) => setShowQRModal(true, tab)}
+                        onGenerateTodoPDF={() => generatePDF(selectedStudent)}
+                    />
                 )}
             </CardTabs>
         </div>

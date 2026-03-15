@@ -26,7 +26,7 @@ export interface StudentFormState {
 }
 
 export interface UseStudentFormProps {
-    studentId: string | null;
+    studentId?: string | null;
     isEditing: boolean;
     onClose: () => void;
     onSaved: (studentData: any, groupIds: string[], photoBase64: string | null) => void;

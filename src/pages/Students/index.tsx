@@ -20,10 +20,11 @@ const Students: React.FC = () => {
     // UI State
     const [showFilters, setShowFilters] = React.useState(false);
     const [showQRModal, setShowQRModal] = React.useState(false);
+    const [qrTab, setQrTab] = React.useState<'encodage' | 'planification' | 'both'>('encodage');
 
     // Data Hooks
     const {
-        students, setStudents, selectedStudent, setSelectedStudent, loading,
+        students, selectedStudent, setSelectedStudent, loading,
         searchQuery, setSearchQuery, filterClass, setFilterClass, filterGroup, setFilterGroup,
         showModal, isEditing, editId, studentToDelete, setStudentToDelete,
         filteredStudents, fetchStudents, handleStudentSaved, handleUpdateImportance,
@@ -33,7 +34,7 @@ const Students: React.FC = () => {
     const {
         isDraggingPhoto, draggingPhotoId, updatingPhotoId, setDraggingPhotoId,
         processAndSavePhoto, handlePhotoDrop, handlePhotoDragOver, handlePhotoDragLeave
-    } = useStudentPhoto(setSelectedStudent, setStudents);
+    } = useStudentPhoto(setSelectedStudent, null);
 
     // Initial Load
     useEffect(() => {
@@ -89,7 +90,10 @@ const Students: React.FC = () => {
                     handlePhotoDragLeave={handlePhotoDragLeave}
                     handlePhotoDrop={handlePhotoDrop}
                     processAndSavePhoto={processAndSavePhoto}
-                    setShowQRModal={setShowQRModal}
+                    setShowQRModal={(show, tab) => {
+                        if (tab) setQrTab(tab);
+                        setShowQRModal(show);
+                    }}
                     handleUpdateImportance={handleUpdateImportance}
                 />
 
@@ -118,6 +122,7 @@ const Students: React.FC = () => {
                     isOpen={showQRModal}
                     onClose={() => setShowQRModal(false)}
                     student={selectedStudent}
+                    initialTab={qrTab}
                 />
             </div >
         </PageLayout>

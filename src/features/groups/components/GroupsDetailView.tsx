@@ -23,7 +23,7 @@ interface GroupsDetailViewProps {
     progressText: string;
     pdfProgress: number;
     onGeneratePDF: () => void;
-    onShowQRModal: () => void;
+    onShowQRModal: (tab?: 'encodage' | 'planification' | 'both') => void;
 }
 
 export const GroupsDetailView: React.FC<GroupsDetailViewProps> = ({
@@ -148,11 +148,21 @@ export const GroupsDetailView: React.FC<GroupsDetailViewProps> = ({
                                 />
                                 <ActionItem
                                     icon={QrCode}
-                                    label="Codes QR"
-                                    subtitle="Générer pour le groupe"
-                                    progress={0}
-                                    onClick={onShowQRModal}
-                                    loading={false}
+                                    label="Exporter PDF Encodage"
+                                    subtitle="Accès au Kiosque"
+                                    onClick={() => onShowQRModal('encodage')}
+                                />
+                                <ActionItem
+                                    icon={QrCode}
+                                    label="Exporter PDF Planification"
+                                    subtitle="Fiches de planning"
+                                    onClick={() => onShowQRModal('planification')}
+                                />
+                                <ActionItem
+                                    icon={QrCode}
+                                    label="Exporter PDF Les deux"
+                                    subtitle="Format mixte (recommandé)"
+                                    onClick={() => onShowQRModal('both')}
                                 />
                             </div>
 

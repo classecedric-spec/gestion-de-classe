@@ -1,5 +1,4 @@
 import React from 'react';
-import { QrCode } from 'lucide-react';
 import clsx from 'clsx';
 import { Badge, Avatar, CardInfo } from '../../../../core';
 
@@ -11,7 +10,6 @@ interface StudentInfoCardProps {
     onPhotoDragLeave: (e: React.DragEvent) => void;
     onPhotoDrop: (e: React.DragEvent) => void;
     onPhotoChange: (file: File) => void;
-    onShowQR: () => void;
 }
 
 export const StudentInfoCard: React.FC<StudentInfoCardProps> = ({
@@ -21,8 +19,7 @@ export const StudentInfoCard: React.FC<StudentInfoCardProps> = ({
     onPhotoDragOver,
     onPhotoDragLeave,
     onPhotoDrop,
-    onPhotoChange,
-    onShowQR
+    onPhotoChange
 }) => {
     return (
         <CardInfo>
@@ -46,13 +43,6 @@ export const StudentInfoCard: React.FC<StudentInfoCardProps> = ({
                         <h2 className="text-cq-xl font-bold text-text-main truncate">
                             {student.prenom} {student.nom}
                         </h2>
-                        <button
-                            onClick={onShowQR}
-                            className="p-2 ml-2 bg-white/5 hover:bg-white/10 text-white rounded-lg transition-colors group"
-                            title="Afficher le Magic QR Code"
-                        >
-                            <QrCode size={20} className="group-hover:text-primary transition-colors" />
-                        </button>
                     </div>
                     <p className="text-cq-base text-grey-medium mt-0.5">
                         {student.Classe?.nom || 'Sans classe'} • {student.Niveau?.nom || 'Niveau non défini'}

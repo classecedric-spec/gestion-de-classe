@@ -1,10 +1,13 @@
 import React, { useState } from 'react';
 import QRCode from "react-qr-code";
-import { X, Printer, Link, Copy, Keyboard, CalendarDays } from 'lucide-react';
+import { X, Printer, Copy, Keyboard, CalendarDays } from 'lucide-react';
 import { toast } from 'sonner';
 import clsx from 'clsx';
+import { pdf } from '@react-pdf/renderer';
 import { getAppBaseUrl } from '../../../utils/urlUtils';
 import { copyToClipboard } from '../../../utils/clipboardUtils';
+import GroupQRPDF, { StudentWithQR } from '../../groups/components/GroupQRPDF';
+import QRCodeGenerator from 'qrcode';
 
 interface StudentQRModalProps {
     isOpen: boolean;
@@ -13,13 +16,23 @@ interface StudentQRModalProps {
         id: string;
         prenom: string;
         nom: string;
+        access_token?: string;
     } | null;
+    initialTab?: QRTab;
 }
 
-type QRTab = 'encodage' | 'planification';
+type QRTab = 'encodage' | 'planification' | 'both';
 
-const StudentQRModal: React.FC<StudentQRModalProps> = ({ isOpen, onClose, student }) => {
-    const [activeTab, setActiveTab] = useState<QRTab>('encodage');
+const StudentQRModal: React.FC<StudentQRModalProps> = ({ isOpen, onClose, student, initialTab = 'encodage' }) => {
+    const [activeTab, setActiveTab] = useState<QRTab>(initialTab);
+    const [isGenerating, setIsGenerating] = useState(false);
+
+    // Sync activeTab when initialTab changes
+    React.useEffect(() => {
+        if (isOpen) {
+            setActiveTab(initialTab);
+        }
+    }, [isOpen, initialTab]);
 
     if (!isOpen || !student) return null;
 
@@ -30,60 +43,45 @@ const StudentQRModal: React.FC<StudentQRModalProps> = ({ isOpen, onClose, studen
     const planificationUrl = `${baseUrl}/kiosk/planning/${student.id}?token=${token}`;
     const currentUrl = activeTab === 'encodage' ? encodageUrl : planificationUrl;
 
-    const handlePrint = () => {
-        const printWindow = window.open('', '', 'width=600,height=600');
-        if (printWindow) {
-            const label = activeTab === 'encodage' ? 'Kiosque Encodage' : 'Kiosque Planification';
-            printWindow.document.write(`
-                <html>
-                    <head>
-                        <title>QR Code - ${student.prenom} ${student.nom}</title>
-                        <style>
-                            body { 
-                                font-family: system-ui, -apple-system, sans-serif; 
-                                display: flex; 
-                                flex-direction: column; 
-                                items-center; 
-                                justify-content: center; 
-                                height: 100vh; 
-                                margin: 0; 
-                                text-align: center;
-                            }
-                            .card {
-                                border: 2px solid #000;
-                                padding: 40px;
-                                border-radius: 20px;
-                                display: inline-flex;
-                                flex-direction: column;
-                                align-items: center;
-                            }
-                            h1 { margin: 0 0 20px 0; font-size: 32px; }
-                            p { margin: 20px 0 0 0; font-size: 14px; color: #666; }
-                        </style>
-                    </head>
-                    <body>
-                        <div class="card">
-                            <h1>${student.prenom} ${student.nom}</h1>
-                            <div id="qr-target"></div>
-                            <p>Scannez pour accéder au ${label}</p>
-                        </div>
-                    </body>
-                </html>
-            `);
+    const handlePrint = async () => {
+        setIsGenerating(true);
+        try {
+            const generateQR = async (url: string) => {
+                return await QRCodeGenerator.toDataURL(url, {
+                    width: 300,
+                    margin: 1,
+                    color: { dark: '#000000', light: '#ffffff' },
+                });
+            };
 
-            const svg = document.getElementById('student-qrcode-svg');
-            if (svg && printWindow.document.getElementById('qr-target')) {
-                printWindow.document.getElementById('qr-target')!.innerHTML = svg.outerHTML;
-                printWindow.document.close();
-                printWindow.focus();
-                setTimeout(() => {
-                    printWindow.print();
-                    printWindow.close();
-                }, 500);
-            } else {
-                printWindow.close();
-                window.print();
-            }
+            const qrData = {
+                encodage: await generateQR(encodageUrl),
+                planification: await generateQR(planificationUrl)
+            };
+
+            const studentWithQR: StudentWithQR = {
+                id: student.id,
+                prenom: student.prenom,
+                nom: student.nom,
+                qrData: qrData,
+            };
+
+            const doc = (
+                <GroupQRPDF
+                    groupName="Individuel"
+                    studentsWithQR={[studentWithQR]}
+                    mode={activeTab === 'both' ? 'both' : activeTab}
+                />
+            );
+
+            const blob = await pdf(doc).toBlob();
+            const url = URL.createObjectURL(blob);
+            window.open(url, '_blank');
+        } catch (error) {
+            console.error('Error generating PDF:', error);
+            toast.error("Échec de la génération du PDF");
+        } finally {
+            setIsGenerating(false);
         }
     };
 
@@ -102,7 +100,6 @@ const StudentQRModal: React.FC<StudentQRModalProps> = ({ isOpen, onClose, studen
                 {/* Header */}
                 <div className="p-4 border-b border-white/10 flex items-center justify-between bg-white/5">
                     <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                        <Link size={20} className="text-primary" />
                         Magic QR Code
                     </h3>
                     <button onClick={onClose} aria-label="Fermer" className="p-1 hover:bg-white/10 rounded-lg text-grey-medium hover:text-white transition-colors">
@@ -117,7 +114,7 @@ const StudentQRModal: React.FC<StudentQRModalProps> = ({ isOpen, onClose, studen
                         className={clsx(
                             'flex-1 flex items-center justify-center gap-2 py-3 text-sm font-bold transition-all',
                             activeTab === 'encodage'
-                                ? 'bg-primary/10 text-primary border-b-2 border-primary'
+                                ? 'bg-primary/20 text-primary border-b-2 border-primary'
                                 : 'text-grey-medium hover:text-white hover:bg-white/5'
                         )}
                     >
@@ -129,12 +126,24 @@ const StudentQRModal: React.FC<StudentQRModalProps> = ({ isOpen, onClose, studen
                         className={clsx(
                             'flex-1 flex items-center justify-center gap-2 py-3 text-sm font-bold transition-all',
                             activeTab === 'planification'
-                                ? 'bg-emerald-500/10 text-emerald-400 border-b-2 border-emerald-400'
+                                ? 'bg-emerald-500/20 text-emerald-400 border-b-2 border-emerald-400'
                                 : 'text-grey-medium hover:text-white hover:bg-white/5'
                         )}
                     >
                         <CalendarDays size={16} />
                         Planification
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('both')}
+                        className={clsx(
+                            'flex-1 flex items-center justify-center gap-2 py-3 text-sm font-bold transition-all',
+                            activeTab === 'both'
+                                ? 'bg-amber-500/20 text-amber-400 border-b-2 border-amber-400'
+                                : 'text-grey-medium hover:text-white hover:bg-white/5'
+                        )}
+                    >
+                        <Printer size={16} />
+                        Mixte
                     </button>
                 </div>
 
@@ -143,23 +152,54 @@ const StudentQRModal: React.FC<StudentQRModalProps> = ({ isOpen, onClose, studen
                     <div className="text-center">
                         <h2 className="text-2xl font-black text-black mb-1">{student.prenom} {student.nom}</h2>
                         <p className="text-sm text-gray-500">
-                            {activeTab === 'encodage' ? 'Accès direct au Kiosque Encodage' : 'Accès direct au Kiosque Planification'}
+                            {activeTab === 'encodage' ? 'Accès direct au Kiosque Encodage' :
+                             activeTab === 'planification' ? 'Accès direct au Kiosque Planification' :
+                             'Accès mixte Encodage + Planification'}
                         </p>
                     </div>
 
-                    <div className="p-4 bg-white rounded-xl shadow-lg border-2 border-dashed border-gray-200">
-                        <QRCode
-                            id="student-qrcode-svg"
-                            value={currentUrl}
-                            size={200}
-                            className="h-auto w-full max-w-[200px]"
-                            viewBox={`0 0 256 256`}
-                        />
+                    <div className="flex flex-col items-center gap-6">
+                        {activeTab === 'both' ? (
+                            <div className="flex gap-6 items-center">
+                                <div className="flex flex-col items-center gap-2">
+                                    <span className="text-[10px] text-gray-400 font-bold uppercase">Encodage</span>
+                                    <div className="p-4 bg-white rounded-xl shadow-lg border-2 border-dashed border-primary/20">
+                                        <QRCode
+                                            value={encodageUrl}
+                                            size={120}
+                                            className="h-auto w-full max-w-[120px]"
+                                            viewBox={`0 0 256 256`}
+                                        />
+                                    </div>
+                                </div>
+                                <div className="flex flex-col items-center gap-2">
+                                    <span className="text-[10px] text-gray-400 font-bold uppercase">Planification</span>
+                                    <div className="p-4 bg-white rounded-xl shadow-lg border-2 border-dashed border-emerald-500/20">
+                                        <QRCode
+                                            value={planificationUrl}
+                                            size={120}
+                                            className="h-auto w-full max-w-[120px]"
+                                            viewBox={`0 0 256 256`}
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="p-4 bg-white rounded-xl shadow-lg border-2 border-dashed border-gray-200">
+                                <QRCode
+                                    id="student-qrcode-svg"
+                                    value={currentUrl}
+                                    size={180}
+                                    className="h-auto w-full max-w-[180px]"
+                                    viewBox={`0 0 256 256`}
+                                />
+                            </div>
+                        )}
                     </div>
 
                     <div className="w-full bg-gray-50 p-3 rounded-lg border border-gray-200 text-center">
-                        <p className="text-xs text-gray-400 font-mono break-all line-clamp-2">
-                            {currentUrl}
+                        <p className="text-[10px] text-gray-400 font-mono break-all line-clamp-2">
+                            {activeTab === 'both' ? 'Format optimisé pour impression mixte' : currentUrl}
                         </p>
                     </div>
                 </div>
@@ -181,10 +221,15 @@ const StudentQRModal: React.FC<StudentQRModalProps> = ({ isOpen, onClose, studen
                     </button>
                     <button
                         onClick={handlePrint}
-                        className="px-4 py-2 rounded-xl font-bold bg-primary text-black hover:bg-primary/90 transition-colors flex items-center gap-2"
+                        disabled={isGenerating}
+                        className="px-6 py-2 rounded-xl font-bold bg-primary text-black hover:bg-primary/90 transition-all flex items-center gap-2 shadow-lg shadow-primary/20 disabled:opacity-50 disabled:cursor-not-allowed active:scale-95"
                     >
-                        <Printer size={18} />
-                        Imprimer
+                        {isGenerating ? (
+                            <div className="w-5 h-5 border-2 border-black/20 border-t-black rounded-full animate-spin" />
+                        ) : (
+                            <Printer size={18} />
+                        )}
+                        Exporter en PDF
                     </button>
                 </div>
             </div>

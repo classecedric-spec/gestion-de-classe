@@ -12,6 +12,7 @@ import { ConfirmModal, EmptyState } from '../../../core';
 import { Layers } from 'lucide-react';
 import { useGroupsPageFlow } from '../hooks/useGroupsPageFlow';
 
+
 // Components
 import { GroupsListSidebar } from './GroupsListSidebar';
 import { GroupsDetailView } from './GroupsDetailView';
@@ -34,7 +35,6 @@ export const GroupsPage: React.FC = () => {
         leftContentRef,
         rightContentRef,
         showModal,
-        isEditingGroup,
         groupToEdit,
         groupToDelete,
         showStudentModal,
@@ -42,6 +42,7 @@ export const GroupsPage: React.FC = () => {
         editStudentId,
         showAddToGroupModal,
         showQRModal,
+        qrInitialTab,
         groupsData,
         groupStudentsData,
         pdfGenerator
@@ -49,9 +50,9 @@ export const GroupsPage: React.FC = () => {
 
     const {
         setActiveTab,
-        setShowStudentModal,
         setShowAddToGroupModal,
         setShowQRModal,
+        setQRInitialTab,
         handleAddClick,
         handleEditGroupClick,
         handleDeleteClick,
@@ -108,7 +109,10 @@ export const GroupsPage: React.FC = () => {
                     progressText={pdfGenerator.progressText}
                     pdfProgress={pdfGenerator.progress}
                     onGeneratePDF={() => pdfGenerator.generateGroupTodoList(groupsData.selectedGroup as any)}
-                    onShowQRModal={() => setShowQRModal(true)}
+                    onShowQRModal={(tab) => {
+                        if (tab) setQRInitialTab(tab);
+                        setShowQRModal(true);
+                    }}
                 />
             )}
 
@@ -116,15 +120,16 @@ export const GroupsPage: React.FC = () => {
             <AddGroupModal
                 isOpen={showModal}
                 onClose={handleCloseGroupModal}
-                onAdded={groupsData.handleAddGroup}
-                groupToEdit={isEditingGroup ? groupToEdit : null}
+                groupToEdit={groupToEdit}
+                onAdded={groupsData.fetchGroups}
             />
 
             <StudentModal
                 showModal={showStudentModal}
-                onClose={() => setShowStudentModal(false)}
+                onClose={() => actions.setShowStudentModal(false)}
                 isEditing={isEditingStudent}
                 editId={editStudentId}
+                studentId={editStudentId || ''}
                 onSaved={handleStudentSaved}
             />
 
@@ -144,6 +149,7 @@ export const GroupsPage: React.FC = () => {
                 onClose={() => setShowQRModal(false)}
                 groupName={groupsData.selectedGroup?.nom || 'Groupe'}
                 students={groupStudentsData.studentsInGroup}
+                initialTab={qrInitialTab}
             />
 
             {/* Remove Student Confirmation */}

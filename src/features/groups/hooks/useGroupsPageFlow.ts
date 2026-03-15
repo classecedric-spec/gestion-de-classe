@@ -36,6 +36,7 @@ export function useGroupsPageFlow() {
 
     // Action Modals
     const [showQRModal, setShowQRModal] = useState(false);
+    const [qrInitialTab, setQrInitialTab] = useState<'encodage' | 'planification' | 'both'>('encodage');
 
     // Data Hooks
     const groupsData = useGroupsData();
@@ -135,6 +136,7 @@ export function useGroupsPageFlow() {
             editStudentId,
             showAddToGroupModal,
             showQRModal,
+            qrInitialTab,
             groupsData,
             groupStudentsData,
             pdfGenerator
@@ -150,6 +152,7 @@ export function useGroupsPageFlow() {
             setEditStudentId,
             setShowAddToGroupModal,
             setShowQRModal,
+            setQRInitialTab: setQrInitialTab,
             handleAddClick,
             handleEditGroupClick,
             handleDeleteClick,
