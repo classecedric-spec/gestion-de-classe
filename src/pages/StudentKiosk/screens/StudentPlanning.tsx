@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { Loader2, RotateCcw, ChevronRight, Check, AlertTriangle, Home, CalendarDays } from 'lucide-react';
 import clsx from 'clsx';
 import { toast } from 'sonner';
@@ -94,6 +94,54 @@ const StudentPlanning: React.FC = () => {
         if (success) {
             setStep('done' as Step);
         }
+    };
+
+    const navigate = useNavigate();
+    const [timeLeft, setTimeLeft] = useState(25);
+
+    const onReset = () => {
+        try {
+            window.close();
+        } catch (e) {
+            console.error("Could not close window", e);
+        }
+        navigate('/kiosk');
+    };
+
+    // Auto-logout timer logic
+    React.useEffect(() => {
+        const timer = setInterval(() => {
+            setTimeLeft((prev) => {
+                if (prev <= 1) {
+                    clearInterval(timer);
+                    onReset();
+                    return 0;
+                }
+                return prev - 1;
+            });
+        }, 1000);
+
+        const resetActivity = () => {
+            setTimeLeft(25);
+        };
+
+        const events = ['mousedown', 'mousemove', 'keydown', 'touchstart', 'scroll'];
+        events.forEach(event => {
+            window.addEventListener(event, resetActivity);
+        });
+
+        return () => {
+            clearInterval(timer);
+            events.forEach(event => {
+                window.removeEventListener(event, resetActivity);
+            });
+        };
+    }, []);
+
+    const formatTime = (seconds: number) => {
+        const m = Math.floor(seconds / 60);
+        const s = seconds % 60;
+        return `${m}:${s < 10 ? '0' : ''}${s}`;
     };
 
     // --- TERMINÉ ---
@@ -672,6 +720,25 @@ const StudentPlanning: React.FC = () => {
                                 <span>Confirmer</span>
                             </button>
                         )}
+                    </div>
+                </div>
+
+                {/* Sticky Footer Timer */}
+                <div className="mt-4 pt-4 border-t border-white/5 w-full max-w-4xl mx-auto flex items-center gap-4">
+                    <div className="h-1.5 flex-grow bg-white/10 rounded-full overflow-hidden">
+                        <div
+                            className={clsx(
+                                "h-full transition-all duration-1000 dynamic-width",
+                                timeLeft < 10 ? "bg-danger animate-pulse" : "bg-primary"
+                            )}
+                            style={{ '--dynamic-width': `${(timeLeft / 25) * 100}%` } as React.CSSProperties}
+                        />
+                    </div>
+                    <div className={clsx(
+                        "font-mono font-black text-xs tabular-nums min-w-[40px] text-right",
+                        timeLeft < 10 ? "text-danger animate-pulse" : "text-grey-medium"
+                    )}>
+                        {formatTime(timeLeft)}
                     </div>
                 </div>
             </div>

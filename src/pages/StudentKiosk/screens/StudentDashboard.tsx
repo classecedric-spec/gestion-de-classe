@@ -22,7 +22,7 @@ const StudentDashboard: React.FC = () => {
         navigate('/kiosk');
     };
 
-    const [timeLeft, setTimeLeft] = useState(45); // 45s in seconds
+    const [timeLeft, setTimeLeft] = useState(25); // 25s in seconds
 
     // Auto-logout timer logic
     useEffect(() => {
@@ -38,7 +38,7 @@ const StudentDashboard: React.FC = () => {
         }, 1000);
 
         const resetActivity = () => {
-            setTimeLeft(45);
+            setTimeLeft(25);
         };
 
         // Events to listen for
@@ -322,14 +322,14 @@ const StudentDashboard: React.FC = () => {
                         <div
                             className={clsx(
                                 "h-full transition-all duration-1000 dynamic-width",
-                                timeLeft < 30 ? "bg-danger animate-pulse" : "bg-primary"
+                                timeLeft < 10 ? "bg-danger animate-pulse" : "bg-primary"
                             )}
-                            style={{ '--dynamic-width': `${(timeLeft / 45) * 100}%` } as React.CSSProperties}
+                            style={{ '--dynamic-width': `${(timeLeft / 25) * 100}%` } as React.CSSProperties}
                         />
                     </div>
                     <div className={clsx(
                         "font-mono font-black text-xl tabular-nums min-w-[80px] text-right",
-                        timeLeft < 30 ? "text-danger animate-pulse" : "text-white"
+                        timeLeft < 10 ? "text-danger animate-pulse" : "text-white"
                     )}>
                         {formatTime(timeLeft)}
                     </div>
