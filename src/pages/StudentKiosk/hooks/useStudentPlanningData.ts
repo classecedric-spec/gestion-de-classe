@@ -111,19 +111,19 @@ export function useStudentPlanningData(studentId: string | undefined) {
             }
 
             // 2.2 Charger toutes les activités disponibles via Secure RPC ou trackingService
-            let modules = [];
+            let fetchedModules = [];
             if (token) {
                 const { data: modulesData, error: modulesError } = await supabase.rpc('get_kiosk_modules_activities', {
                     p_student_id: studentId,
                     p_token: token
                 });
                 if (modulesError) throw modulesError;
-                modules = (modulesData || []) as any[];
+                fetchedModules = (modulesData || []) as any[];
             } else {
-                modules = await trackingService.getMobileModules();
+                fetchedModules = await trackingService.getMobileModules();
             }
 
-            modules.forEach((mod: any) => {
+            fetchedModules.forEach((mod: any) => {
                 const isOverdue = mod.date_fin ? new Date(mod.date_fin) < today : false;
                 
                 // Pour le kiosque, on ne veut afficher le module QUE SI l'élève 
@@ -187,8 +187,6 @@ export function useStudentPlanningData(studentId: string | undefined) {
                 };
             });
 
-            setChoices(choicesMap);
-
             // 4. Filtrer les activités : montrer uniquement les assignées (avec une progression) non terminées OU celles déjà planifiées cette semaine
             const filteredActivities = planActivities.filter(act => {
                 const status = progMap[act.id];
@@ -201,7 +199,13 @@ export function useStudentPlanningData(studentId: string | undefined) {
                 return isPlannedThisWeek || (status !== 'termine' && status !== 'a_verifier');
             });
 
-            setActivities(filteredActivities);
+            // Re-render guards
+            if (JSON.stringify(filteredActivities) !== JSON.stringify(activities)) {
+                setActivities(filteredActivities);
+            }
+            if (JSON.stringify(choicesMap) !== JSON.stringify(choices)) {
+                setChoices(choicesMap);
+            }
 
         } catch (err) {
             console.error('Erreur chargement planification:', err);

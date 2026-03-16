@@ -90,12 +90,17 @@ export function useStudentKioskData(studentId: string | undefined) {
                     return a.nom.localeCompare(b.nom);
                 });
 
-                setModules(fetchedModules);
+                if (JSON.stringify(fetchedModules) !== JSON.stringify(modules)) {
+                    setModules(fetchedModules);
+                }
 
                 const allActivities = fetchedModules.flatMap(m =>
                     (m.Activite || []).map((a: any) => ({ ...a, Module: { nom: m.nom, id: m.id } }))
                 );
-                setActivities(allActivities);
+                
+                if (JSON.stringify(allActivities) !== JSON.stringify(activities)) {
+                    setActivities(allActivities);
+                }
 
                 // 3. Progressions (Also likely updated via RPC or we need fetch capability)
                 // If we can't read table directly, we're blind status-wise.
