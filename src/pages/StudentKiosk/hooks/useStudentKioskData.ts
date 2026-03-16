@@ -37,7 +37,8 @@ export function useStudentKioskData(studentId: string | undefined) {
                 console.error("RPC Error get_kiosk_status:", JSON.stringify(error, null, 2));
             } else {
                 console.log("Kiosk Status result:", data);
-                if (data !== null) setKioskOpen(data);
+                const kioskValue = Array.isArray(data) ? data[0] : data;
+                if (kioskValue !== null) setKioskOpen(kioskValue);
             }
         } catch (e) {
             console.error('Error checking kiosk status:', e);
