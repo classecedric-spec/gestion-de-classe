@@ -146,6 +146,7 @@ export const StudentDetailsColumn: React.FC<StudentDetailsColumnProps> = ({
 
                 {currentTab === 'todo' && (
                     <StudentDetailsTodo 
+                        student={selectedStudent}
                         onShowQR={(tab) => setShowQRModal(true, tab)}
                         onGenerateTodoPDF={() => generatePDF(selectedStudent)}
                     />
