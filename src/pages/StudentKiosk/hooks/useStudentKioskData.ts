@@ -52,8 +52,8 @@ export function useStudentKioskData(studentId: string | undefined) {
 
                 // 1. Fetch Student Data via RPC
                 const { data: rpcData, error: rpcError } = await supabase.rpc('get_kiosk_student_data', {
-                    student_id: studentId,
-                    token: token
+                    p_student_id: studentId,
+                    p_token: token
                 });
 
                 if (rpcError) throw rpcError;

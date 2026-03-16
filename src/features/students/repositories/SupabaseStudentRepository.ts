@@ -181,7 +181,7 @@ export class SupabaseStudentRepository implements IStudentRepository {
     async getStudentsDelta(teacherId: string): Promise<{ delta: any[], isFirstSync: boolean }> {
         const { delta, isFirstSync } = await fetchDelta(
             'Eleve',
-            'id, nom, prenom, photo_url, photo_hash, sex, date_naissance, niveau_id, classe_id, updated_at, trust_trend, parent1_nom, parent1_prenom, parent1_email, parent2_nom, parent2_prenom, parent2_email, nom_parents, Niveau(nom, ordre), Classe(nom)',
+            'id, nom, prenom, photo_url, photo_hash, sex, date_naissance, niveau_id, classe_id, updated_at, trust_trend, parent1_nom, parent1_prenom, parent1_email, parent2_nom, parent2_prenom, parent2_email, nom_parents, access_token, Niveau(nom, ordre), Classe(nom)',
             { titulaire_id: teacherId }
         );
         return { delta, isFirstSync };

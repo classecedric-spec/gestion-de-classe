@@ -73,8 +73,8 @@ export function useStudentPlanningData(studentId: string | undefined) {
             let resolvedLevelId: string | null = null;
             if (token) {
                 const { data: rpcData, error: rpcError } = await supabase.rpc('get_kiosk_student_data', {
-                    student_id: studentId,
-                    token: token,
+                    p_student_id: studentId,
+                    p_token: token,
                 });
                 if (rpcError) throw rpcError;
                 if (!rpcData?.student) throw new Error('Accès refusé');
@@ -307,11 +307,11 @@ export function useStudentPlanningData(studentId: string | undefined) {
                     else if (choice.statut === 'fini') nextEtat = 'a_verifier';
 
                     if (nextEtat) {
-                        await supabase.rpc('update_progression_from_kiosk', {
+                        await supabase.rpc('update_kiosk_progression', {
                             p_student_id: studentId,
                             p_token: token,
                             p_activite_id: choice.activite_id,
-                            p_etat: nextEtat
+                            p_status: nextEtat
                         });
                     }
                 }
