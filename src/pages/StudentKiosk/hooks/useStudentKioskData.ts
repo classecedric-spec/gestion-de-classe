@@ -57,9 +57,11 @@ export function useStudentKioskData(studentId: string | undefined) {
                 });
 
                 if (rpcError) throw rpcError;
-                if (!rpcData || !rpcData.student) throw new Error("Accès refusé");
+                
+                const studentData = Array.isArray(rpcData) ? rpcData[0]?.student : rpcData?.student;
+                if (!studentData) throw new Error("Accès refusé");
 
-                setStudent(rpcData.student);
+                setStudent(studentData);
 
                 // 2. Fetch Modules (Need Anon Read Access or another RPC)
                 // For now, assuming modules are public/anon readable or we use the standard call which might fail if blocked by RLS
@@ -222,8 +224,7 @@ export function useStudentKioskData(studentId: string | undefined) {
                         eleve_id: studentId,
                         activite_id: activityId,
                         etat: newStatus,
-                        updated_at: new Date().toISOString(),
-                        user_id: (await supabase.auth.getUser()).data.user?.id
+                        updated_at: new Date().toISOString()
                     });
                 }
 

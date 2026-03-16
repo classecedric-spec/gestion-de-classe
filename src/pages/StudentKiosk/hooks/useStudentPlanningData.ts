@@ -77,9 +77,10 @@ export function useStudentPlanningData(studentId: string | undefined) {
                     p_token: token,
                 });
                 if (rpcError) throw rpcError;
-                if (!rpcData?.student) throw new Error('Accès refusé');
-                setStudent(rpcData.student);
-                resolvedLevelId = rpcData.student.niveau_id;
+                const studentData = Array.isArray(rpcData) ? rpcData[0]?.student : rpcData?.student;
+                if (!studentData) throw new Error('Accès refusé');
+                setStudent(studentData);
+                resolvedLevelId = studentData.niveau_id;
             } else {
                 const { data: studentData, error } = await supabase
                     .from('Eleve')
