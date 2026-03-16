@@ -110,8 +110,19 @@ export function useStudentPlanningData(studentId: string | undefined) {
                 progMap = await trackingService.fetchStudentProgressionsMap(studentId!);
             }
 
-            // 2.2 Charger toutes les activités disponibles via trackingService
-            const modules = await trackingService.getMobileModules();
+            // 2.2 Charger toutes les activités disponibles via Secure RPC ou trackingService
+            let modules = [];
+            if (token) {
+                const { data: modulesData, error: modulesError } = await supabase.rpc('get_kiosk_modules_activities', {
+                    p_student_id: studentId,
+                    p_token: token
+                });
+                if (modulesError) throw modulesError;
+                modules = (modulesData || []) as any[];
+            } else {
+                modules = await trackingService.getMobileModules();
+            }
+
             modules.forEach((mod: any) => {
                 const isOverdue = mod.date_fin ? new Date(mod.date_fin) < today : false;
                 
@@ -121,8 +132,8 @@ export function useStudentPlanningData(studentId: string | undefined) {
                 
                 if (hasAssignedActivities) {
                     (mod.Activite || []).forEach((act: any) => {
-                        // Check Level restrictions (like in dashboard)
-                        if (resolvedLevelId) {
+                        // Check Level restrictions (Already filtered by RPC in token mode, but keeping for Auth mode)
+                        if (!token && resolvedLevelId) {
                             const levels = act.ActiviteNiveau?.map((an: any) => an.niveau_id) || [];
                             if (levels.length > 0 && !levels.includes(resolvedLevelId)) {
                                 return; // Skip if student level is not included

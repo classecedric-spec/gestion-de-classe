@@ -64,44 +64,36 @@ export function useStudentKioskData(studentId: string | undefined) {
 
                 setStudent(studentData);
 
-                // 2. Fetch Modules (Need Anon Read Access or another RPC)
-                // For now, assuming modules are public/anon readable or we use the standard call which might fail if blocked by RLS
-                // Ideally we should have an RPC or public policy for 'Module'/'Activite'
-                // Let's try standard fetch first. 
-                // If standard fetch fails due to RLS, we need to handle it.
-                // Assuming RLS on 'Module' is permissive for 'anon' or we need to add policy.
-                // *Self-Correction*: The migration plan didn't add RLS for Module. 
-                // We'll proceed assuming standard fetch works or we'll need to add a quick policy.
-                const fetchedModules = await trackingService.getMobileModules();
+                // 2. Fetch Modules & Activities via Secure RPC
+                const { data: modulesData, error: modulesError } = await supabase.rpc('get_kiosk_modules_activities', {
+                    p_student_id: studentId,
+                    p_token: token
+                });
 
-                // Sort to match Dashboard (Date -> Branche -> SousBranche -> Module)
+                if (modulesError) throw modulesError;
+                
+                const fetchedModules = (modulesData || []) as any[];
+
+                // Sort (Date -> Branche -> SousBranche -> Module)
                 fetchedModules.sort((a: any, b: any) => {
-                    // 1. Date Fin
                     if (a.date_fin !== b.date_fin) {
                         if (!a.date_fin) return 1;
                         if (!b.date_fin) return -1;
                         return a.date_fin.localeCompare(b.date_fin);
                     }
-                    // 2. Branche
                     const aB = a.SousBranche?.Branche;
                     const bB = b.SousBranche?.Branche;
                     if (aB?.ordre !== bB?.ordre) return (aB?.ordre || 0) - (bB?.ordre || 0);
-                    if (aB?.nom !== bB?.nom) return (aB?.nom || '').localeCompare(bB?.nom || '');
-
-                    // 3. SousBranche
                     const aSB = a.SousBranche;
                     const bSB = b.SousBranche;
                     if (aSB?.ordre !== bSB?.ordre) return (aSB?.ordre || 0) - (bSB?.ordre || 0);
-                    if (aSB?.nom !== bSB?.nom) return (aSB?.nom || '').localeCompare(bSB?.nom || '');
-
-                    // 4. Module Nom
                     return a.nom.localeCompare(b.nom);
                 });
 
                 setModules(fetchedModules);
 
                 const allActivities = fetchedModules.flatMap(m =>
-                    m.Activite.map((a: any) => ({ ...a, Module: { nom: m.nom, id: m.id } }))
+                    (m.Activite || []).map((a: any) => ({ ...a, Module: { nom: m.nom, id: m.id } }))
                 );
                 setActivities(allActivities);
 
