@@ -32,7 +32,8 @@ export function useStudentDetailsFlow(
         expandedModules,
         fetchStudentProgress, resetProgress,
         toggleModuleExpansion,
-        handleUrgentValidation
+        handleUrgentValidation,
+        handleResetActivity
     } = useStudentProgress();
 
     const {
@@ -88,7 +89,8 @@ export function useStudentDetailsFlow(
             handleUrgentValidation,
             handleUpdateImportance,
             handleUpdateBranchIndex,
-            generatePDF
+            generatePDF,
+            handleResetActivity
         }
     };
 }

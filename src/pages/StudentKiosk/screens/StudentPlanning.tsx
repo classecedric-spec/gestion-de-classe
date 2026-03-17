@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { Loader2, RotateCcw, ChevronRight, Check, AlertTriangle, Home, CalendarDays } from 'lucide-react';
 import clsx from 'clsx';
 import { toast } from 'sonner';
@@ -23,10 +23,10 @@ const StatusGrid: React.FC<{
     const currentIndex = statusOrder.indexOf(currentStatut);
 
     const statusConfigs: { key: PlanningStatus; label: string }[] = [
-        { key: 'demarre', label: 'Démarré' },
-        { key: 'fini', label: 'Fini' },
-        { key: 'corrige', label: 'Corrigé' },
-        { key: 'valide', label: 'Validé et encodé' },
+        { key: 'demarre', label: "J'ai commencé" },
+        { key: 'fini', label: "J'ai terminé" },
+        { key: 'corrige', label: "J'ai corrigé" },
+        { key: 'valide', label: "J'ai moins de 1 erreur" },
     ];
 
     return (
@@ -296,10 +296,34 @@ const formatTime = (seconds: number) => {
 const StudentPlanning: React.FC = () => {
     const { studentId } = useParams<{ studentId: string }>();
     const navigate = useNavigate();
-    const [step, setStep] = useState<Step>('status');
+    const [searchParams, setSearchParams] = useSearchParams();
+    const currentStepFromUrl = (searchParams.get('step') as Step) || 'status';
+    
+    const [step, setStepState] = useState<Step>(currentStepFromUrl);
     const [showValidationErrors, setShowValidationErrors] = useState(false);
+    const [validationResults, setValidationResults] = useState<{ title: string, status: 'termine' | 'a_verifier' }[]>([]);
+    const [showValidationModal, setShowValidationModal] = useState(false);
+    const [isValidating, setIsValidating] = useState(false);
+
+    // Synchroniser l'état step avec l'URL
+    const setStep = (newStep: Step) => {
+        setStepState(newStep);
+        setSearchParams(prev => {
+            const next = new URLSearchParams(prev);
+            next.set('step', newStep);
+            return next;
+        }, { replace: true });
+    };
+
+    // Si l'URL change (ex: bouton back du navigateur), on met à jour l'état
+    useEffect(() => {
+        const stepFromUrl = searchParams.get('step') as Step;
+        if (stepFromUrl && stepFromUrl !== step) {
+            setStepState(stepFromUrl);
+        }
+    }, [searchParams]);
     const [onlyShowUnassigned, setOnlyShowUnassigned] = useState(false);
-    const [timeLeft, setTimeLeft] = useState(25);
+    const [timeLeft, setTimeLeft] = useState(120);
 
     const {
         student, loading, saving, kioskPlanningOpen,
@@ -307,7 +331,7 @@ const StudentPlanning: React.FC = () => {
         homeworkActivities,
         overdueModules, weekModules,
         homeworkModules, weekworkModules,
-        setChoice, toggleLieu, toggleStatut, savePlanification, refresh,
+        setChoice, toggleLieu, toggleStatut, savePlanification, processStep1Validations, refresh,
     } = useStudentPlanningData(studentId);
 
     const onReset = () => {
@@ -327,7 +351,7 @@ const StudentPlanning: React.FC = () => {
             });
         }, 1000);
 
-        const resetActivity = () => setTimeLeft(25);
+        const resetActivity = () => setTimeLeft(120);
         const events = ['mousedown', 'mousemove', 'keydown', 'touchstart', 'scroll'];
         events.forEach(event => window.addEventListener(event, resetActivity));
 
@@ -390,6 +414,21 @@ const StudentPlanning: React.FC = () => {
         }
         setShowValidationErrors(false);
         setStep('weekwork');
+    };
+
+    const handleStep1Continue = async () => {
+        setIsValidating(true);
+        try {
+            const results = await processStep1Validations();
+            if (results.length > 0) {
+                setValidationResults(results);
+                setShowValidationModal(true);
+            } else {
+                setStep('homework');
+            }
+        } finally {
+            setIsValidating(false);
+        }
     };
 
     const handleGoToSummary = () => {
@@ -532,7 +571,12 @@ const StudentPlanning: React.FC = () => {
             <div className="shrink-0 bg-surface/90 border-t border-white/10 backdrop-blur-xl p-4 md:p-5 shadow-[0_-5px_20px_rgba(0,0,0,0.3)] z-20">
                 <div className="max-w-4xl mx-auto flex flex-col md:flex-row md:items-center justify-between gap-4">
                     <div className="flex flex-wrap items-center justify-start gap-x-4 gap-y-1">
-                        {[ { label: 'Démarré' }, { label: 'Fini' }, { label: 'Corrigé' }, { label: 'Validé et encodé' } ].map((item, i) => (
+                        {[ 
+                            { label: "J'ai commencé" }, 
+                            { label: "J'ai terminé" }, 
+                            { label: "J'ai corrigé" }, 
+                            { label: "J'ai moins de 1 erreur" } 
+                        ].map((item, i) => (
                             <div key={i} className="flex items-center gap-1.5">
                                 <div className="w-3 h-3 rounded border border-white/20 bg-white/5" />
                                 <span className="text-[10px] text-grey-medium font-bold uppercase tracking-tight">{item.label}</span>
@@ -550,9 +594,17 @@ const StudentPlanning: React.FC = () => {
                         )}
 
                         {step === 'status' && (
-                            <button onClick={() => setStep('homework')} className="flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-sm bg-primary text-black hover:bg-primary/90 transition-all active:scale-95 shadow-lg shadow-primary/20">
-                                <span>Continuer</span>
-                                <ChevronRight size={18} />
+                            <button 
+                                onClick={handleStep1Continue} 
+                                disabled={isValidating}
+                                className="flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-sm bg-primary text-black hover:bg-primary/90 transition-all active:scale-95 shadow-lg shadow-primary/20 disabled:opacity-50"
+                            >
+                                {isValidating ? <Loader2 size={18} className="animate-spin" /> : (
+                                    <>
+                                        <span>Continuer</span>
+                                        <ChevronRight size={18} />
+                                    </>
+                                )}
                             </button>
                         )}
 
@@ -596,12 +648,53 @@ const StudentPlanning: React.FC = () => {
                     <div className="h-1.5 flex-grow bg-white/10 rounded-full overflow-hidden">
                         <div 
                             className={clsx("h-full transition-all duration-1000", timeLeft < 10 ? "bg-danger animate-pulse" : "bg-primary")} 
-                            style={{ width: `${(timeLeft / 25) * 100}%` }} 
+                            style={{ width: `${(timeLeft / 120) * 100}%` }} 
                         />
                     </div>
                     <div className={clsx("font-mono font-black text-xs tabular-nums min-w-[40px] text-right", timeLeft < 10 ? "text-danger animate-pulse" : "text-grey-medium")}>{formatTime(timeLeft)}</div>
                 </div>
             </div>
+
+            {/* Validation Modal */}
+            {showValidationModal && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-300">
+                    <div className="w-full max-w-md bg-surface border border-white/10 rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300">
+                        <div className="p-8 text-center space-y-6">
+                            <div className="w-20 h-20 bg-primary/10 rounded-full flex items-center justify-center mx-auto border-2 border-primary/20">
+                                <Check size={40} className="text-primary" />
+                            </div>
+                            <div className="space-y-2">
+                                <h3 className="text-2xl font-black text-white uppercase tracking-tight">Travaux Terminés</h3>
+                                <p className="text-grey-medium">Voici ce qui a été enregistré :</p>
+                            </div>
+                            
+                            <div className="bg-white/5 rounded-2xl overflow-hidden border border-white/5 divide-y divide-white/5 max-h-[40vh] overflow-y-auto custom-scrollbar">
+                                {validationResults.map((result, idx) => (
+                                    <div key={idx} className="flex items-center justify-between p-4 text-left">
+                                        <span className="text-white font-bold truncate pr-4">{result.title}</span>
+                                        <div className={clsx(
+                                            "shrink-0 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest",
+                                            result.status === 'termine' ? "bg-emerald-500/20 text-emerald-400" : "bg-orange-500/20 text-orange-400"
+                                        )}>
+                                            {result.status === 'termine' ? 'Validé' : 'À vérifier'}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+
+                            <button 
+                                onClick={() => {
+                                    setShowValidationModal(false);
+                                    setStep('homework');
+                                }}
+                                className="w-full py-4 rounded-2xl bg-primary text-black font-black uppercase tracking-widest hover:bg-primary/90 transition-all active:scale-95 shadow-lg shadow-primary/20"
+                            >
+                                C'est noté !
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

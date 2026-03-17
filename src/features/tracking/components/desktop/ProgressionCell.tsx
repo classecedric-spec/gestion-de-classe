@@ -50,7 +50,9 @@ const ProgressionCell: React.FC<ProgressionCellProps> = ({
     const isLocked = currentStatus === 'a_verifier';
 
     const handleToggleStatus = (newStatus: ProgressionStatus) => {
-        if (isLocked) return;
+        // Only lock if we are NOT trying to validate (moving to 'termine')
+        if (isLocked && newStatus !== 'termine') return;
+        
         const statusStr = typeof currentStatus === 'string' ? currentStatus : 'a_commencer';
         if (currentStatus === newStatus) {
             onStatusClick(activity.id, 'a_commencer', statusStr);

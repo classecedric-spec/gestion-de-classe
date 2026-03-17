@@ -12,6 +12,7 @@ import {
     Folder,
     FileText,
     GitBranch,
+    ClipboardList,
     Package,
     Mail,
     LucideIcon
@@ -42,6 +43,7 @@ export const MAIN_NAV_ITEMS: MainNavItem[] = [
     { icon: Puzzle, label: 'Activités', path: ROUTES.DASHBOARD_ACTIVITIES },
     { icon: FileText, label: 'Responsabilités', path: ROUTES.DASHBOARD_RESPONSABILITES },
     { icon: Mail, label: 'Communications', path: ROUTES.DASHBOARD_COMMUNICATIONS },
+    { icon: ClipboardList, label: 'Notes', path: ROUTES.DASHBOARD_NOTES },
     { type: 'separator' } as NavSeparator,
     { icon: Smartphone, label: 'Suivi Mobile', path: '/mobile-suivi', isExternal: true },
     { type: 'separator' } as NavSeparator,

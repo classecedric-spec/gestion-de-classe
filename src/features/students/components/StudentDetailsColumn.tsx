@@ -128,6 +128,7 @@ export const StudentDetailsColumn: React.FC<StudentDetailsColumnProps> = ({
                         expandedModules={expandedModules}
                         toggleModuleExpansion={toggleModuleExpansion}
                         handleUrgentValidation={handleUrgentValidation}
+                        handleResetActivity={actions.handleResetActivity}
                     />
                 )}
 

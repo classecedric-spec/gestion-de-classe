@@ -1,6 +1,6 @@
 import React from 'react';
 import clsx from 'clsx';
-import { ChevronRight, CheckCircle2, AlertCircle, Clock } from 'lucide-react';
+import { ChevronRight, CheckCircle2, AlertCircle, Clock, X, ShieldCheck } from 'lucide-react';
 import { Badge } from '../../../core';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
@@ -10,14 +10,16 @@ interface StudentJournalViewProps {
     expandedModules: Record<string, boolean>;
     toggleModuleExpansion: (moduleId: string) => void;
     showPendingOnly: boolean;
-    handleUrgentValidation?: (activityId: string, studentId: string, manualIndices?: any) => void; // Optional if not used here
+    handleUrgentValidation?: (activityId: string, studentId: string, manualIndices?: any) => void;
+    handleResetActivity?: (progressionId: string) => void;
 }
 
 export const StudentJournalView: React.FC<StudentJournalViewProps> = ({
     studentProgress,
     expandedModules,
     toggleModuleExpansion,
-    showPendingOnly
+    showPendingOnly,
+    handleResetActivity
 }) => {
     const moduleGroups = Object.values(studentProgress.reduce((acc: any, p) => {
         const mod = p.Activite?.Module;
@@ -46,8 +48,9 @@ export const StudentJournalView: React.FC<StudentJournalViewProps> = ({
                 .map((module: any) => {
                     const activities = module.activities;
                     const completedCount = activities.filter((a: any) => a.etat === 'termine').length;
+                    const toVerifyCount = activities.filter((a: any) => a.etat === 'a_verifier').length;
                     const totalCount = activities.length;
-                    const percent = Math.round((completedCount / totalCount) * 100);
+                    const percent = Math.round(((completedCount + toVerifyCount) / totalCount) * 100);
 
                     // Extracted style to avoid inline style warning
                     const progressBarStyle = { width: `${percent}%` } as React.CSSProperties;
@@ -104,7 +107,9 @@ export const StudentJournalView: React.FC<StudentJournalViewProps> = ({
                                             />
                                         </div>
                                         <span className="text-xs font-black text-grey-medium min-w-[35px] text-right tabular-nums">
-                                            {completedCount}/{totalCount}
+                                            {completedCount}
+                                            {toVerifyCount > 0 ? ` (+ ${toVerifyCount})` : ''}
+                                            /{totalCount}
                                         </span>
                                     </div>
                                 </div>
@@ -113,27 +118,44 @@ export const StudentJournalView: React.FC<StudentJournalViewProps> = ({
                             {isExpanded && (
                                 <div className="border-t border-white/5 bg-black/20">
                                     {activities.sort((a: any, b: any) => (a.Activite?.ordre || 0) - (b.Activite?.ordre || 0)).map((p: any) => (
-                                        <div key={p.id} className="p-3 pl-16 border-b border-white/5 last:border-0 flex items-center justify-between hover:bg-white/5 transition-colors group">
-                                            <h4 className="text-sm text-grey-light font-medium group-hover:text-white transition-colors">{p.Activite?.titre}</h4>
+                                        <div key={p.id} className="p-3 pl-10 border-b border-white/5 last:border-0 flex items-center justify-between hover:bg-white/5 transition-colors group/item">
+                                            <div className="flex items-center gap-3 min-w-0">
+                                                {p.etat !== 'a_commencer' && handleResetActivity && (
+                                                    <button
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            handleResetActivity(p.id);
+                                                        }}
+                                                        className="p-1 rounded-md hover:bg-danger/20 text-grey-dark hover:text-danger transition-all opacity-0 group-hover/item:opacity-100"
+                                                        title="Remettre en cours"
+                                                    >
+                                                        <X size={14} />
+                                                    </button>
+                                                )}
+                                                <h4 className="text-sm text-grey-light font-medium group-hover/item:text-white transition-colors truncate">{p.Activite?.titre}</h4>
+                                            </div>
                                             <div className="flex items-center gap-3">
                                                 <span className="text-[10px] text-grey-dark font-mono">{new Date(p.updated_at).toLocaleDateString()}</span>
                                                 <Badge
                                                     variant={
                                                         p.etat === 'termine' ? 'success' :
                                                             p.etat === 'besoin_d_aide' ? 'danger' :
-                                                                'primary'
+                                                                p.etat === 'a_verifier' ? 'purple' :
+                                                                    'primary'
                                                     }
                                                     size="xs"
                                                     icon={
                                                         p.etat === 'termine' ? <CheckCircle2 size={12} /> :
                                                             p.etat === 'besoin_d_aide' ? <AlertCircle size={12} /> :
-                                                                <Clock size={12} />
+                                                                p.etat === 'a_verifier' ? <ShieldCheck size={12} /> :
+                                                                    <Clock size={12} />
                                                     }
                                                     className={p.etat === 'besoin_d_aide' ? 'animate-pulse' : ''}
                                                 >
                                                     {p.etat === 'termine' ? 'Terminé' :
                                                         p.etat === 'besoin_d_aide' ? "Besoin d'aide" :
-                                                            'En cours'}
+                                                            p.etat === 'a_verifier' ? 'À vérifier' :
+                                                                'En cours'}
                                                 </Badge>
                                             </div>
                                         </div>

@@ -1,5 +1,5 @@
 import React from 'react';
-import { AlertCircle, CheckCircle2, ChevronRight, Clock } from 'lucide-react';
+import { AlertCircle, CheckCircle2, ChevronRight, Clock, ShieldCheck } from 'lucide-react';
 import clsx from 'clsx';
 import { Badge } from '../../../../core';
 import { format } from 'date-fns';
@@ -119,11 +119,15 @@ export const StudentDetailsUrgent: React.FC<StudentDetailsUrgentProps> = ({
                                                         "px-2 py-1 rounded text-[10px] font-black uppercase tracking-wider flex items-center gap-1.5 transition-all cursor-pointer hover:scale-105",
                                                         p.etat === 'besoin_d_aide'
                                                             ? "bg-amber-500/20 text-amber-500 hover:bg-amber-500/30 animate-pulse"
-                                                            : "bg-blue-500/20 text-blue-500 hover:bg-blue-500/30"
+                                                            : p.etat === 'a_verifier'
+                                                                ? "bg-purple-500/20 text-purple-400 hover:bg-purple-500/30 font-bold"
+                                                                : "bg-blue-500/20 text-blue-500 hover:bg-blue-500/30"
                                                     )}
                                                 >
-                                                    <Clock size={10} />
-                                                    {p.etat === 'besoin_d_aide' ? "Besoin d'aide" : "En cours"}
+                                                    {p.etat === 'a_verifier' ? <ShieldCheck size={10} /> : <Clock size={10} />}
+                                                    {p.etat === 'besoin_d_aide' ? "Besoin d'aide" : 
+                                                     p.etat === 'a_verifier' ? "À vérifier" : 
+                                                     "En cours"}
                                                 </div>
                                             </div>
                                         </div>

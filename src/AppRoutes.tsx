@@ -24,6 +24,7 @@ const Materiels = lazy(() => import('./pages/Materiels'));
 const Presence = lazy(() => import('./pages/Presence'));
 const Communications = lazy(() => import('./pages/Communications'));
 const Settings = lazy(() => import('./pages/Settings'));
+const Grades = lazy(() => import('./pages/Grades'));
 const Responsabilites = lazy(() => import('./pages/Responsabilites'));
 const SuiviGlobal = lazy(() => import('./pages/SuiviGlobal'));
 const SuiviGlobalTBI = lazy(() => import('./pages/SuiviGlobalTBI'));
@@ -138,6 +139,7 @@ const AppRoutes = () => {
                 <Route path={ROUTES.DASHBOARD_SETTINGS} element={<Suspense fallback={<PageLoader />}><Settings /></Suspense>} />
                 <Route path={ROUTES.DASHBOARD_PRESENCE} element={<Suspense fallback={<PageLoader />}><Presence /></Suspense>} />
                 <Route path={ROUTES.DASHBOARD_COMMUNICATIONS} element={<Suspense fallback={<PageLoader />}><Communications /></Suspense>} />
+                <Route path={ROUTES.DASHBOARD_NOTES} element={<Suspense fallback={<PageLoader />}><Grades /></Suspense>} />
                 <Route path={ROUTES.DASHBOARD_RESPONSABILITES} element={<Suspense fallback={<PageLoader />}><Responsabilites /></Suspense>} />
             </Route>
 

@@ -13,6 +13,7 @@ interface StudentDetailsSuiviProps {
     expandedModules: Record<string, boolean>;
     toggleModuleExpansion: (moduleId: string) => void;
     handleUrgentValidation: (activityId: string, studentId: string, studentIndices: any) => void;
+    handleResetActivity: (progressionId: string) => void;
 }
 
 export const StudentDetailsSuivi: React.FC<StudentDetailsSuiviProps> = ({
@@ -24,7 +25,8 @@ export const StudentDetailsSuivi: React.FC<StudentDetailsSuiviProps> = ({
     setShowPendingOnly,
     expandedModules,
     toggleModuleExpansion,
-    handleUrgentValidation
+    handleUrgentValidation,
+    handleResetActivity
 }) => {
     return (
         <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
@@ -70,6 +72,7 @@ export const StudentDetailsSuivi: React.FC<StudentDetailsSuiviProps> = ({
                                 toggleModuleExpansion={toggleModuleExpansion}
                                 showPendingOnly={showPendingOnly}
                                 handleUrgentValidation={handleUrgentValidation}
+                                handleResetActivity={handleResetActivity}
                             />
                         </div>
                     )}

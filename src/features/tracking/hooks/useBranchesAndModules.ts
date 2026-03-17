@@ -26,6 +26,7 @@ export interface ModuleWithStats {
     } | null;
     totalActivities: number;
     completedActivities: number;
+    toVerifyActivities: number;
     percent: number;
     Activite?: any[];
 }
@@ -157,14 +158,18 @@ export function useBranchesAndModules(
 
                         const totalActivities = validActivities.length;
                         const completedActivities = validActivities.filter((act: any) =>
-                            act.Progression?.some((p: any) => p.eleve_id === studentId && (p.etat === 'termine' || p.etat === 'a_verifier'))
+                            act.Progression?.some((p: any) => p.eleve_id === studentId && p.etat === 'termine')
+                        ).length;
+                        const toVerifyActivities = validActivities.filter((act: any) =>
+                            act.Progression?.some((p: any) => p.eleve_id === studentId && p.etat === 'a_verifier')
                         ).length;
 
                         return {
                             ...m,
                             totalActivities,
                             completedActivities,
-                            percent: totalActivities > 0 ? Math.round((completedActivities / totalActivities) * 100) : 0
+                            toVerifyActivities,
+                            percent: totalActivities > 0 ? Math.round(((completedActivities + toVerifyActivities) / totalActivities) * 100) : 0
                         };
                     } else {
                         // Group Mode Filtering
@@ -204,6 +209,7 @@ export function useBranchesAndModules(
                             ...m,
                             totalActivities: totalActs,
                             completedActivities: 0,
+                            toVerifyActivities: 0,
                             percent: 0
                         };
                     }

@@ -172,7 +172,9 @@ export const StudentColumnWrapper: React.FC<StudentColumnWrapperProps> = ({
                                                     />
                                                 </div>
                                                 <span className="text-[9px] text-grey-medium font-medium whitespace-nowrap">
-                                                    {module.completedActivities || 0}/{module.totalActivities || 0}
+                                                    {module.completedActivities || 0}
+                                                    {module.toVerifyActivities > 0 ? ` (+ ${module.toVerifyActivities})` : ''}
+                                                    /{module.totalActivities || 0}
                                                 </span>
                                             </div>
                                         </button>

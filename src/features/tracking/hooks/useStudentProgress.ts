@@ -1,6 +1,5 @@
 import { useState, useCallback } from 'react';
 import { trackingService } from '../services/trackingService';
-import { Tables } from '../../../types/supabase';
 
 // Define complex types manually if needed, or use any for deeply nested joins that are hard to type with 'Tables'
 // The query is quite deep: Progression -> Activite -> Module -> SousBranche -> Branche
@@ -109,6 +108,29 @@ export const useStudentProgress = () => {
         }
     }, [studentProgress]);
 
+    const handleResetActivity = useCallback(async (progressionId: string) => {
+        if (!progressionId) return;
+
+        // 1. Optimistic Update
+        const originalProgress = [...studentProgress];
+        
+        setStudentProgress(prev => prev.map(p => {
+            if (p.id === progressionId) {
+                return { ...p, etat: 'a_commencer' };
+            }
+            return p;
+        }));
+
+        try {
+            // 2. Database Update
+            await trackingService.updateProgressionStatus(progressionId, 'a_commencer');
+        } catch (error) {
+            console.error("Error resetting activity:", error);
+            // Revert on error
+            setStudentProgress(originalProgress);
+        }
+    }, [studentProgress]);
+
     return {
         studentProgress,
         loadingProgress,
@@ -128,6 +150,7 @@ export const useStudentProgress = () => {
         toggleBranchExpansion,
         toggleSubBranchExpansion,
         toggleTreeModuleExpansion,
-        handleUrgentValidation
+        handleUrgentValidation,
+        handleResetActivity
     };
 };

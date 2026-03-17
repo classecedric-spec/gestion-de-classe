@@ -21,6 +21,7 @@ export interface PlanningActivity {
     moduleNom: string;
     moduleDateFin: string | null;
     isOverdue: boolean;
+    branchId: string | null;
 }
 
 /**
@@ -34,6 +35,10 @@ export function useStudentPlanningData(studentId: string | undefined) {
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [kioskPlanningOpen, setKioskPlanningOpen] = useState(true);
+
+    // Indices de confiance pour l'auto-vérification
+    const [manualIndices, setManualIndices] = useState<Record<string, any>>({});
+    const [defaultLuckyIndex, setDefaultLuckyIndex] = useState<number>(50);
 
     const location = useLocation();
     const token = new URLSearchParams(location.search).get('token');
@@ -71,23 +76,25 @@ export function useStudentPlanningData(studentId: string | undefined) {
         try {
             // 1. Récupérer les infos de l'élève
             let resolvedLevelId: string | null = null;
+            let studentData: any = null;
             if (token) {
                 const { data: rpcData, error: rpcError } = await supabase.rpc('get_kiosk_student_data', {
                     p_student_id: studentId,
                     p_token: token,
                 });
                 if (rpcError) throw rpcError;
-                const studentData = Array.isArray(rpcData) ? rpcData[0]?.student : rpcData?.student;
+                studentData = Array.isArray(rpcData) ? rpcData[0]?.student : rpcData?.student;
                 if (!studentData) throw new Error('Accès refusé');
                 setStudent(studentData);
                 resolvedLevelId = studentData.niveau_id;
             } else {
-                const { data: studentData, error } = await supabase
+                const { data: sData, error } = await supabase
                     .from('Eleve')
                     .select('*, Niveau(id, nom)')
                     .eq('id', studentId!)
                     .single();
                 if (error) throw error;
+                studentData = sData;
                 setStudent(studentData);
                 resolvedLevelId = studentData.niveau_id || null;
             }
@@ -150,6 +157,7 @@ export function useStudentPlanningData(studentId: string | undefined) {
                                 moduleNom: mod.nom || mod.titre,
                                 moduleDateFin: mod.date_fin,
                                 isOverdue,
+                                branchId: mod.SousBranche?.Branche?.id || null
                             });
                         }
                     });
@@ -207,6 +215,28 @@ export function useStudentPlanningData(studentId: string | undefined) {
                 setChoices(choicesMap);
             }
 
+            // 5. Charger les préférences de confiance (indices)
+            const teacherId = studentData.user_id;
+            if (teacherId) {
+                try {
+                    const { data: prefData } = await supabase
+                        .from('UserPreference')
+                        .select('key, value')
+                        .eq('user_id', teacherId)
+                        .in('key', ['eleve_profil_competences', 'default_lucky_check_index']);
+                    
+                    if (prefData) {
+                        const indicesPref = prefData.find(p => p.key === 'eleve_profil_competences');
+                        if (indicesPref) setManualIndices(indicesPref.value as any);
+
+                        const defaultIdxPref = prefData.find(p => p.key === 'default_lucky_check_index');
+                        if (defaultIdxPref) setDefaultLuckyIndex(Number(defaultIdxPref.value));
+                    }
+                } catch (e) {
+                    console.warn('Impossible de charger les indices de confiance:', e);
+                }
+            }
+
         } catch (err) {
             console.error('Erreur chargement planification:', err);
             toast.error("Erreur d'accès aux données de planification");
@@ -219,20 +249,22 @@ export function useStudentPlanningData(studentId: string | undefined) {
     const setChoice = (activityId: string, jour: string | null, lieu: 'classe' | 'domicile' | null) => {
         setChoices(prev => {
             const current = prev[activityId];
+            const isSelected = current?.jour === jour && jour !== null;
             // Si on clique sur le même jour → désélectionner
-            if (current?.jour === jour && jour !== null) {
-                const { [activityId]: _, ...rest } = prev;
-                return rest;
-            }
-            return {
-                ...prev,
-                [activityId]: { 
-                    activite_id: activityId, 
-                    jour, 
-                    lieu, 
-                    statut: current?.statut || 'non_demarre' 
-                },
-            };
+            const updatedChoices = isSelected
+                ? (() => { const { [activityId]: _, ...rest } = prev; return rest; })()
+                : {
+                    ...prev,
+                    [activityId]: { 
+                        activite_id: activityId, 
+                        jour, 
+                        lieu, 
+                        statut: current?.statut || 'non_demarre' 
+                    },
+                };
+            
+            savePlanification(updatedChoices, true);
+            return updatedChoices;
         });
     };
 
@@ -240,25 +272,30 @@ export function useStudentPlanningData(studentId: string | undefined) {
     const toggleLieu = (activityId: string, jour: string) => {
         setChoices(prev => {
             const current = prev[activityId];
+            let updatedChoices: Record<string, PlanningChoice>;
             if (current?.jour === jour) {
                 // Alterner : classe → domicile → vide
                 if (current.lieu === 'classe') {
-                    return { ...prev, [activityId]: { ...current, lieu: 'domicile' } };
-                } else if (current.lieu === 'domicile') {
+                    updatedChoices = { ...prev, [activityId]: { ...current, lieu: 'domicile' } };
+                } else {
                     const { [activityId]: _, ...rest } = prev;
-                    return rest;
+                    updatedChoices = rest;
                 }
+            } else {
+                // Nouveau choix : par défaut en classe
+                updatedChoices = {
+                    ...prev,
+                    [activityId]: { 
+                        activite_id: activityId, 
+                        jour, 
+                        lieu: 'classe',
+                        statut: current?.statut || 'non_demarre'
+                    },
+                };
             }
-            // Nouveau choix : par défaut en classe
-            return {
-                ...prev,
-                [activityId]: { 
-                    activite_id: activityId, 
-                    jour, 
-                    lieu: 'classe',
-                    statut: current?.statut || 'non_demarre'
-                },
-            };
+
+            savePlanification(updatedChoices, true);
+            return updatedChoices;
         });
     };
 
@@ -266,7 +303,23 @@ export function useStudentPlanningData(studentId: string | undefined) {
     const toggleStatut = (activityId: string, targetStatut: PlanningStatus) => {
         setChoices(prev => {
             const current = prev[activityId];
-            const newStatut = current?.statut === targetStatut ? 'non_demarre' : targetStatut;
+            
+            // Si on clique sur le statut déjà actif -> on reset tout
+            if (current?.statut === targetStatut) {
+                const updatedChoices = {
+                    ...prev,
+                    [activityId]: {
+                        activite_id: activityId,
+                        jour: null,
+                        lieu: null,
+                        statut: 'non_demarre' as PlanningStatus
+                    }
+                };
+                savePlanification(updatedChoices, true);
+                return updatedChoices;
+            }
+
+            const newStatut = targetStatut;
             
             // Logique de lieu basée sur le statut (seulement si lieu n'est pas déjà défini ?)
             // On enforce le lieu lors du changement de statut pour guider l'élève
@@ -280,7 +333,7 @@ export function useStudentPlanningData(studentId: string | undefined) {
             // On ne touche pas à newLieu si newStatut === 'valide' ou 'non_demarre'
             // Cela permet de garder le choix précédent si on revient en arrière.
 
-            return {
+            const updatedChoices = {
                 ...prev,
                 [activityId]: {
                     activite_id: activityId,
@@ -289,15 +342,21 @@ export function useStudentPlanningData(studentId: string | undefined) {
                     statut: newStatut
                 }
             };
+            
+            // Sauvegarde automatique en arrière-plan pour l'Étape 1
+            savePlanification(updatedChoices, true);
+
+            return updatedChoices;
         });
     };
 
     // Sauvegarder la planification complète
-    const savePlanification = async (): Promise<boolean> => {
+    const savePlanification = async (choicesOverride?: Record<string, PlanningChoice>, silent = false): Promise<boolean> => {
         if (!studentId) return false;
-        setSaving(true);
+        const currentChoices = choicesOverride || choices;
+        if (!silent) setSaving(true);
         try {
-            const items = Object.values(choices)
+            const items = Object.values(currentChoices)
                 .filter(c => (c.jour && c.lieu) || c.statut !== 'non_demarre')
                 .map(c => ({
                     activite_id: c.activite_id,
@@ -315,23 +374,23 @@ export function useStudentPlanningData(studentId: string | undefined) {
                 });
                 if (error) throw error;
 
-                // Mettre à jour les progressions réelles via RPC
-                for (const choice of Object.values(choices)) {
+                // Mettre à jour les progressions réelles via RPC (uniquement si NON silencieux = Validation Finale)
+                if (!silent) {
+                    for (const choice of Object.values(currentChoices)) {
                     let nextEtat = '';
-                    if (choice.statut === 'valide') nextEtat = 'termine';
-                    else if (choice.statut === 'demarre') nextEtat = 'en_cours';
+                    if (choice.statut === 'demarre') nextEtat = 'en_cours';
                     else if (choice.statut === 'fini') nextEtat = 'a_verifier';
 
                     if (nextEtat) {
                         await supabase.rpc('update_kiosk_progression', {
                             p_student_id: studentId,
                             p_token: token,
-                            p_activite_id: choice.activite_id,
+                            p_activity_id: choice.activite_id,
                             p_status: nextEtat
                         });
                     }
+                    }
                 }
-
             } else {
                 // Mode authentifié
                 await supabase
@@ -354,11 +413,11 @@ export function useStudentPlanningData(studentId: string | undefined) {
                     if (error) throw error;
                 }
 
-                // Mettre à jour les progressions réelles
-                for (const choice of Object.values(choices)) {
+                // Mettre à jour les progressions réelles (uniquement si NON silencieux = Validation Finale)
+                if (!silent) {
+                    for (const choice of Object.values(currentChoices)) {
                     let nextEtat = '';
-                    if (choice.statut === 'valide') nextEtat = 'termine';
-                    else if (choice.statut === 'demarre') nextEtat = 'en_cours';
+                    if (choice.statut === 'demarre') nextEtat = 'en_cours';
                     else if (choice.statut === 'fini') nextEtat = 'a_verifier';
 
                     if (nextEtat) {
@@ -369,22 +428,97 @@ export function useStudentPlanningData(studentId: string | undefined) {
                             updated_at: new Date().toISOString()
                         });
                     }
+                    }
                 }
             }
 
-            toast.success('Planification enregistrée !');
+            if (!silent) toast.success('Planification enregistrée !');
             return true;
         } catch (err) {
             console.error('Erreur sauvegarde planification:', err);
-            toast.error('Erreur lors de la sauvegarde');
+            if (!silent) toast.error('Erreur lors de la sauvegarde');
             return false;
         } finally {
-            setSaving(false);
+            if (!silent) setSaving(false);
+        }
+    };
+
+    // Nouveau : Valider les activités de l'Etape 1 (4 carrés)
+    const processStep1Validations = async (): Promise<{ title: string, status: 'termine' | 'a_verifier' }[]> => {
+        if (!studentId) return [];
+        const results: { title: string, status: 'termine' | 'a_verifier' }[] = [];
+        const validatedActivityIds: string[] = [];
+
+        try {
+            // On prépare une copie des choix pour nettoyer la planification des activités validées
+            const updatedChoices = { ...choices };
+
+            for (const choice of Object.values(choices)) {
+                if (choice.statut === 'valide') {
+                    const act = activities.find(a => a.id === choice.activite_id);
+                    if (!act) continue;
+
+                    let nextEtat: 'termine' | 'a_verifier' = 'termine';
+                    
+                    // LOGIQUE D'AUTO-VERIFICATION
+                    const branchId = act.branchId;
+                    const studentIdToUse = studentId!;
+                    const specificIdx = branchId ? manualIndices[studentIdToUse]?.[branchId] : null;
+                    const studentGlobalIdx = student?.importance_suivi;
+                    const idx = specificIdx ?? studentGlobalIdx ?? defaultLuckyIndex ?? 50;
+
+                    if (Math.random() * 100 < idx) {
+                        nextEtat = 'a_verifier';
+                    } else {
+                        nextEtat = 'termine';
+                    }
+
+                    // Mise à jour en base
+                    if (token) {
+                        await supabase.rpc('update_kiosk_progression', {
+                            p_student_id: studentId,
+                            p_token: token,
+                            p_activity_id: choice.activite_id,
+                            p_status: nextEtat
+                        });
+                    } else {
+                        await trackingService.upsertProgression({
+                            eleve_id: studentId,
+                            activite_id: choice.activite_id,
+                            etat: nextEtat,
+                            updated_at: new Date().toISOString()
+                        });
+                    }
+
+                    results.push({ title: act.titre, status: nextEtat });
+                    validatedActivityIds.push(choice.activite_id);
+
+                    // --- NETTOYAGE ---
+                    // Une fois validée, l'activité ne fait plus partie du "plan de la semaine" 
+                    // (elle est terminée ou à vérifier), donc on la retire des choix.
+                    delete updatedChoices[choice.activite_id];
+                }
+            }
+
+            if (results.length > 0) {
+                // Mettre à jour les choix localement (retrait des activités validées)
+                setChoices(updatedChoices);
+                // Sauvegarder la planification (cela supprimera les lignes correspondantes dans PlanificationHebdo)
+                await savePlanification(updatedChoices, true);
+                // Rafraîchir les données pour masquer les activités validées (termine/a_verifier)
+                await fetchData();
+            }
+
+            return results;
+        } catch (err) {
+            console.error('Erreur lors de la validation Etape 1:', err);
+            toast.error('Erreur lors de la validation des activités');
+            return [];
         }
     };
 
     // Données dérivées : on masque globalement toutes les activités avec le statut 'valide' (comme sur la to-do liste papier)
-    const activeActivities = activities.filter(a => choices[a.id]?.statut !== 'valide');
+    const activeActivities = activities; // On ne masque plus les 'valide' ici pour les garder en Phase 1
     const overdueActivitiesRaw = activeActivities.filter(a => a.isOverdue);
     const weekActivitiesRaw = activeActivities.filter(a => !a.isOverdue);
 
@@ -398,7 +532,7 @@ export function useStudentPlanningData(studentId: string | undefined) {
     });
 
     const weekworkActivities = [
-        ...weekActivitiesRaw,
+        ...weekActivitiesRaw.filter(a => choices[a.id]?.statut !== 'valide'),
         ...overdueActivitiesRaw.filter(a => {
             const statut = choices[a.id]?.statut || 'non_demarre';
             return statut === 'fini' || statut === 'corrige'; // 2 ou 3 carrés
@@ -438,6 +572,7 @@ export function useStudentPlanningData(studentId: string | undefined) {
         toggleLieu,
         toggleStatut,
         savePlanification,
+        processStep1Validations,
         refresh: fetchData,
     };
 }
