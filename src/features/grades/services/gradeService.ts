@@ -116,4 +116,23 @@ export class GradeService {
             default: return 'Présent';
         }
     }
+
+    convertNoteToLetter(note: number | null, noteMax: number, typeNote: any): string | null {
+        if (note === null || note === undefined || !typeNote || typeNote.systeme !== 'conversion') return null;
+        const config = typeNote.config as any;
+        if (!config || !config.paliers || !Array.isArray(config.paliers)) return null;
+
+        const percentage = (note / noteMax) * 100;
+        
+        // Find the palier where min <= percentage < max
+        // Special case: if percentage is exactly 100 and a palier has maxPercent 100, we include it.
+        const match = config.paliers.find((p: any) => {
+            const min = p.minPercent ?? 0;
+            const max = p.maxPercent ?? 0;
+            if (percentage >= 100 && max >= 100) return percentage >= min;
+            return percentage >= min && percentage < max;
+        });
+        
+        return match ? match.letter : null;
+    }
 }

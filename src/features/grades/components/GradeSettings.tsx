@@ -3,7 +3,6 @@ import { Settings, Plus, Trash2, Edit2, Save, X } from 'lucide-react';
 import Card from '../../../core/Card';
 import Button from '../../../core/Button';
 import Input from '../../../core/Input';
-import Select from '../../../core/Select';
 import { useGrades } from '../hooks/useGrades';
 import { Tables } from '../../../types/supabase';
 import { useAuth } from '../../../hooks/useAuth';
@@ -15,14 +14,22 @@ const GradeSettings: React.FC = () => {
     const [editingId, setEditingId] = useState<string | null>(null);
     const [formData, setFormData] = useState({
         nom: '',
-        systeme: 'numerique', // 'numerique', 'lettre', 'conversion'
+        systeme: 'numerique', 
         config: {} as any
     });
 
     const handleSave = async () => {
         if (!session?.user) return;
+        
+        // Ensure config has at least an empty paliers array for conversion
+        const finalConfig = { ...formData.config };
+        if (formData.systeme === 'conversion' && !finalConfig.paliers) {
+            finalConfig.paliers = [];
+        }
+
         await saveNoteType({
             ...formData,
+            config: finalConfig,
             id: editingId || undefined,
             user_id: session.user.id
         });
@@ -30,7 +37,7 @@ const GradeSettings: React.FC = () => {
     };
 
     const resetForm = () => {
-        setFormData({ nom: '', systeme: 'numerique', config: {} });
+        setFormData({ nom: '', systeme: 'numerique', config: { max: 20 } });
         setIsAdding(false);
         setEditingId(null);
     };
@@ -38,11 +45,41 @@ const GradeSettings: React.FC = () => {
     const startEdit = (type: Tables<'TypeNote'>) => {
         setFormData({
             nom: type.nom,
-            systeme: type.systeme,
+            systeme: (type.systeme as any) || 'numerique', // Cast to any to handle potential DB values
             config: type.config || {}
         });
         setEditingId(type.id);
         setIsAdding(true);
+    };
+
+    const addPalier = () => {
+        const paliers = [...(formData.config.paliers || [])];
+        paliers.push({ letter: '', minPercent: 0, maxPercent: 0 });
+        setFormData({
+            ...formData,
+            config: { ...formData.config, paliers }
+        });
+    };
+
+    const removePalier = (index: number) => {
+        const paliers = [...(formData.config.paliers || [])];
+        paliers.splice(index, 1);
+        setFormData({
+            ...formData,
+            config: { ...formData.config, paliers }
+        });
+    };
+
+    const updatePalier = (index: number, field: 'letter' | 'minPercent' | 'maxPercent', value: any) => {
+        const paliers = [...(formData.config.paliers || [])];
+        paliers[index] = { 
+            ...paliers[index], 
+            [field]: (field === 'minPercent' || field === 'maxPercent') ? parseFloat(value) : value 
+        };
+        setFormData({
+            ...formData,
+            config: { ...formData.config, paliers }
+        });
     };
 
     return (
@@ -50,7 +87,7 @@ const GradeSettings: React.FC = () => {
             <div className="flex justify-between items-center">
                 <div>
                     <h2 className="text-xl font-bold text-text-main">Systèmes de Notation</h2>
-                    <p className="text-sm text-grey-medium">Configurez vos barèmes personnalisés (Points, Lettres, Compétences)</p>
+                    <p className="text-sm text-grey-medium">Configurez vos barèmes personnalisés (Numérique ou Conversion en lettres)</p>
                 </div>
                 {!isAdding && (
                     <Button 
@@ -76,47 +113,117 @@ const GradeSettings: React.FC = () => {
                             <X size={20} />
                         </button>
                     </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-                        <Input 
-                            label="Nom du système" 
-                            placeholder="ex: Points (sur 20), ABCD, Compétences..." 
-                            value={formData.nom}
-                            onChange={(e) => setFormData({...formData, nom: e.target.value})}
-                        />
-                        <Select 
-                            label="Type de barème"
-                            value={formData.systeme}
-                            onChange={(e) => setFormData({...formData, systeme: e.target.value})}
-                            options={[
-                                { value: 'numerique', label: 'Points Numériques (0-20, 0-10...)' },
-                                { value: 'lettre', label: 'Lettres (A, B, C...)' },
-                                { value: 'conversion', label: 'Tableau de conversion (Competences)' }
-                            ]}
-                        />
-                    </div>
-                    
-                    {/* Config editor placeholder */}
-                    {formData.systeme !== 'numerique' && (
-                        <div className="mb-6 bg-input/50 border border-white/5 rounded-2xl p-6">
-                            <div className="flex items-center gap-3 text-grey-medium mb-4">
-                                <div className="p-2 rounded-full bg-white/5">
-                                    <Settings size={18} className="animate-pulse" />
+
+                    <div className="space-y-6">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <Input 
+                                label="Nom du barème" 
+                                placeholder="ex: Points (sur 20), Conversion CED..." 
+                                value={formData.nom}
+                                onChange={(e) => setFormData({...formData, nom: e.target.value})}
+                            />
+                            <div className="space-y-2">
+                                <label className="text-xs font-bold text-grey-medium uppercase tracking-wider">Type de système</label>
+                                <div className="flex bg-input rounded-xl p-1 gap-1 border border-white/5">
+                                    <button
+                                        onClick={() => setFormData({...formData, systeme: 'numerique'})}
+                                        className={`flex-1 py-2 px-4 rounded-lg text-sm font-bold transition-all ${formData.systeme === 'numerique' ? 'bg-primary text-white shadow-lg' : 'text-grey-medium hover:text-grey-dark'}`}
+                                    >
+                                        Numérique
+                                    </button>
+                                    <button
+                                        onClick={() => setFormData({...formData, systeme: 'conversion'})}
+                                        className={`flex-1 py-2 px-4 rounded-lg text-sm font-bold transition-all ${formData.systeme === 'conversion' ? 'bg-primary text-white shadow-lg' : 'text-grey-medium hover:text-grey-dark'}`}
+                                    >
+                                        Conversion
+                                    </button>
                                 </div>
-                                <p className="text-sm italic">
-                                    L'éditeur visuel de barèmes (A, B, C...) sera disponible dans une prochaine mise à jour. 
-                                    Pour l'instant, seuls les titres des systèmes sont enregistrés.
-                                </p>
-                            </div>
-                            <div className="h-24 border-2 border-dashed border-white/10 rounded-xl flex items-center justify-center">
-                                <span className="text-xs uppercase tracking-widest font-black text-white/20">Editeur en cours de développement</span>
                             </div>
                         </div>
-                    )}
 
-                    <div className="flex justify-end gap-3 pt-4 border-t border-white/5">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-4 bg-white/5 rounded-2xl border border-white/5">
+                            <Input 
+                                label="Note Maximale par Défaut" 
+                                type="number"
+                                placeholder="10, 20, 100..." 
+                                value={formData.config.max || ''}
+                                onChange={(e) => setFormData({
+                                    ...formData, 
+                                    config: { ...formData.config, max: parseFloat(e.target.value) }
+                                })}
+                            />
+                            <div className="text-xs text-grey-medium flex items-center italic">
+                                Cette valeur sera proposée automatiquement lors de la création d'une évaluation avec ce barème.
+                            </div>
+                        </div>
+
+                        {formData.systeme === 'conversion' && (
+                            <div className="space-y-4 animate-in fade-in slide-in-from-left-2 duration-300">
+                                <div className="flex justify-between items-center">
+                                    <h4 className="text-sm font-bold text-text-main uppercase tracking-widest">Grille de Conversion</h4>
+                                    <Button size="sm" variant="ghost" icon={Plus} onClick={addPalier} className="text-primary hover:bg-primary/10">
+                                        Ajouter un palier
+                                    </Button>
+                                </div>
+                                <div className="space-y-2">
+                                    {(formData.config.paliers || []).map((palier: any, idx: number) => (
+                                        <div key={idx} className="flex items-center gap-2 p-2 bg-input/50 rounded-xl border border-white/5 group animate-in zoom-in-95 duration-200">
+                                            <div className="w-1/4">
+                                                <input 
+                                                    placeholder="Lettre (ex: A, TB)" 
+                                                    className="w-full bg-transparent border-none outline-none text-sm font-bold text-text-main px-2"
+                                                    value={palier.letter}
+                                                    onChange={(e) => updatePalier(idx, 'letter', e.target.value)}
+                                                />
+                                            </div>
+                                            <div className="flex items-center gap-1 w-1/4">
+                                                <span className="text-grey-medium font-bold text-[10px]">[</span>
+                                                <input 
+                                                    type="number"
+                                                    placeholder="Min" 
+                                                    className="w-full bg-transparent border-none outline-none text-sm font-bold text-primary text-right"
+                                                    value={palier.minPercent}
+                                                    onChange={(e) => updatePalier(idx, 'minPercent', e.target.value)}
+                                                />
+                                                <span className="text-grey-medium text-[10px]">%</span>
+                                            </div>
+                                            <div className="flex items-center gap-1 w-1/4">
+                                                <span className="text-grey-medium text-[10px]">..</span>
+                                                <input 
+                                                    type="number"
+                                                    placeholder="Max" 
+                                                    className="w-full bg-transparent border-none outline-none text-sm font-bold text-primary text-right"
+                                                    value={palier.maxPercent}
+                                                    onChange={(e) => updatePalier(idx, 'maxPercent', e.target.value)}
+                                                />
+                                                <span className="text-grey-medium text-[10px]">%</span>
+                                                <span className="text-grey-medium font-bold text-[10px]">[</span>
+                                            </div>
+                                            <div className="flex-1 flex justify-end">
+                                                <button 
+                                                    onClick={() => removePalier(idx)} 
+                                                    className="p-1.5 text-danger/40 hover:text-danger hover:bg-danger/10 rounded-lg transition-all opacity-0 group-hover:opacity-100"
+                                                    title="Supprimer ce palier"
+                                                >
+                                                    <Trash2 size={14} />
+                                                </button>
+                                            </div>
+                                        </div>
+                                    ))}
+                                    {(formData.config.paliers || []).length === 0 && (
+                                        <div className="py-8 text-center border-2 border-dashed border-white/5 rounded-2xl text-grey-medium text-sm">
+                                            Aucun palier défini. Cliquez sur "Ajouter un palier" pour commencer.
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                    
+                    <div className="flex justify-end gap-3 pt-6 mt-6 border-t border-white/5">
                         <Button variant="ghost" onClick={resetForm}>Annuler</Button>
-                        <Button variant="primary" icon={Save} onClick={handleSave} disabled={!formData.nom}>
-                            Enregistrer le système
+                        <Button variant="primary" icon={Save} onClick={handleSave} disabled={!formData.nom || !formData.config.max}>
+                            Enregistrer le barème
                         </Button>
                     </div>
                 </Card>
@@ -126,17 +233,24 @@ const GradeSettings: React.FC = () => {
                 {noteTypes.map((type) => (
                     <Card key={type.id} className="p-4 flex justify-between items-center group hover:border-primary/40 transition-all duration-300 hover:shadow-lg hover:shadow-primary/5">
                         <div className="flex items-center gap-4">
-                            <div className="w-12 h-12 rounded-2xl bg-input flex items-center justify-center text-primary group-hover:scale-110 transition-transform duration-300 shadow-inner">
+                            <div className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-transform duration-300 shadow-inner
+                                ${type.systeme === 'conversion' ? 'bg-amber-500/10 text-amber-500' : 'bg-primary/10 text-primary'}
+                            `}>
                                 <Settings size={22} />
                             </div>
                             <div className="space-y-1">
                                 <h4 className="font-bold text-text-main leading-none">{type.nom}</h4>
                                 <div className="flex items-center gap-2">
-                                    <span className="text-[10px] px-2 py-0.5 rounded-md bg-white/5 text-grey-medium border border-white/5 uppercase font-black tracking-wider">
-                                        {type.systeme === 'numerique' ? 'Points' : type.systeme === 'lettre' ? 'Lettres' : 'Conversion'}
+                                    <span className="text-[10px] px-2 py-0.5 rounded-md bg-white/5 text-grey-medium border border-white/10 uppercase font-black tracking-wider">
+                                        {type.systeme === 'conversion' ? 'Conversion en Lettres' : 'Numérique'}
                                     </span>
-                                    {type.systeme === 'numerique' && (
-                                        <span className="text-[10px] text-primary font-bold">Standard</span>
+                                    <span className="text-[10px] px-2 py-0.5 rounded-md bg-white/5 text-primary border border-primary/20 uppercase font-black tracking-wider">
+                                        Sur {(type.config as any)?.max || '?'}
+                                    </span>
+                                    {type.systeme === 'conversion' && (
+                                        <span className="text-[10px] px-2 py-0.5 rounded-md bg-amber-500/10 text-amber-500 border border-amber-500/20 uppercase font-black tracking-wider">
+                                            {(type.config as any)?.paliers?.length || 0} paliers
+                                        </span>
                                     )}
                                 </div>
                             </div>
@@ -164,21 +278,18 @@ const GradeSettings: React.FC = () => {
             </div>
 
             {noteTypes.length === 0 && !isAdding && (
-                <Card className="p-16 flex flex-col items-center justify-center text-center bg-input/10 border-dashed border-2">
-                    <div className="w-20 h-20 rounded-full bg-input flex items-center justify-center text-grey-medium/30 mb-6 group-hover:bg-primary/5 transition-colors">
-                        <Settings size={40} />
-                    </div>
-                    <h3 className="text-lg font-bold text-text-main mb-2">Aucun système de notation personnalisé</h3>
-                    <p className="text-sm text-grey-medium max-w-sm">
-                        Créez vos propres barèmes pour évaluer vos élèves avec des lettres, des icônes ou des tableaux de conversion.
+                <Card className="p-16 flex flex-col items-center justify-center text-center bg-input/10 border-dashed border-2 text-grey-medium">
+                    <Settings size={40} className="mb-4 opacity-20" />
+                    <h3 className="text-lg font-bold text-text-main mb-2">Aucun système de notation</h3>
+                    <p className="text-sm max-w-sm mb-8">
+                        Configurez vos barèmes numériques ou de conversion pour vos évaluations.
                     </p>
                     <Button 
                         icon={Plus} 
                         onClick={() => setIsAdding(true)} 
                         variant="primary"
-                        className="mt-8"
                     >
-                        Créer mon premier barème
+                        Créer un barème
                     </Button>
                 </Card>
             )}

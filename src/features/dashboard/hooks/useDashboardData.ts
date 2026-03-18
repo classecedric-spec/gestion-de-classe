@@ -150,16 +150,83 @@ export const useDashboardData = (userId?: string, allStudents: Student[] = []) =
 
             const firstOfMonth = new Date();
             firstOfMonth.setDate(1);
+            const firstOfMonthISO = firstOfMonth.toISOString();
+            
+            const classId = allStudents[0]?.classe_id;
+            const studentIds = allStudents.map(s => s.id);
 
-            // 1. Attendance Today & Monthly Average
-            const { data: attendanceData } = await supabase
-                .from('Attendance')
-                .select('status, date, categorie_id, CategoriePresence(nom)')
-                .in('eleve_id', allStudents.map(s => s.id))
-                .gte('date', firstOfMonth.toISOString())
-                .lte('date', today);
+            // Execute all independent queries concurrently
+            const [
+                { data: attendanceData },
+                { data: recentActivity },
+                { data: monthlyData },
+                { data: progressionAll },
+                { data: branchData },
+                { data: absentData },
+                { count: plannedActivitiesCount },
+                rawLateActivities
+            ] = await Promise.all([
+                // 1. Attendance Today & Monthly Average
+                supabase
+                    .from('Attendance')
+                    .select('status, date, categorie_id, CategoriePresence(nom)')
+                    .in('eleve_id', studentIds)
+                    .gte('date', firstOfMonthISO)
+                    .lte('date', today),
+                
+                // 2. Recent Activity
+                supabase
+                    .from('Progression')
+                    .select('*, Eleve(prenom, nom, photo_url), Activite(titre)')
+                    .in('eleve_id', studentIds)
+                    .order('updated_at', { ascending: false })
+                    .limit(5),
+                
+                // 3. Monthly Actions & Progression Calc (monthly only)
+                supabase
+                    .from('Progression')
+                    .select('id, updated_at, etat')
+                    .in('eleve_id', studentIds)
+                    .gte('updated_at', firstOfMonthISO),
+                
+                // 3b. All progressions
+                supabase
+                    .from('Progression')
+                    .select('etat, updated_at, eleve_id')
+                    .in('eleve_id', studentIds),
+                
+                // 7. Branch Distribution
+                supabase
+                    .from('Progression')
+                    .select('etat, eleve_id, Activite(Module(SousBranche(Branche(nom))))')
+                    .in('eleve_id', studentIds)
+                    .not('etat', 'eq', 'non_commence'),
+                
+                // 9. Absentees
+                supabase
+                    .from('Attendance')
+                    .select('eleve_id, status')
+                    .eq('date', lastActiveDayISO)
+                    .eq('status', 'absent')
+                    .in('eleve_id', studentIds),
+                
+                // 12. Planning
+                supabase
+                    .from('weekly_planning')
+                    .select('*', { count: 'exact', head: true })
+                    .eq('week_start_date', (() => { 
+                        const monday = new Date(); 
+                        monday.setDate(monday.getDate() - (monday.getDay() || 7) + 1); 
+                        return monday.toISOString().split('T')[0]; 
+                    })())
+                    .neq('day_of_week', 'DOCK'),
+                
+                // 13. Overdue Students
+                classId ? moduleRepo.getDetailedLateActivities(classId) : Promise.resolve([])
+            ]);
 
             const todayAttendance = (attendanceData as any[])?.filter(a => a.date === today) || [];
+            
             const presentCount = todayAttendance.filter(a => {
                 if (a.status === 'present') return true;
                 if (a.CategoriePresence && a.CategoriePresence.nom !== 'Absent') return true;
@@ -177,36 +244,16 @@ export const useDashboardData = (userId?: string, allStudents: Student[] = []) =
                 averagePresence = Math.round(totalPresentsMonth / daysWithAttendance.length);
             }
 
-            // 2. Recent Activity
-            const { data: recentActivity } = await supabase
-                .from('Progression')
-                .select('*, Eleve(prenom, nom, photo_url), Activite(titre)')
-                .in('eleve_id', allStudents.map(s => s.id))
-                .order('updated_at', { ascending: false })
-                .limit(5);
-
-            // 3. Monthly Actions & Progression Calc
-            const { data: monthlyData } = await supabase
-                .from('Progression')
-                .select('id, updated_at, etat')
-                .in('eleve_id', allStudents.map(s => s.id))
-                .gte('updated_at', firstOfMonth.toISOString());
-
-            const { data: progressionAll } = await supabase
-                .from('Progression')
-                .select('etat, updated_at, eleve_id')
-                .in('eleve_id', allStudents.map(s => s.id));
-
-            const countTermine = progressionAll?.filter(p => p.etat === 'termine').length || 0;
-            const countAVerifier = progressionAll?.filter(p => p.etat === 'a_verifier').length || 0;
-            const countEnCours = progressionAll?.filter(p => p.etat === 'en_cours').length || 0;
+            const countTermine = (progressionAll as any[])?.filter(p => p.etat === 'termine').length || 0;
+            const countAVerifier = (progressionAll as any[])?.filter(p => p.etat === 'a_verifier').length || 0;
+            const countEnCours = (progressionAll as any[])?.filter(p => p.etat === 'en_cours').length || 0;
 
             const totalStarted = countTermine + countAVerifier + countEnCours;
             const completionRate = totalStarted > 0 ? Math.round(((countTermine + countAVerifier) / totalStarted) * 100) : 0;
             const doneCount = countTermine + countAVerifier;
 
-            const todayValidations = monthlyData?.filter(p => p.updated_at.startsWith(today) && p.etat === 'termine').length || 0;
-            const todayActions = monthlyData?.filter(p => p.updated_at.startsWith(today)).length || 0;
+            const todayValidations = (monthlyData as any[])?.filter(p => p.updated_at.startsWith(today) && p.etat === 'termine').length || 0;
+            const todayActions = (monthlyData as any[])?.filter(p => p.updated_at.startsWith(today)).length || 0;
             const todayValidationRate = todayActions > 0 ? Math.round((todayValidations / todayActions) * 100) : 0;
 
             // 4. Birthdays
@@ -227,7 +274,7 @@ export const useDashboardData = (userId?: string, allStudents: Student[] = []) =
 
             // 5. Immobile Students
             const immobileStudents = allStudents.filter(s => {
-                const studentActivity = progressionAll?.filter(p => p.eleve_id === s.id);
+                const studentActivity = (progressionAll as any[])?.filter(p => p.eleve_id === s.id);
                 if (!studentActivity || studentActivity.length === 0) return true;
                 const lastUpdate = new Date(Math.max(...studentActivity.map(p => new Date(p.updated_at).getTime())));
                 return lastUpdate < lastWeek;
@@ -235,15 +282,8 @@ export const useDashboardData = (userId?: string, allStudents: Student[] = []) =
 
             // 6. Distribution
             const states: Record<string, number> = { termine: 0, a_verifier: 0, en_cours: 0, besoin_d_aide: 0 };
-            progressionAll?.forEach(p => { if (states[p.etat as string] !== undefined) states[p.etat as string]++; });
+            (progressionAll as any[])?.forEach(p => { if (states[p.etat as string] !== undefined) states[p.etat as string]++; });
             const distribution = Object.entries(states).map(([name, value]) => ({ name, value }));
-
-            // 7. Branch Distribution
-            const { data: branchData } = await supabase
-                .from('Progression')
-                .select('etat, eleve_id, Activite(Module(SousBranche(Branche(nom))))')
-                .in('eleve_id', allStudents.map(s => s.id))
-                .not('etat', 'eq', 'non_commence');
 
             const branchCounts: Record<string, { total: number; done: number; byLevel: Record<string, number> }> = {};
             const studentLevelMap: Record<string, string> = {};
@@ -315,13 +355,6 @@ export const useDashboardData = (userId?: string, allStudents: Student[] = []) =
             }
 
             // 9. Absentees
-            const { data: absentData } = await supabase
-                .from('Attendance')
-                .select('eleve_id, status')
-                .eq('date', lastActiveDayISO)
-                .eq('status', 'absent')
-                .in('eleve_id', allStudents.map(s => s.id));
-
             const absentIds = (absentData as any[])?.map(a => a.eleve_id) || [];
             const absentees = allStudents.filter(s => absentIds.includes(s.id));
 
@@ -403,15 +436,7 @@ export const useDashboardData = (userId?: string, allStudents: Student[] = []) =
             Friday.setDate(monday.getDate() + 4);
             const weekLabel = `${monday.getDate().toString().padStart(2, '0')}/${(monday.getMonth() + 1).toString().padStart(2, '0')} au ${Friday.getDate().toString().padStart(2, '0')}/${(Friday.getMonth() + 1).toString().padStart(2, '0')}`;
 
-            const { count: plannedActivitiesCount } = await supabase
-                .from('weekly_planning')
-                .select('*', { count: 'exact', head: true })
-                .eq('week_start_date', mondayISO)
-                .neq('day_of_week', 'DOCK');
-
             // 13. Overdue Students
-            const classId = allStudents[0]?.classe_id;
-            const rawLateActivities = classId ? await moduleRepo.getDetailedLateActivities(classId) : [];
             const overdueByLevel: Record<string, any> = {};
 
             rawLateActivities.forEach(item => {

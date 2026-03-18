@@ -118,6 +118,7 @@ export const useGrades = (brancheId?: string, periode?: string) => {
         saveNoteType: saveNoteTypeMutation.mutateAsync,
         deleteNoteType: deleteNoteTypeMutation.mutateAsync,
         getGradeColor: gradeService.getGradeColor,
-        formatStatut: gradeService.formatStatut
+        formatStatut: gradeService.formatStatut,
+        convertNoteToLetter: gradeService.convertNoteToLetter.bind(gradeService)
     };
 };

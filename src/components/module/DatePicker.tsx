@@ -43,17 +43,23 @@ export const DatePicker: React.FC<DatePickerProps> = ({
                     />
                 </div>
                 <div className="flex gap-2">
-                    {fridayShortcuts.map((friday, index) => (
-                        <button
-                            key={index}
-                            type="button"
-                            onClick={() => handleDateShortcut(friday)}
-                            className="flex-1 px-2 py-1.5 text-xs font-medium text-gray-300 bg-white/5 hover:bg-white/10 border border-white/5 rounded-lg transition-colors truncate"
-                            title={formatDateForInput(friday)}
-                        >
-                            Ven. {formatDateLabel(friday)}
-                        </button>
-                    ))}
+                    {fridayShortcuts.map((friday, index) => {
+                        const isSelected = formatDateForInput(friday) === value;
+                        return (
+                            <button
+                                key={index}
+                                type="button"
+                                onClick={() => handleDateShortcut(friday)}
+                                className={`flex-1 px-2 py-1.5 text-xs font-medium transition-all truncate border-2 rounded-lg ${isSelected
+                                        ? 'border-amber-500/80 bg-amber-500/10 text-amber-200 shadow-[0_0_10px_rgba(245,158,11,0.2)]'
+                                        : 'text-gray-300 bg-white/5 hover:bg-white/10 border-transparent'
+                                    }`}
+                                title={formatDateForInput(friday)}
+                            >
+                                Ven. {formatDateLabel(friday)}
+                            </button>
+                        );
+                    })}
                 </div>
             </div>
         </div>

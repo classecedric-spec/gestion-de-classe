@@ -43,8 +43,13 @@ const GradeEntryGrid: React.FC<GradeEntryGridProps> = ({
         stats, 
         getGradeColor, 
         formatStatut,
-        setSelectedEvaluationId
+        setSelectedEvaluationId,
+        noteTypes,
+        convertNoteToLetter
     } = useGrades(evaluation?.branche_id || undefined, evaluation?.periode || undefined);
+
+    const activeNoteType = noteTypes.find(nt => nt.id === evaluation?.type_note_id);
+    const isConversion = activeNoteType?.systeme === 'conversion';
 
     // Set evaluation ID in hook context to fetch results
     React.useEffect(() => {
@@ -62,7 +67,13 @@ const GradeEntryGrid: React.FC<GradeEntryGridProps> = ({
         enabled: !!evaluation?.group_id
     });
 
-    const students = studentData?.full || [];
+    const students = [...(studentData?.full || [])].sort((a, b) => {
+        const prenomA = a.prenom || '';
+        const prenomB = b.prenom || '';
+        const prenomCmp = prenomA.localeCompare(prenomB);
+        if (prenomCmp !== 0) return prenomCmp;
+        return (a.nom || '').localeCompare(b.nom || '');
+    });
 
     const [focusedIndex, setFocusedIndex] = useState<number | null>(null);
     const [focusedCol, setFocusedCol] = useState<string | 'total' | null>(null);
@@ -135,6 +146,10 @@ const GradeEntryGrid: React.FC<GradeEntryGridProps> = ({
         }
     };
 
+    const [editingTotals, setEditingTotals] = useState<Record<string, boolean>>({});
+    const [editingComments, setEditingComments] = useState<Record<string, boolean>>({});
+    const [localTotals, setLocalTotals] = useState<Record<string, string>>({});
+
     if (loadingStudents) return <div className="p-12 text-center text-grey-medium">Chargement des élèves...</div>;
 
     return (
@@ -188,16 +203,25 @@ const GradeEntryGrid: React.FC<GradeEntryGridProps> = ({
                         {students.map((student: any, studentIndex: number) => {
                             const result = currentResults.find(r => r.eleve_id === student.id);
                             const gradeColor = result?.note !== null ? getGradeColor(result?.note || 0, evaluation?.note_max || 10) : '';
+                            
+                            // Check if all grades are filled
+                            const isRowComplete = hasQuestions 
+                                ? questions.every(q => questionResults.some(qr => qr.eleve_id === student.id && qr.question_id === q.id && qr.note !== null))
+                                : result?.note !== null && result?.note !== undefined;
 
                             return (
                                 <tr 
                                     key={student.id} 
-                                    className={`group transition-colors hover:bg-primary/5 ${focusedIndex === studentIndex ? 'bg-primary/5' : ''}`}
+                                    className={`group transition-colors ${isRowComplete ? 'bg-amber-500/20 hover:bg-amber-500/30' : 'hover:bg-primary/5'} ${focusedIndex === studentIndex && !isRowComplete ? 'bg-primary/5' : ''}`}
                                 >
                                     <td className="py-4 px-6">
                                         <div className="flex items-center gap-3">
-                                            <div className="w-8 h-8 rounded-full bg-grey-light/20 flex items-center justify-center text-grey-medium shrink-0">
-                                                <User size={16} />
+                                            <div className="w-8 h-8 rounded-full bg-grey-light/20 flex items-center justify-center text-grey-medium overflow-hidden shrink-0">
+                                                {student.photo_url ? (
+                                                    <img src={student.photo_url} alt="" className="w-full h-full object-cover" />
+                                                ) : (
+                                                    <User size={16} />
+                                                )}
                                             </div>
                                             <div className="truncate">
                                                 <p className="font-bold text-grey-dark truncate">{student.prenom} {student.nom}</p>
@@ -209,53 +233,87 @@ const GradeEntryGrid: React.FC<GradeEntryGridProps> = ({
                                     {questions.map(q => {
                                         const qResult = questionResults.find(qr => qr.eleve_id === student.id && qr.question_id === q.id);
                                         const refId = `${studentIndex}-${q.id}`;
+                                        const letter = isConversion ? convertNoteToLetter(qResult?.note || null, q.note_max, activeNoteType) : null;
                                         
                                         return (
                                             <td key={q.id} className="py-4 px-1">
-                                                <input
-                                                    ref={el => { inputRefs.current[refId] = el; }}
-                                                    type="text"
-                                                    placeholder="--"
-                                                    defaultValue={qResult?.note ?? ''}
-                                                    onKeyDown={(e) => {
-                                                        handleKeyDown(e, studentIndex, q.id);
-                                                        handleShortcut(e, student.id);
-                                                    }}
-                                                    onBlur={(e) => handleQuestionBlur(student.id, q.id, e.target.value)}
-                                                    onFocus={() => {
-                                                        setFocusedIndex(studentIndex);
-                                                        setFocusedCol(q.id);
-                                                    }}
-                                                    className={`w-14 h-10 text-center text-sm font-bold rounded-lg border-2 transition-all outline-none
-                                                        ${focusedCol === q.id && focusedIndex === studentIndex ? 'border-primary bg-input' : 'border-border/5 bg-input'}
-                                                    `}
-                                                />
+                                                <div className="flex flex-col items-center gap-1">
+                                                    <input
+                                                        ref={el => { inputRefs.current[refId] = el; }}
+                                                        type="text"
+                                                        placeholder="--"
+                                                        defaultValue={qResult?.note ?? ''}
+                                                        onKeyDown={(e) => {
+                                                            handleKeyDown(e, studentIndex, q.id);
+                                                            handleShortcut(e, student.id);
+                                                        }}
+                                                        onBlur={(e) => handleQuestionBlur(student.id, q.id, e.target.value)}
+                                                        onFocus={() => {
+                                                            setFocusedIndex(studentIndex);
+                                                            setFocusedCol(q.id);
+                                                        }}
+                                                        className={`w-14 h-10 text-center text-sm font-bold rounded-lg border-2 transition-all outline-none
+                                                            ${focusedCol === q.id && focusedIndex === studentIndex ? 'border-primary bg-input' : 'border-border/5 bg-input'}
+                                                        `}
+                                                    />
+                                                    {letter && (
+                                                        <span className="text-[10px] font-black text-amber-500 animate-in fade-in zoom-in-95 duration-300">
+                                                            {letter}
+                                                        </span>
+                                                    )}
+                                                </div>
                                             </td>
                                         );
                                     })}
 
                                     {/* Total Input */}
-                                    <td className={`py-4 px-2 bg-primary/5 transition-colors ${focusedCol === 'total' && focusedIndex === studentIndex ? 'bg-primary/10' : ''}`}>
-                                        <input
-                                            ref={el => { inputRefs.current[`${studentIndex}-total`] = el; }}
-                                            type="text"
-                                            placeholder="--"
-                                            value={result?.note ?? ''}
-                                            readOnly={hasQuestions}
-                                            onKeyDown={(e) => {
-                                                handleKeyDown(e, studentIndex, 'total');
-                                                handleShortcut(e, student.id);
-                                            }}
-                                            onBlur={(e) => handleTotalBlur(student.id, e.target.value)}
-                                            onFocus={() => {
-                                                setFocusedIndex(studentIndex);
-                                                setFocusedCol('total');
-                                            }}
-                                            className={`w-16 h-12 text-center text-xl font-black rounded-xl border-2 transition-all outline-none
-                                                ${gradeColor ? `border-${gradeColor} text-${gradeColor} bg-${gradeColor}/5` : 'border-border/10 bg-input focus:border-primary'}
-                                                ${hasQuestions ? 'cursor-default opacity-80' : ''}
-                                            `}
-                                        />
+                                    <td className={`py-4 px-2 ${isRowComplete ? 'bg-amber-500/5' : 'bg-primary/5'} transition-colors ${focusedCol === 'total' && focusedIndex === studentIndex ? 'bg-primary/10' : ''}`}>
+                                        <div className="flex flex-col items-center gap-1">
+                                            <input
+                                                ref={el => { inputRefs.current[`${studentIndex}-total`] = el; }}
+                                                type="text"
+                                                placeholder="--"
+                                                value={localTotals[student.id] !== undefined ? localTotals[student.id] : (result?.note?.toString() ?? '')}
+                                                onChange={(e) => {
+                                                    if (!hasQuestions || editingTotals[student.id]) {
+                                                        setLocalTotals(prev => ({ ...prev, [student.id]: e.target.value }));
+                                                    }
+                                                }}
+                                                readOnly={hasQuestions && !editingTotals[student.id]}
+                                                tabIndex={hasQuestions && !editingTotals[student.id] ? -1 : 0}
+                                                onKeyDown={(e) => {
+                                                    handleKeyDown(e, studentIndex, 'total');
+                                                    handleShortcut(e, student.id);
+                                                }}
+                                                onDoubleClick={() => {
+                                                    if (hasQuestions) setEditingTotals(prev => ({ ...prev, [student.id]: true }));
+                                                }}
+                                                onBlur={(e) => {
+                                                    handleTotalBlur(student.id, e.target.value);
+                                                    if (hasQuestions) {
+                                                        setEditingTotals(prev => ({ ...prev, [student.id]: false }));
+                                                        setLocalTotals(prev => {
+                                                            const n = { ...prev };
+                                                            delete n[student.id];
+                                                            return n;
+                                                        });
+                                                    }
+                                                }}
+                                                onFocus={() => {
+                                                    setFocusedIndex(studentIndex);
+                                                    setFocusedCol('total');
+                                                }}
+                                                className={`w-16 h-12 text-center text-xl font-black rounded-xl border-2 transition-all outline-none
+                                                    ${gradeColor ? `border-${gradeColor} text-${gradeColor} bg-${gradeColor}/5` : 'border-border/10 bg-input focus:border-primary'}
+                                                    ${hasQuestions && !editingTotals[student.id] ? 'cursor-default opacity-80' : 'cursor-text'}
+                                                `}
+                                            />
+                                            {isConversion && (localTotals[student.id] || result?.note !== null) && (
+                                                <span className="text-sm font-black text-amber-500 animate-in fade-in slide-in-from-top-1 duration-300">
+                                                    {convertNoteToLetter(parseFloat(localTotals[student.id] || result?.note?.toString() || '0'), evaluation?.note_max || 20, activeNoteType)}
+                                                </span>
+                                            )}
+                                        </div>
                                     </td>
 
                                     <td className="py-4 px-2 text-center">
@@ -275,7 +333,11 @@ const GradeEntryGrid: React.FC<GradeEntryGridProps> = ({
                                                 type="text"
                                                 placeholder="Ajouter un commentaire..."
                                                 defaultValue={result?.commentaire || ''}
+                                                readOnly={!editingComments[student.id]}
+                                                tabIndex={!editingComments[student.id] ? -1 : 0}
+                                                onDoubleClick={() => setEditingComments(prev => ({ ...prev, [student.id]: true }))}
                                                 onBlur={(e) => {
+                                                    setEditingComments(prev => ({ ...prev, [student.id]: false }));
                                                     if (userId) {
                                                         saveResult({ 
                                                             evaluation_id: evaluationId,
@@ -285,9 +347,9 @@ const GradeEntryGrid: React.FC<GradeEntryGridProps> = ({
                                                         });
                                                     }
                                                 }}
-                                                className="w-full bg-transparent border-b border-transparent focus:border-primary/30 py-1 text-sm text-grey-medium italic focus:not-italic focus:text-grey-dark outline-none transition-all"
+                                                className={`w-full bg-transparent border-b border-transparent focus:border-primary/30 py-1 text-sm text-grey-medium italic focus:not-italic focus:text-grey-dark outline-none transition-all ${!editingComments[student.id] ? 'cursor-default' : 'cursor-text'}`}
                                             />
-                                            <MessageSquare className="absolute right-0 top-1/2 -translate-y-1/2 text-grey-light opacity-0 group-hover/comment:opacity-50" size={12} />
+                                            <MessageSquare className={`absolute right-0 top-1/2 -translate-y-1/2 text-grey-light opacity-0 ${!editingComments[student.id] ? 'group-hover/comment:opacity-50' : ''}`} size={12} />
                                         </div>
                                     </td>
                                 </tr>

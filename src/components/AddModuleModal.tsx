@@ -41,7 +41,7 @@ const AddModuleModal: React.FC<AddModuleModalProps> = ({
     moduleToEdit
 }) => {
     // Hooks
-    const { formData, updateField, isValid } = useModuleForm(moduleToEdit);
+    const { formData, updateField, isValid, resetForm } = useModuleForm(moduleToEdit);
     const {
         branches,
         subBranches,
@@ -53,7 +53,8 @@ const AddModuleModal: React.FC<AddModuleModalProps> = ({
     const { submit, loading, error } = useModuleSubmit(
         moduleToEdit,
         (module) => {
-            onAdded(module);
+            onAdded(module as any);
+            resetForm();
             onClose();
         },
         branches,
@@ -63,6 +64,12 @@ const AddModuleModal: React.FC<AddModuleModalProps> = ({
     // Modal states
     const [showAddBranchModal, setShowAddBranchModal] = useState(false);
     const [showAddSubBranchModal, setShowAddSubBranchModal] = useState(false);
+
+    // Explicit close handler to reset form
+    const handleClose = () => {
+        resetForm();
+        onClose();
+    };
 
     // Load sub-branches when editing
     useEffect(() => {
@@ -128,13 +135,13 @@ const AddModuleModal: React.FC<AddModuleModalProps> = ({
         <>
             <Modal
                 isOpen={isOpen}
-                onClose={onClose}
+                onClose={handleClose}
                 title={moduleToEdit ? 'Modifier le Module' : 'Ajouter un Module'}
                 icon={<Box size={24} />}
                 className="max-w-md"
                 footer={
                     <>
-                        <Button onClick={onClose} variant="secondary" className="flex-1">
+                        <Button onClick={handleClose} variant="secondary" className="flex-1">
                             Annuler
                         </Button>
                         <Button

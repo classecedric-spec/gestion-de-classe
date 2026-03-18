@@ -79,6 +79,17 @@ const AddEvaluationModal: React.FC<AddEvaluationModalProps> = ({
         onClose();
     };
 
+    const handleTypeNoteChange = (id: string) => {
+        setTypeNoteId(id);
+        if (id) {
+            const selectedType = noteTypes.find(nt => nt.id === id);
+            const config = selectedType?.config as any;
+            if (config?.max) {
+                setNoteMax(config.max);
+            }
+        }
+    };
+
     return (
         <Modal
             isOpen={isOpen}
@@ -125,12 +136,12 @@ const AddEvaluationModal: React.FC<AddEvaluationModalProps> = ({
                     </div>
                     <div className="md:col-span-2">
                         <Select 
-                            label="Système de notation (Optionnel)"
+                            label="Barème de notation (Optionnel)"
                             value={typeNoteId}
-                            onChange={(e) => setTypeNoteId(e.target.value)}
+                            onChange={(e) => handleTypeNoteChange(e.target.value)}
                             icon={Settings2}
                             options={[
-                                { value: '', label: 'Points (Numérique)' },
+                                { value: '', label: 'Points personnalisés' },
                                 ...noteTypes.map(nt => ({ value: nt.id, label: nt.nom }))
                             ]}
                         />
