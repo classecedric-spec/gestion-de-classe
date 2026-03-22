@@ -9,6 +9,7 @@ import { getCurrentUser, supabase } from '../lib/database';
 import { SupabaseGroupRepository } from '../features/groups/repositories/SupabaseGroupRepository';
 import { SupabaseAttendanceRepository } from '../features/attendance/repositories/SupabaseAttendanceRepository';
 import { toast } from 'react-hot-toast';
+import { useUserPreferences } from '../hooks/useUserPreferences';
 
 const groupRepository = new SupabaseGroupRepository();
 const attendanceRepository = new SupabaseAttendanceRepository();
@@ -23,18 +24,24 @@ const Communications: React.FC = () => {
     const [activeTab, setActiveTab] = useState('general');
 
     // General Message state
-    const [subject, setSubject] = useState('');
-    const [message, setMessage] = useState('');
+    const [subject, setSubject] = useUserPreferences('comm_general_subject', '');
+    const [message, setMessage] = useUserPreferences('comm_general_message', '');
 
     // Late Work state
-    const [beforeMessage, setBeforeMessage] = useState('Bonjour,\n\nVoici la liste des travaux non terminés de votre enfant à ce jour :');
-    const [afterMessage, setAfterMessage] = useState('Merci de veiller à ce que ces travaux soient complétés dès que possible.\n\nCordialement,');
+    const [beforeMessage, setBeforeMessage] = useUserPreferences('comm_retard_before', 'Bonjour,\n\nVoici la liste des travaux non terminés de votre enfant à ce jour :');
+    const [afterMessage, setAfterMessage] = useUserPreferences('comm_retard_after', 'Merci de veiller à ce que ces travaux soient complétés dès que possible.\n\nCordialement,');
     const [selectedLateDate, setSelectedLateDate] = useState<string>('');
     const [availableDates, setAvailableDates] = useState<string[]>([]);
     const [lateWorksMap, setLateWorksMap] = useState<Record<string, any[]>>({});
 
     const [loading, setLoading] = useState(true);
     const [sending, setSending] = useState(false);
+    const [userEmail, setUserEmail] = useState<string>('');
+    
+    // Dispatch Queue state
+    const [dispatchQueue, setDispatchQueue] = useState<any[]>([]);
+    const [dispatchIndex, setDispatchIndex] = useState<number>(0);
+    const [isDispatching, setIsDispatching] = useState(false);
 
     useEffect(() => {
         loadInitialData();
@@ -53,10 +60,28 @@ const Communications: React.FC = () => {
         }
     }, [selectedGroupId, selectedLateDate, activeTab]);
 
+    // Auto-select/deselect based on late work when in 'retard' tab
+    useEffect(() => {
+        if (activeTab === 'retard' && Object.keys(lateWorksMap).length > 0) {
+            setSelectedStudentIds(prev => {
+                const newSelected = new Set<string>();
+                prev.forEach(id => {
+                    // Only keep selected if they have late work
+                    if (lateWorksMap[id] && lateWorksMap[id].length > 0) {
+                        newSelected.add(id);
+                    }
+                });
+                return newSelected;
+            });
+        }
+    }, [activeTab, lateWorksMap]);
+
     const loadInitialData = async () => {
         try {
             const user = await getCurrentUser();
             if (!user) return;
+            
+            if (user.email) setUserEmail(user.email);
 
             // Load groups
             const userGroups = await groupRepository.getUserGroups(user.id);
@@ -161,7 +186,17 @@ const Communications: React.FC = () => {
 
     const handleSelectAll = () => {
         const withEmail = students.filter(s => s.parent1_email?.trim() || s.parent2_email?.trim());
-        setSelectedStudentIds(new Set(withEmail.map(s => s.id)));
+        
+        if (activeTab === 'retard') {
+            // Only select those with email AND late work
+            setSelectedStudentIds(new Set(
+                withEmail
+                    .filter(s => (lateWorksMap[s.id] || []).length > 0)
+                    .map(s => s.id)
+            ));
+        } else {
+            setSelectedStudentIds(new Set(withEmail.map(s => s.id)));
+        }
     };
 
     const handleDeselectAll = () => {
@@ -193,7 +228,7 @@ const Communications: React.FC = () => {
                 return;
             }
 
-            const bccList = Array.from(recipients).join(',');
+            const bccList = [userEmail, ...Array.from(recipients)].filter(email => !!email?.trim()).join(',');
             const mailtoLink = `mailto:?bcc=${bccList}&subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(message)}`;
             window.location.href = mailtoLink;
             toast.success('Ouverture de votre client mail local...');
@@ -268,7 +303,8 @@ const Communications: React.FC = () => {
             return;
         }
 
-        const mailtoLink = `mailto:${data.to}?subject=${encodeURIComponent(data.subject)}&body=${encodeURIComponent(data.body)}`;
+        const bccPart = userEmail ? `&bcc=${encodeURIComponent(userEmail)}` : '';
+        const mailtoLink = `mailto:${data.to}?subject=${encodeURIComponent(data.subject)}&body=${encodeURIComponent(data.body)}${bccPart}`;
         window.open(mailtoLink, '_blank');
         toast.success(`Email préparé pour ${data.studentName}`);
     };
@@ -281,21 +317,56 @@ const Communications: React.FC = () => {
             return;
         }
 
-        let sentCount = 0;
+        const queue: any[] = [];
         for (const studentId of selectedWithLate) {
             const data = getIndividualMailtoData(studentId);
             if (data) {
-                const mailtoLink = `mailto:${data.to}?subject=${encodeURIComponent(data.subject)}&body=${encodeURIComponent(data.body)}`;
-                window.open(mailtoLink, '_blank');
-                sentCount++;
-                // Small delay to help browser handle multiple popups
-                await new Promise(resolve => setTimeout(resolve, 500));
+                queue.push(data);
             }
         }
 
-        if (sentCount > 0) {
-            toast.success(`${sentCount} emails ont été ouverts`);
+        if (queue.length > 0) {
+            setDispatchQueue(queue);
+            setDispatchIndex(0);
+            setIsDispatching(true);
         }
+    };
+
+    const handleNextDispatch = () => {
+        if (dispatchIndex >= dispatchQueue.length) return;
+
+        const data = dispatchQueue[dispatchIndex];
+        const bccPart = userEmail ? `&bcc=${encodeURIComponent(userEmail)}` : '';
+        const mailtoLink = `mailto:${data.to}?subject=${encodeURIComponent(data.subject)}&body=${encodeURIComponent(data.body)}${bccPart}`;
+        window.open(mailtoLink, '_blank');
+
+        if (dispatchIndex === dispatchQueue.length - 1) {
+            // Last parent email sent, now send teacher summary
+            sendTeacherSummary();
+            setIsDispatching(false);
+            toast.success('Tous les emails ont été préparés !');
+        } else {
+            setDispatchIndex(prev => prev + 1);
+        }
+    };
+
+    const sendTeacherSummary = () => {
+        if (!userEmail) return;
+
+        const summaryLines: string[] = [];
+        dispatchQueue.forEach(item => {
+            const studentId = students.find(s => s.prenom === item.studentName)?.id;
+            if (studentId) {
+                const works = lateWorksMap[studentId] || [];
+                const moduleNames = Array.from(new Set(works.map(w => w.Activite.Module.nom.replace(/\[FP\]/g, '').trim()))).join(', ');
+                summaryLines.push(`${item.studentName} : ${moduleNames}`);
+            }
+        });
+
+        const summaryBody = `Récapitulatif des communications envoyées :\n\n${summaryLines.join('\n')}`;
+        const summarySubject = `Récapitulatif - Suivi Retards (${format(new Date(), 'dd/MM/yyyy')})`;
+        const summaryMailto = `mailto:${userEmail}?subject=${encodeURIComponent(summarySubject)}&body=${encodeURIComponent(summaryBody)}`;
+        window.open(summaryMailto, '_blank');
     };
 
     const tabs: Tab[] = [
@@ -474,6 +545,51 @@ const Communications: React.FC = () => {
                     </Card>
                 </div>
             </div>
+
+            {/* Dispatch Modal */}
+            {isDispatching && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-300">
+                    <Card variant="glass" className="w-full max-w-md p-8 border-primary/30 shadow-2xl shadow-primary/20 space-y-6 text-center">
+                        <div className="space-y-2">
+                            <div className="inline-flex items-center justify-center p-3 bg-primary/20 rounded-full text-primary mb-2">
+                                <Send size={24} />
+                            </div>
+                            <h2 className="text-2xl font-black text-white">Envoi en cours</h2>
+                            <p className="text-grey-light">Élève {dispatchIndex + 1} sur {dispatchQueue.length}</p>
+                        </div>
+
+                        <div className="py-6 px-4 bg-white/5 rounded-2xl border border-white/10">
+                            <p className="text-sm text-grey-medium uppercase font-bold tracking-widest mb-1">Destinataire</p>
+                            <p className="text-xl font-black text-primary">{dispatchQueue[dispatchIndex]?.studentName}</p>
+                        </div>
+
+                        <div className="flex flex-col gap-3">
+                            <Button 
+                                onClick={handleNextDispatch}
+                                size="lg"
+                                className="w-full bg-primary hover:bg-primary-light text-white font-black py-4 h-auto text-lg shadow-lg shadow-primary/30"
+                            >
+                                {dispatchIndex === dispatchQueue.length - 1 ? "Ouvrir l'email et voir mon récap" : "Ouvrir l'email et suivant"}
+                            </Button>
+                            <button 
+                                onClick={() => setIsDispatching(false)}
+                                className="text-sm font-bold text-grey-dark hover:text-white transition-colors py-2"
+                            >
+                                Annuler l'envoi
+                            </button>
+                        </div>
+
+                        <div className="pt-4 border-t border-white/5">
+                            <div className="w-full bg-white/5 h-1.5 rounded-full overflow-hidden">
+                                <div 
+                                    className="bg-primary h-full transition-all duration-500" 
+                                    style={{ width: `${((dispatchIndex + 1) / dispatchQueue.length) * 100}%` }}
+                                />
+                            </div>
+                        </div>
+                    </Card>
+                </div>
+            )}
         </div>
     );
 };

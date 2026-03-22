@@ -1,11 +1,11 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { ArrowLeft, Table, ChevronRight, X, Layers, Filter, ArrowUp, ArrowDown, Search } from 'lucide-react';
+import { ArrowLeft, Table, ChevronRight, X, Layers, Filter, ArrowUp, ArrowDown, Search, Users } from 'lucide-react';
 import { CardInfo, Modal, Badge } from '../../../core';
 import { ModuleWithRelations } from '../utils/moduleHelpers';
 import clsx from 'clsx';
 import { useUserPreferences } from '../../../hooks/useUserPreferences';
 
-type ColumnId = 'statut' | 'nom' | 'branche' | 'sous_branche' | 'date_fin' | 'ateliers';
+type ColumnId = 'statut' | 'nom' | 'branche' | 'sous_branche' | 'date_fin' | 'ateliers' | 'studentCount';
 type ColumnConfig = { id: ColumnId; width: number };
 
 const DEFAULT_COLUMNS: ColumnConfig[] = [
@@ -14,6 +14,7 @@ const DEFAULT_COLUMNS: ColumnConfig[] = [
     { id: 'branche', width: 180 },
     { id: 'sous_branche', width: 180 },
     { id: 'date_fin', width: 180 },
+    { id: 'studentCount', width: 150 },
     { id: 'ateliers', width: 300 }
 ];
 
@@ -381,6 +382,59 @@ export const ModulesTableExcel: React.FC<ModulesTableExcelProps> = ({ modules, o
                 </>
             );
             case 'ateliers': return "Ateliers inclus";
+            case 'studentCount': return (
+                <>
+                                    <div 
+                                        className="flex items-center gap-2 cursor-pointer hover:text-white transition-colors select-none"
+                                        onClick={() => setIsStudentCountMenuOpen(!isStudentCountMenuOpen)}
+                                    >
+                                        Enfants liés
+                                        <Filter size={14} className={clsx(studentCountFilter.length > 0 || isStudentCountMenuOpen ? "text-primary" : "text-grey-medium")} />
+                                    </div>
+                                    
+                                    {isStudentCountMenuOpen && (
+                                        <div 
+                                            ref={studentCountMenuRef}
+                                            className="absolute top-full left-0 mt-2 w-48 bg-surface border border-white/10 rounded-xl shadow-xl z-50 py-2 animate-in fade-in slide-in-from-top-2 duration-200 normal-case tracking-normal font-normal text-sm"
+                                        >
+                                            <div 
+                                                className="px-3 py-1.5 hover:bg-white/5 cursor-pointer flex items-center gap-3 transition-colors text-text-main" 
+                                                onClick={() => setStudentCountFilter([])}
+                                            >
+                                                Tous les nombres
+                                                {studentCountFilter.length === 0 && <ChevronRight size={14} className="ml-auto text-primary" />}
+                                            </div>
+                                            <div className="h-px bg-white/10 my-1 mx-3" />
+                                            {availableStudentCounts.map(count => (
+                                                <div 
+                                                    key={count}
+                                                    className="px-3 py-1.5 hover:bg-white/5 cursor-pointer flex items-center gap-3 transition-colors"
+                                                    onClick={() => {
+                                                        setStudentCountFilter(prev => 
+                                                            prev.includes(count) 
+                                                                ? prev.filter(c => c !== count) 
+                                                                : [...prev, count]
+                                                        );
+                                                    }}
+                                                >
+                                                    <input 
+                                                        type="checkbox" 
+                                                        checked={studentCountFilter.includes(count)} 
+                                                        readOnly 
+                                                        className="w-4 h-4 rounded border-white/20 bg-background accent-primary cursor-pointer" 
+                                                    />
+                                                    <span className={clsx(
+                                                        "transition-colors",
+                                                        studentCountFilter.includes(count) ? "text-primary font-semibold" : "text-text-main"
+                                                    )}>
+                                                        {count} enfant{count > 1 ? 's' : ''}
+                                                    </span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                </>
+            );
             default: return null;
         }
     };
@@ -498,6 +552,12 @@ export const ModulesTableExcel: React.FC<ModulesTableExcelProps> = ({ modules, o
                                                 </div>
                 </>
             );
+            case 'studentCount': return (
+                <div className="font-semibold text-text-main flex items-center gap-2">
+                    {module.studentCount || 0}
+                    <Users size={14} className="text-grey-medium shrink-0" />
+                </div>
+            );
             default: return null;
         }
     };
@@ -557,6 +617,10 @@ export const ModulesTableExcel: React.FC<ModulesTableExcelProps> = ({ modules, o
     const [isSubBranchMenuOpen, setIsSubBranchMenuOpen] = useState(false);
     const [subBranchFilter, setSubBranchFilter] = useState<string>('all');
 
+    // Student Count Filter
+    const [isStudentCountMenuOpen, setIsStudentCountMenuOpen] = useState(false);
+    const [studentCountFilter, setStudentCountFilter] = useState<number[]>([]);
+
     // Date Filter & Sort
     const [isDateMenuOpen, setIsDateMenuOpen] = useState(false);
     const [dateSort, setDateSort] = useState<'asc' | 'desc' | null>(null);
@@ -568,6 +632,7 @@ export const ModulesTableExcel: React.FC<ModulesTableExcelProps> = ({ modules, o
     const subBranchMenuRef = useRef<HTMLDivElement>(null);
     const dateMenuRef = useRef<HTMLDivElement>(null);
     const nameSearchMenuRef = useRef<HTMLDivElement>(null);
+    const studentCountMenuRef = useRef<HTMLDivElement>(null);
 
     // Close menu when clicking outside
     useEffect(() => {
@@ -578,6 +643,7 @@ export const ModulesTableExcel: React.FC<ModulesTableExcelProps> = ({ modules, o
             if (subBranchMenuRef.current && !subBranchMenuRef.current.contains(target)) setIsSubBranchMenuOpen(false);
             if (dateMenuRef.current && !dateMenuRef.current.contains(target)) setIsDateMenuOpen(false);
             if (nameSearchMenuRef.current && !nameSearchMenuRef.current.contains(target)) setIsNameSearchOpen(false);
+            if (studentCountMenuRef.current && !studentCountMenuRef.current.contains(target)) setIsStudentCountMenuOpen(false);
             
             // Handle inline date edit blur
             if (editingDateId && dateInputRef.current && !dateInputRef.current.contains(target)) {
@@ -647,6 +713,11 @@ export const ModulesTableExcel: React.FC<ModulesTableExcelProps> = ({ modules, o
     };
 
     // Derived lists for filters based on current modules
+    // Extract unique student counts
+    const availableStudentCounts = Array.from(new Set(
+        modules.map(m => m.studentCount || 0)
+    )).sort((a, b) => a - b);
+
     // Extract unique branches
     const availableBranches = Array.from(new Map(
         modules
@@ -671,23 +742,21 @@ export const ModulesTableExcel: React.FC<ModulesTableExcelProps> = ({ modules, o
         const matchesBranch = branchFilter === 'all' || module.SousBranche?.branche_id === branchFilter;
         const matchesSubBranch = subBranchFilter === 'all' || module.sous_branche_id === subBranchFilter;
 
-        let matchesDate = true;
-        if (dateFilterType && dateFilterValue) {
-            if (!module.date_fin) {
-                matchesDate = false;
-            } else {
-                const moduleDate = new Date(module.date_fin);
-                moduleDate.setHours(0, 0, 0, 0); // Normalize to midnight
-                const filterDate = new Date(dateFilterValue);
-                filterDate.setHours(0, 0, 0, 0);
+        const matchesDate = !dateFilterType || !dateFilterValue || (() => {
+            if (!module.date_fin) return false;
+            const moduleDate = new Date(module.date_fin);
+            moduleDate.setHours(0, 0, 0, 0);
+            const filterDate = new Date(dateFilterValue);
+            filterDate.setHours(0, 0, 0, 0);
+            if (dateFilterType === 'before') return moduleDate < filterDate;
+            if (dateFilterType === 'equal') return moduleDate.getTime() === filterDate.getTime();
+            if (dateFilterType === 'after') return moduleDate > filterDate;
+            return true;
+        })();
 
-                if (dateFilterType === 'before') matchesDate = moduleDate < filterDate;
-                if (dateFilterType === 'equal') matchesDate = moduleDate.getTime() === filterDate.getTime();
-                if (dateFilterType === 'after') matchesDate = moduleDate > filterDate;
-            }
-        }
+        const matchesStudentCount = studentCountFilter.length === 0 || studentCountFilter.includes(module.studentCount || 0);
 
-        return matchesNameSearch && matchesStatus && matchesBranch && matchesSubBranch && matchesDate;
+        return matchesNameSearch && matchesStatus && matchesBranch && matchesSubBranch && matchesDate && matchesStudentCount;
     }).sort((a, b) => {
         if (!dateSort) return 0;
         

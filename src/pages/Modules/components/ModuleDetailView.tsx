@@ -6,6 +6,7 @@ import { CardInfo, Badge, CardTabs, EmptyState } from '../../../core';
 import ActivitiesTab from './ActivitiesTab';
 import GroupsTab from './GroupsTab';
 import ProgressionKanban from './ProgressionKanban';
+import { useLinkedGroups } from '../hooks/useLinkedGroups';
 
 interface ModuleDetailViewProps {
     moduleHook: any;
@@ -40,6 +41,7 @@ export const ModuleDetailView: React.FC<ModuleDetailViewProps> = ({
     contentRef,
     headerHeight
 }) => {
+    const { linkedGroups, linkedClasses } = useLinkedGroups(moduleHook.states.selectedModule);
 
     if (!moduleHook.states.selectedModule) {
         return (
@@ -95,6 +97,34 @@ export const ModuleDetailView: React.FC<ModuleDetailViewProps> = ({
                                 </>
                             )}
                         </p>
+                        
+                        {/* Linked Groups & Classes */}
+                        {(linkedClasses.length > 0 || linkedGroups.length > 0) && (
+                            <div className="flex flex-wrap gap-2 mt-3 animate-in fade-in slide-in-from-left-2 duration-500">
+                                {linkedClasses.map(classe => (
+                                    <Badge 
+                                        key={classe.id} 
+                                        variant="primary" 
+                                        size="xs" 
+                                        className="bg-primary/20 text-text-main border-primary/30 flex items-center gap-1.5 px-3 py-1"
+                                    >
+                                        <div className="w-1 h-1 rounded-full bg-primary" />
+                                        Classe : {classe.nom}
+                                    </Badge>
+                                ))}
+                                {linkedGroups.map(group => (
+                                    <Badge 
+                                        key={group.id} 
+                                        variant="primary" 
+                                        size="xs" 
+                                        className="bg-primary/10 text-text-main/80 border-primary/20 flex items-center gap-1.5 px-3 py-1"
+                                    >
+                                        <div className="w-1 h-1 rounded-full bg-primary/60" />
+                                        Groupe : {group.nom}
+                                    </Badge>
+                                ))}
+                            </div>
+                        )}
                     </div>
                 </div>
             </CardInfo>

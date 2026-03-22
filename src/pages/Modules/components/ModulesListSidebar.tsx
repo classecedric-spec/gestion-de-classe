@@ -1,5 +1,5 @@
 import React from 'react';
-import { Folder, Search, SlidersHorizontal, Clock, Plus, Loader2, Table } from 'lucide-react';
+import { Folder, SlidersHorizontal, Clock, Plus, Table, Users } from 'lucide-react';
 import { CardInfo, SearchBar, FilterSelect, CardList, ListItem, EmptyState, Badge, Avatar } from '../../../core';
 import clsx from 'clsx';
 
@@ -164,39 +164,54 @@ export const ModulesListSidebar: React.FC<ModulesListSidebarProps> = ({
                                         )
                                     }}
                                     badges={[
-                                        <Badge
-                                            key="status"
-                                            variant={
-                                                module.statut === 'en_cours' ? 'success' :
-                                                    module.statut === 'archive' ? 'danger' :
-                                                        'warning'
-                                            }
-                                            size="xs"
-                                        >
-                                            {module.statut === 'en_cours' ? 'En cours' :
-                                                module.statut === 'archive' ? 'Archi' :
-                                                    'Prep'}
-                                        </Badge>,
-                                        module.date_fin && (
+                                        <div key="left-badges" className="flex gap-1.5 flex-1 items-center">
                                             <Badge
-                                                key="date"
-                                                variant={isExpired ? (moduleHook.states.selectedModule?.id === module.id ? 'default' : 'danger') : 'default'}
+                                                key="status"
+                                                variant={
+                                                    module.statut === 'en_cours' ? 'success' :
+                                                        module.statut === 'archive' ? 'danger' :
+                                                            'warning'
+                                                }
                                                 size="xs"
                                             >
-                                                {new Date(module.date_fin).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' })}
+                                                {module.statut === 'en_cours' ? 'En cours' :
+                                                    module.statut === 'archive' ? 'Archi' :
+                                                        'Prep'}
                                             </Badge>
-                                        ),
-                                        <Badge
-                                            key="progress"
-                                            variant={
-                                                (module.percent || 0) < 50 ? 'danger' :
-                                                    (module.percent || 0) < 75 ? 'warning' :
-                                                        'success'
-                                            }
-                                            size="xs"
-                                        >
-                                            {module.percent || 0}%
-                                        </Badge>
+                                            {module.date_fin && (
+                                                <Badge
+                                                    key="date"
+                                                    variant={isExpired ? 'danger' : 'default'}
+                                                    size="xs"
+                                                >
+                                                    {new Date(module.date_fin).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' })}
+                                                </Badge>
+                                            )}
+                                        </div>,
+                                        <div key="right-badges" className="flex gap-1.5 items-center shrink-0">
+                                            <Badge
+                                                key="progress"
+                                                variant={
+                                                    (module.percent || 0) < 50 ? 'danger' :
+                                                        (module.percent || 0) < 75 ? 'warning' :
+                                                            'success'
+                                                }
+                                                size="xs"
+                                            >
+                                                {module.percent || 0}%
+                                            </Badge>
+                                            <Badge
+                                                key="students"
+                                                variant="danger"
+                                                size="xs"
+                                                className="px-1.5 flex items-center bg-danger/80 text-white border-danger/20"
+                                            >
+                                                <div className="flex items-center gap-1 leading-none">
+                                                    {module.studentCount || 0}
+                                                    <Users size={10} strokeWidth={3} className="shrink-0" />
+                                                </div>
+                                            </Badge>
+                                        </div>
                                     ].filter(Boolean)}
                                 />
                             );

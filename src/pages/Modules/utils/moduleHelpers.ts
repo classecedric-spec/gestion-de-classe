@@ -20,6 +20,7 @@ export interface SousBranche {
 }
 
 export interface Progression {
+    eleve_id: string;
     etat: string;
 }
 
@@ -36,7 +37,9 @@ export interface ModuleWithRelations extends ModuleBase {
     // Computed properties added by calculateModuleProgress
     totalProgressions?: number;
     completedProgressions?: number;
+    studentCount?: number;
     percent?: number;
+    studentIds?: string[];
     // Allow index access for flexibility during migration if needed, though strictly typed is better
     [key: string]: any;
 }
@@ -44,15 +47,19 @@ export interface ModuleWithRelations extends ModuleBase {
 /**
  * Calculate module progress statistics
  */
-export const calculateModuleProgress = (module: ModuleWithRelations): { totalProgressions: number, completedProgressions: number, percent: number } => {
+export const calculateModuleProgress = (module: ModuleWithRelations): { totalProgressions: number, completedProgressions: number, studentCount: number, percent: number, studentIds: string[] } => {
     let totalProgressions = 0;
     let completedProgressions = 0;
+    const studentIds = new Set<string>();
 
     if (module.Activite && module.Activite.length > 0) {
         module.Activite.forEach(act => {
             if (act.Progression && act.Progression.length > 0) {
                 totalProgressions += act.Progression.length;
                 completedProgressions += act.Progression.filter(p => p.etat === 'termine').length;
+                act.Progression.forEach(p => {
+                    if (p.eleve_id) studentIds.add(p.eleve_id);
+                });
             }
         });
     }
@@ -60,6 +67,8 @@ export const calculateModuleProgress = (module: ModuleWithRelations): { totalPro
     return {
         totalProgressions,
         completedProgressions,
+        studentCount: studentIds.size,
+        studentIds: Array.from(studentIds),
         percent: totalProgressions > 0 ? Math.round((completedProgressions / totalProgressions) * 100) : 0
     };
 };

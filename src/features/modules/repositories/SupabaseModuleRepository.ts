@@ -28,7 +28,7 @@ export class SupabaseModuleRepository implements IModuleRepository {
                             acronyme
                         )
                     ),
-                    Progression (etat)
+                    Progression (eleve_id, etat)
                 )
             `;
 
