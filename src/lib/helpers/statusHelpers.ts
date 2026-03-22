@@ -59,9 +59,9 @@ export const STATUS_CONFIG: Record<StatusKey, StatusDetail> = {
     ajustement: {
         color: 'bg-[#F59E0B]',
         textColor: 'text-black',
-        icon: Settings2,
-        label: 'Ajustement',
-        shortLabel: 'Ajust.'
+        icon: AlertCircle,
+        label: '⚠️ Erreur > 1',
+        shortLabel: '⚠️ E > 1'
     },
     a_verifier: {
         color: 'bg-violet-500',

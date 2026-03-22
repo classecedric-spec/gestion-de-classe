@@ -20,6 +20,21 @@ export class SupabaseGradeRepository implements IGradeRepository {
         return data || [];
     }
 
+    async findAllEvaluationsDetailed(): Promise<any[]> {
+        const { data, error } = await supabase
+            .from('EvaluationWithStats')
+            .select(`
+                *,
+                Groupe (nom),
+                Branche (nom),
+                TypeNote (nom)
+            `)
+            .order('date', { ascending: false });
+            
+        if (error) throw error;
+        return data || [];
+    }
+
     async createEvaluation(evaluation: TablesInsert<'Evaluation'>): Promise<Tables<'Evaluation'>> {
         const { data, error } = await supabase
             .from('Evaluation')
@@ -89,6 +104,40 @@ export class SupabaseGradeRepository implements IGradeRepository {
             .from('Resultat')
             .select('*')
             .eq('evaluation_id', evaluationId);
+            
+        if (error) throw error;
+        return data || [];
+    }
+
+    async findResultsByEvaluations(evaluationIds: string[]): Promise<Tables<'Resultat'>[]> {
+        if (evaluationIds.length === 0) return [];
+        const { data, error } = await supabase
+            .from('Resultat')
+            .select('*')
+            .in('evaluation_id', evaluationIds);
+            
+        if (error) throw error;
+        return data || [];
+    }
+
+    async findAllResultsDetailed(): Promise<any[]> {
+        const { data, error } = await supabase
+            .from('Resultat')
+            .select(`
+                *,
+                Eleve (id, nom, prenom),
+                Evaluation (
+                    id, 
+                    titre, 
+                    date, 
+                    periode,
+                    max_note_evaluation,
+                    Groupe (id, nom),
+                    Branche (id, nom),
+                    TypeNote (id, nom)
+                )
+            `)
+            .order('created_at', { ascending: false });
             
         if (error) throw error;
         return data || [];

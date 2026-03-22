@@ -2,6 +2,7 @@ import React from 'react';
 import { Check, Users, Loader2, X } from 'lucide-react';
 import { getInitials } from '../../../../lib/helpers';
 import clsx from 'clsx';
+import { getStatusShortLabel } from '../../../../lib/helpers/statusHelpers';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
@@ -112,9 +113,7 @@ const HelpRequestsPanel: React.FC<HelpRequestsPanelProps> = ({
                                                             : "bg-[#A0A8AD] text-white border border-[#A0A8AD]"
                                             )}
                                         >
-                                            {req.is_suivi ? 'Suivi' :
-                                                req.etat === 'a_verifier' ? 'Vérif' :
-                                                    req.etat === 'ajustement' ? 'Ajust.' : 'Aide'}
+                                            {req.is_suivi ? 'Suivi' : (req.etat === 'a_verifier' ? 'Vérif' : getStatusShortLabel(req.etat))}
                                         </div>
                                     </div>
                                 </div>

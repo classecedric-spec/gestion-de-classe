@@ -29,8 +29,10 @@ export const CardInfo = forwardRef<HTMLDivElement, CardInfoProps>(({
     return (
         <div
             className={clsx(
-                "card-flat shrink-0 transition-all duration-300 ease-in-out overflow-hidden container-card", // Added container-card
-                className
+                "card-flat transition-all duration-300 ease-in-out overflow-hidden container-card", // Removed shrink-0
+                className,
+                // Ensure we are a flex container if flex-1 or flex-col is passed
+                (className?.includes('flex-1') || className?.includes('flex-col')) && "flex flex-col"
             )}
             style={{
                 height: height ? `${height}px` : 'auto',
@@ -42,7 +44,9 @@ export const CardInfo = forwardRef<HTMLDivElement, CardInfoProps>(({
                 ref={ref}
                 className={clsx(
                     "p-6", // Padding standard
-                    contentClassName
+                    contentClassName,
+                    // If content is flex-1, ensure this container also fills the parent
+                    contentClassName?.includes('flex-1') && "flex-1 min-h-0"
                 )}
             >
                 {children}

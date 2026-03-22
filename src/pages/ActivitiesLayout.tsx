@@ -40,7 +40,7 @@ const ActivitiesLayout: React.FC = () => {
             </div>
 
             {/* Content Area */}
-            <div className="flex-1 overflow-hidden p-8 relative animate-in fade-in duration-300">
+            <div className="flex-1 overflow-hidden flex flex-col p-8 relative animate-in fade-in duration-300">
                 <Outlet />
             </div>
         </div>

@@ -1,11 +1,11 @@
 import React, { useEffect, useState } from 'react';
-import { X, ChevronLeft, ChevronRight, AlertTriangle, Download, Loader2, Plus, Briefcase } from 'lucide-react';
-import { DndContext, DragOverlay, DragStartEvent, DragOverEvent, DragEndEvent } from '@dnd-kit/core';
+import { X, ChevronLeft, ChevronRight, AlertTriangle, Download, Loader2, Search } from 'lucide-react';
+import { DndContext, DragOverlay } from '@dnd-kit/core';
 import { toast } from 'sonner';
+import clsx from 'clsx';
 
 import { useWeeklyPlanner, DAYS, PERIODS, getRelativeWeekMonday } from './useWeeklyPlanner';
-import { DraggableDockItem, PlannerSlot } from './PlannerComponents';
-import PreparationModal from './PreparationModal';
+import { PlannerSlot, DraggableLibraryItem, DraggableCustomItem, AddCustomActivityInput } from './PlannerComponents';
 import { WeeklyPlannerPDF } from '../WeeklyPlannerPDF';
 
 // Polyfill check for showSaveFilePicker, common in browser but not in standard TS lib.dom
@@ -21,16 +21,19 @@ interface WeeklyPlannerModalProps {
 }
 
 const WeeklyPlannerModal: React.FC<WeeklyPlannerModalProps> = ({ isOpen, onClose }) => {
-    const [isPrepMode, setIsPrepMode] = useState(false);
-
     const {
-        schedule, modules, weeks, currentWeek, setCurrentWeek, currentWeekLabel,
-        dockItems, plannerItems, dbError, isExporting, setIsExporting,
+        schedule, modules, weeks, currentWeek, setCurrentWeek,
+        plannerItems, customActivities, dbError, isExporting, setIsExporting,
         activeDragItem, activeOver, handleDragStart, handleDragOver, handleDragEnd,
         resizingItem, resizeTargetPeriod, handleResizeStart, handleResizeMove, handleResizeUp,
-        handleToggleDock, handleDelete, handlePermanentDelete, handleExtend, isSlotCovered,
-        handlePrevWeek, handleNextWeek, fetchModules, handleShrinkFromTop
+        handleDelete, handleExtend, isSlotCovered,
+        handlePrevWeek, handleNextWeek, handleShrinkFromTop,
+        handleCreateCustomActivity, handleDeleteCustomActivity
     } = useWeeklyPlanner(isOpen);
+
+    const [searchTerm, setSearchTerm] = useState('');
+    const [libraryTab, setLibraryTab] = useState<'modules' | 'perso'>('modules');
+    const [filterStatus, setFilterStatus] = useState<'en_cours' | 'en_preparation' | 'archive' | 'all'>('en_cours');
 
     // Resize listeners
     useEffect(() => {
@@ -164,103 +167,157 @@ const WeeklyPlannerModal: React.FC<WeeklyPlannerModalProps> = ({ isOpen, onClose
                         </div>
                     </div>
 
-                    {/* Main Grid */}
-                    <div className="flex-1 min-h-0 overflow-hidden p-4 custom-scrollbar bg-input/50 relative" onMouseLeave={() => resizingItem && handleResizeUp()}>
-                        <div className="h-full grid grid-cols-6 gap-3 min-w-[1000px] grid-rows-[auto_repeat(6,minmax(0,1fr))]">
-                            {/* Headers */}
-                            <div className="p-2"></div>
-                            {DAYS.map((d, i) => (
-                                <div key={d} className="font-bold text-center text-grey-medium" style={{ gridColumn: i + 2, gridRow: 1 }}>
-                                    {d}
+                    {/* Main Content Area */}
+                    <div className="flex-1 flex min-h-0 overflow-hidden bg-input/20 h-full relative" onMouseLeave={() => resizingItem && handleResizeUp()}>
+                        {/* Grid */}
+                        <div className="flex-1 overflow-auto p-4 custom-scrollbar relative">
+                            <div className="grid grid-cols-6 gap-3 min-w-[900px] grid-rows-[auto_repeat(6,minmax(0,1fr))]" style={{ minHeight: '100%' }}>
+                                {/* Headers */}
+                                <div className="p-2 sticky top-0 bg-surface/80 backdrop-blur z-20"></div>
+                                {DAYS.map((d, i) => (
+                                    <div key={d} className="font-bold text-center text-grey-medium sticky top-0 bg-surface/80 backdrop-blur z-20 py-2" style={{ gridColumn: i + 2, gridRow: 1 }}>
+                                        {d}
+                                    </div>
+                                ))}
+
+                                {/* Period Labels */}
+                                {PERIODS.map((p, i) => (
+                                    <div key={p} className="flex items-center justify-center font-mono text-xl font-bold text-grey-medium/50 select-none" style={{ gridColumn: 1, gridRow: i + 2 }}>
+                                        {p}
+                                    </div>
+                                ))}
+
+                                {/* Slots */}
+                                {DAYS.map((day, dIndex) => (
+                                    <div key={day} style={{ display: 'contents' }}>
+                                        {PERIODS.map((period, pIndex) => {
+                                            const items = plannerItems.filter(s => s.day_of_week === day && s.period_index === period);
+                                            const covered = isSlotCovered(day, period);
+                                            const isResizeTarget = resizingItem && resizingItem.day_of_week === day && period <= (resizeTargetPeriod || 0) && period > resizingItem.period_index;
+                                            const isDisabledSlot = day === 'Mercredi' && period >= 5;
+
+                                            return (
+                                                <div key={`${day}-${period}`} style={{ display: 'contents' }}>
+                                                    <PlannerSlot
+                                                        data-period={period}
+                                                        dayIndex={dIndex}
+                                                        periodIndex={pIndex}
+                                                        items={items}
+                                                        onDelete={handleDelete}
+                                                        onResizeStart={handleResizeStart}
+                                                        onExtend={handleExtend}
+                                                        onShrink={handleShrinkFromTop}
+                                                        isPlaceholder={covered}
+                                                        isDisabled={isDisabledSlot}
+                                                        modules={modules}
+                                                        isOver={!!(activeOver && activeOver.day === day && activeOver.period === period)}
+                                                    />
+                                                    {isResizeTarget && (
+                                                        <div
+                                                            className="rounded-xl border border-dashed border-primary/50 bg-primary/10 pointer-events-none z-20"
+                                                            style={{ gridColumn: dIndex + 2, gridRow: pIndex + 2 }}
+                                                        ></div>
+                                                    )}
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* Library Sidebar */}
+                        <div className="w-80 border-l border-border bg-surface flex flex-col shrink-0 overflow-hidden">
+                            <div className="p-4 border-b border-border space-y-4">
+                                <div className="flex bg-input p-1 rounded-xl gap-1">
+                                    <button
+                                        onClick={() => setLibraryTab('modules')}
+                                        className={clsx(
+                                            "flex-1 px-3 py-2 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all",
+                                            libraryTab === 'modules' ? "bg-primary text-white shadow-sm" : "text-grey-medium hover:text-text-main"
+                                        )}
+                                    >
+                                        Modules
+                                    </button>
+                                    <button
+                                        onClick={() => setLibraryTab('perso')}
+                                        className={clsx(
+                                            "flex-1 px-3 py-2 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all",
+                                            libraryTab === 'perso' ? "bg-primary text-white shadow-sm" : "text-grey-medium hover:text-text-main"
+                                        )}
+                                    >
+                                        Perso
+                                    </button>
                                 </div>
-                            ))}
 
-                            {/* Period Labels */}
-                            {PERIODS.map((p, i) => (
-                                <div key={p} className="flex items-center justify-center font-mono text-xl font-bold text-grey-medium/50 select-none" style={{ gridColumn: 1, gridRow: i + 2 }}>
-                                    {p}
+                                <div className="space-y-3">
+                                    <div className="relative">
+                                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-grey-medium" size={14} />
+                                        <input
+                                            type="text"
+                                            placeholder={libraryTab === 'modules' ? "Rechercher un module..." : "Rechercher une activité..."}
+                                            className="w-full bg-input border border-border rounded-xl pl-9 pr-4 py-2 text-xs text-text-main focus:outline-none focus:border-primary"
+                                            value={searchTerm}
+                                            onChange={(e) => setSearchTerm(e.target.value)}
+                                        />
+                                    </div>
+                                    
+                                    {libraryTab === 'modules' && (
+                                        <div className="flex bg-input/50 p-1 rounded-lg gap-1">
+                                            {(['en_cours', 'en_preparation', 'archive', 'all'] as const).map(f => (
+                                                <button
+                                                    key={f}
+                                                    onClick={() => setFilterStatus(f)}
+                                                    className={clsx(
+                                                        "flex-1 px-2 py-1.5 rounded-md text-[9px] font-bold uppercase transition-all",
+                                                        filterStatus === f ? "bg-surface-dark text-primary shadow-sm" : "text-grey-medium hover:text-text-main"
+                                                    )}
+                                                >
+                                                    {f === 'en_cours' ? 'Cours' : f === 'en_preparation' ? 'Prep' : f === 'archive' ? 'Arch' : 'Tout'}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    )}
                                 </div>
-                            ))}
+                            </div>
 
-                            {/* Slots */}
-                            {DAYS.map((day, dIndex) => (
-                                <div key={day} style={{ display: 'contents' }}>
-                                    {PERIODS.map((period, pIndex) => {
-                                        const items = plannerItems.filter(s => s.day_of_week === day && s.period_index === period);
-                                        const covered = isSlotCovered(day, period);
-                                        const isResizeTarget = resizingItem && resizingItem.day_of_week === day && period <= (resizeTargetPeriod || 0) && period > resizingItem.period_index;
-                                        const isDisabledSlot = day === 'Mercredi' && period >= 5;
-
-                                        return (
-                                            <div key={`${day}-${period}`} style={{ display: 'contents' }}>
-                                                <PlannerSlot
-                                                    data-period={period}
-                                                    dayIndex={dIndex}
-                                                    periodIndex={pIndex}
-                                                    items={items}
-                                                    onDelete={handleDelete}
-                                                    onResizeStart={handleResizeStart}
-                                                    onExtend={handleExtend}
-                                                    onShrink={handleShrinkFromTop}
-                                                    isPlaceholder={covered}
-                                                    isDisabled={isDisabledSlot}
-                                                    modules={modules}
-                                                    isOver={activeOver && activeOver.day === day && activeOver.period === period}
-                                                />
-                                                {isResizeTarget && (
-                                                    <div
-                                                        className="rounded-xl border border-dashed border-primary/50 bg-primary/10 pointer-events-none z-20"
-                                                        style={{ gridColumn: dIndex + 2, gridRow: pIndex + 2 }}
-                                                    ></div>
-                                                )}
+                            <div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
+                                <div className="space-y-2">
+                                    {libraryTab === 'modules' ? (
+                                        modules.length > 0 ? (
+                                            modules.filter(m => {
+                                                const matchesSearch = m.nom.toLowerCase().includes(searchTerm.toLowerCase());
+                                                const matchesFilter = filterStatus === 'all' || m.statut === filterStatus;
+                                                return matchesSearch && matchesFilter;
+                                            }).map(module => (
+                                                <DraggableLibraryItem key={module.id} module={module} />
+                                            ))
+                                        ) : (
+                                            <div className="text-center py-8">
+                                                <Loader2 className="animate-spin text-primary mx-auto mb-2" size={20} />
+                                                <p className="text-[10px] text-grey-medium">Chargement...</p>
                                             </div>
-                                        );
-                                    })}
+                                        )
+                                    ) : (
+                                        <>
+                                            <AddCustomActivityInput onAdd={handleCreateCustomActivity} />
+                                            <div className="pt-2 space-y-2">
+                                                {customActivities.filter(a => 
+                                                    a.title.toLowerCase().includes(searchTerm.toLowerCase())
+                                                ).sort((a, b) => a.title.localeCompare(b.title)).map(activity => (
+                                                    <DraggableCustomItem 
+                                                        key={activity.id} 
+                                                        activity={activity} 
+                                                        onDelete={handleDeleteCustomActivity}
+                                                    />
+                                                ))}
+                                            </div>
+                                        </>
+                                    )}
                                 </div>
-                            ))}
+                            </div>
                         </div>
                     </div>
-
-                    {/* Dock */}
-                    <div className="bg-surface border-t border-border p-4 shadow-[0_-10px_40px_rgba(0,0,0,0.5)] z-10 relative shrink-0">
-                        <div className="flex items-center gap-3 mb-3">
-                            <h3 className="text-xs font-bold text-grey-medium uppercase tracking-widest flex items-center gap-2">
-                                <Briefcase size={14} /> DOCK
-                            </h3>
-                            <span className="text-[10px] bg-input px-2 py-0.5 rounded text-grey-medium">{dockItems.length} modules prêts</span>
-                        </div>
-
-                        <div className="flex flex-wrap gap-2 overflow-y-auto max-h-[35vh] w-full items-start content-start custom-scrollbar pr-20">
-                            {[...dockItems].sort((a, b) => {
-                                const branchA = a.matiere_principale || 'Autre';
-                                const branchB = b.matiere_principale || 'Autre';
-                                if (branchA !== branchB) return branchA.localeCompare(branchB);
-                                if (!a.date_fin) return 1;
-                                if (!b.date_fin) return -1;
-                                return new Date(a.date_fin!).getTime() - new Date(b.date_fin!).getTime();
-                            }).map(item => (
-                                <DraggableDockItem key={item.id} item={item} onDelete={handlePermanentDelete} variant="pill" />
-                            ))}
-                        </div>
-
-                        <div
-                            onClick={() => setIsPrepMode(true)}
-                            className="absolute top-4 right-4 h-12 w-12 border-2 border-dashed border-yellow-500/30 rounded-full flex items-center justify-center text-yellow-600/50 cursor-pointer hover:border-yellow-400 hover:text-yellow-400 transition-all bg-yellow-400/5 hover:bg-yellow-400/10 z-20"
-                            title="Ajouter des modules"
-                        >
-                            <Plus size={24} />
-                        </div>
-                    </div>
-
-                    <PreparationModal
-                        isOpen={isPrepMode}
-                        onClose={() => setIsPrepMode(false)}
-                        modules={modules}
-                        dockedItems={dockItems}
-                        onToggleDock={handleToggleDock}
-                        currentWeekDate={currentWeek}
-                        fetchModules={fetchModules}
-                    />
 
                     <DragOverlay>
                         {activeDragItem ? (

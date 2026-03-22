@@ -2,9 +2,12 @@ import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../../lib/database';
 import { toast } from 'sonner';
 import { Active, Over } from '@dnd-kit/core';
-import { Tables } from '../../types/supabase';
+import { Tables, TablesInsert, TablesUpdate } from '../../types/supabase';
 import { plannerService } from '../../features/planner/services/plannerService';
 import { WeeklyPlanningItem } from '../../features/planner/repositories/IPlannerRepository';
+import { SupabaseActivityRepository } from '../../features/activities/repositories/SupabaseActivityRepository';
+
+const activityRepository = new SupabaseActivityRepository();
 
 // Helper: Get start of school year (Sept 1st)
 const getSchoolYearStart = (): Date => {
@@ -103,9 +106,10 @@ export const useWeeklyPlanner = (isOpen: boolean) => {
     const [weeks, setWeeks] = useState<{ label: string; value: string; index: number }[]>([]);
     const [currentWeek, setCurrentWeek] = useState<string>(getMonday(new Date()));
     const [isExporting, setIsExporting] = useState(false);
+    const [customActivities, setCustomActivities] = useState<Tables<'custom_activities'>[]>([]);
 
     // Drag & Drop state
-    const [activeDragItem, setActiveDragItem] = useState<WeeklyPlanningItem | null>(null);
+    const [activeDragItem, setActiveDragItem] = useState<any | null>(null);
     const [activeOver, setActiveOver] = useState<{ day: string; period: number } | null>(null);
 
     // Resize state
@@ -122,6 +126,7 @@ export const useWeeklyPlanner = (isOpen: boolean) => {
         if (isOpen) {
             fetchData();
             fetchModules();
+            fetchCustomActivities();
         }
     }, [isOpen, currentWeek]);
 
@@ -129,7 +134,9 @@ export const useWeeklyPlanner = (isOpen: boolean) => {
         setDbError(false);
         try {
             const data = await plannerService.getPlanningForWeek(currentWeek);
-            if (data) setSchedule(data);
+            if (data) {
+                setSchedule(data);
+            }
         } catch (err: any) {
             console.error("Database Error:", err);
             // Fallback not easily implemented with service unless service handles filtering logic
@@ -165,45 +172,93 @@ export const useWeeklyPlanner = (isOpen: boolean) => {
         }
     }, []);
 
+    const fetchCustomActivities = useCallback(async () => {
+        try {
+            const data = await activityRepository.getCustomActivities();
+            setCustomActivities(data);
+        } catch (err) {
+            console.error('Error fetching custom activities:', err);
+        }
+    }, []);
+
+    const handleCreateCustomActivity = useCallback(async (title: string) => {
+        try {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) return null;
+            const newActivity = await activityRepository.createCustomActivity(title, user.id);
+            if (newActivity) {
+                setCustomActivities(prev => [newActivity, ...prev]);
+                return newActivity;
+            }
+        } catch (err) {
+            console.error('Error creating custom activity:', err);
+        }
+        return null;
+    }, []);
+
+    const handleDeleteCustomActivity = useCallback(async (id: string) => {
+        try {
+            await activityRepository.deleteCustomActivity(id);
+            setCustomActivities(prev => prev.filter(a => a.id !== id));
+        } catch (err) {
+            console.error('Error deleting custom activity:', err);
+        }
+    }, []);
+
     // Derived data
-    const dockItems = schedule.filter(s => s.day_of_week === 'DOCK');
     const plannerItems = schedule.filter(s => s.day_of_week !== 'DOCK');
 
-    // Dock toggle
-    const handleToggleDock = useCallback(async (module: { nom: string; isCustom?: boolean }, isCurrentlyDocked: boolean) => {
-        if (isCurrentlyDocked) {
-            const itemToDelete = dockItems.find(i => i.activity_title === module.nom);
-            if (itemToDelete) {
-                await plannerService.deletePlanningItem(itemToDelete.id);
-                setSchedule(prev => prev.filter(p => p.id !== itemToDelete.id));
-            }
-        } else {
-            const { data: { user } } = await supabase.auth.getUser();
+    // New helper functions for drag and drop
+    const handleDropFromLibrary = useCallback(async (module: ModuleWithDetails, day: string, period: number) => {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
 
-            if (!user) {
-                toast.error("Vous devez être connecté");
-                return;
-            }
+        const newItem = {
+            day_of_week: day,
+            period_index: period,
+            activity_title: module.nom,
+            color_code: 'bg-indigo-500/20 text-indigo-300 border-indigo-500/30', // Default color for now
+            duration: 1,
+            week_start_date: currentWeek,
+            user_id: user.id
+        };
 
-            const newItem = {
-                day_of_week: 'DOCK',
-                period_index: 0,
-                activity_title: module.nom,
-                color_code: 'bg-indigo-500/20 text-indigo-300 border-indigo-500/30',
-                duration: 1,
-                week_start_date: currentWeek,
-                user_id: user.id
-            };
-            const data = await plannerService.createPlanningItem(newItem);
-            if (data) {
-                setSchedule(prev => [...prev, data]);
-            }
+        const data = await plannerService.createPlanningItem(newItem);
+        if (data) {
+            setSchedule(prev => [...prev, data]);
         }
-    }, [currentWeek, dockItems]);
+    }, [currentWeek]);
+
+    const handleDropFromCustom = useCallback(async (activity: Tables<'custom_activities'>, day: string, period: number) => {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+
+        const newItem = {
+            day_of_week: day,
+            period_index: period,
+            activity_title: activity.title,
+            color_code: 'bg-green-500/20 text-green-300 border-green-500/30', // Default color for custom activities
+            duration: 1,
+            week_start_date: currentWeek,
+            user_id: user.id
+        };
+
+        const data = await plannerService.createPlanningItem(newItem);
+        if (data) {
+            setSchedule(prev => [...prev, data]);
+        }
+    }, [currentWeek]);
 
     // Drag handlers
     const handleDragStart = useCallback((event: { active: Active }) => {
-        setActiveDragItem(event.active.data.current?.item || null);
+        const data = event.active.data.current;
+        if (data?.type === 'libraryItem') {
+            setActiveDragItem({ activity_title: data.module.nom, ...data.module });
+        } else if (data?.type === 'customItem') {
+            setActiveDragItem({ activity_title: data.activity.title, ...data.activity });
+        } else {
+            setActiveDragItem(data?.item || null);
+        }
     }, []);
 
     const handleDragOver = useCallback((event: { over: Over | null }) => {
@@ -221,53 +276,59 @@ export const useWeeklyPlanner = (isOpen: boolean) => {
 
         if (!over) return;
 
-        const item = active.data.current?.item as WeeklyPlanningItem;
-        const targetData = over.data.current as { day: string; period: number };
+        const activeData = active.data.current;
+        const overData = over.data.current as { day: string; period: number };
 
-        if (!item || !targetData) return;
+        if (!activeData || !overData) return;
 
-        const { day, period } = targetData;
+        const { day, period } = overData;
 
         try {
             const targetItems = plannerItems.filter(p => p.day_of_week === day && p.period_index === period);
-            const isSameSlot = item.day_of_week === day && item.period_index === period;
 
-            if (!isSameSlot && targetItems.length >= 4) {
+            if (targetItems.length >= 4) {
                 toast.error("Maximum 4 activités par créneau !");
                 return;
             }
 
-            await plannerService.updatePlanningItem(item.id, { day_of_week: day, period_index: period, duration: 1 });
+            // Handle New Module from Library
+            if (active.data.current?.type === 'libraryItem') {
+                const module = active.data.current.module as ModuleWithDetails;
+                handleDropFromLibrary(module, day, period);
+                return;
+            }
 
-            setSchedule(prev => prev.map(p =>
-                p.id === item.id ? { ...p, day_of_week: day, period_index: period, duration: 1 } : p
-            ));
+            // Handle New Custom Activity
+            if (active.data.current?.type === 'customItem') {
+                const activity = active.data.current.activity as Tables<'custom_activities'>;
+                handleDropFromCustom(activity, day, period);
+                return;
+            }
+
+            // Existing item placement (grid)
+            const item = activeData.item as WeeklyPlanningItem;
+            const isSameSlot = item.day_of_week === day && item.period_index === period;
+
+            if (!isSameSlot) {
+                await plannerService.updatePlanningItem(item.id, { day_of_week: day, period_index: period, duration: 1 });
+
+                setSchedule(prev => prev.map(p =>
+                    p.id === item.id ? { ...p, day_of_week: day, period_index: period, duration: 1 } : p
+                ));
+            }
         } catch (err) {
             console.error(err);
             fetchData();
         }
-    }, [plannerItems, fetchData]);
+    }, [plannerItems, fetchData, handleDropFromLibrary, handleDropFromCustom]);
 
-    // Delete (return to dock)
+    // Delete (permanent)
     const handleDelete = useCallback(async (id: string) => {
         try {
-            await plannerService.updatePlanningItem(id, { day_of_week: 'DOCK', period_index: 0, duration: 1 });
-
-            setSchedule(prev => prev.map(s =>
-                s.id === id ? { ...s, day_of_week: 'DOCK', period_index: 0, duration: 1 } : s
-            ));
-        } catch (err) {
-            console.error("Error returning to dock:", err);
-        }
-    }, []);
-
-    // Permanent delete
-    const handlePermanentDelete = useCallback(async (id: string) => {
-        try {
             await plannerService.deletePlanningItem(id);
-            setSchedule(prev => prev.filter(s => s.id !== id));
+            setSchedule(prev => prev.filter(p => p.id !== id));
         } catch (err) {
-            console.error("Error deleting permanently:", err);
+            console.error(err);
         }
     }, []);
 
@@ -396,8 +457,8 @@ export const useWeeklyPlanner = (isOpen: boolean) => {
         currentWeek,
         setCurrentWeek,
         currentWeekLabel,
-        dockItems,
         plannerItems,
+        customActivities,
         dbError,
         isExporting,
         setIsExporting,
@@ -409,6 +470,11 @@ export const useWeeklyPlanner = (isOpen: boolean) => {
         handleDragOver,
         handleDragEnd,
 
+        // Custom Activities
+        fetchCustomActivities,
+        handleCreateCustomActivity,
+        handleDeleteCustomActivity,
+
         // Resize
         resizingItem,
         resizeTargetPeriod,
@@ -418,9 +484,7 @@ export const useWeeklyPlanner = (isOpen: boolean) => {
         handleShrinkFromTop,
 
         // Actions
-        handleToggleDock,
         handleDelete,
-        handlePermanentDelete,
         handleExtend,
         isSlotCovered,
         handlePrevWeek,

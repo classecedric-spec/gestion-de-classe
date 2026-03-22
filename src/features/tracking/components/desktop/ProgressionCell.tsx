@@ -1,6 +1,7 @@
 import React from 'react';
 import { Check, ShieldCheck } from 'lucide-react';
 import clsx from 'clsx';
+import { getStatusShortLabel, getStatusLabel } from '../../../../lib/helpers/statusHelpers';
 
 export type ProgressionStatus = 'a_commencer' | 'en_cours' | 'besoin_d_aide' | 'a_verifier' | 'ajustement' | 'termine';
 
@@ -115,9 +116,9 @@ const ProgressionCell: React.FC<ProgressionCellProps> = ({
                             ? "bg-[#F59E0B] text-black border-[#F59E0B] shadow-sm"
                             : "bg-black/20 border-white/5 text-grey-medium hover:border-[#F59E0B]/40"
                     )}
-                    title="Ajustement"
+                    title={getStatusLabel('ajustement')}
                 >
-                    Ajust.
+                    {getStatusShortLabel('ajustement')}
                 </button>
 
                 <button

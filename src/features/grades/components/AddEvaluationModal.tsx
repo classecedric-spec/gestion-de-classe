@@ -2,7 +2,9 @@ import React, { useState } from 'react';
 import { Modal, Input, Button } from '../../../core';
 import { Plus, Trash2, ListChecks, Settings2 } from 'lucide-react';
 import { useAuth } from '../../../hooks/useAuth';
-import { useGrades } from '../hooks/useGrades';
+import { useNoteTypes } from '../hooks/useGrades';
+import { useBranches } from '../../branches/hooks/useBranches';
+import { useGroupsData } from '../../groups/hooks/useGroupsData';
 import Select from '../../../core/Select';
 
 interface AddEvaluationModalProps {
@@ -23,10 +25,22 @@ const AddEvaluationModal: React.FC<AddEvaluationModalProps> = ({
     periode
 }) => {
     const { session } = useAuth();
-    const { noteTypes } = useGrades();
+    const { data: noteTypes = [] } = useNoteTypes();
+    const { branches } = useBranches();
+    const { groups } = useGroupsData();
+
+    // Local state for context (used when props are empty)
+    const [localBrancheId, setLocalBrancheId] = useState<string>(brancheId || '');
+    const [localGroupId, setLocalGroupId] = useState<string>(groupId || '');
+    const [localPeriode, setLocalPeriode] = useState<string>(periode || 'Trimestre 1');
+
+    const effectiveBrancheId = brancheId || localBrancheId;
+    const effectiveGroupId = groupId || localGroupId;
+    const effectivePeriode = periode || localPeriode;
+    const needsContext = !brancheId || !groupId || !periode;
+
     const [titre, setTitre] = useState('');
     const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
-    const [coefficient, setCoefficient] = useState(1);
     const [noteMax, setNoteMax] = useState(10);
     const [typeNoteId, setTypeNoteId] = useState<string>('');
     const [withQuestions, setWithQuestions] = useState(false);
@@ -56,16 +70,15 @@ const AddEvaluationModal: React.FC<AddEvaluationModalProps> = ({
     const handleFormSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         const userId = session?.user?.id;
-        if (!userId || !brancheId || !groupId || !periode) return;
+        if (!userId || !effectiveBrancheId || !effectiveGroupId || !effectivePeriode) return;
 
         const evaluationData = {
             titre,
             date,
-            coefficient,
             note_max: noteMax,
-            branche_id: brancheId,
-            group_id: groupId,
-            periode,
+            branche_id: effectiveBrancheId,
+            group_id: effectiveGroupId,
+            periode: effectivePeriode,
             user_id: userId,
             type_note_id: typeNoteId || null
         };
@@ -90,6 +103,9 @@ const AddEvaluationModal: React.FC<AddEvaluationModalProps> = ({
         }
     };
 
+    const activeNoteType = noteTypes.find(nt => nt.id === typeNoteId);
+    const isConversion = activeNoteType?.systeme === 'conversion';
+
     return (
         <Modal
             isOpen={isOpen}
@@ -97,6 +113,40 @@ const AddEvaluationModal: React.FC<AddEvaluationModalProps> = ({
             title="Nouvelle Évaluation"
         >
             <form onSubmit={handleFormSubmit} className="space-y-6">
+                {needsContext && (
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 bg-white/5 rounded-xl border border-white/10">
+                        <Select
+                            label="Branche"
+                            value={localBrancheId}
+                            onChange={(e) => setLocalBrancheId(e.target.value)}
+                            options={[
+                                { value: '', label: 'Sélectionner...' },
+                                ...branches.map(b => ({ value: b.id, label: b.nom }))
+                            ]}
+                        />
+                        <Select
+                            label="Groupe"
+                            value={localGroupId}
+                            onChange={(e) => setLocalGroupId(e.target.value)}
+                            options={[
+                                { value: '', label: 'Sélectionner...' },
+                                ...groups.map(g => ({ value: g.id, label: g.nom }))
+                            ]}
+                        />
+                        <Select
+                            label="Période"
+                            value={localPeriode}
+                            onChange={(e) => setLocalPeriode(e.target.value)}
+                            options={[
+                                { value: 'Trimestre 1', label: 'Trimestre 1' },
+                                { value: 'Trimestre 2', label: 'Trimestre 2' },
+                                { value: 'Trimestre 3', label: 'Trimestre 3' },
+                                { value: 'Semestre 1', label: 'Semestre 1' },
+                                { value: 'Semestre 2', label: 'Semestre 2' },
+                            ]}
+                        />
+                    </div>
+                )}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="md:col-span-2">
                         <Input
@@ -114,16 +164,7 @@ const AddEvaluationModal: React.FC<AddEvaluationModalProps> = ({
                         onChange={(e) => setDate(e.target.value)}
                         required
                     />
-                    <div className="grid grid-cols-2 gap-3">
-                        <Input
-                            label="Coefficient"
-                            type="number"
-                            min="0.25"
-                            step="0.25"
-                            value={coefficient}
-                            onChange={(e) => setCoefficient(parseFloat(e.target.value))}
-                            required
-                        />
+                    <div className="grid grid-cols-1 gap-3">
                         <Input
                             label="Note Max"
                             type="number"
@@ -145,6 +186,11 @@ const AddEvaluationModal: React.FC<AddEvaluationModalProps> = ({
                                 ...noteTypes.map(nt => ({ value: nt.id, label: nt.nom }))
                             ]}
                         />
+                        {isConversion && (
+                            <p className="mt-2 text-[10px] text-amber-500 font-bold uppercase tracking-wider animate-in fade-in slide-in-from-top-1">
+                                Info: Le maximum ci-dessus servira de base pour la conversion en lettres (%)
+                            </p>
+                        )}
                     </div>
                 </div>
 

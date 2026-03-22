@@ -16,6 +16,14 @@ export class GradeService {
         return this.repository.findEvaluationsByContext(brancheId, periode);
     }
 
+    async getAllEvaluationsDetailed() {
+        return this.repository.findAllEvaluationsDetailed();
+    }
+
+    async getAllResultsDetailed() {
+        return this.repository.findAllResultsDetailed();
+    }
+
     async createEvaluation(evaluation: TablesInsert<'Evaluation'>, questions?: { titre: string, note_max: number, ordre: number }[]) {
         const ev = await this.repository.createEvaluation(evaluation);
         if (questions && questions.length > 0) {
@@ -37,6 +45,10 @@ export class GradeService {
 
     async getResults(evaluationId: string) {
         return this.repository.getResultsWithStudents(evaluationId);
+    }
+
+    async getResultsForEvaluations(evaluationIds: string[]) {
+        return this.repository.findResultsByEvaluations(evaluationIds);
     }
 
     async getQuestionResults(evaluationId: string) {
@@ -117,22 +129,23 @@ export class GradeService {
         }
     }
 
-    convertNoteToLetter(note: number | null, noteMax: number, typeNote: any): string | null {
+    getConversionPalier(note: number | null, noteMax: number, typeNote: any): any | null {
         if (note === null || note === undefined || !typeNote || typeNote.systeme !== 'conversion') return null;
         const config = typeNote.config as any;
         if (!config || !config.paliers || !Array.isArray(config.paliers)) return null;
 
         const percentage = (note / noteMax) * 100;
         
-        // Find the palier where min <= percentage < max
-        // Special case: if percentage is exactly 100 and a palier has maxPercent 100, we include it.
-        const match = config.paliers.find((p: any) => {
+        return config.paliers.find((p: any) => {
             const min = p.minPercent ?? 0;
             const max = p.maxPercent ?? 0;
             if (percentage >= 100 && max >= 100) return percentage >= min;
             return percentage >= min && percentage < max;
-        });
-        
-        return match ? match.letter : null;
+        }) || null;
+    }
+
+    convertNoteToLetter(note: number | null, noteMax: number, typeNote: any): string | null {
+        const palier = this.getConversionPalier(note, noteMax, typeNote);
+        return palier ? palier.letter : null;
     }
 }

@@ -57,9 +57,11 @@ const EvaluationList: React.FC<EvaluationListProps> = ({
                                     {new Date(ev.date).toLocaleDateString('fr-FR')}
                                 </div>
                             </div>
-                            <Badge variant="secondary" className="text-[10px]">
-                                Coef. {ev.coefficient}
-                            </Badge>
+                            {(ev as any).TypeNote?.nom && (
+                                <Badge variant="secondary" className="text-[10px] bg-white/5 text-grey-medium border-white/10 uppercase tracking-wider font-bold">
+                                    {(ev as any).TypeNote.nom}
+                                </Badge>
+                            )}
                         </div>
 
                         <div className="flex items-center justify-between mt-6">

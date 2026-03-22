@@ -1,46 +1,38 @@
-import React, { useState } from 'react';
-import { 
-    ChevronLeft, 
-    Plus, 
-    ClipboardList, 
-    BookOpen, 
-    Settings2 
+import React, { useState, useEffect } from 'react';
+import {
+    ChevronLeft,
+    Plus,
+    ClipboardList,
+    Settings2
 } from 'lucide-react';
+import { useLocation } from 'react-router-dom';
 import { Button, Tabs } from '../core';
-import GradeContextSelector from '../features/grades/components/GradeContextSelector';
-import GradeEntryGrid from '../features/grades/components/GradeEntryGrid';
-import EvaluationList from '../features/grades/components/EvaluationList';
+import EvaluationsTableExcel from '../features/grades/components/EvaluationsTableExcel';
+import EvaluationDetailTable from '../features/grades/components/EvaluationDetailTable';
 import AddEvaluationModal from '../features/grades/components/AddEvaluationModal';
 import GradeSettings from '../features/grades/components/GradeSettings';
-import { useGrades } from '../features/grades/hooks/useGrades';
-import { useBranches } from '../features/branches/hooks/useBranches';
-import { useGroupsData } from '../features/groups/hooks/useGroupsData';
+import { useGradeMutations } from '../features/grades/hooks/useGrades';
 import { TablesInsert } from '../types/supabase';
 
 const Grades: React.FC = () => {
     // UI State
     const [activeTab, setActiveTab] = useState('evaluations');
-    
-    // Context State
-    const [selectedBrancheId, setSelectedBrancheId] = useState<string>();
-    const [selectedGroupId, setSelectedGroupId] = useState<string>();
-    const [selectedPeriode, setSelectedPeriode] = useState<string>('Trimestre 1');
     const [selectedEvaluationId, setSelectedEvaluationId] = useState<string | null>(null);
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+    const location = useLocation();
 
-    // Data Hooks
-    const { branches } = useBranches();
-    const { groups } = useGroupsData();
-    const { 
-        evaluations, 
-        loading, 
-        createEvaluation, 
-        deleteEvaluation 
-    } = useGrades(selectedBrancheId, selectedPeriode);
+    // Reset view to evaluations table when navigating to this page (e.g. sidebar click)
+    useEffect(() => {
+        if (location.pathname === '/dashboard/notes') {
+            setSelectedEvaluationId(null);
+            setActiveTab('evaluations');
+        }
+    }, [location.key, location.pathname]);
 
-    // Derived State
-    const currentEvaluation = evaluations.find(e => e.id === selectedEvaluationId);
-    const hasContext = !!selectedBrancheId && !!selectedGroupId && !!selectedPeriode;
+    // Data for Add Modal (use mutations only to avoid over-fetching)
+    const {
+        createEvaluation
+    } = useGradeMutations();
 
     // Handlers
     const handleCreateEvaluation = async (data: TablesInsert<'Evaluation'>, questions: any[]) => {
@@ -59,13 +51,13 @@ const Grades: React.FC = () => {
     ];
 
     return (
-        <div className="p-6 max-w-7xl mx-auto space-y-8 min-h-screen animate-in fade-in slide-in-from-bottom-2 duration-500">
+        <div className="p-6 w-full space-y-6 min-h-screen animate-in fade-in slide-in-from-bottom-2 duration-500">
             {/* Header section */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div className="flex items-center gap-4">
                     {(selectedEvaluationId || activeTab === 'settings') && (
-                        <Button 
-                            variant="ghost" 
+                        <Button
+                            variant="ghost"
                             size="sm"
                             onClick={() => {
                                 if (selectedEvaluationId) setSelectedEvaluationId(null);
@@ -77,13 +69,8 @@ const Grades: React.FC = () => {
                         </Button>
                     )}
                     <div>
-                        <h1 className="text-3xl font-black text-grey-dark flex items-center gap-3 tracking-tight">
-                            {selectedEvaluationId ? (
-                                <>
-                                    <ClipboardList className="text-primary" size={32} />
-                                    {currentEvaluation?.titre}
-                                </>
-                            ) : activeTab === 'settings' ? (
+                        <h1 className="text-3xl font-black text-text-main flex items-center gap-3 tracking-tight">
+                            {activeTab === 'settings' ? (
                                 <>
                                     <Settings2 className="text-primary" size={32} />
                                     Configuration
@@ -96,9 +83,7 @@ const Grades: React.FC = () => {
                             )}
                         </h1>
                         <p className="text-grey-medium font-medium mt-1">
-                            {selectedEvaluationId 
-                                ? `${selectedPeriode} • ${branches.find(b => b.id === selectedBrancheId)?.nom}`
-                                : activeTab === 'settings'
+                            {activeTab === 'settings'
                                 ? 'Personnalisez vos barèmes et types de notes'
                                 : 'Gérez et encodez les résultats de vos élèves'
                             }
@@ -106,35 +91,25 @@ const Grades: React.FC = () => {
                     </div>
                 </div>
 
-                {!selectedEvaluationId && activeTab === 'evaluations' && (
+                {!selectedEvaluationId && (
                     <div className="flex items-center gap-3">
-                        <Tabs 
-                            tabs={tabs} 
-                            activeTab={activeTab} 
-                            onChange={setActiveTab} 
+                        <Tabs
+                            tabs={tabs}
+                            activeTab={activeTab}
+                            onChange={setActiveTab}
                             variant="capsule"
                             level={3}
                         />
-                        {hasContext && (
-                            <Button 
+                        {activeTab === 'evaluations' && (
+                            <Button
                                 onClick={() => setIsAddModalOpen(true)}
-                                className="shadow-lg shadow-primary/20 hover:scale-105 transition-transform"
+                                className="border border-primary/30"
                             >
                                 <Plus size={20} className="mr-2" />
                                 Nouvelle Évaluation
                             </Button>
                         )}
                     </div>
-                )}
-                
-                {!selectedEvaluationId && activeTab === 'settings' && (
-                    <Tabs 
-                        tabs={tabs} 
-                        activeTab={activeTab} 
-                        onChange={setActiveTab} 
-                        variant="capsule"
-                        level={3}
-                    />
                 )}
             </div>
 
@@ -143,69 +118,26 @@ const Grades: React.FC = () => {
                 <div className="animate-in fade-in slide-in-from-right-4 duration-300">
                     <GradeSettings />
                 </div>
+            ) : selectedEvaluationId ? (
+                <EvaluationDetailTable
+                    evaluationId={selectedEvaluationId}
+                    onBack={() => setSelectedEvaluationId(null)}
+                />
             ) : (
-                <>
-                    {/* Context Selector - Only visible when not in entry mode */}
-                    {!selectedEvaluationId && (
-                        <GradeContextSelector
-                            branches={branches}
-                            groups={groups}
-                            selectedBrancheId={selectedBrancheId}
-                            setSelectedBrancheId={setSelectedBrancheId}
-                            selectedGroupId={selectedGroupId}
-                            setSelectedGroupId={setSelectedGroupId}
-                            selectedPeriode={selectedPeriode}
-                            setSelectedPeriode={setSelectedPeriode}
-                            disabled={loading}
-                        />
-                    )}
-
-                    {/* Main Content Area */}
-                    <div className="min-h-[400px]">
-                        {!hasContext ? (
-                            <div className="flex flex-col items-center justify-center h-full py-20 text-center space-y-4 bg-surface rounded-3xl border border-dashed border-border/20">
-                                <div className="p-6 rounded-full bg-grey-light/10 text-grey-light mb-4">
-                                    <BookOpen size={64} strokeWidth={1} />
-                                </div>
-                                <h3 className="text-xl font-bold text-grey-dark">Prêt à commencer ?</h3>
-                                <p className="max-w-xs text-grey-medium">
-                                    Sélectionnez un groupe, une matière et une période pour voir les évaluations.
-                                </p>
-                            </div>
-                        ) : loading ? (
-                            <div className="flex flex-col items-center justify-center py-20 animate-pulse">
-                                <ClipboardList className="text-grey-light mb-4" size={48} />
-                                <p className="text-grey-medium font-bold">Chargement des données...</p>
-                            </div>
-                        ) : selectedEvaluationId ? (
-                            <GradeEntryGrid 
-                                evaluationId={selectedEvaluationId} 
-                                evaluation={currentEvaluation}
-                            />
-                        ) : (
-                            <EvaluationList
-                                evaluations={evaluations.filter(e => e.group_id === selectedGroupId)}
-                                onSelect={setSelectedEvaluationId}
-                                onDelete={deleteEvaluation}
-                                brancheId={selectedBrancheId}
-                                periode={selectedPeriode}
-                            />
-                        )}
-                    </div>
-                </>
+                <EvaluationsTableExcel
+                    onSelectEvaluation={setSelectedEvaluationId}
+                />
             )}
 
             {/* Add Evaluation Modal */}
-            {hasContext && (
-                <AddEvaluationModal
-                    isOpen={isAddModalOpen}
-                    onClose={() => setIsAddModalOpen(false)}
-                    onSubmit={handleCreateEvaluation}
-                    brancheId={selectedBrancheId || ''}
-                    groupId={selectedGroupId || ''}
-                    periode={selectedPeriode}
-                />
-            )}
+            <AddEvaluationModal
+                isOpen={isAddModalOpen}
+                onClose={() => setIsAddModalOpen(false)}
+                onSubmit={handleCreateEvaluation}
+                brancheId={''}
+                groupId={''}
+                periode={''}
+            />
         </div>
     );
 };

@@ -54,7 +54,7 @@ const GradeSettings: React.FC = () => {
 
     const addPalier = () => {
         const paliers = [...(formData.config.paliers || [])];
-        paliers.push({ letter: '', minPercent: 0, maxPercent: 0 });
+        paliers.push({ letter: '', minPercent: 0, maxPercent: 0, color: 'emerald' });
         setFormData({
             ...formData,
             config: { ...formData.config, paliers }
@@ -70,12 +70,21 @@ const GradeSettings: React.FC = () => {
         });
     };
 
-    const updatePalier = (index: number, field: 'letter' | 'minPercent' | 'maxPercent', value: any) => {
+    const updatePalier = (index: number, field: keyof any, value: any) => {
         const paliers = [...(formData.config.paliers || [])];
         paliers[index] = { 
             ...paliers[index], 
-            [field]: (field === 'minPercent' || field === 'maxPercent') ? parseFloat(value) : value 
+            [field]: field === 'minPercent' || field === 'maxPercent' ? parseFloat(value) || 0 : value 
         };
+        setFormData({
+            ...formData,
+            config: { ...formData.config, paliers }
+        });
+    };
+
+    const sortPaliers = () => {
+        const paliers = [...(formData.config.paliers || [])];
+        paliers.sort((a, b) => (a.minPercent || 0) - (b.minPercent || 0));
         setFormData({
             ...formData,
             config: { ...formData.config, paliers }
@@ -141,21 +150,23 @@ const GradeSettings: React.FC = () => {
                             </div>
                         </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-4 bg-white/5 rounded-2xl border border-white/5">
-                            <Input 
-                                label="Note Maximale par Défaut" 
-                                type="number"
-                                placeholder="10, 20, 100..." 
-                                value={formData.config.max || ''}
-                                onChange={(e) => setFormData({
-                                    ...formData, 
-                                    config: { ...formData.config, max: parseFloat(e.target.value) }
-                                })}
-                            />
-                            <div className="text-xs text-grey-medium flex items-center italic">
-                                Cette valeur sera proposée automatiquement lors de la création d'une évaluation avec ce barème.
+                        {formData.systeme === 'numerique' && (
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-4 bg-white/5 rounded-2xl border border-white/5 animate-in fade-in slide-in-from-top-2">
+                                <Input 
+                                    label="Note Maximale par Défaut" 
+                                    type="number"
+                                    placeholder="10, 20, 100..." 
+                                    value={formData.config.max || ''}
+                                    onChange={(e) => setFormData({
+                                        ...formData, 
+                                        config: { ...formData.config, max: parseFloat(e.target.value) }
+                                    })}
+                                />
+                                <div className="text-xs text-grey-medium flex items-center italic">
+                                    Cette valeur sera proposée automatiquement lors de la création d'une évaluation avec ce barème.
+                                </div>
                             </div>
-                        </div>
+                        )}
 
                         {formData.systeme === 'conversion' && (
                             <div className="space-y-4 animate-in fade-in slide-in-from-left-2 duration-300">
@@ -166,50 +177,98 @@ const GradeSettings: React.FC = () => {
                                     </Button>
                                 </div>
                                 <div className="space-y-2">
-                                    {(formData.config.paliers || []).map((palier: any, idx: number) => (
-                                        <div key={idx} className="flex items-center gap-2 p-2 bg-input/50 rounded-xl border border-white/5 group animate-in zoom-in-95 duration-200">
-                                            <div className="w-1/4">
-                                                <input 
-                                                    placeholder="Lettre (ex: A, TB)" 
-                                                    className="w-full bg-transparent border-none outline-none text-sm font-bold text-text-main px-2"
-                                                    value={palier.letter}
-                                                    onChange={(e) => updatePalier(idx, 'letter', e.target.value)}
-                                                />
-                                            </div>
-                                            <div className="flex items-center gap-1 w-1/4">
-                                                <span className="text-grey-medium font-bold text-[10px]">[</span>
-                                                <input 
-                                                    type="number"
-                                                    placeholder="Min" 
-                                                    className="w-full bg-transparent border-none outline-none text-sm font-bold text-primary text-right"
-                                                    value={palier.minPercent}
-                                                    onChange={(e) => updatePalier(idx, 'minPercent', e.target.value)}
-                                                />
-                                                <span className="text-grey-medium text-[10px]">%</span>
-                                            </div>
-                                            <div className="flex items-center gap-1 w-1/4">
-                                                <span className="text-grey-medium text-[10px]">..</span>
-                                                <input 
-                                                    type="number"
-                                                    placeholder="Max" 
-                                                    className="w-full bg-transparent border-none outline-none text-sm font-bold text-primary text-right"
-                                                    value={palier.maxPercent}
-                                                    onChange={(e) => updatePalier(idx, 'maxPercent', e.target.value)}
-                                                />
-                                                <span className="text-grey-medium text-[10px]">%</span>
-                                                <span className="text-grey-medium font-bold text-[10px]">[</span>
-                                            </div>
-                                            <div className="flex-1 flex justify-end">
-                                                <button 
-                                                    onClick={() => removePalier(idx)} 
-                                                    className="p-1.5 text-danger/40 hover:text-danger hover:bg-danger/10 rounded-lg transition-all opacity-0 group-hover:opacity-100"
-                                                    title="Supprimer ce palier"
-                                                >
-                                                    <Trash2 size={14} />
-                                                </button>
-                                            </div>
+                                    {/* Header Labels */}
+                                    {(formData.config.paliers || []).length > 0 && (
+                                        <div className="flex items-center gap-2 px-2 text-[10px] font-black text-grey-medium uppercase tracking-widest mb-1">
+                                            <div className="w-1/4 px-2">Titre</div>
+                                            <div className="w-[18%] text-right pr-4">Inf.</div>
+                                            <div className="w-[18%] text-right pr-4">Sup.</div>
+                                            <div className="w-[15%] text-center">Couleur</div>
+                                            <div className="flex-1"></div>
                                         </div>
-                                    ))}
+                                    )}
+                                    
+                                    {(formData.config.paliers || []).map((palier: any, idx: number) => {
+                                        const paliers = formData.config.paliers || [];
+                                        const hasInnerError = palier.minPercent > palier.maxPercent;
+                                        
+                                        // Overlap detection
+                                        const overlapsWithPrevious = idx > 0 && paliers[idx-1].maxPercent > palier.minPercent;
+                                        const overlapsWithNext = idx < paliers.length - 1 && palier.maxPercent > paliers[idx+1].minPercent;
+                                        const hasOverlap = overlapsWithPrevious || overlapsWithNext;
+
+                                        const hasError = hasInnerError || hasOverlap;
+
+                                        const colors = [
+                                            { name: 'emerald', class: 'bg-emerald-500' },
+                                            { name: 'blue', class: 'bg-blue-500' },
+                                            { name: 'amber', class: 'bg-amber-500' },
+                                            { name: 'rose', class: 'bg-rose-500' },
+                                            { name: 'purple', class: 'bg-purple-500' },
+                                            { name: 'grey', class: 'bg-grey-medium' }
+                                        ];
+                                        
+                                        return (
+                                            <div key={idx} className={`flex items-center gap-2 p-2 bg-input/50 rounded-xl border-2 transition-all group animate-in zoom-in-95 duration-200
+                                                ${hasError ? 'border-danger flex-shake shadow-lg shadow-danger/10' : 'border-white/5'}
+                                            `}>
+                                                <div className="w-1/4">
+                                                    <input 
+                                                        placeholder="Lettre (ex: A, TB)" 
+                                                        className="w-full bg-transparent border-none outline-none text-sm font-bold text-text-main px-2"
+                                                        value={palier.letter}
+                                                        onChange={(e) => updatePalier(idx, 'letter', e.target.value)}
+                                                    />
+                                                </div>
+                                                <div className="flex items-center gap-1 w-[18%]">
+                                                    <input 
+                                                        type="number"
+                                                        placeholder="Min" 
+                                                        className={`w-full bg-transparent border-none outline-none text-sm font-bold text-right ${hasInnerError || overlapsWithPrevious ? 'text-danger' : 'text-primary'}`}
+                                                        value={palier.minPercent}
+                                                        onChange={(e) => updatePalier(idx, 'minPercent', e.target.value)}
+                                                        onBlur={sortPaliers}
+                                                    />
+                                                    <span className="text-grey-medium text-[10px]">%</span>
+                                                </div>
+                                                <div className="flex items-center gap-1 w-[18%]">
+                                                    <input 
+                                                        type="number"
+                                                        placeholder="Max" 
+                                                        className={`w-full bg-transparent border-none outline-none text-sm font-bold text-right ${hasInnerError || overlapsWithNext ? 'text-danger' : 'text-primary'}`}
+                                                        value={palier.maxPercent}
+                                                        onChange={(e) => updatePalier(idx, 'maxPercent', e.target.value)}
+                                                        onBlur={sortPaliers}
+                                                    />
+                                                    <span className="text-grey-medium text-[10px]">%</span>
+                                                </div>
+                                                <div className="w-[15%] flex justify-center gap-1">
+                                                    <div className="flex flex-wrap justify-center gap-0.5 max-w-[60px]">
+                                                        {colors.map(c => (
+                                                            <button
+                                                                key={c.name}
+                                                                type="button"
+                                                                onClick={() => {
+                                                                    updatePalier(idx, 'color' as any, c.name);
+                                                                }}
+                                                                className={`w-3 h-3 rounded-full ${c.class} transition-transform hover:scale-125 ${palier.color === c.name ? 'ring-2 ring-white ring-offset-1 ring-offset-grey-dark' : 'opacity-40 hover:opacity-100'}`}
+                                                                title={c.name}
+                                                            />
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                                <div className="flex-1 flex justify-end">
+                                                    <button 
+                                                        onClick={() => removePalier(idx)} 
+                                                        className="p-1.5 text-danger/40 hover:text-danger hover:bg-danger/10 rounded-lg transition-all opacity-0 group-hover:opacity-100"
+                                                        title="Supprimer ce palier"
+                                                    >
+                                                        <Trash2 size={14} />
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
                                     {(formData.config.paliers || []).length === 0 && (
                                         <div className="py-8 text-center border-2 border-dashed border-white/5 rounded-2xl text-grey-medium text-sm">
                                             Aucun palier défini. Cliquez sur "Ajouter un palier" pour commencer.
@@ -222,7 +281,23 @@ const GradeSettings: React.FC = () => {
                     
                     <div className="flex justify-end gap-3 pt-6 mt-6 border-t border-white/5">
                         <Button variant="ghost" onClick={resetForm}>Annuler</Button>
-                        <Button variant="primary" icon={Save} onClick={handleSave} disabled={!formData.nom || !formData.config.max}>
+                        <Button 
+                            variant="primary" 
+                            icon={Save} 
+                            onClick={handleSave} 
+                            disabled={
+                                !formData.nom || 
+                                (formData.systeme === 'numerique' && !formData.config.max) ||
+                                (formData.systeme === 'conversion' && (
+                                    (formData.config.paliers || []).some((p: any, idx: number) => {
+                                        const paliers = formData.config.paliers;
+                                        const hasInnerError = p.minPercent > p.maxPercent;
+                                        const overlapsWithNext = idx < paliers.length - 1 && p.maxPercent > paliers[idx+1].minPercent;
+                                        return hasInnerError || overlapsWithNext;
+                                    })
+                                ))
+                            }
+                        >
                             Enregistrer le barème
                         </Button>
                     </div>
@@ -244,9 +319,16 @@ const GradeSettings: React.FC = () => {
                                     <span className="text-[10px] px-2 py-0.5 rounded-md bg-white/5 text-grey-medium border border-white/10 uppercase font-black tracking-wider">
                                         {type.systeme === 'conversion' ? 'Conversion en Lettres' : 'Numérique'}
                                     </span>
-                                    <span className="text-[10px] px-2 py-0.5 rounded-md bg-white/5 text-primary border border-primary/20 uppercase font-black tracking-wider">
-                                        Sur {(type.config as any)?.max || '?'}
-                                    </span>
+                                    {type.systeme === 'numerique' && (
+                                        <span className="text-[10px] px-2 py-0.5 rounded-md bg-white/5 text-primary border border-primary/20 uppercase font-black tracking-wider">
+                                            Sur {(type.config as any)?.max || '?'}
+                                        </span>
+                                    )}
+                                    {type.systeme === 'conversion' && (
+                                        <span className="text-[10px] px-2 py-0.5 rounded-md bg-amber-500/10 text-amber-500 border border-amber-500/20 uppercase font-black tracking-wider">
+                                            Points libres
+                                        </span>
+                                    )}
                                     {type.systeme === 'conversion' && (
                                         <span className="text-[10px] px-2 py-0.5 rounded-md bg-amber-500/10 text-amber-500 border border-amber-500/20 uppercase font-black tracking-wider">
                                             {(type.config as any)?.paliers?.length || 0} paliers

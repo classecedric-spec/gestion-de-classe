@@ -1,5 +1,6 @@
-import React, { useState, useRef, useLayoutEffect } from 'react';
+import React, { useState, useRef, useLayoutEffect, useEffect } from 'react';
 import { Check, AlertCircle, X } from 'lucide-react';
+import { useLocation } from 'react-router-dom';
 import clsx from 'clsx';
 
 // Modals
@@ -27,7 +28,15 @@ const Modules: React.FC = () => {
     const rightContentRef = useRef<HTMLDivElement>(null);
     const [headerHeight, setHeaderHeight] = useState<number | undefined>(undefined);
     const [showFilters, setShowFilters] = useState(false);
-    const [viewMode, setViewMode] = useState<'list' | 'table'>('list');
+    const [viewMode, setViewMode] = useState<'list' | 'table'>('table');
+    const location = useLocation();
+
+    // Reset viewMode to table when navigating to this page (e.g. sidebar click)
+    useEffect(() => {
+        if (location.pathname === '/dashboard/activities/modules') {
+            setViewMode('table');
+        }
+    }, [location.key, location.pathname]);
 
     // Notifications
     const { notification, showNotification, dismissNotification } = useNotifications();
@@ -99,6 +108,7 @@ const Modules: React.FC = () => {
     const handleModuleSelect = (module: any) => {
         moduleHook.actions.setSelectedModule(module);
         setDetailTab('activities');
+        setViewMode('list');
     };
 
     const handleEdit = (module: any) => {
@@ -121,12 +131,13 @@ const Modules: React.FC = () => {
     };
 
     return (
-        <div className="flex h-full gap-6 animate-in fade-in duration-500 relative">
+        <div className="flex flex-1 min-h-0 gap-6 animate-in fade-in duration-500 relative">
             {viewMode === 'table' ? (
                 <ModulesTableExcel
                     modules={moduleHook.states.filteredModules}
                     onClose={() => setViewMode('list')}
                     updateModule={moduleHook.actions.updateModule}
+                    onSelectModule={handleModuleSelect}
                 />
             ) : (
                 <>

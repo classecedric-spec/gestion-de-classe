@@ -22,9 +22,10 @@ interface ModulesTableExcelProps {
     modules: ModuleWithRelations[];
     onClose: () => void;
     updateModule?: (id: string, moduleData: any) => Promise<any>;
+    onSelectModule?: (module: ModuleWithRelations) => void;
 }
 
-export const ModulesTableExcel: React.FC<ModulesTableExcelProps> = ({ modules, onClose, updateModule }) => {
+export const ModulesTableExcel: React.FC<ModulesTableExcelProps> = ({ modules, onClose, updateModule, onSelectModule }) => {
     // We already have filtered & sorted modules passed from moduleHook
     const [selectedModuleForModal, setSelectedModuleForModal] = useState<ModuleWithRelations | null>(null);
 
@@ -478,7 +479,13 @@ export const ModulesTableExcel: React.FC<ModulesTableExcelProps> = ({ modules, o
             );
             case 'nom': return (
                 <>
-                                                <div className="font-semibold text-text-main group-hover:text-primary transition-colors flex items-center gap-2">
+                                                <div 
+                                                    className={clsx(
+                                                        "font-semibold text-text-main transition-colors flex items-center gap-2",
+                                                        onSelectModule ? "cursor-pointer hover:text-primary hover:underline underline-offset-4" : ""
+                                                    )}
+                                                    onClick={() => onSelectModule?.(module)}
+                                                >
                                                     {module.nom}
                                                 </div>
                 </>
@@ -758,18 +765,39 @@ export const ModulesTableExcel: React.FC<ModulesTableExcelProps> = ({ modules, o
 
         return matchesNameSearch && matchesStatus && matchesBranch && matchesSubBranch && matchesDate && matchesStudentCount;
     }).sort((a, b) => {
-        if (!dateSort) return 0;
+        // 1. Status Priority: en_cours (1), en_preparation (2), archive (3)
+        const statusPriority: Record<string, number> = { 
+            en_cours: 1, 
+            en_preparation: 2, 
+            archive: 3 
+        };
+        const sA = statusPriority[a.statut || 'en_preparation'] || 2;
+        const sB = statusPriority[b.statut || 'en_preparation'] || 2;
+        if (sA !== sB) return sA - sB;
+
+        // 2. Date Sort (use user preference if active, otherwise default to ascending)
+        // If a specific dateSort is active ('asc' or 'desc'), respect it.
+        // Otherwise, default to earliest first ('asc') for non-archived modules.
+        const dSort = dateSort || 'asc';
+        const dateA = a.date_fin ? new Date(a.date_fin).getTime() : Infinity;
+        const dateB = b.date_fin ? new Date(b.date_fin).getTime() : Infinity;
         
-        const dateA = a.date_fin ? new Date(a.date_fin).getTime() : 0;
-        const dateB = b.date_fin ? new Date(b.date_fin).getTime() : 0;
-        
-        // Modules without dates go to the bottom in both cases
-        if (dateA === 0 && dateB === 0) return 0;
-        if (dateA === 0) return 1;
-        if (dateB === 0) return -1;
-        
-        if (dateSort === 'asc') return dateA - dateB;
-        return dateB - dateA;
+        if (dateA !== dateB) {
+            return dSort === 'asc' ? dateA - dateB : dateB - dateA;
+        }
+
+        // 3. Branch (Alphabetical)
+        const branchA = a.SousBranche?.Branche?.nom || '';
+        const branchB = b.SousBranche?.Branche?.nom || '';
+        if (branchA !== branchB) return branchA.localeCompare(branchB);
+
+        // 4. Sub-branch (Alphabetical)
+        const subA = a.SousBranche?.nom || '';
+        const subB = b.SousBranche?.nom || '';
+        if (subA !== subB) return subA.localeCompare(subB);
+
+        // 5. Module Name (Alphabetical)
+        return a.nom.localeCompare(b.nom);
     });
 
 
@@ -811,7 +839,7 @@ export const ModulesTableExcel: React.FC<ModulesTableExcelProps> = ({ modules, o
 
     
     return (
-        <div className="w-full h-full flex flex-col gap-6 overflow-hidden animate-in fade-in duration-500">
+        <div className="w-full h-full flex flex-col gap-6 overflow-hidden min-h-0 animate-in fade-in duration-500">
             {/* Header / Top Bar */}
             <div className="flex items-center justify-between bg-surface/80 backdrop-blur-md rounded-2xl border border-white/5 p-4 shadow-lg shrink-0">
                 <div className="flex items-center gap-4">
@@ -838,7 +866,10 @@ export const ModulesTableExcel: React.FC<ModulesTableExcelProps> = ({ modules, o
             </div>
 
             {/* Table Container */}
-            <CardInfo className="flex-1 overflow-hidden flex flex-col p-0">
+            <CardInfo 
+                className="flex-1 overflow-hidden min-h-0" 
+                contentClassName="flex-1 flex flex-col p-0 min-h-0"
+            >
                 <div className="flex-1 overflow-auto custom-scrollbar">
                     <table className="w-full text-left border-collapse text-sm whitespace-nowrap table-fixed">
                         

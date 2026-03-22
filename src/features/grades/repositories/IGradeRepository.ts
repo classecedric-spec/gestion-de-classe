@@ -3,6 +3,7 @@ import { Tables, TablesInsert, TablesUpdate } from '../../../types/supabase';
 export interface IGradeRepository {
     // Evaluation CRUD
     findEvaluationsByContext(brancheId?: string, periode?: string): Promise<Tables<'Evaluation'>[]>;
+    findAllEvaluationsDetailed(): Promise<any[]>;
     createEvaluation(evaluation: TablesInsert<'Evaluation'>): Promise<Tables<'Evaluation'>>;
     updateEvaluation(id: string, evaluation: TablesUpdate<'Evaluation'>): Promise<Tables<'Evaluation'>>;
     deleteEvaluation(id: string): Promise<void>;
@@ -14,6 +15,8 @@ export interface IGradeRepository {
 
     // Resultat CRUD
     findResultsByEvaluation(evaluationId: string): Promise<Tables<'Resultat'>[]>;
+    findResultsByEvaluations(evaluationIds: string[]): Promise<Tables<'Resultat'>[]>;
+    findAllResultsDetailed(): Promise<any[]>;
     upsertResult(result: TablesInsert<'Resultat'>): Promise<Tables<'Resultat'>>;
     deleteResult(id: string): Promise<void>;
 

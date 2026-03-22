@@ -45,7 +45,7 @@ const GradeEntryGrid: React.FC<GradeEntryGridProps> = ({
         formatStatut,
         setSelectedEvaluationId,
         noteTypes,
-        convertNoteToLetter
+        getConversionPalier
     } = useGrades(evaluation?.branche_id || undefined, evaluation?.periode || undefined);
 
     const activeNoteType = noteTypes.find(nt => nt.id === evaluation?.type_note_id);
@@ -233,7 +233,16 @@ const GradeEntryGrid: React.FC<GradeEntryGridProps> = ({
                                     {questions.map(q => {
                                         const qResult = questionResults.find(qr => qr.eleve_id === student.id && qr.question_id === q.id);
                                         const refId = `${studentIndex}-${q.id}`;
-                                        const letter = isConversion ? convertNoteToLetter(qResult?.note || null, q.note_max, activeNoteType) : null;
+                                        const palier = isConversion ? getConversionPalier(qResult?.note || null, q.note_max, activeNoteType) : null;
+                                        const colorMap: Record<string, string> = {
+                                            emerald: 'text-emerald-500 border-emerald-500/20 bg-emerald-500/5',
+                                            blue: 'text-blue-500 border-blue-500/20 bg-blue-500/5',
+                                            amber: 'text-amber-500 border-amber-500/20 bg-amber-500/5',
+                                            rose: 'text-rose-500 border-rose-500/20 bg-rose-500/5',
+                                            purple: 'text-purple-500 border-purple-500/20 bg-purple-500/5',
+                                            grey: 'text-grey-medium border-grey-medium/20 bg-grey-medium/5'
+                                        };
+                                        const colorClasses = palier?.color ? colorMap[palier.color] || '' : '';
                                         
                                         return (
                                             <td key={q.id} className="py-4 px-1">
@@ -253,12 +262,12 @@ const GradeEntryGrid: React.FC<GradeEntryGridProps> = ({
                                                             setFocusedCol(q.id);
                                                         }}
                                                         className={`w-14 h-10 text-center text-sm font-bold rounded-lg border-2 transition-all outline-none
-                                                            ${focusedCol === q.id && focusedIndex === studentIndex ? 'border-primary bg-input' : 'border-border/5 bg-input'}
+                                                            ${focusedCol === q.id && focusedIndex === studentIndex ? 'border-primary bg-input' : (colorClasses || 'border-border/5 bg-input')}
                                                         `}
                                                     />
-                                                    {letter && (
-                                                        <span className="text-[10px] font-black text-amber-500 animate-in fade-in zoom-in-95 duration-300">
-                                                            {letter}
+                                                    {palier && (
+                                                        <span className={`text-[10px] font-black animate-in fade-in zoom-in-95 duration-300 ${colorClasses.split(' ')[0]}`}>
+                                                            {palier.letter}
                                                         </span>
                                                     )}
                                                 </div>
@@ -308,11 +317,25 @@ const GradeEntryGrid: React.FC<GradeEntryGridProps> = ({
                                                     ${hasQuestions && !editingTotals[student.id] ? 'cursor-default opacity-80' : 'cursor-text'}
                                                 `}
                                             />
-                                            {isConversion && (localTotals[student.id] || result?.note !== null) && (
-                                                <span className="text-sm font-black text-amber-500 animate-in fade-in slide-in-from-top-1 duration-300">
-                                                    {convertNoteToLetter(parseFloat(localTotals[student.id] || result?.note?.toString() || '0'), evaluation?.note_max || 20, activeNoteType)}
-                                                </span>
-                                            )}
+                                            {isConversion && (localTotals[student.id] || result?.note !== null) && (() => {
+                                                const totalNote = parseFloat(localTotals[student.id] || result?.note?.toString() || '0');
+                                                const palier = getConversionPalier(totalNote, evaluation?.note_max || 20, activeNoteType);
+                                                const colorMap: Record<string, string> = {
+                                                    emerald: 'text-emerald-500',
+                                                    blue: 'text-blue-500',
+                                                    amber: 'text-amber-500',
+                                                    rose: 'text-rose-500',
+                                                    purple: 'text-purple-500',
+                                                    grey: 'text-grey-medium'
+                                                };
+                                                const colorClass = palier?.color ? colorMap[palier.color] || 'text-amber-500' : 'text-amber-500';
+                                                
+                                                return palier && (
+                                                    <span className={`text-sm font-black animate-in fade-in slide-in-from-top-1 duration-300 ${colorClass}`}>
+                                                        {palier.letter}
+                                                    </span>
+                                                );
+                                            })()}
                                         </div>
                                     </td>
 

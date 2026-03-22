@@ -1,97 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, GripVertical, Trash2, ChevronLeft, ChevronRight, Calendar } from 'lucide-react';
+import { Trash2, ChevronLeft, ChevronRight, Calendar, Plus } from 'lucide-react';
 import { useDraggable, useDroppable } from '@dnd-kit/core';
 import { CSS } from '@dnd-kit/utilities';
 import { DAYS, PERIODS, WeeklyPlanningItem, ModuleWithDetails } from './useWeeklyPlanner';
-
-/**
- * DraggableDockItem - Item draggable dans le dock
- */
-interface DraggableDockItemProps {
-    item: WeeklyPlanningItem;
-    onDelete: (id: string) => void;
-    variant?: 'pill' | 'card';
-}
-
-export const DraggableDockItem: React.FC<DraggableDockItemProps> = ({ item, onDelete, variant }) => {
-    const { attributes, listeners, setNodeRef, transform } = useDraggable({
-        id: `dock-${item.id}`,
-        data: { type: 'dockItem', item }
-    });
-
-    const style = transform ? {
-        transform: CSS.Translate.toString(transform),
-        opacity: 0.5,
-    } : undefined;
-
-    const formatDateShort = (dateStr?: string) => {
-        if (!dateStr) return '';
-        const d = new Date(dateStr);
-        return d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'numeric' });
-    };
-
-    if (variant === 'pill') {
-        return (
-            <div
-                ref={setNodeRef}
-                style={style}
-                {...listeners}
-                {...attributes}
-                className="relative group flex flex-col items-center justify-center text-center bg-surface hover:bg-surface-hover border border-border hover:border-primary/50 rounded-xl p-[5px] w-[140px] h-auto min-h-[50px] cursor-grab active:cursor-grabbing transition-all shadow-sm hover:shadow-md flex-shrink-0"
-            >
-                <div className="flex-1 flex flex-col items-center justify-center w-full overflow-hidden">
-                    <span className="font-bold text-[11px] md:text-xs text-text-main line-clamp-3 leading-tight w-full break-words">
-                        {item.activity_title}
-                    </span>
-                    {item.date_fin && (
-                        <span className="text-[9px] text-grey-medium mt-1 font-normal block">
-                            ({formatDateShort(item.date_fin)})
-                        </span>
-                    )}
-                </div>
-
-                {(item.niveaux && item.niveaux.length > 0) && (
-                    <div className="w-full flex justify-center border-t border-border/50 pt-1 mt-1 shrink-0">
-                        <span className="text-[9px] text-primary font-medium uppercase tracking-wide">
-                            {item.niveaux.join(', ')}
-                        </span>
-                    </div>
-                )}
-
-                <button
-                    onPointerDown={(e) => e.stopPropagation()}
-                    onClick={(e) => { e.stopPropagation(); onDelete(item.id); }}
-                    className="absolute -top-1 -right-1 p-1 bg-surface border border-border rounded-full hover:text-danger hover:border-danger opacity-0 group-hover:opacity-100 transition-all shadow-sm"
-                >
-                    <X size={10} />
-                </button>
-            </div>
-        );
-    }
-
-    // Default Card Style
-    return (
-        <div
-            ref={setNodeRef}
-            style={style}
-            {...listeners}
-            {...attributes}
-            className="p-2 min-w-[120px] max-w-[160px] h-20 rounded-xl cursor-grab active:cursor-grabbing bg-surface border border-border hover:border-primary/50 hover:bg-white/5 flex flex-col relative group transition-all flex-shrink-0"
-        >
-            <span className="font-bold text-xs text-text-main line-clamp-2 leading-tight mb-1">{item.activity_title}</span>
-            <div className="mt-auto flex justify-between items-end">
-                <div className="opacity-50 text-text-main"><GripVertical size={14} /></div>
-                <button
-                    onPointerDown={(e) => e.stopPropagation()}
-                    onClick={(e) => { e.stopPropagation(); onDelete(item.id); }}
-                    className="p-1.5 hover:bg-danger/10 rounded-lg text-grey-medium hover:text-danger transition-colors opacity-0 group-hover:opacity-100"
-                >
-                    <Trash2 size={12} />
-                </button>
-            </div>
-        </div>
-    );
-};
+import { Tables } from '../../types/supabase';
+import clsx from 'clsx';
 
 /**
  * PlannerSlot - Case de planning avec support carousel
@@ -263,6 +176,168 @@ export const PlannerSlot: React.FC<PlannerSlotProps & React.HTMLAttributes<HTMLD
                     Déposer
                 </div>
             )}
+        </div>
+    );
+};
+
+/**
+ * DraggableLibraryItem - Item draggable dans la bibliothèque (Module brut)
+ */
+interface DraggableLibraryItemProps {
+    module: ModuleWithDetails;
+}
+
+export const DraggableLibraryItem: React.FC<DraggableLibraryItemProps> = ({ module }) => {
+    const { attributes, listeners, setNodeRef, transform } = useDraggable({
+        id: `lib-${module.id}`,
+        data: { type: 'libraryItem', module }
+    });
+
+    const style = transform ? {
+        transform: CSS.Translate.toString(transform),
+        opacity: 0.5,
+        zIndex: 100,
+    } : undefined;
+
+    const branchName = module.SousBranche?.Branche?.nom;
+    const branchColor = branchName === 'Français' ? 'text-blue-400 bg-blue-500/10' :
+                        branchName === 'Mathématiques' ? 'text-red-400 bg-red-500/10' :
+                        branchName === 'Eveil' ? 'text-emerald-400 bg-emerald-500/10' :
+                        'text-grey-medium bg-white/5';
+
+    return (
+        <div
+            ref={setNodeRef}
+            style={style}
+            {...listeners}
+            {...attributes}
+            className="group relative bg-surface-dark/40 hover:bg-input border border-white/5 hover:border-primary/50 p-2.5 rounded-xl cursor-grab active:cursor-grabbing transition-all shadow-sm hover:shadow-md select-none"
+        >
+            <div className="flex flex-col gap-1.5">
+                <span className="font-bold text-[11px] text-text-main line-clamp-2 leading-tight">
+                    {module.nom}
+                </span>
+                {module.SousBranche && (
+                    <div className={clsx("text-[9px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded-md w-fit", branchColor)}>
+                        {module.SousBranche.nom}
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+};
+
+/**
+ * DraggableCustomItem - Item draggable pour les activités perso
+ */
+interface DraggableCustomItemProps {
+    activity: Tables<'custom_activities'>;
+    onDelete: (id: string) => void;
+}
+
+export const DraggableCustomItem: React.FC<DraggableCustomItemProps> = ({ activity, onDelete }) => {
+    const { attributes, listeners, setNodeRef, transform } = useDraggable({
+        id: `custom-${activity.id}`,
+        data: { 
+            type: 'libraryItem', 
+            module: { nom: activity.title, isCustom: true } 
+        }
+    });
+
+    const style = transform ? {
+        transform: CSS.Translate.toString(transform),
+        opacity: 0.5,
+        zIndex: 100,
+    } : undefined;
+
+    return (
+        <div
+            ref={setNodeRef}
+            style={style}
+            {...listeners}
+            {...attributes}
+            className="group relative bg-surface-dark/40 hover:bg-input border border-white/5 hover:border-primary/50 p-2.5 rounded-xl cursor-grab active:cursor-grabbing transition-all shadow-sm hover:shadow-md select-none flex items-center justify-between"
+        >
+            <div className="flex flex-col gap-1 pr-6">
+                <span className="font-bold text-[11px] text-text-main line-clamp-2 leading-tight">
+                    {activity.title}
+                </span>
+                <div className="text-[9px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded-md w-fit text-amber-400 bg-amber-500/10">
+                    Perso
+                </div>
+            </div>
+            
+            <button
+                onPointerDown={(e) => e.stopPropagation()}
+                onClick={(e) => { e.stopPropagation(); onDelete(activity.id); }}
+                className="absolute right-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 p-1.5 hover:bg-danger/10 rounded-lg text-grey-medium hover:text-danger transition-all"
+                title="Supprimer définitivement"
+            >
+                <Trash2 size={12} />
+            </button>
+        </div>
+    );
+};
+
+/**
+ * AddCustomActivityInput - Champ de saisie pour nouvelle activité perso
+ */
+interface AddCustomActivityInputProps {
+    onAdd: (title: string) => void;
+}
+
+export const AddCustomActivityInput: React.FC<AddCustomActivityInputProps> = ({ onAdd }) => {
+    const [text, setText] = useState('');
+    const [isAdding, setIsAdding] = useState(false);
+
+    const handleSubmit = () => {
+        if (text.trim()) {
+            onAdd(text.trim());
+            setText('');
+            setIsAdding(false);
+        }
+    };
+
+    if (!isAdding) {
+        return (
+            <button
+                onClick={() => setIsAdding(true)}
+                className="w-full flex items-center justify-center gap-2 p-3 rounded-xl border border-dashed border-white/10 hover:border-primary/50 text-grey-medium hover:text-primary transition-all text-xs font-bold uppercase tracking-wider"
+            >
+                <Plus size={14} /> Ajouter une activité
+            </button>
+        );
+    }
+
+    return (
+        <div className="space-y-2 p-3 bg-white/5 rounded-xl border border-primary/30 animate-in fade-in slide-in-from-top-2 duration-200">
+            <input
+                autoFocus
+                type="text"
+                placeholder="Ex: Échecs, Réunion..."
+                className="w-full bg-input border border-border rounded-lg px-3 py-2 text-xs text-text-main focus:outline-none focus:border-primary"
+                value={text}
+                onChange={(e) => setText(e.target.value)}
+                onKeyDown={(e) => {
+                    if (e.key === 'Enter') handleSubmit();
+                    if (e.key === 'Escape') setIsAdding(false);
+                }}
+            />
+            <div className="flex justify-end gap-2">
+                <button
+                    onClick={() => setIsAdding(false)}
+                    className="px-2 py-1 text-[10px] text-grey-medium hover:text-text-main uppercase font-bold"
+                >
+                    Annuler
+                </button>
+                <button
+                    onClick={handleSubmit}
+                    disabled={!text.trim()}
+                    className="px-3 py-1 bg-primary hover:bg-primary-hover text-white rounded-lg text-[10px] font-bold uppercase disabled:opacity-50"
+                >
+                    Créer
+                </button>
+            </div>
         </div>
     );
 };

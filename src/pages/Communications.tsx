@@ -353,20 +353,47 @@ const Communications: React.FC = () => {
     const sendTeacherSummary = () => {
         if (!userEmail) return;
 
+        const selectedWithLate = Array.from(selectedStudentIds).filter(id => (lateWorksMap[id] || []).length > 0);
+        if (selectedWithLate.length === 0) {
+            toast.error('Aucun élève sélectionné avec des travaux en retard');
+            return;
+        }
+
         const summaryLines: string[] = [];
-        dispatchQueue.forEach(item => {
-            const studentId = students.find(s => s.prenom === item.studentName)?.id;
-            if (studentId) {
+        selectedWithLate.forEach(studentId => {
+            const student = students.find(s => s.id === studentId);
+            if (student) {
+                // Student header (Bold)
+                summaryLines.push(`**${student.prenom} ${student.nom}**`);
+                summaryLines.push('-------------------');
+                
                 const works = lateWorksMap[studentId] || [];
-                const moduleNames = Array.from(new Set(works.map(w => w.Activite.Module.nom.replace(/\[FP\]/g, '').trim()))).join(', ');
-                summaryLines.push(`${item.studentName} : ${moduleNames}`);
+                // Group by module
+                const groupedWorks: Record<string, any[]> = {};
+                works.forEach(w => {
+                    const moduleName = w.Activite.Module.nom.replace(/\[FP\]/g, '').trim();
+                    if (!groupedWorks[moduleName]) groupedWorks[moduleName] = [];
+                    groupedWorks[moduleName].push(w);
+                });
+
+                Object.entries(groupedWorks).forEach(([moduleName, moduleWorks]) => {
+                    // Indented module header
+                    summaryLines.push(`  ${moduleName}`);
+                    summaryLines.push(`  -----------------`);
+                    moduleWorks.forEach(w => {
+                        summaryLines.push(`    - ${w.Activite.titre}`);
+                    });
+                    summaryLines.push(''); // Spacing between modules
+                });
+                summaryLines.push(''); // Spacing between students
             }
         });
 
-        const summaryBody = `Récapitulatif des communications envoyées :\n\n${summaryLines.join('\n')}`;
+        const summaryBody = `Récapitulatif détaillé des travaux en retard :\n\n${summaryLines.join('\n')}`;
         const summarySubject = `Récapitulatif - Suivi Retards (${format(new Date(), 'dd/MM/yyyy')})`;
         const summaryMailto = `mailto:${userEmail}?subject=${encodeURIComponent(summarySubject)}&body=${encodeURIComponent(summaryBody)}`;
         window.open(summaryMailto, '_blank');
+        toast.success('Récapitulatif généré !');
     };
 
     const tabs: Tab[] = [
@@ -497,10 +524,18 @@ const Communications: React.FC = () => {
                                     <Button
                                         onClick={handleSendAllLate}
                                         variant="secondary"
-                                        className="w-full bg-amber-500/20 hover:bg-amber-500/30 text-amber-400 border-amber-500/30"
+                                        className="w-full bg-amber-500/20 hover:bg-amber-500/30 text-amber-400 border-amber-500/30 mb-2"
                                         icon={Send}
                                     >
                                         Envoyer à tous les sélectionnés
+                                    </Button>
+                                    <Button
+                                        onClick={sendTeacherSummary}
+                                        variant="ghost"
+                                        className="w-full border border-primary/30 text-theme-primary hover:bg-primary/10"
+                                        icon={Users}
+                                    >
+                                        Mon récapitulatif
                                     </Button>
                                 </div>
                             </div>
