@@ -52,6 +52,7 @@ const MobileDashboard: React.FC = () => {
     // Random Picker State
     const [isRandomPickerOpen, setIsRandomPickerOpen] = useState(false);
     const [groupStudents, setGroupStudents] = useState<any[]>([]); // Using any for compatibility with RandomPickerModal props for now
+    const [pickerPool, setPickerPool] = useState<any[]>([]);
 
     // Stats state
     const [stats, setStats] = useState<DashboardStats>({
@@ -188,6 +189,8 @@ const MobileDashboard: React.FC = () => {
             const fetchGroupStudents = async () => {
                 const students = await attendanceRepository.getStudentsByGroup(activeGroup.id);
                 setGroupStudents(students);
+                // Initialize/reset pool when group changes
+                setPickerPool(students);
             };
             fetchGroupStudents();
         } else if (session) {
@@ -418,6 +421,8 @@ const MobileDashboard: React.FC = () => {
                 isOpen={isRandomPickerOpen}
                 onClose={() => setIsRandomPickerOpen(false)}
                 students={groupStudents}
+                pool={pickerPool}
+                setPool={setPickerPool}
             />
         </div>
     );
