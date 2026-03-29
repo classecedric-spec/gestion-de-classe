@@ -32,6 +32,16 @@ export default defineConfig({
       }
     })
   ],
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'react-pdf': ['@react-pdf/renderer'],
+          'vendor': ['react', 'react-dom', 'react-router-dom', 'lucide-react', 'jspdf', 'exceljs']
+        }
+      }
+    }
+  },
   test: {
     globals: true,
     environment: 'jsdom',
