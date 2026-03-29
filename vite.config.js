@@ -36,8 +36,8 @@ export default defineConfig({
     rollupOptions: {
       output: {
         manualChunks: {
-          'react-pdf': ['@react-pdf/renderer'],
-          'vendor': ['react', 'react-dom', 'react-router-dom', 'lucide-react', 'jspdf', 'exceljs']
+          'react-pdf': ['@react-pdf/renderer', 'pdf-lib'],
+          'vendor': ['react', 'react-dom', 'react-router-dom', 'lucide-react', 'exceljs', '@supabase/supabase-js']
         }
       }
     }
