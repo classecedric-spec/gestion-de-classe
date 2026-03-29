@@ -21,7 +21,7 @@ interface UseActivitiesReturn {
     availableModules: AvailableModule[];
     fetchActivities: () => void;
     deleteActivity: (id: string) => void;
-    setActivities: (activities: ActivityWithRelations[]) => void;
+    setActivities: Dispatch<SetStateAction<ActivityWithRelations[]>>;
 }
 
 export const useActivities = (): UseActivitiesReturn => {
@@ -100,8 +100,6 @@ export const useActivities = (): UseActivitiesReturn => {
         },
         onError: (_err, _variables, context) => {
             if (context?.previous) queryClient.setQueryData(context.queryKey, context.previous);
-        },
-        onSettled: () => {
             queryClient.invalidateQueries({ queryKey: ['activities', user?.id] });
         }
     });
@@ -119,6 +117,11 @@ export const useActivities = (): UseActivitiesReturn => {
         availableModules,
         fetchActivities: () => queryClient.invalidateQueries({ queryKey: ['activities', user?.id] }),
         deleteActivity: (id: string) => deleteMutation.mutate(id),
-        setActivities: (newActivities) => queryClient.setQueryData(['activities', user?.id], newActivities)
+        setActivities: (action) => {
+            queryClient.setQueryData<ActivityWithRelations[]>(['activities', user?.id], (old) => {
+                const prev = old || [];
+                return typeof action === 'function' ? (action as Function)(prev) : [action]; // Actually we just return what action function does
+            });
+        }
     };
 };

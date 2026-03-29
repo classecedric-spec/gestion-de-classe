@@ -13,7 +13,6 @@ interface HelpRequestsPanelProps {
     helpRequests: HelpRequest[];
     expandedRequestId: string | null;
     helpersCache: Record<string, Helper[]>;
-    itemToDelete: any | null; // Detailed typing can be added if itemToDelete structure is known
     onExpand: (requestId: string, activityId: string) => void;
     onStatusClick: (activityId: string, status: ProgressionStatus, currentStatus: string, studentId?: string) => void;
     onSetItemToDelete: (item: any) => void;
@@ -27,7 +26,6 @@ const HelpRequestsPanel: React.FC<HelpRequestsPanelProps> = ({
     helpRequests,
     expandedRequestId,
     helpersCache,
-    itemToDelete,
     onExpand,
     onStatusClick,
     onSetItemToDelete
@@ -80,8 +78,13 @@ const HelpRequestsPanel: React.FC<HelpRequestsPanelProps> = ({
                                     <div className="w-[80%] flex flex-col justify-center px-3 relative shrink-0">
                                         {/* Line 1: Student Name & Date */}
                                         <div className="flex items-center justify-between w-full">
-                                            <h4 className="font-bold text-white truncate max-w-[70%] text-[clamp(12px,4.5cqw,24px)]">
-                                                {req.eleve?.prenom} {req.eleve?.nom?.charAt(0).toUpperCase()}
+                                            <h4 className="font-bold text-white truncate max-w-[70%] text-[clamp(12px,4.5cqw,24px)] flex items-center gap-2">
+                                                <span>{req.eleve?.prenom} {req.eleve?.nom?.charAt(0).toUpperCase()}</span>
+                                                {req.eleve?.importance_suivi !== undefined && req.eleve?.importance_suivi !== null && (
+                                                    <span className="text-[0.8em] font-medium text-grey-medium tabular-nums">
+                                                        ({req.eleve.importance_suivi}%)
+                                                    </span>
+                                                )}
                                             </h4>
 
                                             {req.activite?.Module?.date_fin && (
@@ -113,7 +116,7 @@ const HelpRequestsPanel: React.FC<HelpRequestsPanelProps> = ({
                                                             : "bg-[#A0A8AD] text-white border border-[#A0A8AD]"
                                             )}
                                         >
-                                            {req.is_suivi ? 'Suivi' : (req.etat === 'a_verifier' ? 'Vérif' : getStatusShortLabel(req.etat))}
+                                            {req.is_suivi ? 'Suivi' : getStatusShortLabel(req.etat)}
                                         </div>
                                     </div>
                                 </div>

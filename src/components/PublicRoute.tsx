@@ -15,7 +15,6 @@ interface PublicRouteProps {
  */
 const PublicRoute: React.FC<PublicRouteProps> = ({ children }) => {
     const [session, setSession] = useState<Session | null>(null);
-    const [loading, setLoading] = useState<boolean>(true);
 
     useEffect(() => {
         const checkSession = async () => {
@@ -30,8 +29,6 @@ const PublicRoute: React.FC<PublicRouteProps> = ({ children }) => {
             } catch (error) {
                 console.error('Unexpected error in PublicRoute:', error);
                 setSession(null);
-            } finally {
-                setLoading(false);
             }
         };
 
@@ -39,7 +36,6 @@ const PublicRoute: React.FC<PublicRouteProps> = ({ children }) => {
 
         const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
             setSession(session);
-            setLoading(false);
         });
 
         return () => {

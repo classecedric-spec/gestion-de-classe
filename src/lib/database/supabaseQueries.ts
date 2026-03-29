@@ -11,7 +11,7 @@ export type Update<T extends TableName> = Database['public']['Tables'][T]['Updat
  * We use 'any' for the schema mapping to avoid complex internal type mismatches
  * while maintaining the ability to use the builder in our utility functions.
  */
-export type FilterBuilder<T extends TableName> = any; // PostgrestFilterBuilder is complex to mirror here perfectly without full Supabase types
+export type FilterBuilder<T extends TableName> = T extends any ? any : never; // PostgrestFilterBuilder is complex to mirror here perfectly without full Supabase types
 
 export interface FetchOptions {
     select?: string;

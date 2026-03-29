@@ -5,7 +5,6 @@ import { ClipboardList, Users } from 'lucide-react';
 import { responsabiliteService } from '../services/responsabiliteService';
 import { useAuth } from '../../../hooks/useAuth';
 import { getInitials } from '../../../lib/helpers';
-import clsx from 'clsx';
 
 interface ResponsibilityOverviewModalProps {
     isOpen: boolean;

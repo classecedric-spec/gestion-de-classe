@@ -14,7 +14,6 @@ interface AttendanceGeneralTabProps {
     onSelectSetup?: (setup: SetupPresence) => void;
     isSetupLocked: boolean;
     onUnlockEditing: () => void;
-    currentDateForExport: string;
     onCopyPeriod: (source: string, target: string) => void;
     setConfirmModal: (state: any) => void;
 }
@@ -28,7 +27,6 @@ export const AttendanceGeneralTab: React.FC<AttendanceGeneralTabProps> = ({
     onSelectSetup,
     isSetupLocked,
     onUnlockEditing,
-    currentDateForExport,
     onCopyPeriod,
     setConfirmModal
 }) => {

@@ -11,6 +11,7 @@ export interface HelpRequest {
         id: string;
         prenom: string;
         nom: string;
+        importance_suivi: number | null;
     } | null;
     activite: {
         id: string;
@@ -68,7 +69,7 @@ export function useHelpRequests(
                     id,
                     etat,
                     is_suivi,
-                    eleve:Eleve(id, prenom, nom),
+                    eleve:Eleve(id, prenom, nom, importance_suivi),
                     activite:Activite(
                         id,
                         titre,

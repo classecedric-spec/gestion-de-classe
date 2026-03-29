@@ -156,10 +156,9 @@ interface WeeklyPlannerPDFProps {
     schedule: WeeklyPlanningItem[];
     modules: ModuleWithDetails[];
     weekLabel: string;
-    weekStartDate: string;
 }
 
-export const WeeklyPlannerPDF: React.FC<WeeklyPlannerPDFProps> = ({ schedule, modules, weekLabel, weekStartDate }) => {
+export const WeeklyPlannerPDF: React.FC<WeeklyPlannerPDFProps> = ({ schedule, modules, weekLabel }) => {
     const days = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi'];
     const periods = [1, 2, 3, 4, 5, 6]; // 6 Periods
 
@@ -184,7 +183,7 @@ export const WeeklyPlannerPDF: React.FC<WeeklyPlannerPDFProps> = ({ schedule, mo
                     </View>
 
                     {/* Day Columns */}
-                    {days.map((day, dIndex) => {
+                    {days.map((day) => {
                         const dayItems = getItemsForDay(day, schedule);
 
                         return (

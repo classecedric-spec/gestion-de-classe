@@ -47,7 +47,7 @@ const AttendanceConfigModal: React.FC<AttendanceConfigModalProps> = ({
         sets, loading,
         view, setView,
         currentSet, setCurrentSet,
-        categories, setCategories,
+        categories,
         activeTab, setActiveTab,
         // Export
         exportMode, setExportMode,
@@ -117,7 +117,6 @@ const AttendanceConfigModal: React.FC<AttendanceConfigModalProps> = ({
                         onSelectSetup={onSelectSetup}
                         isSetupLocked={isSetupLocked}
                         onUnlockEditing={onUnlockEditing || (() => { })}
-                        currentDateForExport={currentDateForExport}
                         onCopyPeriod={(s, t) => handleCopyPeriod(s, t, onConfigSaved)}
                         setConfirmModal={setConfirmModalState}
                     />

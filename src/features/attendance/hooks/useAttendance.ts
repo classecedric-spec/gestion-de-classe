@@ -131,32 +131,55 @@ export const useAttendance = () => {
         },
         onError: (_err, _variables, context) => {
             if (context?.previous) queryClient.setQueryData(context.queryKey, context.previous);
-        },
-        onSettled: () => {
             queryClient.invalidateQueries({ queryKey: ['attendance', user?.id, currentDate, currentPeriod, selectedGroupId, selectedSetupId] });
+        },
+        onSuccess: (_data, variables) => {
+            // Update the temp ID with the real server ID in the cache
+            if (variables.id?.toString().startsWith('temp-') && _data?.id) {
+                const queryKey = ['attendance', user?.id, currentDate, currentPeriod, selectedGroupId, selectedSetupId];
+                queryClient.setQueryData<Attendance[]>(queryKey, (old = []) =>
+                    old.map(a => a.id === variables.id ? { ...a, id: _data.id } : a)
+                );
+            }
         }
     });
 
     const deleteMutation = useMutation({
-        mutationFn: (id: string | number) => attendanceService.deleteAttendance(id),
+        mutationFn: (id: string) => attendanceService.deleteAttendance(id),
         onMutate: async (id) => {
             const queryKey = ['attendance', user?.id, currentDate, currentPeriod, selectedGroupId, selectedSetupId];
             await queryClient.cancelQueries({ queryKey });
             const previous = queryClient.getQueryData<Attendance[]>(queryKey) || [];
-            queryClient.setQueryData<Attendance[]>(queryKey, previous.filter(a => a.id !== id));
+            queryClient.setQueryData<Attendance[]>(queryKey, previous.filter(a => a.id !== id.toString()));
             return { previous, queryKey };
         },
         onError: (_err, _variables, context) => {
             if (context?.previous) queryClient.setQueryData(context.queryKey, context.previous);
-        },
-        onSettled: () => {
             queryClient.invalidateQueries({ queryKey: ['attendance', user?.id, currentDate, currentPeriod, selectedGroupId, selectedSetupId] });
         }
     });
 
     const bulkMutation = useMutation({
         mutationFn: (recs: any[]) => attendanceService.bulkInsertAttendances(recs),
-        onSettled: () => {
+        onMutate: async (newRecords) => {
+            const queryKey = ['attendance', user?.id, currentDate, currentPeriod, selectedGroupId, selectedSetupId];
+            await queryClient.cancelQueries({ queryKey });
+            const previous = queryClient.getQueryData<Attendance[]>(queryKey) || [];
+
+            const optimisticRecords: Attendance[] = newRecords.map((r: any, i: number) => ({
+                id: `bulk-temp-${Date.now()}-${i}`,
+                ...r,
+                created_at: new Date().toISOString(),
+                updated_at: null
+            }));
+            queryClient.setQueryData<Attendance[]>(queryKey, [...previous, ...optimisticRecords]);
+            return { previous, queryKey };
+        },
+        onError: (_err, _variables, context) => {
+            if (context?.previous) queryClient.setQueryData(context.queryKey, context.previous);
+        },
+        onSuccess: () => {
+            // After bulk insert succeeds, sync with server to get real IDs
             queryClient.invalidateQueries({ queryKey: ['attendance', user?.id, currentDate, currentPeriod, selectedGroupId, selectedSetupId] });
         }
     });
@@ -181,7 +204,8 @@ export const useAttendance = () => {
                 categorie_id: targetId === 'unassigned' ? null : targetId,
                 status: 'present',
                 user_id: user.id,
-                created_at: currentRecord?.created_at || new Date().toISOString()
+                created_at: currentRecord?.created_at || new Date().toISOString(),
+                updated_at: currentRecord?.updated_at || null
             };
             upsertMutation.mutate(newRecord);
         }

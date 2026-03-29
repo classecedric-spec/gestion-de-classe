@@ -6,6 +6,7 @@ import { useNoteTypes } from '../hooks/useGrades';
 import { useBranches } from '../../branches/hooks/useBranches';
 import { useGroupsData } from '../../groups/hooks/useGroupsData';
 import Select from '../../../core/Select';
+import { usePeriods } from '../hooks/usePeriods';
 
 interface AddEvaluationModalProps {
     isOpen: boolean;
@@ -27,6 +28,7 @@ const AddEvaluationModal: React.FC<AddEvaluationModalProps> = ({
     const { session } = useAuth();
     const { data: noteTypes = [] } = useNoteTypes();
     const { branches } = useBranches();
+    const { periodOptions, loading: loadingPeriods } = usePeriods();
     const { groups } = useGroupsData();
 
     // Local state for context (used when props are empty)
@@ -137,13 +139,13 @@ const AddEvaluationModal: React.FC<AddEvaluationModalProps> = ({
                             label="Période"
                             value={localPeriode}
                             onChange={(e) => setLocalPeriode(e.target.value)}
-                            options={[
-                                { value: 'Trimestre 1', label: 'Trimestre 1' },
-                                { value: 'Trimestre 2', label: 'Trimestre 2' },
-                                { value: 'Trimestre 3', label: 'Trimestre 3' },
-                                { value: 'Semestre 1', label: 'Semestre 1' },
-                                { value: 'Semestre 2', label: 'Semestre 2' },
-                            ]}
+                            options={
+                                loadingPeriods
+                                    ? [{ value: '', label: 'Chargement...' }]
+                                    : periodOptions.length > 0
+                                        ? periodOptions
+                                        : [{ value: 'Trimestre 1', label: 'Trimestre 1' }]
+                            }
                         />
                     </div>
                 )}

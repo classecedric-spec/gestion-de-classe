@@ -81,11 +81,20 @@ export const useAttendanceConfig = ({
     // 4. Mutations
     const deleteSetupMutation = useMutation({
         mutationFn: (id: string) => attendanceService.deleteSetup(id),
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['attendance-setup', user?.id] });
-            toast.success("Configuration supprimée");
+        onMutate: async (id) => {
+            const queryKey = ['attendance-setup', user?.id];
+            await queryClient.cancelQueries({ queryKey });
+            const previous = queryClient.getQueryData<SetupPresence[]>(queryKey) || [];
+            queryClient.setQueryData(queryKey, previous.filter(s => s.id !== id));
+            return { previous, queryKey };
         },
-        onError: (err: any) => toast.error('Erreur: ' + err.message)
+        onError: (_err, _variables, context) => {
+            if (context?.previous) queryClient.setQueryData(context.queryKey, context.previous);
+            toast.error('Erreur: ' + (_err as any).message);
+        },
+        onSuccess: () => {
+            toast.success("Configuration supprimée");
+        }
     });
 
     const saveSetupMutation = useMutation({

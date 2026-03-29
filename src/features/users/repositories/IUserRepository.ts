@@ -1,5 +1,5 @@
 
-import { PostgrestError } from '@supabase/supabase-js';
+
 import { Tables, TablesUpdate } from '../../../types/supabase';
 
 export interface IUserRepository {

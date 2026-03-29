@@ -79,7 +79,6 @@ const EmptyState: React.FC<EmptyStateProps> = ({
         }
     };
 
-    const ActionIcon = action?.icon;
 
     return (
         <div className={clsx(

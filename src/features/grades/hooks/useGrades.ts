@@ -34,15 +34,49 @@ export const useGradeMutations = (selectedEvaluationId?: string | null) => {
 
     const deleteEvaluationMutation = useMutation({
         mutationFn: (id: string) => gradeService.deleteEvaluation(id),
+        onMutate: async (id) => {
+            await queryClient.cancelQueries({ queryKey: ['all_evaluations_detailed'] });
+            await queryClient.cancelQueries({ queryKey: ['evaluations'] });
+
+            const previousDetailed = queryClient.getQueryData<any[]>(['all_evaluations_detailed']);
+            queryClient.setQueryData(['all_evaluations_detailed'], (old: any[] | undefined) =>
+                old?.filter((e: any) => e.id !== id) ?? []
+            );
+
+            return { previousDetailed };
+        },
+        onError: (_err, _id, context) => {
+            if (context?.previousDetailed) {
+                queryClient.setQueryData(['all_evaluations_detailed'], context.previousDetailed);
+            }
+            toast.error("Erreur lors de la suppression");
+        },
         onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['evaluations'] });
-            queryClient.invalidateQueries({ queryKey: ['all_evaluations_detailed'] });
             toast.success("Évaluation supprimée");
         }
     });
 
     const saveResultMutation = useMutation({
         mutationFn: (result: TablesInsert<'Resultat'>) => gradeService.saveResult(result),
+        onMutate: async (newResult) => {
+            if (!selectedEvaluationId) return;
+            const queryKey = ['evaluation_results', selectedEvaluationId];
+            await queryClient.cancelQueries({ queryKey });
+            const previous = queryClient.getQueryData<any[]>(queryKey) || [];
+
+            const exists = previous.find((r: any) => r.eleve_id === newResult.eleve_id);
+            if (exists) {
+                queryClient.setQueryData(queryKey, previous.map((r: any) =>
+                    r.eleve_id === newResult.eleve_id ? { ...r, ...newResult } : r
+                ));
+            } else {
+                queryClient.setQueryData(queryKey, [...previous, { id: `temp-${Date.now()}`, ...newResult }]);
+            }
+            return { previous, queryKey };
+        },
+        onError: (_err, _variables, context) => {
+            if (context?.previous) queryClient.setQueryData(context.queryKey, context.previous);
+        },
         onSuccess: () => {
             if (selectedEvaluationId) {
                 queryClient.invalidateQueries({ queryKey: ['evaluation_results', selectedEvaluationId] });
@@ -52,6 +86,27 @@ export const useGradeMutations = (selectedEvaluationId?: string | null) => {
 
     const saveQuestionResultsMutation = useMutation({
         mutationFn: (results: TablesInsert<'ResultatQuestion'>[]) => gradeService.saveQuestionResults(results),
+        onMutate: async (newResults) => {
+            if (!selectedEvaluationId) return;
+            const queryKey = ['question_results', selectedEvaluationId];
+            await queryClient.cancelQueries({ queryKey });
+            const previous = queryClient.getQueryData<any[]>(queryKey) || [];
+
+            let updated = [...previous];
+            for (const nr of newResults) {
+                const idx = updated.findIndex((r: any) => r.eleve_id === nr.eleve_id && r.question_id === nr.question_id);
+                if (idx >= 0) {
+                    updated[idx] = { ...updated[idx], ...nr };
+                } else {
+                    updated.push({ id: `temp-${Date.now()}`, ...nr });
+                }
+            }
+            queryClient.setQueryData(queryKey, updated);
+            return { previous, queryKey };
+        },
+        onError: (_err, _variables, context) => {
+            if (context?.previous) queryClient.setQueryData(context.queryKey, context.previous);
+        },
         onSuccess: () => {
             if (selectedEvaluationId) {
                 queryClient.invalidateQueries({ queryKey: ['question_results', selectedEvaluationId] });
@@ -70,8 +125,19 @@ export const useGradeMutations = (selectedEvaluationId?: string | null) => {
 
     const deleteNoteTypeMutation = useMutation({
         mutationFn: (id: string) => gradeService.deleteNoteType(id),
+        onMutate: async (id) => {
+            await queryClient.cancelQueries({ queryKey: ['note_types'] });
+            const previous = queryClient.getQueryData<any[]>(['note_types']);
+            queryClient.setQueryData(['note_types'], (old: any[] | undefined) =>
+                old?.filter((nt: any) => nt.id !== id) ?? []
+            );
+            return { previous };
+        },
+        onError: (_err, _id, context) => {
+            if (context?.previous) queryClient.setQueryData(['note_types'], context.previous);
+            toast.error("Erreur lors de la suppression");
+        },
         onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['note_types'] });
             toast.success("Type de note supprimé");
         }
     });

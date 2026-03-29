@@ -1,7 +1,6 @@
 import { useState, useCallback } from 'react';
 import { supabase } from '../../../lib/database';
 import { fetchWithCache } from '../../../lib/sync';
-import { useOfflineSync } from '../../../context/OfflineSyncContext';
 import { useUpdateProgression } from '../../../hooks/useUpdateProgression';
 import { toast } from 'sonner';
 import { Student } from '../../attendance/services/attendanceService';
@@ -94,8 +93,18 @@ export function useProgressions(
 
                 // Fallback chain: specific branch index > student global importance > global default
                 const idx = specificIdx ?? studentGlobalIdx ?? defaultLuckyCheckIndex ?? 50;
+                const randomRoll = Math.random() * 100;
+                const willVerify = randomRoll < idx;
 
-                if (Math.random() * 100 < idx) {
+                const targetStudent = students.find(s => s.id === targetStudentId);
+                const act = activities.find(a => a.id === activityId);
+
+                console.log(`[Dashboard] ${targetStudent?.prenom} ${targetStudent?.nom} | Module: ${act?.Module?.nom} | Activité: ${act?.titre}`);
+                console.log(`- Détail des indices : Matière: ${specificIdx ?? '---'}% | Élève: ${studentGlobalIdx ?? '---'}% | Défaut: ${defaultLuckyCheckIndex ?? 50}%`);
+                console.log(`- Indice appliqué : ${idx}% (Source: ${specificIdx !== undefined && specificIdx !== null ? 'MATIÈRE' : (studentGlobalIdx !== undefined && studentGlobalIdx !== null ? 'ÉLÈVE' : 'DÉFAUT')})`);
+                console.log(`- Tirage: ${randomRoll.toFixed(2)}% | Décision: ${willVerify ? 'À VÉRIFIER 🟣' : 'TERMINÉ 🟢'}`);
+
+                if (willVerify) {
                     finalStatus = 'a_verifier';
                     toast("Vérification requise (Auto)", { description: "L'activité doit être vérifiée.", duration: 4000 });
                 }

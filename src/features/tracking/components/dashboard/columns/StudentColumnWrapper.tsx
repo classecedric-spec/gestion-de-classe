@@ -72,8 +72,13 @@ export const StudentColumnWrapper: React.FC<StudentColumnWrapperProps> = ({
                                         </div>
                                         <div className="min-w-0 flex-1">
                                             <div className="flex items-center justify-between gap-2">
-                                                <h3 className="text-xl font-bold text-white leading-tight truncate">
-                                                    {selectedStudent.prenom}
+                                                <h3 className="text-xl font-bold text-white leading-tight truncate flex items-center gap-2">
+                                                    <span>{selectedStudent.prenom}</span>
+                                                    {selectedStudent.importance_suivi !== undefined && selectedStudent.importance_suivi !== null && (
+                                                        <span className="text-[0.6em] font-medium text-grey-medium tabular-nums opacity-60">
+                                                            ({selectedStudent.importance_suivi}%)
+                                                        </span>
+                                                    )}
                                                 </h3>
 
                                                 <button

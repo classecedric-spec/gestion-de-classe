@@ -1,4 +1,4 @@
-import { TablesInsert, TablesUpdate, Tables } from '../../../types/supabase';
+import { TablesInsert, Tables } from '../../../types/supabase';
 import { ProgressionWithDetails, StudentBasicInfo } from '../types/tracking.types';
 
 /**

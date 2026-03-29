@@ -160,8 +160,6 @@ export const useStudentsData = (initialStudentId: string | null = null) => {
             toast.success("Élève enregistré");
             handleCloseModal();
 
-            // If it was a creation, we might have a real ID now. 
-            // We can replace the temp ID immediately in the cache to avoid a flicker
             if (!variables.isEdit && data && typeof data === 'object' && data.id) {
                 const queryKey = ['students', user?.id];
                 queryClient.setQueryData<StudentDetailed[]>(queryKey, (old = []) =>
@@ -169,8 +167,7 @@ export const useStudentsData = (initialStudentId: string | null = null) => {
                 );
                 setSelectedStudentId(data.id);
             }
-        },
-        onSettled: () => {
+            // Sync with server for clean data
             queryClient.invalidateQueries({ queryKey: ['students', user?.id] });
         }
     });
@@ -208,8 +205,6 @@ export const useStudentsData = (initialStudentId: string | null = null) => {
             }
             console.error(err);
             toast.error("Échec de la mise à jour");
-        },
-        onSettled: () => {
             queryClient.invalidateQueries({ queryKey: ['students', user?.id] });
         }
     });
@@ -241,21 +236,19 @@ export const useStudentsData = (initialStudentId: string | null = null) => {
             }
             return { previousStudents, queryKey };
         },
-        onError: (_err, _student, context) => {
-            if (context?.previousStudents && context.queryKey) {
-                queryClient.setQueryData(context.queryKey, context.previousStudents);
-            }
-            toast.error("Erreur lors de la suppression");
-        },
         onSuccess: () => {
             toast.success("Élève supprimé");
             if (selectedStudentId === studentToDelete?.id) {
                 setSelectedStudentId(null);
             }
-        },
-        onSettled: () => {
-            queryClient.invalidateQueries({ queryKey: ['students', user?.id] });
             setStudentToDelete(null);
+        },
+        onError: (_err, _student, context) => {
+            if (context?.previousStudents && context.queryKey) {
+                queryClient.setQueryData(context.queryKey, context.previousStudents);
+            }
+            toast.error("Erreur lors de la suppression");
+            queryClient.invalidateQueries({ queryKey: ['students', user?.id] });
         }
     });
 

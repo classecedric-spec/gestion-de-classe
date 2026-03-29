@@ -85,6 +85,13 @@ const Home: React.FC = () => {
     const [isRandomPickerOpen, setIsRandomPickerOpen] = useState(false);
     const [isWeeklyPlannerOpen, setIsWeeklyPlannerOpen] = useState(false);
     const [isResponsibilityOverviewOpen, setIsResponsibilityOverviewOpen] = useState(false);
+    const [pickerPool, setPickerPool] = useState<any[]>([]);
+
+    useEffect(() => {
+        if (students && students.length > 0 && pickerPool.length === 0) {
+            setPickerPool(students);
+        }
+    }, [students]);
 
     // ESC key handler for PDF generation
     useEffect(() => {
@@ -151,6 +158,8 @@ const Home: React.FC = () => {
                 isOpen={isRandomPickerOpen}
                 onClose={() => setIsRandomPickerOpen(false)}
                 students={students || []}
+                pool={pickerPool}
+                setPool={setPickerPool}
             />
             <WeeklyPlannerModal
                 isOpen={isWeeklyPlannerOpen}

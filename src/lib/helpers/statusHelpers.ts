@@ -4,7 +4,7 @@
  * Used across all progression/activity status displays
  */
 
-import { Check, AlertCircle, ShieldCheck, Home, Settings2, LucideIcon } from 'lucide-react';
+import { Check, AlertCircle, ShieldCheck, Home, LucideIcon } from 'lucide-react';
 
 export type StatusKey =
     | 'a_commencer'
@@ -68,7 +68,7 @@ export const STATUS_CONFIG: Record<StatusKey, StatusDetail> = {
         textColor: 'text-white',
         icon: ShieldCheck,
         label: 'À vérifier',
-        shortLabel: 'Vérif'
+        shortLabel: 'À vérifier'
     },
     termine: {
         color: 'bg-success',

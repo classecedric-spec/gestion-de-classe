@@ -1,5 +1,5 @@
 import React from 'react';
-import { ShieldCheck, Lock, EyeOff, Database } from 'lucide-react';
+import { Lock, EyeOff, Database } from 'lucide-react';
 import PublicHeader from '../components/PublicHeader';
 
 const Privacy: React.FC = () => {

@@ -27,21 +27,49 @@ const Responsabilites: React.FC = () => {
     // 2. Mutations
     const createTaskMutation = useMutation({
         mutationFn: (titre: string) => responsabiliteService.createResponsibility(session!.user.id, titre),
+        onMutate: async (titre) => {
+            const queryKey = ['responsibilities', session?.user.id];
+            await queryClient.cancelQueries({ queryKey });
+            const previous = queryClient.getQueryData<ResponsabiliteWithEleves[]>(queryKey) || [];
+
+            const tempTask: ResponsabiliteWithEleves = {
+                id: `temp-${Date.now()}`,
+                titre,
+                user_id: session!.user.id,
+                created_at: new Date().toISOString(),
+                eleves: []
+            };
+            queryClient.setQueryData(queryKey, [tempTask, ...previous]);
+            return { previous, queryKey };
+        },
+        onError: (_err, _variables, context) => {
+            if (context?.previous) queryClient.setQueryData(context.queryKey, context.previous);
+            toast.error("Erreur lors de la création");
+        },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['responsibilities', session?.user.id] });
             setNewTaskTitle('');
             toast.success("Responsabilité créée");
-        },
-        onError: () => toast.error("Erreur lors de la création")
+        }
     });
 
     const deleteTaskMutation = useMutation({
         mutationFn: (id: string) => responsabiliteService.deleteResponsibility(id),
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['responsibilities', session?.user.id] });
-            toast.success("Responsabilité supprimée");
+        onMutate: async (id) => {
+            const queryKey = ['responsibilities', session?.user.id];
+            await queryClient.cancelQueries({ queryKey });
+            const previous = queryClient.getQueryData<ResponsabiliteWithEleves[]>(queryKey) || [];
+
+            queryClient.setQueryData(queryKey, previous.filter(t => t.id !== id));
+            return { previous, queryKey };
         },
-        onError: () => toast.error("Erreur lors de la suppression")
+        onError: (_err, _variables, context) => {
+            if (context?.previous) queryClient.setQueryData(context.queryKey, context.previous);
+            toast.error("Erreur lors de la suppression");
+        },
+        onSuccess: () => {
+            toast.success("Responsabilité supprimée");
+        }
     });
 
     const assignMutation = useMutation({
@@ -57,11 +85,25 @@ const Responsabilites: React.FC = () => {
 
     const unassignMutation = useMutation({
         mutationFn: (assignmentId: string) => responsabiliteService.unassignStudent(assignmentId),
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['responsibilities', session?.user.id] });
-            toast.success("Assignation retirée");
+        onMutate: async (assignmentId) => {
+            const queryKey = ['responsibilities', session?.user.id];
+            await queryClient.cancelQueries({ queryKey });
+            const previous = queryClient.getQueryData<ResponsabiliteWithEleves[]>(queryKey) || [];
+
+            const updated = previous.map(task => ({
+                ...task,
+                eleves: task.eleves.filter(e => e.id !== assignmentId)
+            }));
+            queryClient.setQueryData(queryKey, updated);
+            return { previous, queryKey };
         },
-        onError: () => toast.error("Erreur lors du retrait")
+        onError: (_err, _variables, context) => {
+            if (context?.previous) queryClient.setQueryData(context.queryKey, context.previous);
+            toast.error("Erreur lors du retrait");
+        },
+        onSuccess: () => {
+            toast.success("Assignation retirée");
+        }
     });
 
     // Handlers

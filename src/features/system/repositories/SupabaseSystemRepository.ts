@@ -165,7 +165,7 @@ export class SupabaseSystemRepository implements ISystemRepository {
         }
     }
 
-    async hardReset(userId: string): Promise<void> {
+    async hardReset(_userId: string): Promise<void> {
         // Tables dans l'ordre des dépendances FK
         await supabase.from('SuiviAdulte').delete().not('id', 'is', null);
         await supabase.from('Progression').delete().not('id', 'is', null);

@@ -161,15 +161,13 @@ export const useClasses = () => {
         },
         onError: (_err, _variables, context) => {
             if (context?.previousClasses) queryClient.setQueryData(context.queryKey, context.previousClasses);
-        },
-        onSettled: () => {
             queryClient.invalidateQueries({ queryKey: ['classes', user?.id] });
         }
     });
 
     const addClassMutation = useMutation({
         mutationFn: (newClass: any) => classService.createClass(newClass),
-        onSettled: () => {
+        onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['classes', user?.id] });
         }
     });
@@ -188,8 +186,6 @@ export const useClasses = () => {
         },
         onError: (_err, _variables, context) => {
             if (context?.previous) queryClient.setQueryData(context.queryKey, context.previous);
-        },
-        onSettled: () => {
             queryClient.invalidateQueries({ queryKey: ['students-in-class', user?.id, selectedClass?.id] });
             queryClient.invalidateQueries({ queryKey: ['students', user?.id] });
         }
@@ -210,8 +206,6 @@ export const useClasses = () => {
         },
         onError: (_err, _variables, context) => {
             if (context?.previous) queryClient.setQueryData(context.queryKey, context.previous);
-        },
-        onSettled: () => {
             queryClient.invalidateQueries({ queryKey: ['students-in-class', user?.id, selectedClass?.id] });
             queryClient.invalidateQueries({ queryKey: ['students', user?.id] });
         }

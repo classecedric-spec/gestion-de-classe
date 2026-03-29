@@ -1,27 +1,23 @@
 import React from 'react';
-import { Activity } from 'lucide-react';
+
 import HelpRequestsPanel from '../../desktop/HelpRequestsPanel';
 
 interface HelpColumnWrapperProps {
     helpRequests: any[];
     expandedRequestId: string | null;
     helpersCache: any;
-    itemToDelete: any;
     onExpand: (id: string | null) => void;
     onStatusClick: (activityId: string, status: string, currentStatus?: string, studentId?: string) => void;
     onSetItemToDelete: (item: any) => void;
-    onGenerateAutoSuivi: () => void;
 }
 
 export const HelpColumnWrapper: React.FC<HelpColumnWrapperProps> = ({
     helpRequests,
     expandedRequestId,
     helpersCache,
-    itemToDelete,
     onExpand,
     onStatusClick,
-    onSetItemToDelete,
-    onGenerateAutoSuivi
+    onSetItemToDelete
 }) => {
     return (
         <div className="flex flex-col h-full">
@@ -38,7 +34,6 @@ export const HelpColumnWrapper: React.FC<HelpColumnWrapperProps> = ({
                     helpRequests={helpRequests}
                     expandedRequestId={expandedRequestId}
                     helpersCache={helpersCache}
-                    itemToDelete={itemToDelete}
                     onExpand={onExpand}
                     onStatusClick={onStatusClick}
                     onSetItemToDelete={onSetItemToDelete}

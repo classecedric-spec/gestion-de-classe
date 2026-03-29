@@ -466,8 +466,15 @@ export function useStudentPlanningData(studentId: string | undefined) {
                     const specificIdx = branchId ? manualIndices[studentIdToUse]?.[branchId] : null;
                     const studentGlobalIdx = student?.importance_suivi;
                     const idx = specificIdx ?? studentGlobalIdx ?? defaultLuckyIndex ?? 50;
+                    const randomRoll = Math.random() * 100;
+                    const willVerify = randomRoll < idx;
 
-                    if (Math.random() * 100 < idx) {
+                    console.log(`[Validation] ${student?.prenom} ${student?.nom} | Module: ${act.moduleNom} | Activité: ${act.titre}`);
+                    console.log(`- Détail des indices : Matière: ${specificIdx ?? '---'}% | Élève: ${studentGlobalIdx ?? '---'}% | Défaut: ${defaultLuckyIndex ?? 50}%`);
+                    console.log(`- Indice appliqué : ${idx}% (Source: ${specificIdx !== null && specificIdx !== undefined ? 'MATIÈRE' : (studentGlobalIdx !== null && studentGlobalIdx !== undefined ? 'ÉLÈVE' : 'DÉFAUT')})`);
+                    console.log(`- Tirage: ${randomRoll.toFixed(2)}% | Décision: ${willVerify ? 'À VÉRIFIER 🟣' : 'TERMINÉ 🟢'}`);
+
+                    if (willVerify) {
                         nextEtat = 'a_verifier';
                     } else {
                         nextEtat = 'termine';

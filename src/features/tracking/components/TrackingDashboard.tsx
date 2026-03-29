@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Check, Activity } from 'lucide-react';
 import clsx from 'clsx';
 import TimerModal from '../../../components/TimerModal';
@@ -71,6 +71,14 @@ const TrackingDashboard: React.FC<TrackingDashboardProps> = ({
     } = states;
 
     const { setIsRandomPickerOpen } = actions;
+
+    const [pickerPool, setPickerPool] = useState<any[]>([]);
+
+    useEffect(() => {
+        if (groupsHook.states.students && groupsHook.states.students.length > 0 && pickerPool.length === 0) {
+            setPickerPool(groupsHook.states.students);
+        }
+    }, [groupsHook.states.students]);
 
     // Extracted styles to avoid inline style warnings
     const column1Style = { width: `${layoutHook.states.columnWidths[0]}%` };
@@ -184,7 +192,6 @@ const TrackingDashboard: React.FC<TrackingDashboardProps> = ({
                             helpRequests={helpHook.states.helpRequests}
                             expandedRequestId={helpHook.states.expandedRequestId}
                             helpersCache={helpHook.states.helpersCache}
-                            itemToDelete={progressionsHook.states.itemToDelete}
                             onExpand={(requestId: string | null) => {
                                 if (!requestId) return;
                                 const req = helpHook.states.helpRequests.find(r => r.id === requestId);
@@ -201,7 +208,6 @@ const TrackingDashboard: React.FC<TrackingDashboardProps> = ({
                                 }
                             }}
                             onSetItemToDelete={progressionsHook.actions.setItemToDelete}
-                            onGenerateAutoSuivi={() => progressionsHook.actions.handleAddStudentsForSuivi()}
                         />
                     </div>
                     <ColumnResizeHandle orientation="horizontal" onMouseDown={layoutHook.actions.handleRowMouseDown(1)} isEditMode={layoutHook.states.isEditMode} />
@@ -296,6 +302,8 @@ const TrackingDashboard: React.FC<TrackingDashboardProps> = ({
                 isOpen={isRandomPickerOpen}
                 onClose={() => setIsRandomPickerOpen(false)}
                 students={groupsHook.states.students || []}
+                pool={pickerPool}
+                setPool={setPickerPool}
             />
         </>
     );

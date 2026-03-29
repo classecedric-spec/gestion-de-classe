@@ -11,6 +11,7 @@ export interface AvatarProps {
     icon?: LucideIcon;
     size?: AvatarSize;
     className?: string;
+    tooltip?: string;
     editable?: boolean;
     loading?: boolean;
     onImageChange?: (file: File) => void | Promise<void>;
@@ -51,6 +52,7 @@ const Avatar: React.FC<AvatarProps> = ({
     icon: Icon,
     size = 'md',
     className,
+    tooltip,
     editable = false,
     loading = false,
     onImageChange,
@@ -143,6 +145,7 @@ const Avatar: React.FC<AvatarProps> = ({
             onDragLeave={editable ? handleDragLeave : undefined}
             onDrop={editable ? handleDrop : undefined}
             onClick={editable ? handleClick : undefined}
+            title={tooltip}
         >
             {loading ? (
                 <Loader2 className="animate-spin text-primary" size={iconSizes[size]} />

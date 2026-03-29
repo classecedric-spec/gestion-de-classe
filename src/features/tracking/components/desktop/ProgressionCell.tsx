@@ -53,7 +53,7 @@ const ProgressionCell: React.FC<ProgressionCellProps> = ({
     const handleToggleStatus = (newStatus: ProgressionStatus) => {
         // Only lock if we are NOT trying to validate (moving to 'termine')
         if (isLocked && newStatus !== 'termine') return;
-        
+
         const statusStr = typeof currentStatus === 'string' ? currentStatus : 'a_commencer';
         if (currentStatus === newStatus) {
             onStatusClick(activity.id, 'a_commencer', statusStr);
@@ -122,28 +122,29 @@ const ProgressionCell: React.FC<ProgressionCellProps> = ({
                 </button>
 
                 <button
+                    disabled={isLocked}
                     onClick={() => handleToggleStatus('termine')}
                     className={clsx(
                         "py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all border flex items-center justify-center gap-1 shrink-0 truncate px-1",
                         isLocked
-                            ? "bg-[#8B5CF6] text-white border-[#8B5CF6] shadow-sm ring-2 ring-purple-500/50 scale-105"
+                            ? "bg-[#8B5CF6] text-white border-[#8B5CF6] shadow-sm ring-2 ring-purple-500/50 scale-100 opacity-90 cursor-not-allowed"
                             : ((currentStatus === 'termine' || currentStatus === 'a_verifier')
                                 ? (currentStatus === 'a_verifier'
                                     ? "bg-[#8B5CF6] text-white border-[#8B5CF6] shadow-sm"
                                     : "bg-success text-white border-success shadow-sm")
                                 : "bg-black/20 border-white/5 text-grey-medium hover:border-success/40")
                     )}
-                    title={currentStatus === 'termine' ? 'Validé' : (isLocked ? 'En attente de vérification' : 'Valider')}
+                    title={currentStatus === 'termine' ? 'Validé' : (isLocked ? 'À vérifier' : 'Valider')}
                 >
                     {isLocked ? (
                         <>
-                            <ShieldCheck size={11} className="shrink-0 animate-pulse" />
-                            <span className="truncate">Verif</span>
+                            <ShieldCheck size={11} className="shrink-0" />
+                            <span className="truncate">À vérifier</span>
                         </>
                     ) : (
                         <>
                             <Check size={11} className={clsx("shrink-0", currentStatus !== 'termine' && "opacity-50")} />
-                            <span className="truncate">{currentStatus === 'termine' ? 'Validé' : 'Vérif'}</span>
+                            <span className="truncate">{currentStatus === 'termine' ? 'Validé' : 'Valider'}</span>
                         </>
                     )}
                 </button>

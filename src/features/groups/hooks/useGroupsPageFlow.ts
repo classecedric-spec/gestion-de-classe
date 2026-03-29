@@ -8,14 +8,19 @@
  * const { states, actions } = useGroupsPageFlow();
  */
 
-import { useState, useRef, useLayoutEffect, useEffect } from 'react';
+import { useState, useRef, useLayoutEffect, useEffect, useCallback } from 'react';
+import { supabase } from '../../../lib/database';
 import { Tables } from '../../../types/supabase';
 import { useGroupsData } from './useGroupsData';
 import { useGroupStudents, StudentWithClass } from './useGroupStudents';
 import { useGroupPdfGenerator } from '../../dashboard/hooks/useGroupPdfGenerator';
+import { trackingService } from '../../tracking/services/trackingService';
 
 export function useGroupsPageFlow() {
-    const [activeTab, setActiveTab] = useState<'students' | 'actions'>('students');
+    const [activeTab, setActiveTab] = useState<'students' | 'actions' | 'tableau'>('students');
+    const [visibleColumns, setVisibleColumns] = useState<string[]>(['classe', 'importance_suivi']);
+    const [eleveProfilCompetences, setEleveProfilCompetences] = useState<any>({});
+    const [branches, setBranches] = useState<any[]>([]);
 
     // --- Height Synchronization ---
     const leftContentRef = useRef<HTMLDivElement>(null);
@@ -44,6 +49,85 @@ export function useGroupsPageFlow() {
 
     // PDF Generator Hook
     const pdfGenerator = useGroupPdfGenerator();
+
+    // Load preferences
+    useEffect(() => {
+        const loadPrefs = async () => {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (user) {
+                // Column preferences
+                const prefs = await trackingService.loadUserPreference(user.id, 'group_tableau_visible_columns');
+                if (prefs && Array.isArray(prefs)) {
+                    setVisibleColumns(prefs.filter(c => c !== 'sex'));
+                }
+
+                // Branch indices
+                const profile = await trackingService.loadUserPreference(user.id, 'eleve_profil_competences');
+                if (profile) setEleveProfilCompetences(profile);
+
+                // Branch List
+                const { data: branchData } = await supabase.from('Branche').select('id, nom').order('ordre');
+                if (branchData) setBranches(branchData || []);
+            }
+        };
+        loadPrefs();
+    }, []);
+
+    const toggleColumn = useCallback(async (columnId: string) => {
+        setVisibleColumns(prev => {
+            const next = prev.includes(columnId)
+                ? prev.filter(id => id !== columnId)
+                : [...prev, columnId];
+
+            // Save to DB in background
+            supabase.auth.getUser().then(({ data: { user } }) => {
+                if (user) {
+                    trackingService.saveUserPreference(user.id, 'group_tableau_visible_columns', next);
+                }
+            });
+
+            return next;
+        });
+    }, []);
+
+    const reorderColumns = useCallback(async (newOrder: string[]) => {
+        setVisibleColumns(newOrder);
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+            await trackingService.saveUserPreference(user.id, 'group_tableau_visible_columns', newOrder);
+        }
+    }, []);
+
+    const updateStudentField = useCallback(async (studentId: string, field: string, value: any) => {
+        try {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) return;
+
+            if (field.startsWith('branch_')) {
+                const branchId = field.replace('branch_', '');
+                const currentProfile = { ...eleveProfilCompetences };
+                const studentData = currentProfile[studentId] || {};
+                studentData[branchId] = value;
+                currentProfile[studentId] = studentData;
+                
+                setEleveProfilCompetences(currentProfile);
+                await trackingService.saveUserPreference(user.id, 'eleve_profil_competences', currentProfile);
+                return;
+            }
+
+            const { error } = await supabase
+                .from('Eleve')
+                .update({ [field]: value })
+                .eq('id', studentId);
+
+            if (error) throw error;
+            
+            // Refresh local data
+            groupStudentsData.fetchStudentsInGroup(groupsData.selectedGroup?.id || '');
+        } catch (error) {
+            console.error('Error updating student field:', error);
+        }
+    }, [eleveProfilCompetences, groupStudentsData, groupsData.selectedGroup]);
 
     // --- Height Measure Effect ---
     useLayoutEffect(() => {
@@ -139,7 +223,10 @@ export function useGroupsPageFlow() {
             qrInitialTab,
             groupsData,
             groupStudentsData,
-            pdfGenerator
+            pdfGenerator,
+            visibleColumns,
+            eleveProfilCompetences,
+            branches
         },
         actions: {
             setActiveTab,
@@ -159,7 +246,10 @@ export function useGroupsPageFlow() {
             confirmDeleteGroup,
             handleEditStudent,
             handleStudentSaved,
-            handleCloseGroupModal
+            handleCloseGroupModal,
+            toggleColumn,
+            reorderColumns,
+            updateStudentField
         }
     };
 }

@@ -1,4 +1,4 @@
-import { Tables, TablesInsert, TablesUpdate } from '../../../types/supabase';
+import { TablesInsert, TablesUpdate } from '../../../types/supabase';
 import { TypeMateriel, MaterialActivity } from '../types/material.types';
 
 /**

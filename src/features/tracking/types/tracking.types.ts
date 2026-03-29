@@ -9,6 +9,7 @@ export type ProgressionWithDetails = Tables<'Progression'> & {
         id: string;
         prenom: string | null;
         nom: string | null;
+        importance_suivi: number | null;
     } | null;
     activite: (Tables<'Activite'> & {
         Module: (Tables<'Module'> & {
@@ -24,4 +25,5 @@ export type StudentBasicInfo = {
     id: string;
     prenom: string | null;
     nom: string | null;
+    importance_suivi: number | null;
 };

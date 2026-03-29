@@ -11,7 +11,8 @@ import {
     AlertCircle,
     Check,
     Zap,
-    Clock
+    Clock,
+    ChevronDown
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { SupabaseAttendanceRepository } from '../features/attendance/repositories/SupabaseAttendanceRepository';
@@ -47,6 +48,7 @@ const MobileDashboard: React.FC = () => {
     const [session, setSession] = useState<Session | null>(null);
     const [loading, setLoading] = useState(true);
     const [userName, setUserName] = useState('');
+    const [groups, setGroups] = useState<Tables<'Groupe'>[]>([]);
     const [activeGroup, setActiveGroup] = useState<Tables<'Groupe'> | null>(null);
 
     // Random Picker State
@@ -95,18 +97,19 @@ const MobileDashboard: React.FC = () => {
             if (user) {
                 setUserName(`${user.prenom || ''} ${user.nom || ''}`.trim());
 
+                // Fetch all groups for this user
+                const userGroups = await groupRepository.getUserGroups(userId);
+                setGroups(userGroups);
+
                 let groupToSet: Tables<'Groupe'> | null = null;
-                // Try to get last selected group
+                // 1. Try last selected
                 if (user.last_selected_group_id) {
-                    groupToSet = await groupRepository.getGroup(user.last_selected_group_id);
+                    groupToSet = userGroups.find(g => g.id === user.last_selected_group_id) || null;
                 }
 
-                // Fallback: get first group if no last selection
-                if (!groupToSet) {
-                    const groups = await groupRepository.getUserGroups(userId);
-                    if (groups.length > 0) {
-                        groupToSet = groups[0];
-                    }
+                // 2. Fallback to first group
+                if (!groupToSet && userGroups.length > 0) {
+                    groupToSet = userGroups[0];
                 }
 
                 if (groupToSet) setActiveGroup(groupToSet);
@@ -115,6 +118,20 @@ const MobileDashboard: React.FC = () => {
             console.error('Error fetching user info:', error);
         }
     }, []);
+
+    const handleGroupChange = async (groupId: string) => {
+        if (!session?.user.id) return;
+        
+        const selectedGroup = groups.find(g => g.id === groupId);
+        if (selectedGroup) {
+            setActiveGroup(selectedGroup);
+            try {
+                await userRepository.updateLastSelectedGroup(session.user.id, groupId);
+            } catch (error) {
+                console.error('Error saving last selected group:', error);
+            }
+        }
+    };
 
     const fetchStats = useCallback(async (groupId: string | null = null) => {
         setLoadingStats(true);
@@ -324,8 +341,8 @@ const MobileDashboard: React.FC = () => {
             <header className="bg-surface/80 backdrop-blur-md border-b border-white/5 p-4 sticky top-0 z-20">
                 <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-primary-dark flex items-center justify-center text-text-dark font-black text-lg shadow-lg shadow-primary/20">
-                            G
+                        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-primary-dark flex items-center justify-center text-text-dark font-black text-lg shadow-lg shadow-primary/20 shrink-0">
+                            {activeGroup?.nom?.[0] || 'G'}
                         </div>
                         <div>
                             <h1 className="text-base font-black text-white leading-tight">Bonjour{userName ? `, ${userName.split(' ')[0]}` : ''}</h1>
@@ -335,7 +352,7 @@ const MobileDashboard: React.FC = () => {
                     <Button
                         variant="ghost"
                         onClick={handleLogout}
-                        className="w-10 h-10 p-0"
+                        className="w-10 h-10 p-0 hover:bg-white/5"
                         icon={LogOut}
                         title="Se déconnecter"
                     />
@@ -344,8 +361,39 @@ const MobileDashboard: React.FC = () => {
 
             <main className="flex-1 p-4 space-y-5 pb-4 flex flex-col h-[calc(100vh-80px)]">
 
-                {/* Stats Cards */}
+                {/* Main Grid */}
                 <section className="grid grid-cols-2 gap-3">
+                    
+                    {/* FULL WIDTH GROUP PICKER CARD */}
+                    <div className="col-span-2 bg-surface/50 border border-primary/20 rounded-xl p-4 hover:bg-surface transition-all group relative overflow-hidden">
+                        <div className="flex items-center gap-2 mb-2">
+                            <span className="p-1 rounded bg-primary/10 text-primary">
+                                <User size={12} />
+                            </span>
+                            <span className="text-[9px] font-bold uppercase tracking-widest text-primary">
+                                Groupe Actuel
+                            </span>
+                        </div>
+                        
+                        <div className="relative flex items-center">
+                            <select
+                                value={activeGroup?.id || ''}
+                                onChange={(e) => handleGroupChange(e.target.value)}
+                                title="Changer de groupe"
+                                className="appearance-none bg-transparent border-none p-0 pr-8 text-xl font-black text-white focus:outline-none focus:ring-0 cursor-pointer w-full truncate relative z-10"
+                                style={{ WebkitAppearance: 'none' }}
+                            >
+                                {groups.map(g => (
+                                    <option key={g.id} value={g.id} className="bg-surface text-white">
+                                        {g.nom}
+                                    </option>
+                                ))}
+                            </select>
+                            <ChevronDown size={20} className="text-primary absolute right-0 pointer-events-none animate-bounce-subtle" />
+                        </div>
+                        
+                        <div className="absolute top-0 right-0 w-24 h-24 bg-primary/5 rounded-full -mr-12 -mt-12 blur-2xl pointer-events-none"></div>
+                    </div>
                     <StatCard
                         icon={AlertCircle}
                         variant="warning"

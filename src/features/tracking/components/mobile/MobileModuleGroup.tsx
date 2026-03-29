@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { ChevronDown, ChevronRight, User } from 'lucide-react';
-import clsx from 'clsx';
 import MobileRequestCard from './MobileRequestCard'; // Reusing the existing card
 import { ProgressionWithDetails, StudentBasicInfo } from '../../services/trackingService';
 

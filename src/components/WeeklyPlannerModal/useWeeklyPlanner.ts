@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../../lib/database';
 import { toast } from 'sonner';
 import { Active, Over } from '@dnd-kit/core';
-import { Tables, TablesInsert, TablesUpdate } from '../../types/supabase';
+import { Tables } from '../../types/supabase';
 import { plannerService } from '../../features/planner/services/plannerService';
 import { WeeklyPlanningItem } from '../../features/planner/repositories/IPlannerRepository';
 import { SupabaseActivityRepository } from '../../features/activities/repositories/SupabaseActivityRepository';

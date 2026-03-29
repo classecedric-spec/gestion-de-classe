@@ -16,7 +16,11 @@ export interface StatCardProps {
     /** The main stat value to display */
     value: string | number | React.ReactNode;
     /** Optional subtitle/description */
-    subtitle?: string;
+    subtitle?: string | React.ReactNode;
+    /** Extended description node */
+    description?: React.ReactNode;
+    /** Trend component */
+    trend?: { value: string | React.ReactNode; isUp?: boolean };
     /** Loading state */
     loading?: boolean;
     /** Click handler */
@@ -62,6 +66,8 @@ const StatCard: React.FC<StatCardProps> = ({
     title,
     value,
     subtitle,
+    description,
+    trend,
     loading = false,
     onClick,
     href,
@@ -117,6 +123,19 @@ const StatCard: React.FC<StatCardProps> = ({
                 <p className={clsx('text-[10px] mt-1 transition-colors', subtitleColorClasses[variant])}>
                     {subtitle}
                 </p>
+            )}
+            {description && (
+                <div className="mt-2 text-[11px] text-grey-medium">
+                    {description}
+                </div>
+            )}
+            {trend && (
+                <div className="flex items-center gap-1 mt-2 text-[10px]">
+                    <span className={trend.isUp ? 'text-success' : 'text-danger'}>
+                        {trend.isUp ? '↑' : '↓'}
+                    </span>
+                    <span className="text-grey-light">{trend.value}</span>
+                </div>
             )}
         </>
     );

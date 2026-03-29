@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Mic, MicOff, Settings2 } from 'lucide-react';
+import { X, Settings2 } from 'lucide-react';
 
 interface NoiseMeterModalProps {
     isOpen: boolean;

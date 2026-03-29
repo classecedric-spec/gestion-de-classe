@@ -1,15 +1,18 @@
 import React, { useState } from 'react';
-import { Settings, Plus, Trash2, Edit2, Save, X } from 'lucide-react';
+import { Settings, Plus, Trash2, Edit2, Save, X, Calculator, CalendarDays } from 'lucide-react';
 import Card from '../../../core/Card';
 import Button from '../../../core/Button';
 import Input from '../../../core/Input';
+import Tabs from '../../../core/Tabs';
 import { useGrades } from '../hooks/useGrades';
 import { Tables } from '../../../types/supabase';
 import { useAuth } from '../../../hooks/useAuth';
+import PeriodSettings from './PeriodSettings';
 
 const GradeSettings: React.FC = () => {
     const { noteTypes, saveNoteType, deleteNoteType } = useGrades();
     const { session } = useAuth();
+    const [activeTab, setActiveTab] = useState<'noteTypes' | 'periods'>('noteTypes');
     const [isAdding, setIsAdding] = useState(false);
     const [editingId, setEditingId] = useState<string | null>(null);
     const [formData, setFormData] = useState({
@@ -91,13 +94,36 @@ const GradeSettings: React.FC = () => {
         });
     };
 
+    const settingsTabs = [
+        { id: 'noteTypes', label: 'Systèmes de Notation', icon: Calculator },
+        { id: 'periods', label: 'Périodes d\'évaluation', icon: CalendarDays }
+    ];
+
     return (
         <div className="space-y-6">
-            <div className="flex justify-between items-center">
-                <div>
-                    <h2 className="text-xl font-bold text-text-main">Systèmes de Notation</h2>
-                    <p className="text-sm text-grey-medium">Configurez vos barèmes personnalisés (Numérique ou Conversion en lettres)</p>
+            {/* Settings Tabs */}
+            <div className="flex justify-start">
+                <Tabs
+                    tabs={settingsTabs}
+                    activeTab={activeTab}
+                    onChange={(id) => setActiveTab(id as 'noteTypes' | 'periods')}
+                    variant="capsule"
+                    level={2}
+                />
+            </div>
+
+            {activeTab === 'periods' ? (
+                <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
+                    <PeriodSettings />
                 </div>
+            ) : (
+                <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                    {/* Note Types Section */}
+                    <div className="flex justify-between items-center">
+                        <div>
+                            <h2 className="text-xl font-bold text-text-main">Systèmes de Notation</h2>
+                            <p className="text-sm text-grey-medium">Configurez vos barèmes personnalisés (Numérique ou Conversion en lettres)</p>
+                        </div>
                 {!isAdding && (
                     <Button 
                         icon={Plus} 
@@ -374,6 +400,8 @@ const GradeSettings: React.FC = () => {
                         Créer un barème
                     </Button>
                 </Card>
+            )}
+            </div>
             )}
         </div>
     );

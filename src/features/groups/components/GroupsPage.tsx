@@ -45,7 +45,10 @@ export const GroupsPage: React.FC = () => {
         qrInitialTab,
         groupsData,
         groupStudentsData,
-        pdfGenerator
+        pdfGenerator,
+        visibleColumns,
+        eleveProfilCompetences,
+        branches
     } = states;
 
     const {
@@ -59,7 +62,10 @@ export const GroupsPage: React.FC = () => {
         confirmDeleteGroup,
         handleEditStudent,
         handleStudentSaved,
-        handleCloseGroupModal
+        handleCloseGroupModal,
+        toggleColumn,
+        reorderColumns,
+        updateStudentField
     } = actions;
 
     return (
@@ -113,6 +119,12 @@ export const GroupsPage: React.FC = () => {
                         if (tab) setQRInitialTab(tab);
                         setShowQRModal(true);
                     }}
+                    visibleColumns={visibleColumns}
+                    onToggleColumn={toggleColumn}
+                    onReorderColumns={reorderColumns}
+                    onUpdateStudentField={updateStudentField}
+                    eleveProfilCompetences={eleveProfilCompetences}
+                    branches={branches}
                 />
             )}
 

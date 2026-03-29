@@ -86,13 +86,11 @@ export const useGroupsData = () => {
         onSuccess: (data: any) => {
             if (data && data.id) {
                 setSelectedGroup(data);
-                // Also update the temp item in the list if still there
                 queryClient.setQueryData<Tables<'Groupe'>[]>(['groups', user?.id], (old = []) =>
                     old.map(g => g.id.startsWith('temp-') ? { ...g, ...data } : g)
                 );
             }
-        },
-        onSettled: () => {
+            // Sync with server to get clean data
             queryClient.invalidateQueries({ queryKey: ['groups', user?.id] });
         }
     });
@@ -119,8 +117,6 @@ export const useGroupsData = () => {
             if (context?.previousGroups) {
                 queryClient.setQueryData(context.queryKey, context.previousGroups);
             }
-        },
-        onSettled: () => {
             queryClient.invalidateQueries({ queryKey: ['groups', user?.id] });
         }
     });
@@ -138,7 +134,8 @@ export const useGroupsData = () => {
             queryClient.setQueryData(queryKey, newGroups);
             return { previousGroups, queryKey };
         },
-        onSettled: () => {
+        onError: (_err, _variables, context) => {
+            if (context?.previousGroups) queryClient.setQueryData(context.queryKey, context.previousGroups);
             queryClient.invalidateQueries({ queryKey: ['groups', user?.id] });
         }
     });

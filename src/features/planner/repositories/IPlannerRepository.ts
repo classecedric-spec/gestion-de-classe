@@ -1,4 +1,4 @@
-import { Tables, TablesInsert } from '../../../types/supabase';
+import { TablesInsert } from '../../../types/supabase';
 
 export interface WeeklyPlanningItem {
     id: string;

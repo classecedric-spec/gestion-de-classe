@@ -42,6 +42,7 @@ export interface Activity {
     ActiviteNiveau?: { niveau_id: string }[];
     Module?: {
         id: string;
+        nom: string;
         SousBranche?: {
             id: string;
             Branche?: {

@@ -1,7 +1,7 @@
 import React from 'react';
 import { X, Users, Loader2 } from 'lucide-react';
 import clsx from 'clsx';
-import { getStatusShortLabel } from '../../../../lib/helpers/statusHelpers';
+import { getStatusShortLabel, normalizeStatus } from '../../../../lib/helpers/statusHelpers';
 import { getInitials } from '../../../../lib/helpers';
 import { ProgressionWithDetails, StudentBasicInfo } from '../../services/trackingService';
 
@@ -100,7 +100,7 @@ const MobileRequestCard: React.FC<MobileRequestCardProps> = ({
                                     ? "bg-orange-500 text-white border border-orange-500"
                                     : "bg-[#A0A8AD] text-white border border-[#A0A8AD]"
                     )}>
-                        {req.is_suivi ? 'Suivi' : (req.etat === 'a_verifier' ? 'Vérif' : getStatusShortLabel(req.etat))}
+                        {req.is_suivi ? 'Suivi' : getStatusShortLabel(normalizeStatus(req.etat))}
                     </div>
                 </div>
             </div>

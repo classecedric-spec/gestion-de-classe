@@ -11,7 +11,7 @@ export async function seedOverdueData(supabase: SupabaseClient) {
     }
 
     // 2. Find or Create Student 'Cedric Test'
-    let { data: student, error: studentError } = await supabase
+    let { data: student, error: _studentError } = await supabase
         .from('Eleve')
         .select('*')
         .eq('nom', 'Test')

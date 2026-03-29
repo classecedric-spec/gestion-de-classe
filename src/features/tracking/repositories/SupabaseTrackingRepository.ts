@@ -15,7 +15,7 @@ export class SupabaseTrackingRepository implements ITrackingRepository {
             .from('Progression')
             .select(`
         *,
-        eleve:Eleve(id, prenom, nom, Niveau(nom, ordre)),
+        eleve:Eleve(id, prenom, nom, importance_suivi, Niveau(nom, ordre)),
         activite:Activite(
           *,
           Module(
@@ -84,7 +84,7 @@ export class SupabaseTrackingRepository implements ITrackingRepository {
     async findStudentsByActivityStatus(activityId: string, studentIds: string[], status: string): Promise<StudentBasicInfo[]> {
         const { data, error } = await supabase
             .from('Progression')
-            .select('eleve:Eleve(id, prenom, nom)')
+            .select('eleve:Eleve(id, prenom, nom, importance_suivi)')
             .eq('activite_id', activityId)
             .eq('etat', status)
             .in('eleve_id', studentIds);
@@ -304,11 +304,12 @@ export class SupabaseTrackingRepository implements ITrackingRepository {
             return { helpPending: 0, validationsToday: 0 };
         }
 
-        // Get help pending count
+        // Get help pending count ONLY FOR ACTIVE MODULES
         let queryHelp = supabase
             .from('Progression')
-            .select('*', { count: 'exact', head: true })
-            .in('etat', ['besoin_d_aide', 'a_verifier', 'ajustement']);
+            .select('*, Activite!inner(Module!inner(statut))', { count: 'exact', head: true })
+            .in('etat', ['besoin_d_aide', 'a_verifier', 'ajustement'])
+            .eq('Activite.Module.statut', 'en_cours');
 
         if (filterStudentIds) {
             queryHelp = queryHelp.in('eleve_id', filterStudentIds);
@@ -317,14 +318,15 @@ export class SupabaseTrackingRepository implements ITrackingRepository {
         const { count: helpCount, error: helpError } = await queryHelp;
         if (helpError) throw helpError;
 
-        // Get validations today
+        // Get validations today ONLY FOR ACTIVE MODULES
         const today = new Date();
         today.setHours(0, 0, 0, 0);
 
         let queryVal = supabase
             .from('Progression')
-            .select('*', { count: 'exact', head: true })
+            .select('*, Activite!inner(Module!inner(statut))', { count: 'exact', head: true })
             .eq('etat', 'valide')
+            .eq('Activite.Module.statut', 'en_cours')
             .gte('updated_at', today.toISOString());
 
         if (filterStudentIds) {
@@ -409,7 +411,7 @@ export class SupabaseTrackingRepository implements ITrackingRepository {
             .from('Progression')
             .select(`
                 *,
-                Eleve (id, prenom, nom, photo_url, photo_hash, Niveau(nom, ordre)),
+                Eleve (id, prenom, nom, photo_url, photo_hash, importance_suivi, Niveau(nom, ordre)),
                 Activite (
                     id, titre,
                     Module (id, nom, statut)

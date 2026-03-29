@@ -1,6 +1,7 @@
 import React, { useRef, useLayoutEffect, useState } from 'react';
 import { Plus, SlidersHorizontal, Puzzle, Folder, Clock, Check, AlertCircle, X, FileText, LayoutList } from 'lucide-react';
 import { useActivities } from '../features/activities/hooks/useActivities';
+import { ActivityWithRelations } from '../features/activities/services/activityService';
 import ActivityDetails from '../features/activities/components/ActivityDetails';
 import AddActivityModal from '../features/activities/components/AddActivityModal';
 import { ConfirmModal, CardInfo, CardList, ListItem, SearchBar, FilterSelect, Avatar, Badge, EmptyState, CardTabs } from '../core';
@@ -35,10 +36,10 @@ const Activities: React.FC = () => {
     } = useActivities();
 
     // Local UI State
-    const [selectedActivity, setSelectedActivity] = useState<any>(null);
+    const [selectedActivity, setSelectedActivity] = useState<ActivityWithRelations | null>(null);
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-    const [activityToEdit, setActivityToEdit] = useState<any>(null);
-    const [activityToDelete, setActivityToDelete] = useState<any>(null);
+    const [activityToEdit, setActivityToEdit] = useState<ActivityWithRelations | null>(null);
+    const [activityToDelete, setActivityToDelete] = useState<ActivityWithRelations | null>(null);
     const [currentTab, setCurrentTab] = useState('exigences');
 
     // --- Height Measure Effect (Students Page Strategy) ---
@@ -67,15 +68,16 @@ const Activities: React.FC = () => {
     }, [activities.length, showFilters, selectedActivity, searchTerm, statusFilter, moduleFilter]);
 
     // Handlers
-    const handleCreated = (newActivity?: any) => {
+    const handleCreated = (newActivity?: ActivityWithRelations) => {
         if (newActivity) {
             setActivities(prev => {
-                const exists = prev.find(a => a.id === newActivity.id);
+                const safePrev = prev || [];
+                const exists = safePrev.find(a => a.id === newActivity.id);
                 if (exists) {
-                    const updated = prev.map(a => a.id === newActivity.id ? { ...exists, ...newActivity } : a);
+                    const updated = safePrev.map(a => a.id === newActivity.id ? { ...exists, ...newActivity } : a);
                     return updated;
                 }
-                return [newActivity, ...prev];
+                return [newActivity, ...safePrev];
             });
 
             // CRITICAL: Update selected activity if it was modified
@@ -91,16 +93,14 @@ const Activities: React.FC = () => {
 
     const handleDelete = async () => {
         if (!activityToDelete) return;
-        const success = await deleteActivity(activityToDelete.id);
-        if (success) {
-            if (selectedActivity?.id === activityToDelete.id) {
-                setSelectedActivity(null);
-            }
-            setActivityToDelete(null);
+        deleteActivity(activityToDelete.id);
+        if (selectedActivity?.id === activityToDelete.id) {
+            setSelectedActivity(null);
         }
+        setActivityToDelete(null);
     };
 
-    const handleEdit = (activity: any) => {
+    const handleEdit = (activity: ActivityWithRelations) => {
         setActivityToEdit(activity);
         setIsAddModalOpen(true);
     };
@@ -110,7 +110,7 @@ const Activities: React.FC = () => {
         setIsAddModalOpen(true);
     };
 
-    const handleSelectActivity = (activity: any) => {
+    const handleSelectActivity = (activity: ActivityWithRelations) => {
         setSelectedActivity(activity);
     };
 
