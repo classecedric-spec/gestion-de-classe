@@ -1,5 +1,27 @@
+/**
+ * Nom du module/fichier : responsabiliteService.ts
+ * 
+ * Données en entrée : 
+ *   - `userId` : L'identifiant de l'enseignant.
+ *   - `titre` : Le nom de la responsabilité (ex: 'Chef de rang').
+ *   - `eleveId` ou `eleveIds` : Les identifiants des enfants désignés.
+ * 
+ * Données en sortie : 
+ *   - Liste des responsabilités avec les élèves assignés.
+ *   - Confirmation des actions de création ou de suppression.
+ * 
+ * Objectif principal : Gérer le "Tableau des Responsabilités" (ou "Meteo des métiers") de la classe. Ce service permet de définir quels sont les petits rôles d'entraide dans la classe et d'y attacher un ou plusieurs élèves. Il communique avec Supabase pour garder trace de qui fait quoi.
+ * 
+ * Ce que ça orchestre : 
+ *   - La récupération de la liste complète des rôles.
+ *   - L'ajout d'un nouveau rôle.
+ *   - L'assignation (individuelle ou groupée) d'élèves à un rôle précis.
+ *   - Le retrait d'un élève d'une mission.
+ */
+
 import { supabase } from '../../../lib/database';
 
+// Structure de base d'une responsabilité
 export interface Responsabilite {
     id: string;
     titre: string;
@@ -7,6 +29,7 @@ export interface Responsabilite {
     created_at: string;
 }
 
+// Structure d'un lien entre un élève et sa tâche
 export interface ResponsabiliteEleve {
     id: string;
     responsabilite_id: string;
@@ -15,6 +38,7 @@ export interface ResponsabiliteEleve {
     created_at: string;
 }
 
+// Vue complète (Le rôle + les élèves qui l'occupent)
 export interface ResponsabiliteWithEleves extends Responsabilite {
     eleves: {
         id: string;
@@ -28,9 +52,12 @@ export interface ResponsabiliteWithEleves extends Responsabilite {
     }[];
 }
 
+/**
+ * SERVICE DE GESTION DES RESPONSABILITÉS
+ */
 export const responsabiliteService = {
     /**
-     * Fetch all responsibilities for a user, including assigned students
+     * LECTURE : Récupère tous les métiers de la classe et les enfants qui les font.
      */
     async getResponsibilities(userId: string): Promise<ResponsabiliteWithEleves[]> {
         const { data, error } = await supabase
@@ -51,7 +78,7 @@ export const responsabiliteService = {
     },
 
     /**
-     * Create a new responsibility
+     * CRÉATION : Ajoute un nouveau métier (ex: 'Responsable Lumières').
      */
     async createResponsibility(userId: string, titre: string): Promise<Responsabilite> {
         const { data, error } = await supabase
@@ -65,7 +92,7 @@ export const responsabiliteService = {
     },
 
     /**
-     * Delete a responsibility
+     * SUPPRESSION : Efface un métier du tableau.
      */
     async deleteResponsibility(id: string): Promise<void> {
         const { error } = await supabase
@@ -77,7 +104,7 @@ export const responsabiliteService = {
     },
 
     /**
-     * Assign a student to a responsibility
+     * ASSIGNATION SIMPLE : Donne une mission à un élève.
      */
     async assignStudent(userId: string, responsabiliteId: string, eleveId: string): Promise<void> {
         const { error } = await supabase
@@ -92,7 +119,7 @@ export const responsabiliteService = {
     },
 
     /**
-     * Assign multiple students to a responsibility
+     * ASSIGNATION GROUPÉE : Permet de désigner plusieurs élèves d'un coup pour une tâche.
      */
     async assignStudents(userId: string, responsabiliteId: string, eleveIds: string[]): Promise<void> {
         if (!eleveIds.length) return;
@@ -111,7 +138,7 @@ export const responsabiliteService = {
     },
 
     /**
-     * Unassign a student from a responsibility
+     * RETRAIT : Libère un élève de sa mission.
      */
     async unassignStudent(assignmentId: string): Promise<void> {
         const { error } = await supabase
@@ -122,3 +149,14 @@ export const responsabiliteService = {
         if (error) throw error;
     }
 };
+
+/**
+ * LOGIGRAMME DE GESTION :
+ * 
+ * 1. CHARGEMENT -> Le service demande à Supabase la liste des métiers.
+ * 2. ÉDITION -> L'enseignant décide de créer "Responsable Plantes".
+ * 3. ÉTAPE SQL : Le service insère la ligne dans la table `Responsabilite`.
+ * 4. ASSIGNATION -> L'enseignant choisit "Alice" et "Bob".
+ * 5. ÉTAPE SQL : Le service crée deux liens dans la table `ResponsabiliteEleve`.
+ * 6. AFFICHAGE -> L'interface se met à jour pour montrer Alice et Bob à côté de "Responsable Plantes".
+ */

@@ -1,3 +1,21 @@
+/**
+ * Nom du module/fichier : Branches.tsx
+ * 
+ * Données en entrée : 
+ *   - Liste des matières (via le Hook `useBranches`).
+ *   - Termes de recherche utilisateur.
+ * 
+ * Données en sortie : 
+ *   - Interface de gestion des matières principales.
+ *   - Actions de création, modification et suppression de branches.
+ * 
+ * Objectif principal : Offrir une page de configuration pour définir les grandes matières de l'école (ex: Français, Mathématiques, Éveil). C'est ici que l'enseignant organise son "arborescence" pédagogique. La page permet de classer les matières par glisser-déposer et d'accéder aux détails de chaque branche.
+ * 
+ * Ce que ça affiche : 
+ *   - À gauche : Une barre de recherche et la liste ordonnable des matières.
+ *   - À droite : Le panneau de détails de la matière sélectionnée (incluant ses sous-matières).
+ */
+
 import React, { useState, useRef, useLayoutEffect } from 'react';
 import { GitBranch } from 'lucide-react';
 import { useBranches } from '../features/branches/hooks/useBranches';
@@ -7,7 +25,11 @@ import AddBranchModal from '../features/branches/components/AddBranchModal';
 import { useInAppMigration } from '../hooks/useInAppMigration';
 import { ConfirmModal, CardInfo, SearchBar, Badge } from '../core';
 
+/**
+ * Composant de page principal pour la gestion de l'arborescence des matières (Branches).
+ */
 const Branches: React.FC = () => {
+    // On extrait toute la logique métier (données et actions) du Hook spécialisé
     const {
         loading,
         filteredBranches,
@@ -23,21 +45,24 @@ const Branches: React.FC = () => {
         reorderSubBranches
     } = useBranches();
 
-    // In-app migration for branches and sub-branches
+    // Système de migration interne (synchronisation des données locales vers la base de données)
     useInAppMigration(filteredBranches, 'Branche', 'branche');
     useInAppMigration(subBranches, 'SousBranche', 'sousbranche');
 
+    // États locaux pour gérer l'affichage des fenêtres surgissantes (Modales)
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
     const [branchToEdit, setBranchToEdit] = useState<any>(null);
     const [branchToDelete, setBranchToDelete] = useState<any>(null);
     const [isDeleting, setIsDeleting] = useState(false);
 
-    // --- Height Synchronization ---
+    // --- SYNCHRONISATION VISUELLE DES HAUTEURS ---
+    // Ces références servent à s'assurer que les colonnes gauche et droite ont la même taille pour le design.
     const leftContentRef = useRef<HTMLDivElement>(null);
     const rightContentRef = useRef<HTMLDivElement>(null);
     const [headerHeight, setHeaderHeight] = useState<number | undefined>(undefined);
 
     useLayoutEffect(() => {
+        /** Recalcule la hauteur maximale entre les deux colonnes pour aligner l'interface. */
         const syncHeight = () => {
             const leftEl = leftContentRef.current;
             const rightEl = rightContentRef.current;
@@ -61,17 +86,21 @@ const Branches: React.FC = () => {
         return () => { clearTimeout(t); clearTimeout(t2); };
     }, [filteredBranches.length, selectedBranch, searchTerm]);
 
-    // Handlers
+    // --- GESTIONS DES ACTIONS UTILISATEUR (HANDLERS) ---
+    
+    /** Ouvre la fenêtre de création d'une nouvelle matière. */
     const handleOpenCreate = () => {
         setBranchToEdit(null);
         setIsAddModalOpen(true);
     };
 
+    /** Ouvre la fenêtre de modification pour une matière existante. */
     const handleEdit = (branch: any) => {
         setBranchToEdit(branch);
         setIsAddModalOpen(true);
     };
 
+    /** Enregistre les données issues de la modale (création ou mise à jour). */
     const handleModalSubmit = async (branchData: any) => {
         if (branchToEdit) {
             await updateBranch(branchToEdit.id, branchData);
@@ -81,12 +110,14 @@ const Branches: React.FC = () => {
         setIsAddModalOpen(false);
     };
 
+    /** Supprime définitivement une matière après confirmation. */
     const handleDeleteConfirm = async () => {
         if (!branchToDelete) return;
         setIsDeleting(true);
         const success = await deleteBranch(branchToDelete.id);
         setIsDeleting(false);
         if (success) {
+            // Si on supprime la branche qu'on était en train de regarder, on désélectionne tout
             if (selectedBranch?.id === branchToDelete.id) {
                 setSelectedBranch(null);
             }
@@ -96,7 +127,8 @@ const Branches: React.FC = () => {
 
     return (
         <div className="h-full flex gap-6 animate-in fade-in duration-500 relative">
-            {/* Sidebar Column - 25% like Students/Activities */}
+            
+            {/* COLONNE GAUCHE : RECHErche ET LISTE DES MATIÈRES (Largeur 25%) */}
             <div className="w-1/4 flex flex-col gap-6 overflow-hidden">
                 <CardInfo
                     ref={leftContentRef}
@@ -123,6 +155,7 @@ const Branches: React.FC = () => {
                     </div>
                 </CardInfo>
 
+                {/* Liste interactive permettant de cliquer ou de réorganiser les blocs */}
                 <BranchList
                     branches={filteredBranches}
                     loading={loading}
@@ -135,7 +168,7 @@ const Branches: React.FC = () => {
                 />
             </div>
 
-            {/* Detail Column */}
+            {/* COLONNE DROITE : DÉTAILS DE LA MATIÈRE SÉLECTIONNÉE (Largeur 75%) */}
             <div className="flex-1 flex flex-col gap-6 overflow-hidden relative">
                 <BranchDetails
                     selectedBranch={selectedBranch}
@@ -146,7 +179,7 @@ const Branches: React.FC = () => {
                 />
             </div>
 
-            {/* Modals & Confirmations */}
+            {/* MODALES ET POPUPS DE CONFIRMATION */}
             <ConfirmModal
                 isOpen={!!branchToDelete}
                 onClose={() => setBranchToDelete(null)}
@@ -170,3 +203,16 @@ const Branches: React.FC = () => {
 };
 
 export default Branches;
+
+/**
+ * LOGIGRAMME DE FONCTIONNEMENT :
+ * 
+ * 1. L'enseignant ouvre la page des Branches.
+ * 2. Il voit la liste de ses matières à gauche.
+ * 3. S'il veut trouver une matière précise, il utilise la barre de recherche.
+ * 4. S'il veut changer l'ordre (ex: mettre le Français en premier), il fait glisser la ligne correspondante.
+ * 5. Quand il clique sur une matière :
+ *    - Le panneau de droite s'actualise pour montrer les sous-matières (ex: Grammaire, Orthographe pour le Français).
+ * 6. S'il clique sur l'icône de suppression (croix rouge) :
+ *    - Une fenêtre de confirmation apparaît avant de supprimer définitivement la donnée.
+ */

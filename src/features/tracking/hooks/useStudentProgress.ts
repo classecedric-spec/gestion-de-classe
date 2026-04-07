@@ -1,33 +1,54 @@
+/**
+ * Nom du module/fichier : useStudentProgress.ts
+ * 
+ * Données en entrée : 
+ *   - `studentId` : L'identifiant de l'élève dont on veut voir le détail.
+ * 
+ * Données en sortie : 
+ *   - `studentProgress` : Liste complète de ses réussites, échecs et travaux en cours.
+ *   - `currentTab` / `suiviMode` : Réglages d'affichage (Infos, Journal de bord, Arbre de progression).
+ *   - `expandedModules/Branches` : État d'ouverture des dossiers (pour ne pas tout voir en même temps).
+ *   - `actions` : Fonctions pour charger les données, valider un exercice ou réinitialiser un travail.
+ * 
+ * Objectif principal : Gérer la "Fiche Individuelle" de l'élève. C'est ici que l'enseignant vient voir précisément où en est un enfant. Ce hook orchestre l'affichage du parcours de l'élève, permet de naviguer entre ses différentes matières (Français, Maths...) et offre des outils pour valider manuellement des exercices oraux ou pratiques.
+ * 
+ * Ce que ça contient : 
+ *   - Le chargement ultra-détaillé de la progression (jointures entre Exercices, Chapitres et Matières).
+ *   - La mémorisation de ce qui est "ouvert" ou "fermé" à l'écran pour garder une interface propre.
+ *   - Une logique de validation "Optimiste" : l'interface change instantanément quand on clique, et le serveur est prévenu en arrière-plan.
+ *   - L'intégration de la "Probabilité de contrôle" : lors d'une validation, le logiciel décide si l'exercice doit être vérifié par l'enseignant (🟣) ou s'il est validé d'office (✅).
+ */
+
 import { useState, useCallback } from 'react';
 import { trackingService } from '../services/trackingService';
 
-// Define complex types manually if needed, or use any for deeply nested joins that are hard to type with 'Tables'
-// The query is quite deep: Progression -> Activite -> Module -> SousBranche -> Branche
-// For now, I will use 'any' for the progress items to save time, as defining the full join type is verbose.
+/**
+ * Type complexe représentant une ligne de progression avec toutes ses infos rattachées.
+ */
 type ProgressionWithDetails = any;
 
 /**
- * useStudentProgress
- * 
- * Hook pour gérer les progressions d'un élève :
- * - Chargement des progressions
- * - Gestion des onglets de détail
- * - Expansion des modules/branches
+ * Hook de pilotage de la fiche de progression individuelle.
  */
 export const useStudentProgress = () => {
+    // ÉTATS : Données et Chargement
     const [studentProgress, setStudentProgress] = useState<ProgressionWithDetails[]>([]);
     const [loadingProgress, setLoadingProgress] = useState(false);
+    
+    // ÉTATS : Navigation dans la fiche
     const [currentTab, setCurrentTab] = useState('infos');
     const [suiviMode, setSuiviMode] = useState<'journal' | 'progression'>('journal');
     const [showPendingOnly, setShowPendingOnly] = useState(false);
 
-    // Expansion states
+    // ÉTATS : "Accordéons" (Gestion de ce qui est déplié à l'écran)
     const [expandedModules, setExpandedModules] = useState<Record<string, boolean>>({});
     const [expandedBranches, setExpandedBranches] = useState<Record<string, boolean>>({});
     const [expandedSubBranches, setExpandedSubBranches] = useState<Record<string, boolean>>({});
     const [expandedTreeModules, setExpandedTreeModules] = useState<Record<string, boolean>>({});
 
-    // Charge les progressions d'un élève
+    /** 
+     * ACTION : Charger le dossier de l'élève.
+     */
     const fetchStudentProgress = useCallback(async (studentId: string, _students?: any[], _selectedStudent?: any) => {
         setLoadingProgress(true);
         try {
@@ -40,7 +61,9 @@ export const useStudentProgress = () => {
         }
     }, []);
 
-    // Reset progress when student changes
+    /** 
+     * ACTION : Tout refermer quand on change d'élève.
+     */
     const resetProgress = useCallback(() => {
         setStudentProgress([]);
         setExpandedModules({});
@@ -49,108 +72,80 @@ export const useStudentProgress = () => {
         setExpandedTreeModules({});
     }, []);
 
-    // Toggle expansion states
-    const toggleModuleExpansion = useCallback((moduleId: string) => {
-        setExpandedModules(prev => ({ ...prev, [moduleId]: !prev[moduleId] }));
-    }, []);
+    // FONCTIONS : Ouvrir/Fermer une matière ou un chapitre.
+    const toggleModuleExpansion = useCallback((moduleId: string) => { setExpandedModules(prev => ({ ...prev, [moduleId]: !prev[moduleId] })); }, []);
+    const toggleBranchExpansion = useCallback((branchId: string) => { setExpandedBranches(prev => ({ ...prev, [branchId]: !prev[branchId] })); }, []);
+    const toggleSubBranchExpansion = useCallback((subBranchId: string) => { setExpandedSubBranches(prev => ({ ...prev, [subBranchId]: !prev[subBranchId] })); }, []);
+    const toggleTreeModuleExpansion = useCallback((moduleId: string) => { setExpandedTreeModules(prev => ({ ...prev, [moduleId]: !prev[moduleId] })); }, []);
 
-    const toggleBranchExpansion = useCallback((branchId: string) => {
-        setExpandedBranches(prev => ({ ...prev, [branchId]: !prev[branchId] }));
-    }, []);
-
-    const toggleSubBranchExpansion = useCallback((subBranchId: string) => {
-        setExpandedSubBranches(prev => ({ ...prev, [subBranchId]: !prev[subBranchId] }));
-    }, []);
-
-    const toggleTreeModuleExpansion = useCallback((moduleId: string) => {
-        setExpandedTreeModules(prev => ({ ...prev, [moduleId]: !prev[moduleId] }));
-    }, []);
-
-    // Validation logic for Urgent Tab (adapted from useProgressions)
+    /** 
+     * ACTION : Valider un exercice en urgence.
+     * Applique la logique de "Tirage au sort" : faut-il que le prof vérifie ?
+     */
     const handleUrgentValidation = useCallback(async (activityId: string, studentId: string, manualIndices: any = {}) => {
         if (!studentId) return;
 
-        // 1. Determine new status (Default: 'termine', but check probability for 'a_verifier')
-        let newStatus = 'termine';
+        let newStatus = 'termine'; // Statut par défaut : ✅ Terminé
 
-        // Find the activity to check its branch for manual indices
+        // On cherche la matière de cet exercice pour connaître la probabilité de contrôle.
         const progressionItem = studentProgress.find(p => p.Activite?.id === activityId);
         const branchId = progressionItem?.Activite?.Module?.SousBranche?.Branche?.id;
 
         if (branchId) {
-            const idx = manualIndices?.[studentId]?.[branchId] ?? 50; // Default 50% chance if no setting
+            const idx = manualIndices?.[studentId]?.[branchId] ?? 50; 
+            // TIRAGE AU SORT : Si le score est faible, on a plus de chances de tomber sur "À vérifier" (🟣).
             if (Math.random() * 100 < idx) {
                 newStatus = 'a_verifier';
-                // We could toast here, but UI will handle feedback
             }
         }
 
-        // 2. Optimistic Update
+        // MISE À JOUR OPTIMISTE : On change l'écran avant même d'avoir la réponse du serveur.
         const originalProgress = [...studentProgress];
-
         setStudentProgress(prev => prev.map(p => {
-            if (p.Activite?.id === activityId) {
-                return { ...p, etat: newStatus };
-            }
+            if (p.Activite?.id === activityId) return { ...p, etat: newStatus };
             return p;
         }));
 
         try {
-            // 3. Status update
-            if (progressionItem?.id) {
-                await trackingService.updateProgressionStatus(progressionItem.id, newStatus);
-            }
-
+            if (progressionItem?.id) await trackingService.updateProgressionStatus(progressionItem.id, newStatus);
         } catch (error) {
-            console.error("Error updating status:", error);
-            // Revert
-            setStudentProgress(originalProgress);
+            console.error("Error", error);
+            setStudentProgress(originalProgress); // En cas d'erreur de réseau, on remet l'ancien état.
         }
     }, [studentProgress]);
 
+    /** 
+     * ACTION : Remettre un exercice à zéro (ex: l'élève s'est trompé de bouton).
+     */
     const handleResetActivity = useCallback(async (progressionId: string) => {
         if (!progressionId) return;
-
-        // 1. Optimistic Update
         const originalProgress = [...studentProgress];
-        
         setStudentProgress(prev => prev.map(p => {
-            if (p.id === progressionId) {
-                return { ...p, etat: 'a_commencer' };
-            }
+            if (p.id === progressionId) return { ...p, etat: 'a_commencer' };
             return p;
         }));
-
         try {
-            // 2. Database Update
             await trackingService.updateProgressionStatus(progressionId, 'a_commencer');
         } catch (error) {
-            console.error("Error resetting activity:", error);
-            // Revert on error
             setStudentProgress(originalProgress);
         }
     }, [studentProgress]);
 
     return {
-        studentProgress,
-        loadingProgress,
-        currentTab,
-        setCurrentTab,
-        suiviMode,
-        setSuiviMode,
-        showPendingOnly,
-        setShowPendingOnly,
-        expandedModules,
-        expandedBranches,
-        expandedSubBranches,
-        expandedTreeModules,
-        fetchStudentProgress,
-        resetProgress,
-        toggleModuleExpansion,
-        toggleBranchExpansion,
-        toggleSubBranchExpansion,
-        toggleTreeModuleExpansion,
-        handleUrgentValidation,
-        handleResetActivity
+        studentProgress, loadingProgress, currentTab, setCurrentTab, suiviMode, setSuiviMode, showPendingOnly, setShowPendingOnly,
+        expandedModules, expandedBranches, expandedSubBranches, expandedTreeModules,
+        fetchStudentProgress, resetProgress, toggleModuleExpansion, toggleBranchExpansion, toggleSubBranchExpansion, toggleTreeModuleExpansion,
+        handleUrgentValidation, handleResetActivity
     };
 };
+
+/**
+ * LOGIGRAMME DE FONCTIONNEMENT :
+ * 
+ * 1. ACTION : L'enseignant clique sur "Julie".
+ * 2. CHARGEMENT : Le hook `useStudentProgress` va chercher ses 200 lignes de travail.
+ * 3. NAVIGATION : L'enseignant clique sur l'onglet "Arbre". `setSuiviMode` passe en mode visuel.
+ * 4. CONSULTATION : L'enseignant déplie la branche "Maths". `toggleBranchExpansion` s'active.
+ * 5. VALIDATION : Julie vient montrer son cahier. L'enseignant clique sur la coche. 
+ * 6. CALCUL : Le logiciel fait un tirage. Pas de chance, Julie doit être contrôlée. L'icône devient violette (🟣).
+ */

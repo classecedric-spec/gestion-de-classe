@@ -1,3 +1,24 @@
+/**
+ * Nom du module/fichier : MobileRequestCard.tsx
+ * 
+ * Données en entrée : 
+ *   - `req` : Les détails de la demande (élève, exercice, statut, date).
+ *   - `isExpanded` : Indique si la fiche est ouverte pour montrer les actions détaillées.
+ *   - `helpers` : Liste des élèves tuteurs suggérés.
+ *   - `onStatusUpdate`, `onClear` : Actions de validation de l'exercice.
+ * 
+ * Données en sortie : 
+ *   - Une carte interactive optimisée pour le pouce (mobile) permettant de traiter une alerte.
+ * 
+ * Objectif principal : Être l'unité d'action en mobilité. Quand l'enseignant circule avec sa tablette, il voit ces fiches. Elles lui permettent de valider un travail ("Validé"), de demander de le refaire ("A refaire"), ou de voir qui peut aider l'élève ("Helpers"). C'est le "Post-it" numérique de la classe.
+ * 
+ * Ce que ça affiche : 
+ *   - La photo et le nom de l'élève.
+ *   - Le nom du module et de l'exercice en petit.
+ *   - Le statut coloré (Aide, À vérifier, Suivi).
+ *   - Quand on clique : trois gros boutons (Non Valide, A refaire, Validé) et la liste des tuteurs.
+ */
+
 import React from 'react';
 import { X, Users, Loader2 } from 'lucide-react';
 import clsx from 'clsx';
@@ -14,6 +35,9 @@ interface MobileRequestCardProps {
     onClear: (req: ProgressionWithDetails) => void;
 }
 
+/**
+ * Fiche individuelle de demande de suivi/aide pour l'interface mobile.
+ */
 const MobileRequestCard: React.FC<MobileRequestCardProps> = ({
     req,
     isExpanded,
@@ -24,6 +48,7 @@ const MobileRequestCard: React.FC<MobileRequestCardProps> = ({
 }) => {
     return (
         <div
+            // Déplier la fiche au clic pour voir les boutons d'action
             onClick={() => !req.is_suivi && req.etat !== 'besoin_d_aide' && onExpand(req.id, req.activite?.id)}
             className={clsx(
                 "bg-surface border border-white/10 rounded-2xl p-4 shadow-xl active:scale-[0.98] transition-all relative group",
@@ -31,7 +56,7 @@ const MobileRequestCard: React.FC<MobileRequestCardProps> = ({
                 isExpanded && "ring-2 ring-primary/50 border-primary/50"
             )}
         >
-            {/* Delete Button - For Aide (besoin_d_aide) AND Suivi */}
+            {/* Bouton de suppression (croix rouge) : pour les demandes d'aide ou suivis manuels */}
             {(req.is_suivi || req.etat === 'besoin_d_aide') && (
                 <button
                     onClick={(e) => { e.stopPropagation(); onClear(req); }}
@@ -43,7 +68,7 @@ const MobileRequestCard: React.FC<MobileRequestCardProps> = ({
             )}
 
             <div className="flex w-full items-center gap-3">
-                {/* Photo */}
+                {/* PHOTO DE L'ÉLÈVE */}
                 <div className="w-14 h-14 rounded-2xl overflow-hidden border-2 border-white/5 shrink-0 bg-surface-light shadow-inner">
                     {(req.eleve as any)?.photo_url || (req.eleve as any)?.photo_base64 ? (
                         <img src={(req.eleve as any).photo_url || (req.eleve as any).photo_base64} alt="" className="w-full h-full object-cover" />
@@ -54,7 +79,7 @@ const MobileRequestCard: React.FC<MobileRequestCardProps> = ({
                     )}
                 </div>
 
-                {/* Text Info */}
+                {/* INFORMATIONS TEXTUELLES (Élève, Module, Activité) */}
                 <div className="flex-1 min-w-0 flex flex-col justify-center">
                     <h2 className="text-base font-black text-white truncate leading-tight">
                         {req.eleve?.prenom} {req.eleve?.nom}
@@ -77,7 +102,7 @@ const MobileRequestCard: React.FC<MobileRequestCardProps> = ({
                     )}
                 </div>
 
-                {/* Badge Status */}
+                {/* ZONE STATUT ET DATE : Le badge de couleur */}
                 <div className="shrink-0 flex flex-col items-end justify-center gap-1.5">
                     {req.updated_at && (
                         <span className="text-[9px] text-[#FFD700] font-bold whitespace-nowrap drop-shadow-sm">
@@ -105,10 +130,11 @@ const MobileRequestCard: React.FC<MobileRequestCardProps> = ({
                 </div>
             </div>
 
-            {/* Expanded Actions */}
+            {/* ACTIONS ÉTENDUES (Apparaissent au clic) */}
             {isExpanded && (
                 <div className="mt-4 pt-4 border-t border-white/5 animate-in slide-in-from-top-2 duration-300 space-y-4">
                     <div className="grid grid-cols-3 gap-2">
+                        {/* Boutons d'action rapide pour le pouce de l'enseignant */}
                         <button
                             onClick={(e) => { e.stopPropagation(); onStatusUpdate(req, 'non_valide'); }}
                             className="py-2.5 bg-danger/10 hover:bg-danger text-danger hover:text-white rounded-xl border border-danger/20 text-[10px] font-black uppercase tracking-tighter transition-all"
@@ -129,7 +155,7 @@ const MobileRequestCard: React.FC<MobileRequestCardProps> = ({
                         </button>
                     </div>
 
-                    {/* Helpers */}
+                    {/* SÉCURITÉ PÉDAGOGIQUE : Liste des tuteurs (seulement pour les demandes d'aide) */}
                     {req.etat === 'besoin_d_aide' && (
                         <div className="pt-2">
                             <div className="flex items-center gap-2 mb-3">
@@ -175,3 +201,14 @@ const MobileRequestCard: React.FC<MobileRequestCardProps> = ({
 };
 
 export default MobileRequestCard;
+
+/**
+ * LOGIGRAMME DE FONCTIONNEMENT :
+ * 
+ * 1. Charlotte finit son exercice de calcul et attend la validation.
+ * 2. Un ticket violet "À vérifier" apparaît sur le smartphone de l'enseignant.
+ * 3. L'enseignant s'approche de Charlotte, regarde son travail, et tape sur la fiche de Charlotte sur son écran.
+ * 4. La fiche s'agrandit pour montrer les 3 boutons colorés.
+ * 5. Le travail est parfait. L'enseignant tape sur le gros bouton vert "Validé".
+ * 6. RÉSULTAT : Le ticket de Charlotte disparaît car il est traité. Le point de compétence est enregistré pour son bilan.
+ */

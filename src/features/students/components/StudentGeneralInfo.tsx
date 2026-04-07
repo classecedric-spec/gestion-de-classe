@@ -1,3 +1,15 @@
+/**
+ * Nom du module/fichier : StudentGeneralInfo.tsx
+ * 
+ * Données en entrée : Les données de l'élève en cours (nom, prénom, photo), et les listes de choix (classes, niveaux, groupes).
+ * 
+ * Données en sortie : Une interface de saisie regroupant les informations personnelles de l'enfant.
+ * 
+ * Objectif principal : Gérer la saisie de l'identité de l'élève (l'onglet "Enfant"). Il permet de charger une photo, de renseigner le nom, la date de naissance, le sexe, et d'affecter l'élève à une classe, un niveau et plusieurs groupes pédagogiques.
+ * 
+ * Ce que ça affiche : Un champ d'upload de photo, des cases à cocher pour le sexe (Garçon/Fille), des menus déroulants pour la classe et le niveau, et des "étiquettes" cliquables pour les groupes.
+ */
+
 import React, { ChangeEvent } from 'react';
 import { User, Users, Plus } from 'lucide-react';
 import clsx from 'clsx';
@@ -35,6 +47,7 @@ const StudentGeneralInfo: React.FC<StudentGeneralInfoProps> = ({
         <div className="space-y-6 animate-in slide-in-from-right-4 duration-300">
             {/* Photo Upload */}
             <div className="flex justify-center mb-6">
+                {/* Zone de photo : permet de voir l'aperçu de l'élève et de changer son image. */}
                 <ImageUpload
                     value={student.photo_url || student.photo_base64}
                     onChange={(v: string) => {
@@ -85,6 +98,7 @@ const StudentGeneralInfo: React.FC<StudentGeneralInfoProps> = ({
             <div className="space-y-1">
                 <label className="text-xs font-semibold text-gray-400 uppercase">Sexe</label>
                 <div className="flex gap-4">
+                    {/* Choix du sexe : utilise des boutons colorés (bleu pour garçon, rose pour fille) pour une reconnaissance visuelle rapide. */}
                     <label className={clsx(
                         "flex-1 p-3 rounded-xl border cursor-pointer transition-all flex items-center justify-center gap-2",
                         student.sex === 'M'
@@ -125,6 +139,7 @@ const StudentGeneralInfo: React.FC<StudentGeneralInfoProps> = ({
             <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1 relative">
                     <label className="text-xs font-semibold text-gray-400 uppercase">Classe</label>
+                    {/* Menus de sélection : ils listent les classes et niveaux existants, avec une option spéciale en bas pour en créer un nouveau sans quitter le formulaire. */}
                     <select
                         value={student.classe_id}
                         title="Classe de l'élève"
@@ -161,6 +176,7 @@ const StudentGeneralInfo: React.FC<StudentGeneralInfoProps> = ({
                     <Users size={14} />
                     Groupes (Sélection multiple)
                 </label>
+                {/* Sélecteur de groupes : affiche les groupes sous forme de boutons. Plus intuitif que des cases à cocher, il suffit de cliquer pour ajouter l'élève à un groupe (le bouton devient jaune/couleur primaire). */}
                 <div className="flex flex-wrap gap-2 p-3 bg-input border border-border/10 rounded-xl min-h-[60px]">
                     {groupsList.map(g => (
                         <Button
@@ -194,3 +210,14 @@ const StudentGeneralInfo: React.FC<StudentGeneralInfoProps> = ({
 };
 
 export default StudentGeneralInfo;
+
+/**
+ * 1. Le professeur est dans l'onglet "Enfant" du formulaire élève.
+ * 2. Il commence par choisir une photo (clic ou glisser-déposer).
+ * 3. Il tape le nom et le prénom.
+ * 4. Il sélectionne la date de naissance (un calendrier s'ouvre automatiquement).
+ * 5. Il choisit le sexe et la classe.
+ * 6. Il clique sur les noms des groupes auxquels l'élève doit appartenir (ex: "Groupe A", "Soutien").
+ * 7. Si le groupe n'existe pas, il clique sur le bouton "Nouveau" avec le signe '+'.
+ * 8. Toutes ces informations sont enregistrées temporairement dans l'état du formulaire en attendant la validation finale.
+ */

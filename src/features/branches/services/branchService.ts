@@ -1,3 +1,19 @@
+/**
+ * Nom du module/fichier : branchService.ts
+ * 
+ * Données en entrée : 
+ *   - Les informations brutes d'une branche ou sous-branche (nom, photo, ordre).
+ *   - Les fichiers images au format base64.
+ * 
+ * Données en sortie : 
+ *   - Les objets "Branche" ou "SousBranche" tels qu'enregistrés en base de données.
+ *   - Les URL publiques des photos téléchargées.
+ * 
+ * Objectif principal : Agir comme le "secrétariat technique" des matières scolaires. Ce service gère les tâches lourdes : parler à la base de données (Supabase), valider que les noms ne sont pas vides, classer les matières par ordre numérique, et envoyer les logos dans le coffre-fort de stockage Cloud.
+ * 
+ * Ce que ça affiche : Rien (c'est un service de données invisible).
+ */
+
 import { supabase } from '../../../lib/database';
 import { storageService } from '../../../lib/storage';
 import { validateWith, BranchSchema, SubBranchSchema } from '../../../lib/helpers';
@@ -13,9 +29,9 @@ type SousBrancheUpdate = Database['public']['Tables']['SousBranche']['Update'];
 
 export const branchService = {
     /**
-     * Fetch all branches
-     * @returns {Promise<BrancheRow[]>} List of branches
-     * @throws {PostgrestError} If query fails
+     * RÉCUPÉRATION DES BRANCHES :
+     * Demande à la base de données la liste de toutes les matières, 
+     * triée selon l'ordre défini par l'enseignant.
      */
     fetchBranches: async (): Promise<BrancheRow[]> => {
         const { data, error } = await supabase
@@ -28,10 +44,8 @@ export const branchService = {
     },
 
     /**
-     * Fetch sub-branches for a branch
-     * @param {string} branchId - ID of the branch
-     * @returns {Promise<SousBrancheRow[]>} List of sub-branches
-     * @throws {PostgrestError} If query fails
+     * RÉCUPÉRATION DES SOUS-BRANCHES :
+     * Va chercher les spécialités rattachées à une matière précise (ex: tout ce qui est sous "Maths").
      */
     fetchSubBranches: async (branchId: string): Promise<SousBrancheRow[]> => {
         const { data, error } = await supabase
@@ -45,26 +59,22 @@ export const branchService = {
     },
 
     /**
-     * Upload photo to storage using centralized service
-     * @param folder - Folder path (e.g., 'branche', 'sousbranche')
-     * @param entityId - Entity ID for filename
-     * @param base64 - Base64 image data
-     * @returns Public URL or null on error
+     * TÉLÉCHARGEMENT DE PHOTO :
+     * Envoie une image sur le serveur et récupère son adresse internet (URL).
      */
     uploadPhoto: async (folder: string, entityId: string, base64: string): Promise<string | null> => {
         const result = await storageService.uploadImage(folder, entityId, base64);
         return result.publicUrl;
     },
 
-
     /**
-     * Create a new branch
-     * @param {BrancheInsert} branchData - Branch data to insert
-     * @returns {Promise<BrancheRow>} Created branch
-     * @throws {Error} If validation fails or query errors
+     * CRÉATION D'UNE MATIÈRE :
+     * 1. Vérifie la validité des données.
+     * 2. Calcule le numéro d'ordre pour la mettre à la fin de la liste.
+     * 3. Enregistre le profil.
+     * 4. Si une photo est fournie, elle l'envoie et met à jour le profil avec l'URL finale.
      */
     createBranch: async (branchData: BrancheInsert): Promise<BrancheRow> => {
-        // Validation
         const validation = validateWith(BranchSchema.partial(), branchData);
         if (!validation.success) {
             throw new Error(`Erreur de validation: ${validation.errors.join(', ')}`);
@@ -73,7 +83,7 @@ export const branchService = {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) throw new Error("User not authenticated");
 
-        // Get max order
+        // Calcul automatique de la position (ordre)
         const { data: maxOrderData } = await supabase
             .from('Branche')
             .select('ordre')
@@ -82,11 +92,10 @@ export const branchService = {
 
         const nextOrder = (maxOrderData && maxOrderData.length > 0) ? (maxOrderData[0].ordre || 0) + 1 : 1;
 
-        // Extract base64 if present
         const photoBase64 = (branchData as any).photo_base64;
         const dataToInsert = { ...branchData, user_id: user.id, ordre: nextOrder };
 
-        // Remove base64 from insert payload
+        // On nettoie la donnée temporaire base64 avant l'envoi en base
         // @ts-ignore
         delete dataToInsert.photo_base64;
 
@@ -98,12 +107,11 @@ export const branchService = {
 
         if (error) throw error;
 
-        // Upload photo if needed
+        // Si l'utilisateur a mis un logo, on l'envoie maintenant qu'on a l'ID de la branche
         if (photoBase64 && photoBase64.startsWith('data:image')) {
             const publicUrl = await branchService.uploadPhoto('branche', data.id, photoBase64);
             if (publicUrl) {
                 await supabase.from('Branche').update({ photo_url: publicUrl }).eq('id', data.id);
-                // Update local data object to return correct URL
                 data.photo_url = publicUrl;
             }
         }
@@ -112,27 +120,21 @@ export const branchService = {
     },
 
     /**
-     * Update an existing branch
-     * @param {string} id - Branch ID
-     * @param {BrancheUpdate} branchData - Data to update
-     * @returns {Promise<BrancheRow>} Updated branch
-     * @throws {Error} If validation fails or query errors
+     * MODIFICATION D'UNE MATIÈRE :
+     * Similaire à la création, mais met à jour une ligne déjà existante.
      */
     updateBranch: async (id: string, branchData: BrancheUpdate): Promise<BrancheRow> => {
-        // Validation
         const validation = validateWith(BranchSchema.partial(), branchData);
         if (!validation.success) {
             throw new Error(`Erreur de validation: ${validation.errors.join(', ')}`);
         }
 
-        // Extract base64
         const photoBase64 = (branchData as any).photo_base64;
         const dataToUpdate = { ...branchData };
 
         // @ts-ignore
         delete dataToUpdate.photo_base64;
 
-        // Upload photo if new base64 provided
         if (photoBase64 && photoBase64.startsWith('data:image')) {
             const publicUrl = await branchService.uploadPhoto('branche', id, photoBase64);
             if (publicUrl) {
@@ -152,10 +154,8 @@ export const branchService = {
     },
 
     /**
-     * Delete a branch
-     * @param {string} id - Branch ID
-     * @returns {Promise<void>}
-     * @throws {Error} If user not authenticated or query fails
+     * SUPPRESSION :
+     * Retire définitivement la matière de la base de données.
      */
     deleteBranch: async (id: string): Promise<void> => {
         const { data: { user } } = await supabase.auth.getUser();
@@ -170,10 +170,8 @@ export const branchService = {
     },
 
     /**
-     * Update branches order
-     * @param {BrancheUpdate[]} updates - Usage of updates
-     * @returns {Promise<void>}
-     * @throws {PostgrestError} If query fails
+     * MISE À JOUR DE L'ORDRE (Branche) :
+     * Permet d'enregistrer massivement les nouvelles positions des matières (1, 2, 3...)
      */
     updateOrder: async (updates: BrancheUpdate[]): Promise<void> => {
         const { error } = await supabase
@@ -184,10 +182,8 @@ export const branchService = {
     },
 
     /**
-     * Update SUB-branches order
-     * @param {SousBrancheUpdate[]} updates - List of updates
-     * @returns {Promise<void>}
-     * @throws {PostgrestError} If query fails
+     * MISE À JOUR DE L'ORDRE (SousBranche) :
+     * Permet d'enregistrer massivement les nouvelles positions des spécialités.
      */
     updateSubBranchOrder: async (updates: SousBrancheUpdate[]): Promise<void> => {
         const { error } = await supabase
@@ -198,13 +194,10 @@ export const branchService = {
     },
 
     /**
-     * Create a new sub-branch
-     * @param {SousBrancheInsert} subBranchData - Data to insert
-     * @returns {Promise<SousBrancheRow>} Created sub-branch
-     * @throws {Error} If validation fails or query errors
+     * CRÉATION D'UNE SOUS-MATIÈRE :
+     * Fonctionne exactement comme la création d'une branche, mais rattachée à une parente.
      */
     createSubBranch: async (subBranchData: SousBrancheInsert): Promise<SousBrancheRow> => {
-        // Validation
         const validation = validateWith(SubBranchSchema.partial(), subBranchData);
         if (!validation.success) {
             throw new Error(`Erreur de validation: ${validation.errors.join(', ')}`);
@@ -213,7 +206,6 @@ export const branchService = {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) throw new Error("User not authenticated");
 
-        // Extract base64
         const photoBase64 = (subBranchData as any).photo_base64;
         const dataToInsert = { ...subBranchData, user_id: user.id };
 
@@ -228,7 +220,6 @@ export const branchService = {
 
         if (error) throw error;
 
-        // Upload photo if needed
         if (photoBase64 && photoBase64.startsWith('data:image')) {
             const publicUrl = await branchService.uploadPhoto('sousbranche', data.id, photoBase64);
             if (publicUrl) {
@@ -241,20 +232,15 @@ export const branchService = {
     },
 
     /**
-     * Update an existing sub-branch
-     * @param {string} id - Sub-branch ID
-     * @param {SousBrancheUpdate} subBranchData - Data to update
-     * @returns {Promise<SousBrancheRow>} Updated sub-branch
-     * @throws {Error} If validation fails or query errors
+     * MODIFICATION D'UNE SOUS-MATIÈRE :
+     * Met à jour le nom, la branche parente ou la photo d'une spécialité.
      */
     updateSubBranch: async (id: string, subBranchData: SousBrancheUpdate): Promise<SousBrancheRow> => {
-        // Validation
         const validation = validateWith(SubBranchSchema.partial(), subBranchData);
         if (!validation.success) {
             throw new Error(`Erreur de validation: ${validation.errors.join(', ')}`);
         }
 
-        // Extract base64
         const photoBase64 = (subBranchData as any).photo_base64;
         const dataToUpdate = { ...subBranchData };
 
@@ -280,3 +266,13 @@ export const branchService = {
     }
 };
 
+/**
+ * LOGIGRAMME DE FONCTIONNEMENT :
+ * 
+ * 1. Une demande de création de matière arrive (ex: "Art").
+ * 2. ÉTAPE VALIDATION : Le service vérifie que les données respectent les règles de sécurité.
+ * 3. ÉTAPE RANGEMENT : Il calcule que si vous avez déjà 3 matières, celle-ci portera le numéro 4.
+ * 4. ÉTAPE BASE DE DONNÉES : Il envoie l'ordre d'écriture au serveur Supabase.
+ * 5. ÉTAPE IMAGE (Si présente) : Il envoie la photo au stockage Cloud et récupère son "adresse web".
+ * 6. ÉTAPE MISE À JOUR : Il complète le dossier de la matière avec l'adresse de la photo pour que tout soit prêt.
+ */

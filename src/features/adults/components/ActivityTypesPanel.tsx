@@ -1,7 +1,22 @@
+/**
+ * Nom du module/fichier : ActivityTypesPanel.tsx
+ * 
+ * Données en entrée : 
+ *   - activityTypes : Liste des types d'actions paramétrés.
+ *   - loading : État de chargement.
+ *   - onAdd, onEdit, onDelete : Fonctions de communication avec le serveur.
+ * 
+ * Données en sortie : 
+ *   - Un panneau d'administration visuel (grille de cartes).
+ *   - Déclenchement des actions de modification/suppression.
+ * 
+ * Objectif principal : Ce composant permet à l'utilisateur de configurer les "étiquettes" d'actions que les adultes effectuent en classe. C'est ici que l'on définit par exemple qu'un adulte peut faire de "l'Observation", du "Coaching" ou de la "Surveillance".
+ */
+
 import React, { useState } from 'react';
 import { Activity, Plus, Edit, X, Save } from 'lucide-react';
 import { ActivityType } from '../services/adultService';
-import { Badge, Button, Avatar, EmptyState, ConfirmModal } from '../../../core';
+import { Button, Avatar, EmptyState, ConfirmModal } from '../../../core';
 
 interface ActivityTypesPanelProps {
     activityTypes: ActivityType[];
@@ -18,23 +33,27 @@ const ActivityTypesPanel: React.FC<ActivityTypesPanelProps> = ({
     onEdit,
     onDelete
 }) => {
+    // ÉTATS LOCAUX POUR LA GESTION DES FENÊTRES (MODALES)
     const [showModal, setShowModal] = useState<boolean>(false);
     const [isEditing, setIsEditing] = useState<boolean>(false);
     const [currentActivity, setCurrentActivity] = useState<Partial<ActivityType>>({ label: '' });
     const [activityToDelete, setActivityToDelete] = useState<ActivityType | null>(null);
 
+    // Ouvre la fenêtre pour créer une nouvelle action
     const openAddModal = () => {
         setCurrentActivity({ label: '' });
         setIsEditing(false);
         setShowModal(true);
     };
 
+    // Ouvre la fenêtre pour modifier une action existante
     const openEditModal = (act: ActivityType) => {
         setCurrentActivity(act);
         setIsEditing(true);
         setShowModal(true);
     };
 
+    // Envoi des données vers le serveur après validation du formulaire
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         let success = false;
@@ -46,6 +65,7 @@ const ActivityTypesPanel: React.FC<ActivityTypesPanelProps> = ({
         if (success) setShowModal(false);
     };
 
+    // Confirmation finale de la suppression
     const handleDeleteConfirm = async () => {
         if (activityToDelete) {
             await onDelete(activityToDelete.id);
@@ -55,6 +75,7 @@ const ActivityTypesPanel: React.FC<ActivityTypesPanelProps> = ({
 
     return (
         <div className="flex-1 flex flex-col bg-surface/30 backdrop-blur-md rounded-2xl border border-white/5 overflow-hidden shadow-xl">
+            {/* EN-TÊTE DU PANNEAU */}
             <div className="p-6 border-b border-white/5 flex items-center justify-between">
                 <div>
                     <h2 className="text-xl font-bold text-text-main flex items-center gap-2">
@@ -73,10 +94,11 @@ const ActivityTypesPanel: React.FC<ActivityTypesPanelProps> = ({
                 </Button>
             </div>
 
+            {/* LISTE DES ACTIONS (GRILLE) */}
             <div className="flex-1 overflow-y-auto p-6 custom-scrollbar bg-background/20">
                 {loading && activityTypes.length === 0 ? (
                     <div className="flex justify-center py-8">
-                        <Avatar loading size="md" initials="" />
+                        <Avatar loading size="default" initials="" />
                     </div>
                 ) : activityTypes.length === 0 ? (
                     <EmptyState
@@ -98,6 +120,7 @@ const ActivityTypesPanel: React.FC<ActivityTypesPanelProps> = ({
                                         />
                                         <span className="font-bold text-sm text-text-main group-hover:text-primary transition-colors">{act.label}</span>
                                     </div>
+                                    {/* Boutons d'édition/suppression apparaissant au survol */}
                                     <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                                         <button
                                             onClick={() => openEditModal(act)}
@@ -121,7 +144,7 @@ const ActivityTypesPanel: React.FC<ActivityTypesPanelProps> = ({
                 )}
             </div>
 
-            {/* Modal */}
+            {/* FENÊTRE FLOTTANTE (MODALE) DE SAISIE */}
             {showModal && (
                 <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in">
                     <div className="w-full max-w-md bg-surface border border-white/10 rounded-2xl shadow-2xl p-8 animate-in zoom-in-95">
@@ -146,7 +169,7 @@ const ActivityTypesPanel: React.FC<ActivityTypesPanelProps> = ({
                 </div>
             )}
 
-            {/* Confirm Delete */}
+            {/* CONFIRMATION DE SUPPRESSION */}
             <ConfirmModal
                 isOpen={!!activityToDelete}
                 onClose={() => setActivityToDelete(null)}
@@ -162,3 +185,12 @@ const ActivityTypesPanel: React.FC<ActivityTypesPanelProps> = ({
 };
 
 export default ActivityTypesPanel;
+
+/**
+ * LOGIGRAMME DE FONCTIONNEMENT :
+ * 
+ * 1. ENTRÉE : Le composant reçoit la liste brute des types d'actions paramétrés.
+ * 2. AFFICHAGE : Il génère une grille de "badges" éditables.
+ * 3. INTERACTION : L'utilisateur clique sur "Nouveau type" ou sur l'icône de stylo pour ouvrir un formulaire de saisie.
+ * 4. VALIDATION : En cliquant sur "Enregistrer", le composant appelle la fonction parente (onAdd ou onEdit) pour mettre à jour la base de données.
+ */

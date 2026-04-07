@@ -1,3 +1,23 @@
+/**
+ * Nom du module/fichier : AdultTrackingPanel.tsx
+ * 
+ * Données en entrée : 
+ *   - `adultActivities` : Liste des binômes "Adulte + Action" déjà enregistrés.
+ *   - `showModal` : État qui commande l'ouverture de la fenêtre d'ajout.
+ *   - `allAdults`, `activityTypes` : Menus pour choisir qui fait quoi.
+ *   - `currentAdult`, `currentActivity` : Sélection temporaire dans la fenêtre.
+ *   - `onAddClick`, `onSave`, `onDelete` : Actions de gestion de la liste.
+ * 
+ * Données en sortie : 
+ *   - Une interface de suivi des intervenants adultes et une fenêtre de saisie.
+ * 
+ * Objectif principal : Clarifier l'organisation humaine de la classe. En ateliers, il y a souvent plusieurs adultes (Maître/Maîtresse, AESH, stagiaire). Ce panneau permet de noter quel adulte est responsable de quel groupe. C'est crucial pour la mémoire de la classe et pour savoir qui a supervisé quel progrès.
+ * 
+ * Ce que ça affiche : 
+ *   - Une liste de badges avec les initiales de l'adulte et le nom de son action (ex: "JC • Remédiation Lecture").
+ *   - Une fenêtre modale avec des listes déroulantes pour créer ces binômes.
+ */
+
 import React from 'react';
 import { User as UserIcon, Activity, Plus, X, Trash2, ChevronDown, Loader2, Save } from 'lucide-react';
 import { Adult, ActivityType, AdultActivity } from '../../hooks/useAdultTracking';
@@ -19,8 +39,7 @@ interface AdultTrackingPanelProps {
 }
 
 /**
- * AdultTrackingPanel
- * Panel for tracking adult activities with modal for adding
+ * Panneau de suivi des interventions adultes avec fenêtre de saisie intégrée.
  */
 const AdultTrackingPanel: React.FC<AdultTrackingPanelProps> = ({
     adultActivities,
@@ -39,13 +58,14 @@ const AdultTrackingPanel: React.FC<AdultTrackingPanelProps> = ({
 }) => {
     return (
         <>
-            {/* Panel Content */}
+            {/* ZONE DE LISTE : Affiche l'occupation actuelle de chaque adulte */}
             <div className="flex-1 overflow-hidden flex flex-col">
                 <div className="p-4 border-b border-white/5 flex items-center justify-between shrink-0">
                     <div className="flex items-center gap-2">
                         <UserIcon size={14} className="text-primary" />
                         <span className="text-[10px] font-black uppercase tracking-[0.2em] text-grey-light">Actions Adultes</span>
                     </div>
+                    {/* Bouton pour ajouter un nouvel intervenant à la liste */}
                     <button
                         onClick={onAddClick}
                         className="p-1 px-2.5 bg-primary/20 text-primary border border-primary/20 rounded-md hover:bg-primary/30 transition-all active:scale-95"
@@ -54,15 +74,19 @@ const AdultTrackingPanel: React.FC<AdultTrackingPanelProps> = ({
                         <Plus size={14} />
                     </button>
                 </div>
+                
                 <div className="flex-1 overflow-y-auto p-4 custom-scrollbar space-y-3">
+                    {/* Message si aucun adulte n'est déclaré en activité */}
                     {adultActivities.length === 0 ? (
                         <div className="h-full flex flex-col items-center justify-center text-grey-medium opacity-30 gap-2 grayscale">
                             <Activity size={24} />
                             <span className="text-[8px] font-black uppercase tracking-widest text-center">Aucune action enregistrée aujourd'hui</span>
                         </div>
                     ) : (
+                        // Boucle sur les binômes Adulte/Action existants
                         adultActivities.map(act => (
                             <div key={act.id} className="bg-surface/40 border border-white/5 rounded-xl px-3 py-1.5 flex items-center gap-3 group animate-in slide-in-from-right-2 hover:bg-surface/60 transition-colors">
+                                {/* Initiales de l'adulte dans un petit carré stylisé */}
                                 <div className="w-7 h-7 rounded-lg bg-background flex items-center justify-center text-primary font-bold text-[10px] shrink-0 shadow-inner">
                                     {act.Adulte?.prenom?.[0] || '?'}{act.Adulte?.nom?.[0] || '?'}
                                 </div>
@@ -75,6 +99,7 @@ const AdultTrackingPanel: React.FC<AdultTrackingPanelProps> = ({
                                         {act.TypeActiviteAdulte?.label || 'Action'}
                                     </p>
                                 </div>
+                                {/* Bouton de suppression apparaissant au survol */}
                                 <button
                                     onClick={() => onDelete(act.id)}
                                     className="p-1.5 text-grey-medium hover:text-danger opacity-0 group-hover:opacity-100 transition-all shrink-0"
@@ -87,7 +112,7 @@ const AdultTrackingPanel: React.FC<AdultTrackingPanelProps> = ({
                 </div>
             </div>
 
-            {/* Add Adult Modal */}
+            {/* FENÊTRE SURGISSANTE (Modale) : Créer un nouveau binôme Adulte/Action */}
             {showModal && (
                 <div className="fixed inset-0 z-[220] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
                     <div className="w-full max-w-sm bg-surface border border-white/10 rounded-2xl shadow-2xl p-8 animate-in zoom-in-95 duration-200">
@@ -100,8 +125,9 @@ const AdultTrackingPanel: React.FC<AdultTrackingPanelProps> = ({
                                 <X size={20} />
                             </button>
                         </div>
+                        
                         <div className="space-y-6">
-                            {/* Adult Selection */}
+                            {/* Choix de l'Adulte (Menu déroulant) */}
                             <div className="space-y-2">
                                 <label className="text-[10px] font-black uppercase tracking-[0.2em] text-grey-medium ml-1">Choisir l'adulte</label>
                                 <div className="relative group">
@@ -126,7 +152,7 @@ const AdultTrackingPanel: React.FC<AdultTrackingPanelProps> = ({
                                 </div>
                             </div>
 
-                            {/* Activity Selection */}
+                            {/* Choix de l'Action (Menu déroulant - ex: Évaluation, Surveillance, Aide) */}
                             <div className="space-y-2">
                                 <label className="text-[10px] font-black uppercase tracking-[0.2em] text-grey-medium ml-1">Choisir l'action</label>
                                 <div className="relative group">
@@ -151,6 +177,7 @@ const AdultTrackingPanel: React.FC<AdultTrackingPanelProps> = ({
                                 </div>
                             </div>
 
+                            {/* Bouton de validation final */}
                             <button
                                 disabled={!currentAdult || !currentActivity || loadingAdults}
                                 onClick={() => currentAdult && currentActivity && onSave(currentAdult, currentActivity)}
@@ -168,3 +195,14 @@ const AdultTrackingPanel: React.FC<AdultTrackingPanelProps> = ({
 };
 
 export default AdultTrackingPanel;
+
+/**
+ * LOGIGRAMME DE FONCTIONNEMENT :
+ * 
+ * 1. ARRIVÉE : Mme Dupré, l'intervenante informatique, arrive dans la classe.
+ * 2. ACTION : L'enseignant clique sur le "+" du panneau "Actions Adultes".
+ * 3. ANALYSE : La fenêtre surgit. L'enseignant choisit "Mme Dupré" et "Encadrement Atelier Numérique".
+ * 4. VALIDATION : Le badge "MD • Encadrement Atelier Numérique" s'ajoute à la liste.
+ * 5. SEANCE : Pendant tout le reste de la séance, l'enseignant voit d'un coup d'œil qui est avec qui.
+ * 6. FIN : Mme Dupré s'en va. L'enseignant survole son nom et clique sur la petite corbeille pour libérer la place.
+ */

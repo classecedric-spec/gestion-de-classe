@@ -1,3 +1,20 @@
+/**
+ * Nom du module/fichier : DashboardTools.tsx
+ * 
+ * Données en entrée : 
+ *   - selectedGroup : Le groupe (classe) sélectionné pour les outils de génération.
+ *   - groups : Liste de toutes les classes de l'enseignant.
+ *   - isGenerating : État de chargement lors de la création d'un PDF.
+ *   - onOpenRandomPicker : Fonction pour lancer l'outil de tirage au sort (La Main Innocente).
+ * 
+ * Données en sortie : Un panneau composé de boutons d'accès rapide et d'outils utilitaires.
+ * 
+ * Objectif principal : Centraliser les "outils du quotidien" de l'enseignant. Ce composant combine :
+ *   1. Des raccourcis vers les fonctions majeures (Appel, Suivi, Gestion des classes).
+ *   2. Un centre de téléchargement pour générer des listes de devoirs/ateliers par classe.
+ *   3. Des gadgets ludiques comme le tirage au sort d'un élève.
+ */
+
 import React from 'react';
 import { Settings2, CheckSquare, LayoutList, GraduationCap, FileText, Users, Zap } from 'lucide-react';
 import { Button, Select } from '../../../core';
@@ -16,6 +33,9 @@ interface DashboardToolsProps {
     onOpenNoiseMeter?: () => void;
 }
 
+/**
+ * Panneau d'outils et de raccourcis du tableau de bord.
+ */
 const DashboardTools: React.FC<DashboardToolsProps> = ({
     selectedGroup,
     groups,
@@ -28,7 +48,7 @@ const DashboardTools: React.FC<DashboardToolsProps> = ({
 
     return (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {/* Quick Actions */}
+            {/* --- SECTION 1 : RACCOURCIS DE CONFIGURATION --- */}
             <section className="bg-surface p-8 rounded-3xl border border-white/5 space-y-8">
                 <h2 className="text-xl font-bold text-text-main flex items-center gap-3">
                     <Settings2 className="text-primary" /> Configuration & Actions
@@ -59,13 +79,14 @@ const DashboardTools: React.FC<DashboardToolsProps> = ({
                 </div>
             </section>
 
-            {/* Tools Grid */}
+            {/* --- SECTION 2 : CENTRE DE TÉLÉCHARGEMENT & GADGETS --- */}
             <section className="md:col-span-2 bg-gradient-to-br from-surface to-background p-8 rounded-3xl border border-white/5">
                 <h2 className="text-xl font-bold text-text-main flex items-center gap-3 mb-8">
                     <FileText className="text-warning" /> Centre de téléchargement
                 </h2>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    {/* PDF Generator */}
+                    
+                    {/* GÉNÉRATEUR DE PDF : Création de listes de travail par classe */}
                     <div className="p-6 bg-white/5 rounded-2xl border border-white/5 space-y-4">
                         <div className="flex items-center gap-3 mb-2">
                             <div className="p-2 rounded-xl bg-primary/20 text-primary">
@@ -75,11 +96,11 @@ const DashboardTools: React.FC<DashboardToolsProps> = ({
                         </div>
                         <p className="text-xs text-grey-medium leading-relaxed italic">Générez un livret A5 contenant les listes de travail pour chaque élève du groupe sélectionné.</p>
 
-                        {/* Group Selector */}
+                        {/* Sélecteur de groupe pour la génération */}
                         <Select
                             label="Sélectionner un groupe"
                             value={selectedGroup?.id || ''}
-                            onChange={(e) => {
+                            onChange={(e: any) => {
                                 const group = groups?.find(g => g.id === e.target.value);
                                 onGroupChange(group);
                             }}
@@ -100,7 +121,7 @@ const DashboardTools: React.FC<DashboardToolsProps> = ({
                         </Button>
                     </div>
 
-                    {/* Random Picker */}
+                    {/* LA MAIN INNOCENTE : Outil de tirage au sort aléatoire */}
                     <div className="p-6 bg-white/5 rounded-2xl border border-white/5 space-y-4">
                         <div className="flex items-center gap-3 mb-2">
                             <div className="p-2 rounded-xl bg-purple-500/20 text-purple-500">
@@ -118,7 +139,7 @@ const DashboardTools: React.FC<DashboardToolsProps> = ({
                         </Button>
                     </div>
 
-                    {/* Homework Tracker (Placeholder) */}
+                    {/* EMPLACEMENT RÉSERVÉ : Modules en cours de développement */}
                     <div className="p-6 bg-white/5 rounded-2xl border border-white/5 space-y-4 opacity-50 pointer-events-none">
                         <div className="flex items-center gap-3 mb-2">
                             <div className="p-2 rounded-xl bg-rose-500/20 text-rose-500">
@@ -135,3 +156,13 @@ const DashboardTools: React.FC<DashboardToolsProps> = ({
 };
 
 export default DashboardTools;
+
+/**
+ * LOGIGRAMME DE FONCTIONNEMENT :
+ * 
+ * 1. INITIALISATION : Le composant affiche les raccourcis vers les autres modules de l'application.
+ * 2. NAVIGATION : Si l'enseignant clique sur "Faire l'appel", l'application change de page via `navigate`.
+ * 3. SÉLECTION : L'enseignant choisit une classe dans la liste déroulante pour les outils PDF.
+ * 4. GÉNÉRATION : Au clic sur "Imprimer", le service de génération de PDF est sollicité.
+ * 5. DIVERTISSEMENT : Le bouton "La Main Innocente" ouvre une modale spéciale de tirage au sort.
+ */

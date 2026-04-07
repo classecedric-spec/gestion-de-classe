@@ -1,3 +1,19 @@
+/**
+ * Nom du module/fichier : DashboardPedagogicalAssistant.tsx
+ * 
+ * Données en entrée : 
+ *   - branchStats : Statistiques de progression par domaine (Maths, Français, etc.) avec taux de réussite.
+ *   - suggestions : Conseils automatiques (ex: "Proposer de nouveaux ateliers à tel élève").
+ *   - yesterdayAbsentees : Liste des élèves absents lors de la dernière journée d'école.
+ * 
+ * Données en sortie : Un panneau d'analyse incluant des graphiques circulaires et des listes d'élèves.
+ * 
+ * Objectif principal : Agir comme un conseiller pour l'enseignant. Ce composant analyse les données de la classe pour mettre en avant :
+ *   1. La progression globale par matière (via des graphiques en cercles).
+ *   2. Des alertes sur les élèves absents récemment (pour le rattrapage).
+ *   3. Des suggestions intelligentes pour aider à la décision pédagogique au quotidien.
+ */
+
 import React from 'react';
 import { TrendingUp, Users } from 'lucide-react';
 import clsx from 'clsx';
@@ -12,6 +28,9 @@ interface DashboardPedagogicalAssistantProps {
     onStudentClick: (student: Student) => void;
 }
 
+/**
+ * Assistant pédagogique du tableau de bord : analyse et aide à la décision.
+ */
 const DashboardPedagogicalAssistant: React.FC<DashboardPedagogicalAssistantProps> = ({
     branchStats,
     suggestions,
@@ -21,20 +40,21 @@ const DashboardPedagogicalAssistant: React.FC<DashboardPedagogicalAssistantProps
 }) => {
     return (
         <div className="mt-6">
+            {/* --- SECTION 1 : PROGRESSION PAR DOMAINE (GRAPHIQUES CIRCULAIRES) --- */}
             <section className="bg-gradient-to-br from-primary/10 to-transparent p-6 rounded-2xl border border-primary/10">
                 <h2 className="text-lg font-bold text-text-main mb-6 flex items-center gap-3">
                     <TrendingUp className="text-primary w-5 h-5" /> Assistant Pédagogique
                 </h2>
 
-                {/* Circular Charts Grid */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6 gap-6 mb-8">
                     {branchStats.map(stat => (
                         <div key={stat.name} className="bg-surface/50 p-4 rounded-xl border border-white/5 flex flex-col items-center gap-3 hover:bg-white/5 transition-all">
+                            {/* Graphique de progression en anneau */}
                             <div className="relative w-16 h-16">
                                 <div
                                     className="w-full h-full rounded-full"
                                     style={{
-                                        background: stat.gradient
+                                        background: stat.gradient // Dégradé calculé par le hook selon le taux de réussite
                                     }}
                                 />
                                 <div className="absolute inset-0 m-auto w-12 h-12 bg-surface rounded-full flex items-center justify-center border border-white/5">
@@ -44,6 +64,7 @@ const DashboardPedagogicalAssistant: React.FC<DashboardPedagogicalAssistantProps
                             <span className="text-sm font-bold text-text-main uppercase tracking-tighter w-full text-center break-words" title={stat.name}>
                                 {stat.name}
                             </span>
+                            {/* Détail numérique : Finis vs En cours */}
                             <div className="flex flex-wrap items-center gap-3 w-full justify-center">
                                 <div className="flex items-center gap-1" title="Fini (Terminé + À vérif.)">
                                     <div className="w-2 h-2 rounded-full bg-white/20"></div>
@@ -58,7 +79,7 @@ const DashboardPedagogicalAssistant: React.FC<DashboardPedagogicalAssistantProps
                     ))}
                 </div>
 
-                {/* Level Legend */}
+                {/* Légende des couleurs par niveau scolaire */}
                 <div className="flex flex-wrap justify-center gap-4 mb-8 px-4">
                     {Object.entries(LEVEL_COLORS).map(([level, color]) => (
                         <div key={level} className="flex items-center gap-2">
@@ -68,7 +89,7 @@ const DashboardPedagogicalAssistant: React.FC<DashboardPedagogicalAssistantProps
                     ))}
                 </div>
 
-                {/* Suggestions List */}
+                {/* --- SECTION 2 : SUGGESTIONS INTELLIGENTES --- */}
                 <div className="space-y-3 pt-6 border-t border-white/5">
                     <p className="text-xs font-bold text-grey-medium mb-2 uppercase tracking-widest">Suggestions</p>
                     {suggestions.map((sug, i) => (
@@ -83,6 +104,7 @@ const DashboardPedagogicalAssistant: React.FC<DashboardPedagogicalAssistantProps
                                 <span className="text-sm font-bold text-text-main">{sug.title}</span>
                             </div>
                             <p className="text-xs text-grey-medium pl-10">{sug.desc}</p>
+                            {/* Lien rapide vers la fiche élève concernée par la suggestion */}
                             {sug.student && (
                                 <div className="pl-10">
                                     <button
@@ -101,7 +123,7 @@ const DashboardPedagogicalAssistant: React.FC<DashboardPedagogicalAssistantProps
                 </div>
             </section>
 
-            {/* Yesterday Absentees */}
+            {/* --- SECTION 3 : ALERTES ABSENTÉISME --- */}
             {yesterdayAbsentees && yesterdayAbsentees.length > 0 && (
                 <section className="bg-surface p-6 rounded-2xl border border-white/5 h-fit mt-6">
                     <h2 className="text-lg font-bold text-text-main flex items-center gap-3 mb-6">
@@ -109,7 +131,11 @@ const DashboardPedagogicalAssistant: React.FC<DashboardPedagogicalAssistantProps
                     </h2>
                     <div className="flex flex-wrap gap-2">
                         {yesterdayAbsentees.map(s => (
-                            <span key={s.id} onClick={() => onStudentClick(s)} className="px-3 py-1.5 bg-danger/10 text-danger border border-danger/20 rounded-lg text-[10px] font-black uppercase cursor-pointer hover:bg-danger/20 transition-all">
+                            <span 
+                                key={s.id} 
+                                onClick={() => onStudentClick(s)} 
+                                className="px-3 py-1.5 bg-danger/10 text-danger border border-danger/20 rounded-lg text-[10px] font-black uppercase cursor-pointer hover:bg-danger/20 transition-all"
+                            >
                                 {s.prenom}
                             </span>
                         ))}
@@ -121,3 +147,13 @@ const DashboardPedagogicalAssistant: React.FC<DashboardPedagogicalAssistantProps
 };
 
 export default DashboardPedagogicalAssistant;
+
+/**
+ * LOGIGRAMME DE FONCTIONNEMENT :
+ * 
+ * 1. SYNTHÈSE : Le composant reçoit les indicateurs de succès par matière (branchStats).
+ * 2. VISUALISATION : Il dessine des anneaux de couleur dont le remplissage dépend du pourcentage de réussite.
+ * 3. ANALYSE CRITIQUE : Il liste les suggestions générées par l'algorithme (ex: élèves bloqués sur un atelier).
+ * 4. SUIVI SOCIAL : Il affiche les enfants qui n'étaient pas là hier, car ils ont peut-être manqué des consignes importantes.
+ * 5. NAVIGATION : Chaque nom d'élève ou bouton "Ouvrir" redirige l'enseignant vers la fiche détaillée de l'enfant pour action.
+ */

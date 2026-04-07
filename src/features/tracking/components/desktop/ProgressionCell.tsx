@@ -1,3 +1,22 @@
+/**
+ * Nom du module/fichier : ProgressionCell.tsx
+ * 
+ * Données en entrée : 
+ *   - `activity` : Les détails de l'exercice (titre, matériel nécessaire, niveaux autorisés).
+ *   - `currentStatus` : L'état actuel de réussite de l'élève sur cet exercice (ex: 'en_cours', 'termine').
+ *   - `onStatusClick` : Fonction déclenchée quand l'enseignant change le statut.
+ * 
+ * Données en sortie : 
+ *   - Une petite carte interactive (cellule) représentant un exercice unique pour un élève.
+ * 
+ * Objectif principal : Être l'unité de base du suivi. Chaque "case" permet à l'enseignant de voir si l'élève a besoin d'aide, s'il fait des erreurs récurrentes (ajustement), ou s'il a terminé. C'est l'interface directe pour "Valider" le travail d'un enfant en un clic.
+ * 
+ * Ce que ça affiche : 
+ *   - Le nom de l'exercice.
+ *   - Trois boutons d'action rapide : "Aide", "Ajustement" (orange), et "Valider" (vert/violet).
+ *   - Un mode spécial "À vérifier" (violet) si l'élève a fini sur sa tablette et attend la validation de l'adulte.
+ */
+
 import React from 'react';
 import { Check, ShieldCheck } from 'lucide-react';
 import clsx from 'clsx';
@@ -31,8 +50,7 @@ interface ProgressionCellProps {
 }
 
 /**
- * ProgressionCell
- * Individual activity cell with status buttons
+ * Cellule d'exercice individuelle avec boutons de changement de statut.
  */
 const ProgressionCell: React.FC<ProgressionCellProps> = ({
     activity,
@@ -40,7 +58,7 @@ const ProgressionCell: React.FC<ProgressionCellProps> = ({
     onStatusClick,
     studentLevelId
 }) => {
-    // Filter activity by level
+    // FILTRAGE : Si l'exercice n'est pas prévu pour le niveau de l'élève (ex: un exercice de CE2 pour un CP), on ne l'affiche pas.
     if (studentLevelId) {
         const activityLevels = activity.ActiviteNiveau?.map(an => an.niveau_id) || [];
         if (activityLevels.length > 0 && !activityLevels.includes(studentLevelId)) {
@@ -48,14 +66,22 @@ const ProgressionCell: React.FC<ProgressionCellProps> = ({
         }
     }
 
+    // ÉTAT DE VERROUILLAGE : Si l'élève a envoyé son travail pour correction ('a_verifier'), 
+    // l'enseignant doit confirmer le 'Terminé' avant de pouvoir refaire d'autres changements.
     const isLocked = currentStatus === 'a_verifier';
 
+    /** 
+     * CHANGEMENT DE STATUT : 
+     * Cette fonction est appelée quand on clique sur l'un des trois boutons.
+     * Elle gère le cycle de vie de l'exercice (ex: passer de 'En cours' à 'Aide').
+     */
     const handleToggleStatus = (newStatus: ProgressionStatus) => {
-        // Only lock if we are NOT trying to validate (moving to 'termine')
+        // Sécurité : on ne peut pas changer vers autre chose que 'termine' si c'est verrouillé pour vérification.
         if (isLocked && newStatus !== 'termine') return;
 
         const statusStr = typeof currentStatus === 'string' ? currentStatus : 'a_commencer';
         if (currentStatus === newStatus) {
+            // Si on reclique sur le même bouton, on revient à l'état "Non commencé".
             onStatusClick(activity.id, 'a_commencer', statusStr);
         } else {
             onStatusClick(activity.id, newStatus, statusStr);
@@ -71,7 +97,7 @@ const ProgressionCell: React.FC<ProgressionCellProps> = ({
                 ? "bg-purple-900/10 border-purple-500/30 ring-1 ring-purple-500/10"
                 : "bg-white/[0.03] border-white/5"
         )}>
-            {/* Title Zone (Top, Full Width) */}
+            {/* ZONE TITRE : Nom de l'exercice et codes de matériel (ex: [ORP] pour ordinateur) */}
             <div className="w-full min-w-0">
                 <span className={clsx(
                     "text-xs leading-tight transition-all text-left block",
@@ -89,8 +115,9 @@ const ProgressionCell: React.FC<ProgressionCellProps> = ({
                 </span>
             </div>
 
-            {/* Buttons Zone (Bottom, One Line) */}
+            {/* ZONE BOUTONS : Les trois actions possibles pour l'adulte */}
             <div className="grid grid-cols-3 gap-1.5 w-full mt-auto">
+                {/* Bouton AIDE : Lucas lève la main ? On clique ici. */}
                 <button
                     disabled={isLocked}
                     onClick={() => handleToggleStatus('besoin_d_aide')}
@@ -106,6 +133,7 @@ const ProgressionCell: React.FC<ProgressionCellProps> = ({
                     Aide
                 </button>
 
+                {/* Bouton AJUSTEMENT : L'exercice est trop dur ou demande une correction ? Bouton orange. */}
                 <button
                     disabled={isLocked}
                     onClick={() => handleToggleStatus('ajustement')}
@@ -121,6 +149,7 @@ const ProgressionCell: React.FC<ProgressionCellProps> = ({
                     {getStatusShortLabel('ajustement')}
                 </button>
 
+                {/* Bouton VALIDER : Le Graal pour l'élève. Devient Vert quand c'est fini. */}
                 <button
                     disabled={isLocked}
                     onClick={() => handleToggleStatus('termine')}
@@ -153,4 +182,18 @@ const ProgressionCell: React.FC<ProgressionCellProps> = ({
     );
 };
 
+// Optimisation : React.memo évite de repeindre cette case si le statut de l'élève n'a pas bougé.
 export default React.memo(ProgressionCell);
+
+/**
+ * LOGIGRAMME DE FONCTIONNEMENT :
+ * 
+ * 1. PRÉSENTATION : Dans la fiche de Julie, on voit l'exercice "Les verbes du 1er groupe". Julie n'a pas encore commencé.
+ * 2. ACTION ÉLÈVE : Julie ouvre l'exercice sur sa tablette.
+ * 3. MISE À JOUR : La case passe automatiquement en mode "En cours" (les boutons deviennent plus clairs).
+ * 4. BLOCAGE : Julie ne comprend pas la consigne. Elle appuie sur "Aide".
+ * 5. RÉACTION ADULTE : La case de Julie affiche "Aide" en gris sur le dashboard de l'enseignant.
+ * 6. VÉRIFICATION : L'enseignant va voir Julie, l'aide, et trouve qu'elle a fini.
+ * 7. ACTION ADULTE : L'enseignant clique sur le gros bouton "Valider".
+ * 8. FIN : La case devient Verte Émeraude. Julie peut passer à l'exercice suivant. Ses parents verront ce soir qu'elle a réussi cet atelier.
+ */

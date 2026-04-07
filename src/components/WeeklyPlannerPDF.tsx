@@ -1,9 +1,29 @@
+/**
+ * Nom du module/fichier : WeeklyPlannerPDF.tsx
+ * 
+ * Données en entrée : 
+ *   - `schedule` : Liste des cours et activités planifiés pour la semaine.
+ *   - `modules` : Détails des modules (branches, sous-branches) pour enrichir l'affichage.
+ *   - `weekLabel` : Le titre de la semaine (ex: "Semaine du 25 au 29 Octobre").
+ * 
+ * Données en sortie : 
+ *   - Génération d'un document PDF structuré et stylisé.
+ * 
+ * Objectif principal : Transformer la grille interactive du web en un document "papier" propre que l'enseignant peut imprimer et poser sur son bureau. Le PDF doit refléter fidèlement le planning, y compris les durées prolongées et les créneaux partagés.
+ * 
+ * Ce que ça gère : 
+ *   - La mise en page format paysage (A4).
+ *   - Le rendu des couleurs (codes hexadécimaux).
+ *   - Les différents modes d'affichage : Mono-activité (pleine case), Duo (moitié/moitié) ou Quadrants (4 activités).
+ *   - L'affichage des "OFF" (mercredi après-midi).
+ */
+
 import React from 'react';
 import { Page, Text, View, Document, StyleSheet } from '@react-pdf/renderer';
 import { WeeklyPlanningItem, ModuleWithDetails } from './WeeklyPlannerModal/useWeeklyPlanner';
 
 
-// Create styles
+// Configuration des styles PDF (équivalent du CSS pour l'impression)
 const styles = StyleSheet.create({
     page: {
         flexDirection: 'column',
@@ -63,7 +83,7 @@ const styles = StyleSheet.create({
         fontWeight: 'bold',
         textTransform: 'uppercase',
     },
-    // Slots
+    // Styles pour les cases (Slots)
     slot: {
         borderBottomWidth: 1,
         borderBottomColor: '#ddd',
@@ -84,14 +104,14 @@ const styles = StyleSheet.create({
         fontSize: 12,
         fontWeight: 'bold',
     },
-    // Item Card
+    // Styles pour les étiquettes de cours
     itemCard: {
         backgroundColor: '#e6f0ff',
         borderRadius: 4,
         padding: 4,
         marginBottom: 2,
         borderLeftWidth: 3,
-        borderLeftColor: '#2563eb', // Primary Blue
+        borderLeftColor: '#2563eb', // Bleu primaire
     },
     itemTitle: {
         fontSize: 9,
@@ -119,21 +139,21 @@ const styles = StyleSheet.create({
     },
 });
 
-// Helper to filter items by day
+// FONCTION UTILITAIRE : Récupère les cours d'une journée donnée.
 const getItemsForDay = (dayName: string, schedule: WeeklyPlanningItem[]) => {
     return schedule.filter(item => item.day_of_week === dayName).sort((a, b) => a.period_index - b.period_index);
 };
 
-// Helper to resolve module details
+// FONCTION UTILITAIRE : Enrichit l'étiquette avec la branche et le niveau depuis la base de données.
 const getModuleDetails = (activityTitle: string, modules: ModuleWithDetails[]) => {
     const module = modules.find(m => m.nom === activityTitle);
     if (!module) return null;
 
-    // Branch / SubBranch
+    // Branches
     const subBranch = module.SousBranche?.nom;
     const branch = module.SousBranche?.Branche?.nom;
 
-    // Levels (Levels with requirements)
+    // Niveaux concernés (ex: CE1, CE2)
     const levels = new Set<string>();
     if (module.Activite) {
         module.Activite.forEach(act => {
@@ -156,21 +176,27 @@ interface WeeklyPlannerPDFProps {
     schedule: WeeklyPlanningItem[];
     modules: ModuleWithDetails[];
     weekLabel: string;
+    weekStartDate?: string;
 }
 
+/**
+ * COMPOSANT : Le document PDF à exporter.
+ */
 export const WeeklyPlannerPDF: React.FC<WeeklyPlannerPDFProps> = ({ schedule, modules, weekLabel }) => {
     const days = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi'];
-    const periods = [1, 2, 3, 4, 5, 6]; // 6 Periods
+    const periods = [1, 2, 3, 4, 5, 6]; // 6 périodes standard
 
     return (
         <Document>
             <Page size="A4" orientation="landscape" style={styles.page}>
+                {/* EN-TÊTE DU DOCUMENT */}
                 <View style={styles.header}>
                     <Text style={styles.title}>Planning - {weekLabel}</Text>
                 </View>
 
+                {/* GRILLE PRINCIPALE */}
                 <View style={styles.grid}>
-                    {/* Period Labels Column */}
+                    {/* Colonne des numéros d'heures (1 à 6) */}
                     <View style={styles.periodColumn}>
                         <View style={styles.colHeader}>
                             <Text style={styles.colHeaderText}>#</Text>
@@ -182,7 +208,7 @@ export const WeeklyPlannerPDF: React.FC<WeeklyPlannerPDFProps> = ({ schedule, mo
                         ))}
                     </View>
 
-                    {/* Day Columns */}
+                    {/* Colonnes des jours de la semaine */}
                     {days.map((day) => {
                         const dayItems = getItemsForDay(day, schedule);
 
@@ -191,49 +217,46 @@ export const WeeklyPlannerPDF: React.FC<WeeklyPlannerPDFProps> = ({ schedule, mo
                                 <View style={styles.colHeader}>
                                     <Text style={styles.colHeaderText}>{day}</Text>
                                 </View>
-                                {/* Slots */}
+                                
+                                {/* Tracé des cases du jour */}
                                 <View style={{ flex: 1 }}>
                                     {(() => {
                                         const rendered = [];
 
-                                        // FIXED LOOP: Iterate 1 to 6 to ensure every column has exactly 6 slots/borders
+                                        // On boucle sur chaque créneau horaire
                                         for (let p = 1; p <= 6; p++) {
                                             const isWednesdayAfternoon = day === 'Mercredi' && p >= 5;
 
-                                            // Find ALL items starting at this period
+                                            // Récupération des activités commençant à cette heure (max 4 gérées ici)
                                             const itemsStartingHere = dayItems.filter(it => it.period_index === p)
-                                                // Handle up to 4 items (slice just in case, though UI limits it)
                                                 .slice(0, 4);
 
+                                            // Vérifie si un cours de la période précédente déborde encore ici
                                             const isCovered = dayItems.some(it => it.period_index < p && (it.period_index + (it.duration || 1)) > p);
 
-                                            // Base Cell Style
+                                            // calcul du style visuel (fond et bordures)
                                             let backgroundColor = '#fff';
                                             let borderBottomColor = '#ddd';
                                             let borderColor = '#ddd';
                                             let borderWidth = 0.5;
 
-                                            // Determine layout mode
                                             const itemCount = itemsStartingHere.length;
                                             const isMulti = itemCount > 1;
 
-                                            // No extra border for multi items as requested (sub-cells are enough)
                                             if (itemCount === 1) {
-                                                backgroundColor = itemsStartingHere[0].color_code ? '#e6f0ff' : '#e6f0ff'; // Note: color_code in TS might be a tailwind class, so we might need fallback or hex map if using color literals. Assuming hex or pdf-safe colors for now, or fallback.
-                                                // PDF renderer needs HEX mostly. If color_code is tailwind (e.g. 'bg-red-500'), we can't use it directly in PDF styles easily without mapping.
-                                                // For now, defaulting to basic colors or checking if color_code is hex.
-                                                // Let's stick to safe defaults or simple logic if color_code is not hex.
-
-                                                // Simple hack: if color_code starts with # use it, else default
+                                                // Gestion de la couleur personnalisée
                                                 if (itemsStartingHere[0].color_code?.startsWith?.('#')) {
                                                     backgroundColor = itemsStartingHere[0].color_code;
+                                                } else {
+                                                    backgroundColor = '#e6f0ff';
                                                 }
 
-                                                // Border logic
+                                                // Si le cours continue au créneau suivant, on cache la bordure du bas
                                                 const item = itemsStartingHere[0];
                                                 const lastPeriodIndex = item.period_index + (item.duration || 1) - 1;
                                                 if (p < lastPeriodIndex) borderBottomColor = backgroundColor;
                                             } else if (isCovered) {
+                                                // On applique la couleur de l'élément qui déborde
                                                 const coveringItem = dayItems.find(it => it.period_index < p && (it.period_index + (it.duration || 1)) > p);
 
                                                 if (coveringItem?.color_code?.startsWith?.('#')) {
@@ -249,7 +272,9 @@ export const WeeklyPlannerPDF: React.FC<WeeklyPlannerPDFProps> = ({ schedule, mo
                                                 borderBottomColor = '#444';
                                             }
 
-                                            // Render Content based on Count
+                                            /**
+                                             * Rendu interne de la cellule selon le nombre d'activités.
+                                             */
                                             const renderContent = () => {
                                                 if (itemCount === 0) {
                                                     if (isWednesdayAfternoon && !isCovered) {
@@ -262,7 +287,7 @@ export const WeeklyPlannerPDF: React.FC<WeeklyPlannerPDFProps> = ({ schedule, mo
                                                     return null;
                                                 }
 
-                                                // Helper to render a single mini-card
+                                                // Sous-fonction pour dessiner une petite étiquette
                                                 const renderItemCard = (item: WeeklyPlanningItem, styleExtras = {}) => {
                                                     const moduleDetails = getModuleDetails(item.activity_title, modules);
                                                     return (
@@ -285,13 +310,13 @@ export const WeeklyPlannerPDF: React.FC<WeeklyPlannerPDFProps> = ({ schedule, mo
                                                     );
                                                 };
 
+                                                // CAS : 1 seule activité
                                                 if (itemCount === 1) {
-                                                    // Standard Full Cell
-                                                    return renderItemCard(itemsStartingHere[0], { flex: 1, backgroundColor: 'transparent' }); // bg handled by container
+                                                    return renderItemCard(itemsStartingHere[0], { flex: 1, backgroundColor: 'transparent' });
                                                 }
 
+                                                // CAS : 2 activités (partage vertical)
                                                 if (itemCount === 2) {
-                                                    // Split Vertically (2 Rows)
                                                     return (
                                                         <View style={{ flex: 1, flexDirection: 'column' }}>
                                                             {renderItemCard(itemsStartingHere[0], { flex: 1, borderBottomWidth: 0.5, borderBottomColor: '#fff', marginBottom: 1 })}
@@ -300,7 +325,7 @@ export const WeeklyPlannerPDF: React.FC<WeeklyPlannerPDFProps> = ({ schedule, mo
                                                     );
                                                 }
 
-                                                // 3 or 4 Items: Quadrants (2x2)
+                                                // CAS : 3 ou 4 activités (partage en 4 quadrants)
                                                 return (
                                                     <View style={{ flex: 1, flexDirection: 'row', flexWrap: 'wrap' }}>
                                                         {itemsStartingHere.map((item, idx) => (
@@ -348,3 +373,13 @@ export const WeeklyPlannerPDF: React.FC<WeeklyPlannerPDFProps> = ({ schedule, mo
         </Document>
     );
 };
+
+/**
+ * LOGIGRAMME D'EXPORT PDF :
+ * 
+ * 1. PRÉPARATION -> Le composant reçoit la liste finale des créneaux planifiés de la part du semainier interactif.
+ * 2. STRUCTURE -> Il crée une Page A4 paysage avec une table de 6 colonnes (1 pour les heures + 5 pour les jours).
+ * 3. REMPLISSAGE -> Pour chaque jour et chaque heure, il vérifie s'il y a un ou plusieurs cours.
+ * 4. DESSIN -> Si 1 cours : il remplit la case. Si multiple : il divise la case en 2 ou 4 compartiments.
+ * 5. DURÉE -> Si un cours dure 2h, il colorie aussi la case suivante et retire la bordure intermédiaire.
+ */

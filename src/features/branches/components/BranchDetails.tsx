@@ -1,3 +1,21 @@
+/**
+ * Nom du module/fichier : BranchDetails.tsx
+ * 
+ * Données en entrée : 
+ *   - `selectedBranch` : La matière principale choisie (ex: 'Mathématiques').
+ *   - `subBranches` : Liste des spécialités liées (ex: 'Calcul', 'Géométrie').
+ * 
+ * Données en sortie : 
+ *   - Un panneau d'affichage détaillé avec des onglets.
+ *   - Action de réorganisation des sous-matières (`onReorderSub`).
+ * 
+ * Objectif principal : Présenter toutes les informations d'une matière et permettre de gérer ses sous-divisions. C'est le "zoom" sur une branche. L'enseignant peut y voir le logo en grand et organiser l'ordre de ses sous-matières par glisser-déposer.
+ * 
+ * Ce que ça affiche : 
+ *   - Un en-tête avec le logo et le nom.
+ *   - Un système d'onglets pour basculer entre la liste des sous-matières (Sous-branches) et les infos générales.
+ */
+
 import React, { useState } from 'react';
 import { GitBranch, ListTree, Info } from 'lucide-react';
 import {
@@ -30,6 +48,9 @@ interface BranchDetailsProps {
     headerHeight?: number;
 }
 
+/**
+ * Composant affichant le détail complet d'une branche sélectionnée.
+ */
 const BranchDetails: React.FC<BranchDetailsProps> = ({
     selectedBranch,
     subBranches,
@@ -37,9 +58,10 @@ const BranchDetails: React.FC<BranchDetailsProps> = ({
     rightContentRef,
     headerHeight
 }) => {
+    // État local pour savoir quel onglet est actif (Sous-matières ou Infos)
     const [activeTab, setActiveTab] = useState('subbranches');
 
-    // Drag and Drop Logic
+    // --- CONFIGURATION DU GLISSER-DÉPOSER ---
     const sensors = useSensors(
         useSensor(PointerSensor, {
             activationConstraint: {
@@ -51,6 +73,9 @@ const BranchDetails: React.FC<BranchDetailsProps> = ({
         })
     );
 
+    /**
+     * FIN DU DÉPLACEMENT : Quand l'enseignant lâche une sous-matière à une nouvelle place.
+     */
     const handleDragEnd = (event: DragEndEvent) => {
         const { active, over } = event;
 
@@ -62,6 +87,7 @@ const BranchDetails: React.FC<BranchDetailsProps> = ({
         }
     };
 
+    // Si aucune matière n'est sélectionnée, on affiche un message d'invitation sympathique
     if (!selectedBranch) {
         return (
             <div className="flex-1 card-flat overflow-hidden">
@@ -79,6 +105,7 @@ const BranchDetails: React.FC<BranchDetailsProps> = ({
 
     return (
         <>
+            {/* -- PARTIE HAUTE : RÉSUMÉ DE LA BRANCHE -- */}
             <CardInfo
                 ref={rightContentRef}
                 height={headerHeight}
@@ -104,6 +131,7 @@ const BranchDetails: React.FC<BranchDetailsProps> = ({
                 </div>
             </CardInfo>
 
+            {/* -- PARTIE BASSE : CONTENU DÉTAILLÉ (ONGLETS) -- */}
             <CardTabs
                 tabs={[
                     { id: 'subbranches', label: 'Sous-branches', icon: ListTree },
@@ -112,6 +140,7 @@ const BranchDetails: React.FC<BranchDetailsProps> = ({
                 activeTab={activeTab}
                 onChange={setActiveTab}
             >
+                {/* ONGLET 1 : LA LISTE DES SOUS-MATIÈRES */}
                 {activeTab === 'subbranches' && (
                     <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
                         {subBranches.length === 0 ? (
@@ -143,6 +172,7 @@ const BranchDetails: React.FC<BranchDetailsProps> = ({
                     </div>
                 )}
 
+                {/* ONGLET 2 : INFOS GÉNÉRALES (Vide pour l'instant) */}
                 {activeTab === 'infos' && (
                     <div className="p-8 text-center text-grey-medium italic opacity-60 animate-in fade-in slide-in-from-bottom-2 duration-300">
                         Aucune information supplémentaire disponible pour cette branche.
@@ -154,3 +184,14 @@ const BranchDetails: React.FC<BranchDetailsProps> = ({
 };
 
 export default React.memo(BranchDetails);
+
+/**
+ * LOGIGRAMME DE FONCTIONNEMENT :
+ * 
+ * 1. L'enseignant clique sur la matière "Mathématiques" dans la liste de gauche.
+ * 2. Le composant `BranchDetails` reçoit les informations de la branche.
+ * 3. Il affiche le logo et le nom en haut de la page.
+ * 4. Il va chercher toutes les sous-branches (ex: Géométrie, Calcul, Mesures) pour les lister dans le premier onglet.
+ * 5. L'enseignant peut alors réorganiser ces sous-matières par glisser-déposer.
+ * 6. S'il change d'onglet pour "Informations", le tableau des sous-matières disparaît au profit d'un texte informatif.
+ */

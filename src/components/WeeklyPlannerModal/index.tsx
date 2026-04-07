@@ -1,3 +1,23 @@
+/**
+ * Nom du module/fichier : WeeklyPlannerModal/index.tsx
+ * 
+ * Données en entrée : 
+ *   - `isOpen` : Indique si le semainier doit s'ouvrir.
+ *   - `onClose` : Fonction pour fermer la fenêtre.
+ * 
+ * Données en sortie : 
+ *   - Affichage d'un agenda interactif.
+ *   - Export PDF de la semaine choisie.
+ * 
+ * Objectif principal : Créer une interface de type "Emploi du temps" sous forme de grille (Lundi au Vendredi). L'enseignant peut y glisser-déposer (Drag & Drop) des modules d'apprentissage ou des activités personnalisées. C'est l'outil central de planification hebdomadaire.
+ * 
+ * Ce que ça orchestre : 
+ *   - La grille des jours et des périodes (colonnes/lignes).
+ *   - La bibliothèque latérale (Sidebar) pour piocher des activités.
+ *   - Le système d'export PDF via @react-pdf/renderer.
+ *   - La navigation entre les semaines (Passée, Courante, Prochaine).
+ */
+
 import React, { useEffect, useState } from 'react';
 import { X, ChevronLeft, ChevronRight, AlertTriangle, Download, Loader2, Search } from 'lucide-react';
 import { DndContext, DragOverlay } from '@dnd-kit/core';
@@ -8,7 +28,7 @@ import { useWeeklyPlanner, DAYS, PERIODS, getRelativeWeekMonday } from './useWee
 import { PlannerSlot, DraggableLibraryItem, DraggableCustomItem, AddCustomActivityInput } from './PlannerComponents';
 import { WeeklyPlannerPDF } from '../WeeklyPlannerPDF';
 
-// Polyfill check for showSaveFilePicker, common in browser but not in standard TS lib.dom
+// Vérification de la capacité du navigateur à choisir un dossier de sauvegarde
 declare global {
     interface Window {
         showSaveFilePicker?: (options?: any) => Promise<any>;
@@ -20,7 +40,11 @@ interface WeeklyPlannerModalProps {
     onClose: () => void;
 }
 
+/**
+ * COMPOSANT PRINCIPAL : Le Semainier Interactif.
+ */
 const WeeklyPlannerModal: React.FC<WeeklyPlannerModalProps> = ({ isOpen, onClose }) => {
+    // RÉCUPÉRATION DE TOUTE LA LOGIQUE (via le hook personnalisé)
     const {
         schedule, modules, weeks, currentWeek, setCurrentWeek,
         plannerItems, customActivities, dbError, isExporting, setIsExporting,
@@ -31,11 +55,14 @@ const WeeklyPlannerModal: React.FC<WeeklyPlannerModalProps> = ({ isOpen, onClose
         handleCreateCustomActivity, handleDeleteCustomActivity
     } = useWeeklyPlanner(isOpen);
 
+    // États locaux pour la recherche et les onglets de la bibliothèque
     const [searchTerm, setSearchTerm] = useState('');
     const [libraryTab, setLibraryTab] = useState<'modules' | 'perso'>('modules');
     const [filterStatus, setFilterStatus] = useState<'en_cours' | 'en_preparation' | 'archive' | 'all'>('en_cours');
 
-    // Resize listeners
+    /**
+     * ÉCOUTEURS : Gère le redimensionnement des créneaux à la souris.
+     */
     useEffect(() => {
         if (isOpen) {
             document.addEventListener('mousemove', handleResizeMove);
@@ -47,12 +74,16 @@ const WeeklyPlannerModal: React.FC<WeeklyPlannerModalProps> = ({ isOpen, onClose
         };
     }, [isOpen, handleResizeMove, handleResizeUp]);
 
+    /**
+     * EXPORT PDF : Génère et télécharge le planning visuel.
+     */
     const handleExportPDF = async () => {
         const start = new Date(currentWeek);
         const end = new Date(start);
         end.setDate(start.getDate() + 4);
         const filename = `Planning_${start.toISOString().split('T')[0]}_au_${end.toISOString().split('T')[0]}.pdf`;
 
+        // Tentative d'utilisation de l'API moderne de sauvegarde
         let fileHandle = null;
         if (window.showSaveFilePicker) {
             try {
@@ -67,7 +98,7 @@ const WeeklyPlannerModal: React.FC<WeeklyPlannerModalProps> = ({ isOpen, onClose
 
         setIsExporting(true);
         try {
-            // Dynamic import PDF libraries
+            // Chargement à la demande des bibliothèques lourdes
             const { pdf } = await import('@react-pdf/renderer');
             const { saveAs } = await import('file-saver');
 
@@ -83,6 +114,7 @@ const WeeklyPlannerModal: React.FC<WeeklyPlannerModalProps> = ({ isOpen, onClose
                 />
             ).toBlob();
 
+            // Sauvegarde du fichier
             if (fileHandle) {
                 const writable = await fileHandle.createWritable();
                 await writable.write(blob);
@@ -103,24 +135,27 @@ const WeeklyPlannerModal: React.FC<WeeklyPlannerModalProps> = ({ isOpen, onClose
     if (!isOpen) return null;
 
     return (
+        /* Le DndContext gère le glisser-déposer sur toute la fenêtre */
         <DndContext onDragStart={handleDragStart} onDragOver={handleDragOver} onDragEnd={handleDragEnd}>
             <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
                 <div className="bg-surface border border-border rounded-3xl w-full max-w-7xl h-[95vh] overflow-hidden shadow-2xl flex flex-col relative">
 
-                    {/* Header */}
+                    {/* BARRE D'EN-TÊTE : Titre, Navigation Semaine, Export */}
                     <div className="p-5 border-b border-border flex justify-between items-center bg-surface z-20">
                         <div className="flex items-center gap-4">
                             <h2 className="text-xl font-black text-text-main uppercase tracking-tight flex items-center gap-3">
                                 📅 Semainier
                             </h2>
 
-                            {/* Week Selector */}
+                            {/* Sélecteur de semaine */}
                             <div className="flex items-center gap-2">
                                 <div className="flex items-center gap-1 bg-input rounded-xl p-1 border border-border">
                                     <button onClick={handlePrevWeek} className="p-1 hover:bg-surface rounded-lg text-grey-medium hover:text-text-main transition-colors" title="Semaine précédente">
                                         <ChevronLeft size={18} />
                                     </button>
                                     <select
+                                        id="week-selector"
+                                        title="Changement de semaine"
                                         value={currentWeek}
                                         onChange={(e) => setCurrentWeek(e.target.value)}
                                         className="bg-transparent text-sm font-bold text-text-main outline-none max-w-[150px] sm:max-w-[200px] cursor-pointer px-1"
@@ -134,6 +169,7 @@ const WeeklyPlannerModal: React.FC<WeeklyPlannerModalProps> = ({ isOpen, onClose
                                     </button>
                                 </div>
 
+                                {/* Raccourcis rapides */}
                                 <div className="flex items-center gap-1 bg-input rounded-xl p-1 border border-border">
                                     {[-1, 0, 1].map(offset => (
                                         <button
@@ -163,41 +199,42 @@ const WeeklyPlannerModal: React.FC<WeeklyPlannerModalProps> = ({ isOpen, onClose
                                 {isExporting ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
                                 <span className="hidden sm:inline">Exporter PDF</span>
                             </button>
-                            <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-lg text-grey-medium hover:text-text-main"><X size={20} /></button>
+                            <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-lg text-grey-medium hover:text-text-main" title="Fermer le semainier"><X size={20} /></button>
                         </div>
                     </div>
 
-                    {/* Main Content Area */}
+                    {/* ZONE CENTRALE : Grille + Bibliothèque */}
                     <div className="flex-1 flex min-h-0 overflow-hidden bg-input/20 h-full relative" onMouseLeave={() => resizingItem && handleResizeUp()}>
-                        {/* Grid */}
+                        
+                        {/* LA GRILLE DE PLANNING */}
                         <div className="flex-1 overflow-auto p-4 custom-scrollbar relative">
-                            <div className="grid grid-cols-6 gap-3 min-w-[900px] grid-rows-[auto_repeat(6,minmax(0,1fr))]" style={{ minHeight: '100%' }}>
-                                {/* Headers */}
+                            <div className="grid grid-cols-6 gap-3 min-w-[900px] grid-rows-[auto_repeat(6,minmax(0,1fr))] min-h-full">
+                                {/* En-têtes des jours */}
                                 <div className="p-2 sticky top-0 bg-surface/80 backdrop-blur z-20"></div>
                                 {DAYS.map((d, i) => (
-                                    <div key={d} className="font-bold text-center text-grey-medium sticky top-0 bg-surface/80 backdrop-blur z-20 py-2" style={{ gridColumn: i + 2, gridRow: 1 }}>
+                                    <div key={d} className="font-bold text-center text-grey-medium sticky top-0 bg-surface/80 backdrop-blur z-20 py-2" {...{ style: { gridColumn: i + 2, gridRow: 1 } }}>
                                         {d}
                                     </div>
                                 ))}
 
-                                {/* Period Labels */}
+                                {/* Heures / Périodes (1, 2, 3...) */}
                                 {PERIODS.map((p, i) => (
-                                    <div key={p} className="flex items-center justify-center font-mono text-xl font-bold text-grey-medium/50 select-none" style={{ gridColumn: 1, gridRow: i + 2 }}>
+                                    <div key={p} className="flex items-center justify-center font-mono text-xl font-bold text-grey-medium/50 select-none" {...{ style: { gridColumn: 1, gridRow: i + 2 } }}>
                                         {p}
                                     </div>
                                 ))}
 
-                                {/* Slots */}
+                                {/* Les cellules interactives (Slots) */}
                                 {DAYS.map((day, dIndex) => (
-                                    <div key={day} style={{ display: 'contents' }}>
+                                    <div key={day} className="contents">
                                         {PERIODS.map((period, pIndex) => {
                                             const items = plannerItems.filter(s => s.day_of_week === day && s.period_index === period);
-                                            const covered = isSlotCovered(day, period);
+                                            const covered = isSlotCovered(day, period); // Vérifie si une activité au-dessus ne "couvre" pas cette case par sa durée
                                             const isResizeTarget = resizingItem && resizingItem.day_of_week === day && period <= (resizeTargetPeriod || 0) && period > resizingItem.period_index;
-                                            const isDisabledSlot = day === 'Mercredi' && period >= 5;
+                                            const isDisabledSlot = day === 'Mercredi' && period >= 5; // Pas de cours le mercredi après-midi
 
                                             return (
-                                                <div key={`${day}-${period}`} style={{ display: 'contents' }}>
+                                                <div key={`${day}-${period}`} className="contents">
                                                     <PlannerSlot
                                                         data-period={period}
                                                         dayIndex={dIndex}
@@ -212,10 +249,11 @@ const WeeklyPlannerModal: React.FC<WeeklyPlannerModalProps> = ({ isOpen, onClose
                                                         modules={modules}
                                                         isOver={!!(activeOver && activeOver.day === day && activeOver.period === period)}
                                                     />
+                                                    {/* Aide visuelle pendant le redimensionnement */}
                                                     {isResizeTarget && (
                                                         <div
                                                             className="rounded-xl border border-dashed border-primary/50 bg-primary/10 pointer-events-none z-20"
-                                                            style={{ gridColumn: dIndex + 2, gridRow: pIndex + 2 }}
+                                                            {...{ style: { gridColumn: dIndex + 2, gridRow: pIndex + 2 } }}
                                                         ></div>
                                                     )}
                                                 </div>
@@ -226,9 +264,10 @@ const WeeklyPlannerModal: React.FC<WeeklyPlannerModalProps> = ({ isOpen, onClose
                             </div>
                         </div>
 
-                        {/* Library Sidebar */}
+                        {/* BIBLIOTHÈQUE LATÉRALE (DOCK) */}
                         <div className="w-80 border-l border-border bg-surface flex flex-col shrink-0 overflow-hidden">
                             <div className="p-4 border-b border-border space-y-4">
+                                {/* Onglets : Modules vs Activités Perso */}
                                 <div className="flex bg-input p-1 rounded-xl gap-1">
                                     <button
                                         onClick={() => setLibraryTab('modules')}
@@ -251,6 +290,7 @@ const WeeklyPlannerModal: React.FC<WeeklyPlannerModalProps> = ({ isOpen, onClose
                                 </div>
 
                                 <div className="space-y-3">
+                                    {/* Recherche */}
                                     <div className="relative">
                                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-grey-medium" size={14} />
                                         <input
@@ -262,6 +302,7 @@ const WeeklyPlannerModal: React.FC<WeeklyPlannerModalProps> = ({ isOpen, onClose
                                         />
                                     </div>
                                     
+                                    {/* Filtres de statut pour les modules */}
                                     {libraryTab === 'modules' && (
                                         <div className="flex bg-input/50 p-1 rounded-lg gap-1">
                                             {(['en_cours', 'en_preparation', 'archive', 'all'] as const).map(f => (
@@ -281,6 +322,7 @@ const WeeklyPlannerModal: React.FC<WeeklyPlannerModalProps> = ({ isOpen, onClose
                                 </div>
                             </div>
 
+                            {/* Liste déroulante des éléments à glisser */}
                             <div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
                                 <div className="space-y-2">
                                     {libraryTab === 'modules' ? (
@@ -300,6 +342,7 @@ const WeeklyPlannerModal: React.FC<WeeklyPlannerModalProps> = ({ isOpen, onClose
                                         )
                                     ) : (
                                         <>
+                                            {/* Ajout d'une activité personnalisée (ex: "Conseil de classe") */}
                                             <AddCustomActivityInput onAdd={handleCreateCustomActivity} />
                                             <div className="pt-2 space-y-2">
                                                 {customActivities.filter(a => 
@@ -319,6 +362,7 @@ const WeeklyPlannerModal: React.FC<WeeklyPlannerModalProps> = ({ isOpen, onClose
                         </div>
                     </div>
 
+                    {/* Calque fantôme affiché pendant qu'on déplace un objet */}
                     <DragOverlay>
                         {activeDragItem ? (
                             <div className="p-3 bg-primary text-white rounded-xl shadow-2xl w-40 font-bold text-center scale-105 border-2 border-white/20">
@@ -333,3 +377,13 @@ const WeeklyPlannerModal: React.FC<WeeklyPlannerModalProps> = ({ isOpen, onClose
 };
 
 export default WeeklyPlannerModal;
+
+/**
+ * LOGIGRAMME D'UTILISATION :
+ * 
+ * 1. CHARGEMENT -> Le semainier s'ouvre sur la semaine courante. Il charge les cours et la bibliothèque latérale.
+ * 2. GLISSER -> L'enseignant choisit un module dans la liste de droite et le glisse vers une heure précise (ex: Lundi, période 2).
+ * 3. DÉPOSER -> Le système calcule la place prise par le cours. Si c'est OK, il enregistre le créneau en BDD.
+ * 4. AJUSTER -> L'enseignant peut étirer le bas d'un créneau pour qu'il dure 2 périodes au lieu d'une seule.
+ * 5. EXPORTER -> Quand le planning est prêt, un clic sur "Exporter PDF" génère une version imprimable propre.
+ */

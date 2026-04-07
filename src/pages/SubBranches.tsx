@@ -1,3 +1,21 @@
+/**
+ * Nom du module/fichier : SubBranches.tsx
+ * 
+ * Données en entrée : 
+ *   - Liste des sous-branches (via le Hook `useSubBranches`).
+ *   - Liste des branches parentes (via le Hook `useBranches`).
+ * 
+ * Données en sortie : 
+ *   - Interface de gestion des spécialités ou "sous-matières".
+ *   - Actions de création, modification et suppression de sous-branches.
+ * 
+ * Objectif principal : Offrir une vue d'ensemble et un outil de gestion pour toutes les sous-matières créées, indépendamment de leur branche parente. C'est l'endroit idéal pour faire du "nettoyage" ou de la création en masse de spécialités (ex: ajouter 'Dictée', 'Rédaction', 'Lecture' d'un coup).
+ * 
+ * Ce que ça affiche : 
+ *   - À gauche : Une barre de recherche et la liste de toutes les sous-matières.
+ *   - À droite : Les détails de la sous-matière sélectionnée (incluant sa branche parente).
+ */
+
 import React, { useState, useRef, useLayoutEffect } from 'react';
 import { Layers } from 'lucide-react';
 import { useSubBranches } from '../features/sub-branches/hooks/useSubBranches';
@@ -8,7 +26,11 @@ import AddSubBranchModal from '../features/branches/components/AddSubBranchModal
 import { useInAppMigration } from '../hooks/useInAppMigration';
 import { ConfirmModal, CardInfo, Badge, SearchBar } from '../core';
 
+/**
+ * Composant de page principal pour la gestion globale des sous-matières (Sous-branches).
+ */
 const SubBranches: React.FC = () => {
+    // On récupère les données et les actions via le Hook dédié aux sous-matières
     const {
         filteredSubBranches,
         loading,
@@ -21,23 +43,25 @@ const SubBranches: React.FC = () => {
         deleteSubBranch,
     } = useSubBranches();
 
-    // Fetch branches for the modal dropdown
+    // On a aussi besoin des branches parentes pour pouvoir les proposer lors d'une création
     const { branches: availableBranches } = useBranches();
 
-    // In-app migration
+    // Système de migration pour assurer la cohérence des données local/serveur
     useInAppMigration(filteredSubBranches, 'SousBranche', 'sousbranche');
 
+    // États pour gérer les fenêtres surgissantes
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
     const [subBranchToEdit, setSubBranchToEdit] = useState<any>(null);
     const [subBranchToDelete, setSubBranchToDelete] = useState<any>(null);
     const [isDeleting, setIsDeleting] = useState(false);
 
-    // --- Height Synchronization ---
+    // --- SYNCHRONISATION DES HAUTEURS POUR LE DESIGN ---
     const leftContentRef = useRef<HTMLDivElement>(null);
     const rightContentRef = useRef<HTMLDivElement>(null);
     const [headerHeight, setHeaderHeight] = useState<number | undefined>(undefined);
 
     useLayoutEffect(() => {
+        /** Aligne la colonne de gauche sur celle de droite (ou inversement) pour un aspect "pro". */
         const syncHeight = () => {
             const leftEl = leftContentRef.current;
             const rightEl = rightContentRef.current;
@@ -61,17 +85,21 @@ const SubBranches: React.FC = () => {
         return () => { clearTimeout(t); clearTimeout(t2); };
     }, [filteredSubBranches.length, selectedSubBranch, searchTerm]);
 
-    // Handlers
+    // --- GESTIONNAIRES D'ACTIONS (HANDLERS) ---
+
+    /** Ouvre la fenêtre pour ajouter une nouvelle sous-matière. */
     const handleOpenCreate = () => {
         setSubBranchToEdit(null);
         setIsAddModalOpen(true);
     };
 
+    /** Ouvre la fenêtre pour modifier une spécialité existante. */
     const handleEdit = (subBranch: any) => {
         setSubBranchToEdit(subBranch);
         setIsAddModalOpen(true);
     };
 
+    /** Enregistre les changements (création ou modification). */
     const handleModalSubmit = async (subBranchData: any) => {
         let success = false;
         if (subBranchToEdit) {
@@ -85,12 +113,14 @@ const SubBranches: React.FC = () => {
         }
     };
 
+    /** Confirme et exécute la suppression d'une sous-matière. */
     const handleDeleteConfirm = async () => {
         if (!subBranchToDelete) return;
         setIsDeleting(true);
         const success = await deleteSubBranch(subBranchToDelete.id);
         setIsDeleting(false);
         if (success) {
+            // Si on supprime celle qu'on visualisait, on remet l'affichage à zéro
             if (selectedSubBranch?.id === subBranchToDelete.id) {
                 setSelectedSubBranch(null);
             }
@@ -100,7 +130,8 @@ const SubBranches: React.FC = () => {
 
     return (
         <div className="h-full flex gap-6 animate-in fade-in duration-500 relative">
-            {/* Sidebar Column - 25% like Students/Activities */}
+            
+            {/* COLONNE GAUCHE : RECHERCHE ET LISTE GLOBALE (25%) */}
             <div className="w-1/4 flex flex-col gap-6 overflow-hidden">
                 <CardInfo
                     ref={leftContentRef}
@@ -127,6 +158,7 @@ const SubBranches: React.FC = () => {
                     </div>
                 </CardInfo>
 
+                {/* Liste de toutes les sous-matières affichées à plat */}
                 <SubBranchList
                     subBranches={filteredSubBranches}
                     loading={loading}
@@ -138,7 +170,7 @@ const SubBranches: React.FC = () => {
                 />
             </div>
 
-            {/* Detail Column */}
+            {/* COLONNE DROITE : DÉTAILS ET APPARTENANCE (75%) */}
             <div className="flex-1 flex flex-col gap-6 overflow-hidden relative">
                 <SubBranchDetails
                     selectedSubBranch={selectedSubBranch}
@@ -147,7 +179,7 @@ const SubBranches: React.FC = () => {
                 />
             </div>
 
-            {/* Delete Confirmation Modal */}
+            {/* MODALE DE SUPPRESSION */}
             <ConfirmModal
                 isOpen={!!subBranchToDelete}
                 onClose={() => setSubBranchToDelete(null)}
@@ -160,6 +192,7 @@ const SubBranches: React.FC = () => {
                 isLoading={isDeleting}
             />
 
+            {/* MODALE D'AJOUT / MODIFICATION */}
             <AddSubBranchModal
                 isOpen={isAddModalOpen}
                 onClose={() => setIsAddModalOpen(false)}
@@ -172,3 +205,16 @@ const SubBranches: React.FC = () => {
 };
 
 export default SubBranches;
+
+/**
+ * LOGIGRAMME DE FONCTIONNEMENT :
+ * 
+ * 1. L'enseignant arrive sur la page pour voir toutes ses spécialités (Sous-branches).
+ * 2. Une liste complète est chargée, triée par nom ou par branche parente.
+ * 3. Au clic sur une sous-matière (ex: 'Calcul') :
+ *    - Le panneau de droite s'ouvre pour confirmer que 'Calcul' appartient aux 'Mathématiques'.
+ * 4. Si l'enseignant veut créer une nouvelle spécialité :
+ *    - Il ouvre la fenêtre d'ajout.
+ *    - Il tape le nom (ex: 'Dictée') et choisit 'Français' comme parent.
+ * 5. L'interface se met à jour instantanément pour montrer la nouvelle rattachée.
+ */

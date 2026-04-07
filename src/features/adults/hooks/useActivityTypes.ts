@@ -1,17 +1,33 @@
+/**
+ * Nom du module/fichier : useActivityTypes.ts
+ * 
+ * Données en entrée : 
+ *   - Appels au service adultService.
+ * 
+ * Données en sortie : 
+ *   - activityTypes : Liste des types d'actions.
+ *   - loading : État de chargement.
+ *   - Fonctions CRUD : createActivityType, updateActivityType, deleteActivityType.
+ * 
+ * Objectif principal : Ce hook gère la liste des "étiquettes" d'actions (Observation, Aide, etc.) utilisables pour le suivi. Une particularité importante : si la liste est vide à l'ouverture, il génère automatiquement un jeu de données par défaut ("seed") pour que l'utilisateur n'ait pas à tout créer de zéro.
+ */
+
 import { useState, useEffect, useCallback } from 'react';
 import { adultService, ActivityType } from '../services/adultService';
 import { toast } from 'sonner';
 
 export const useActivityTypes = () => {
+    // ÉTATS LOCAUX
     const [activityTypes, setActivityTypes] = useState<ActivityType[]>([]);
     const [loading, setLoading] = useState<boolean>(true);
 
+    // CHARGEMENT ET GÉNÉRATION AUTOMATIQUE
     const fetchActivityTypes = useCallback(async () => {
         setLoading(true);
         try {
             let data = await adultService.fetchActivityTypes();
             if (data.length === 0) {
-                // Auto-seed if empty
+                // Si aucune action n'existe, on injecte les actions par défaut (Observation, Aide, etc.)
                 const seeded = await adultService.seedDefaultActivityTypes();
                 data = seeded || [];
             }
@@ -28,6 +44,7 @@ export const useActivityTypes = () => {
         fetchActivityTypes();
     }, [fetchActivityTypes]);
 
+    // CRÉATION D'UN NOUVEAU TYPE
     const createActivityType = async (label: string): Promise<boolean> => {
         try {
             const newType = await adultService.createActivityType(label);
@@ -41,31 +58,33 @@ export const useActivityTypes = () => {
         }
     };
 
+    // MISE À JOUR (Approche Optimiste)
     const updateActivityType = async (id: string, label: string): Promise<boolean> => {
         const previousTypes = [...activityTypes];
 
-        // Optimistic UI Update
+        // 1. Mise à jour visuelle immédiate
         setActivityTypes(prev => prev.map(t => t.id === id ? { ...t, nom: label } : t));
 
         try {
             const updatedType = await adultService.updateActivityType(id, label);
-            // Replace with server data for consistency
+            // 2. Synchronisation avec la donnée réelle du serveur
             setActivityTypes(prev => prev.map(t => t.id === id ? updatedType : t));
             toast.success("Action mise à jour");
             return true;
         } catch (error) {
             console.error("Error updating activity type:", error);
-            // Revert on error
+            // 3. Rollback en cas d'erreur
             setActivityTypes(previousTypes);
             toast.error("Erreur lors de la mise à jour");
             return false;
         }
     };
 
+    // SUPPRESSION (Approche Optimiste)
     const deleteActivityType = async (id: string): Promise<boolean> => {
         const previousTypes = [...activityTypes];
 
-        // Optimistic UI Update
+        // 1. Suppression visuelle immédiate
         setActivityTypes(prev => prev.filter(t => t.id !== id));
 
         try {
@@ -74,7 +93,7 @@ export const useActivityTypes = () => {
             return true;
         } catch (error) {
             console.error("Error deleting activity type:", error);
-            // Revert on error
+            // 2. Restauration en cas d'échec
             setActivityTypes(previousTypes);
             toast.error("Erreur lors de la suppression");
             return false;
@@ -90,3 +109,12 @@ export const useActivityTypes = () => {
         deleteActivityType
     };
 };
+
+/**
+ * LOGIGRAMME DE FONCTIONNEMENT :
+ * 
+ * 1. CHARGEMENT : Le hook vérifie si des types d'actions existent.
+ * 2. AUTO-SEED : Si vide, il demande au service de créer les types standards.
+ * 3. ÉDITION : Gère les ajouts, modifications et suppressions.
+ * 4. FLUIDITÉ : Utilise les mises à jour optimistes pour que l'utilisateur n'ait pas de temps d'attente visuel.
+ */

@@ -1,3 +1,19 @@
+/**
+ * Nom du module/fichier : AdultList.tsx
+ * 
+ * Données en entrée : 
+ *   - adults : Liste brute des membres de l'équipe.
+ *   - loading : État de chargement.
+ *   - searchTerm : Texte saisi pour la recherche.
+ *   - onAdd, onEdit, onDelete : Fonctions de mise à jour des données.
+ * 
+ * Données en sortie : 
+ *   - Une liste visuelle d'adultes avec recherche intégrée.
+ *   - Des modales de saisie pour ajouter/modifier un membre.
+ * 
+ * Objectif principal : Ce composant gère l'affichage et l'administration des adultes (personnel pédagogique). Il permet de les filtrer par nom, de voir leur fonction (ATSEM, AESH...) et d'ouvrir les formulaires pour gérer leurs profils.
+ */
+
 import React, { useState } from 'react';
 import { User, Plus, Search, Edit, X, ChevronDown, Save } from 'lucide-react';
 import type { Database } from '../../../types/supabase';
@@ -26,31 +42,36 @@ const AdultList: React.FC<AdultListProps> = ({
     onEdit,
     onDelete,
 }) => {
+    // ÉTATS LOCAUX POUR LES FORMULAIRES ET CONFIRMATIONS
     const [showModal, setShowModal] = useState<boolean>(false);
     const [isEditing, setIsEditing] = useState<boolean>(false);
 
-    // Using any purely for the temporary form state which needs a flexible interface before submission
+    // État temporaire pour stocker les saisies du formulaire avant envoi
     const [currentAdult, setCurrentAdult] = useState<any>({ nom: '', prenom: '', fonction: '' });
 
+    // Stocke l'adulte que l'on s'apprête à supprimer pour la modale de confirmation
     const [adultToDelete, setAdultToDelete] = useState<AdultRow | null>(null);
 
+    // Prépare le formulaire pour un ajout
     const openAddModal = () => {
         setCurrentAdult({ nom: '', prenom: '', fonction: '' });
         setIsEditing(false);
         setShowModal(true);
     };
 
+    // Prépare le formulaire avec les données existantes pour une modification
     const openEditModal = (adult: AdultRow) => {
         setCurrentAdult({ ...adult, fonction: (adult as any).fonction || '' });
         setIsEditing(true);
         setShowModal(true);
     };
 
+    // Déclenche l'enregistrement (Ajout ou Modification)
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         let success = false;
 
-        // Prepare payload
+        // On prépare les données minimales requises
         const payload = {
             nom: currentAdult.nom,
             prenom: currentAdult.prenom,
@@ -64,6 +85,7 @@ const AdultList: React.FC<AdultListProps> = ({
         if (success) setShowModal(false);
     };
 
+    // Confirmation définitive de la suppression
     const handleDeleteConfirm = async () => {
         if (adultToDelete) {
             await onDelete(adultToDelete.id);
@@ -73,6 +95,7 @@ const AdultList: React.FC<AdultListProps> = ({
 
     return (
         <div className="w-1/3 min-w-[320px] flex flex-col bg-surface/30 backdrop-blur-md rounded-2xl border border-white/5 overflow-hidden shadow-xl">
+            {/* EN-TÊTE ET BARRE DE RECHERCHE */}
             <div className="p-6 border-b border-white/5 space-y-4">
                 <div className="flex items-center justify-between">
                     <h2 className="text-xl font-bold text-text-main flex items-center gap-2">
@@ -96,6 +119,7 @@ const AdultList: React.FC<AdultListProps> = ({
                 </div>
             </div>
 
+            {/* LISTE DÉROULANTE DES ADULTES */}
             <div className="flex-1 overflow-y-auto p-4 space-y-2 custom-scrollbar">
                 {loading && adults.length === 0 ? (
                     <div className="flex justify-center py-8">
@@ -122,6 +146,7 @@ const AdultList: React.FC<AdultListProps> = ({
                                     <p className="text-[10px] text-grey-medium truncate uppercase tracking-wider mt-0.5">{(adult as any).fonction}</p>
                                 )}
                             </div>
+                            {/* Boutons d'action visibles au survol de la ligne */}
                             <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                                 <button
                                     onClick={() => openEditModal(adult)}
@@ -143,6 +168,7 @@ const AdultList: React.FC<AdultListProps> = ({
                 )}
             </div>
 
+            {/* BOUTON D'AJOUT EN BAS DE LISTE */}
             <div className="p-4 border-t border-white/5 bg-surface/30">
                 <Button
                     onClick={openAddModal}
@@ -154,22 +180,22 @@ const AdultList: React.FC<AdultListProps> = ({
                 </Button>
             </div>
 
-            {/* Modal */}
+            {/* FENÊTRE MODALE DE SAISIE / ÉDITION */}
             {showModal && (
                 <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in">
                     <div className="w-full max-w-md bg-surface border border-white/10 rounded-2xl shadow-2xl p-8 animate-in zoom-in-95">
                         <div className="flex justify-between items-center mb-6">
                             <h2 className="text-2xl font-bold text-white">{isEditing ? 'Modifier l\'adulte' : 'Ajouter un adulte'}</h2>
-                            <button onClick={() => setShowModal(false)} className="text-grey-medium hover:text-white"><X size={24} /></button>
+                            <button onClick={() => setShowModal(false)} className="text-grey-medium hover:text-white" title="Fermer"><X size={24} /></button>
                         </div>
                         <form onSubmit={handleSubmit} className="space-y-4">
                             <div>
                                 <label className="block text-sm font-medium text-grey-medium mb-1 uppercase tracking-wider text-[10px]">Prénom</label>
-                                <input required type="text" value={currentAdult.prenom} onChange={(e) => setCurrentAdult({ ...currentAdult, prenom: e.target.value })} className="w-full bg-background/50 border border-white/10 rounded-xl p-3 text-white focus:ring-2 focus:ring-primary/50 outline-none" />
+                                <input required type="text" title="Prénom" value={currentAdult.prenom} onChange={(e) => setCurrentAdult({ ...currentAdult, prenom: e.target.value })} className="w-full bg-background/50 border border-white/10 rounded-xl p-3 text-white focus:ring-2 focus:ring-primary/50 outline-none" />
                             </div>
                             <div>
                                 <label className="block text-sm font-medium text-grey-medium mb-1 uppercase tracking-wider text-[10px]">Nom</label>
-                                <input required type="text" value={currentAdult.nom} onChange={(e) => setCurrentAdult({ ...currentAdult, nom: e.target.value })} className="w-full bg-background/50 border border-white/10 rounded-xl p-3 text-white focus:ring-2 focus:ring-primary/50 outline-none" />
+                                <input required type="text" title="Nom" value={currentAdult.nom} onChange={(e) => setCurrentAdult({ ...currentAdult, nom: e.target.value })} className="w-full bg-background/50 border border-white/10 rounded-xl p-3 text-white focus:ring-2 focus:ring-primary/50 outline-none" />
                             </div>
                             <div>
                                 <label className="block text-sm font-medium text-grey-medium mb-1 uppercase tracking-wider text-[10px]">Fonction</label>
@@ -178,6 +204,7 @@ const AdultList: React.FC<AdultListProps> = ({
                                         value={currentAdult.fonction}
                                         onChange={(e) => setCurrentAdult({ ...currentAdult, fonction: e.target.value })}
                                         className="w-full bg-background/50 border border-white/10 rounded-xl p-3 text-white focus:ring-2 focus:ring-primary/50 outline-none appearance-none cursor-pointer"
+                                        title="Sélectionnez la fonction"
                                     >
                                         <option value="" className="bg-surface">Sélectionner une fonction...</option>
                                         <option value="Titulaire" className="bg-surface">Titulaire</option>
@@ -194,6 +221,7 @@ const AdultList: React.FC<AdultListProps> = ({
                                 {currentAdult.fonction === 'Autre' && (
                                     <input
                                         type="text"
+                                        title="Précisez la fonction"
                                         placeholder="Précisez la fonction..."
                                         className="w-full bg-background/50 border border-white/10 rounded-xl p-3 text-white focus:ring-2 focus:ring-primary/50 outline-none mt-2 animate-in slide-in-from-top-1"
                                         onChange={(e) => setCurrentAdult({ ...currentAdult, fonctionAlt: e.target.value })}
@@ -217,7 +245,7 @@ const AdultList: React.FC<AdultListProps> = ({
                 </div>
             )}
 
-            {/* Confirm Delete */}
+            {/* MODALE DE CONFIRMATION DE SUPPRESSION */}
             <ConfirmModal
                 isOpen={!!adultToDelete}
                 onClose={() => setAdultToDelete(null)}
@@ -233,3 +261,13 @@ const AdultList: React.FC<AdultListProps> = ({
 };
 
 export default AdultList;
+
+/**
+ * LOGIGRAMME DE FONCTIONNEMENT :
+ * 
+ * 1. ENTRÉE : Reçoit la liste des membres pédagogiques.
+ * 2. FILTRAGE : Si l'utilisateur tape dans la recherche, le composant parent renvoie une liste réduite.
+ * 3. ÉDITION : L'utilisateur clique sur "Ajouter" ou "Modifier", ce qui pré-remplit l'état interne (currentAdult).
+ * 4. VALIDATION : À la soumission du formulaire, les données sont nettoyées et envoyées au service via les fonctions "onAdd" ou "onEdit".
+ * 5. MISE À JOUR : Une fois l'opération serveur réussie, la fenêtre se ferme automatiquement.
+ */

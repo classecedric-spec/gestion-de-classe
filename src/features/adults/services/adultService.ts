@@ -1,3 +1,17 @@
+/**
+ * Nom du module/fichier : adultService.ts
+ * 
+ * Données en entrée : 
+ *   - adultRepository : Dépôt pour les profils adultes et leur suivi.
+ *   - activityTypeRepository : Dépôt pour les types d'actions.
+ * 
+ * Données en sortie : 
+ *   - Adult / AdultActivity : Objets représentant les personnes et leurs actions enregistrées.
+ *   - Méthodes CRUD pour les adultes et leurs activités.
+ * 
+ * Objectif principal : Ce service est le point d'entrée principal pour tout ce qui concerne les "Adultes" dans l'application. Il coordonne la gestion des profils (nom, prénom) et la saisie de leur suivi quotidien (ex: "M. Dupont a fait de l'Observation aujourd'hui"). Il assure également que l'utilisateur est bien identifié (authentifié) avant de créer des données.
+ */
+
 import { Tables, TablesInsert, TablesUpdate } from '../../../types/supabase';
 import { IAdultRepository } from '../repositories/IAdultRepository';
 import { SupabaseAdultRepository } from '../repositories/SupabaseAdultRepository';
@@ -6,6 +20,7 @@ import { SupabaseActivityTypeRepository } from '../repositories/SupabaseActivity
 
 export type { ActivityType };
 
+// INTERFACES SIMPLIFIÉES POUR LE SUIVI
 export interface Adult {
     id: string;
     nom: string;
@@ -17,25 +32,23 @@ export interface AdultActivity extends Tables<'SuiviAdulte'> {
     TypeActiviteAdulte?: { id: string; label: string } | null;
 }
 
-/**
- * Service for Adult management
- * Handles business logic for managing adults in the system
- */
 export class AdultService {
     constructor(
         private adultRepository: IAdultRepository,
         private activityTypeRepository: IActivityTypeRepository
     ) { }
 
+    // --- GESTION DES PROFILS ADULTES ---
+
     /**
-     * Fetch all adults ordered by name
+     * RÉCUPÉRATION : Liste complète (format Supabase)
      */
     async fetchAdults(): Promise<Tables<'Adulte'>[]> {
         return await this.adultRepository.getAll();
     }
 
     /**
-     * Re-fetch all adults as simplified Adult interface for tracking
+     * RÉCUPÉRATION : Format simplifié pour l'affichage du suivi
      */
     async fetchAllAdults(): Promise<Adult[]> {
         const adults = await this.adultRepository.getAll();
@@ -43,79 +56,82 @@ export class AdultService {
     }
 
     /**
-     * Create a new adult
+     * CRÉATION
      */
     async createAdult(adultData: TablesInsert<'Adulte'>): Promise<Tables<'Adulte'>> {
         return await this.adultRepository.create(adultData);
     }
 
     /**
-     * Update an existing adult
+     * MISE À JOUR
      */
     async updateAdult(id: string, adultData: TablesUpdate<'Adulte'>): Promise<Tables<'Adulte'>> {
         return await this.adultRepository.update(id, adultData);
     }
 
     /**
-     * Delete an adult
+     * SUPPRESSION
      */
     async deleteAdult(id: string): Promise<void> {
         await this.adultRepository.delete(id);
     }
 
+    // --- GESTION DU SUIVI QUOTIDIEN ---
+
     /**
-     * Fetch tracking for today (used by TBI dashboard)
+     * SUIVI DU JOUR : Récupère les actions saisies aujourd'hui
      */
     async fetchTrackingToday(): Promise<AdultActivity[]> {
         return await this.adultRepository.fetchTrackingToday();
     }
 
     /**
-     * Fetch tracking since a specific date (used by tracking dashboard)
+     * HISTORIQUE : Récupère les activités depuis une date donnée
      */
     async fetchAdultActivities(_sinceDate: string): Promise<AdultActivity[]> {
-        // The repository already has fetchTrackingToday which uses today's date.
-        // We can expose or extend it if we want to filter specifically by sinceDate.
-        // For now, let's keep it consistent with tracking dashboard requirements.
+        // Note : Actuellement limité au suivi du jour par le repository
         return await this.adultRepository.fetchTrackingToday();
     }
 
     /**
-     * Add activity
+     * ENREGISTREMENT D'UNE ACTION : Lie un adulte à un type d'activité
      */
     async addActivity(adulteId: string, activiteId: string, userId: string): Promise<void> {
         await this.adultRepository.addActivity(adulteId, activiteId, userId);
     }
 
     /**
-     * Create activity (replaces createAdultActivity)
+     * CRÉATION D'ACTIVITÉ (Variante d'appel)
      */
     async createAdultActivity(activity: { adulte_id: string; activite_id: string; user_id: string }): Promise<void> {
         await this.adultRepository.addActivity(activity.adulte_id, activity.activite_id, activity.user_id);
     }
 
     /**
-     * Delete tracking
+     * ANNULATION D'UN SUIVI
      */
     async deleteSuivi(id: string): Promise<void> {
         await this.adultRepository.deleteSuivi(id);
     }
 
     /**
-     * Delete activity (replaces deleteAdultActivity)
+     * SUPPRESSION D'ACTIVITÉ (Variante d'appel)
      */
     async deleteAdultActivity(id: string): Promise<void> {
         await this.adultRepository.deleteSuivi(id);
     }
 
-    // --- Activity Type methods ---
+    // --- GESTION DES TYPES D'ACTIONS (Délégation) ---
 
     async fetchActivityTypes(): Promise<ActivityType[]> {
         return await this.activityTypeRepository.getAll();
     }
 
+    /**
+     * GÉNÉRATION INITIALE : Crée les actions types si aucune n'existe
+     */
     async seedDefaultActivityTypes(): Promise<ActivityType[]> {
-        // Find existing user_id
+        // On récupère l'identifiant de l'utilisateur connecté
         const { data: { user } } = await (await import('../../../lib/database')).supabase.auth.getUser();
         if (!user) return [];
 
@@ -129,6 +145,9 @@ export class AdultService {
         return await this.activityTypeRepository.bulkCreate(defaults, user.id);
     }
 
+    /**
+     * CRÉATION DE TYPE : Avec vérification d'authentification
+     */
     async createActivityType(label: string): Promise<ActivityType> {
         const { data: { user } } = await (await import('../../../lib/database')).supabase.auth.getUser();
         if (!user) throw new Error("User not authenticated");
@@ -144,8 +163,17 @@ export class AdultService {
     }
 }
 
-// Export singleton instance
+// Instance unique (Singleton) regroupant toute la logique métier
 export const adultService = new AdultService(
     new SupabaseAdultRepository(),
     new SupabaseActivityTypeRepository()
 );
+
+/**
+ * LOGIGRAMME DE FONCTIONNEMENT :
+ * 
+ * 1. ORIENTATION : Le service aiguille les demandes soit vers les profils (Adultes), soit vers les actions (Activities).
+ * 2. AUTHENTIFICATION : Avant toute création (Seed ou Type personnalisé), il vérifie l'identité via Supabase.
+ * 3. COORDINATION : Il transforme parfois les données (mapping) pour simplifier le travail des composants visuels.
+ * 4. PERSISTANCE : Il utilise les dépôts (repositories) pour transformer ces ordres en requêtes SQL vers la base de données.
+ */

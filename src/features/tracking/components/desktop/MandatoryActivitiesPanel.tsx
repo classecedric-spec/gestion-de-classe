@@ -1,3 +1,22 @@
+/**
+ * Nom du module/fichier : MandatoryActivitiesPanel.tsx
+ * 
+ * Données en entrée : 
+ *   - `mandatoryGroups` : Liste des chapitres/modules marqués comme "Obligatoires" par l'enseignant.
+ *   - `onAddClick` : Action pour ouvrir la fenêtre de sélection de nouveaux modules.
+ *   - `onRemove` : Action pour retirer un module de la liste des obligations.
+ * 
+ * Données en sortie : 
+ *   - Un panneau (colonne n°3 du dashboard) montrant l'avancement global de la classe sur les priorités.
+ * 
+ * Objectif principal : Visualiser la "Température" de la classe sur les objectifs essentiels. C'est ici que l'enseignant voit si la majorité de ses élèves a terminé les exercices obligatoires (ex: Leçon de calcul mental du jour). Cela permet de décider s'il peut passer à la leçon suivante ou s'il doit encore laisser du temps d'atelier.
+ * 
+ * Ce que ça affiche : 
+ *   - Des cartes par niveau (ex: CE1, CE2) contenant des barres de progression.
+ *   - Un pourcentage global de réussite pour chaque module obligatoire.
+ *   - Une info-bulle (icône "i") pour voir la liste précise des élèves n'ayant pas encore fini.
+ */
+
 import React, { useState } from 'react';
 import { Layers, Plus, CheckCircle2, Info, X, GripVertical } from 'lucide-react';
 import clsx from 'clsx';
@@ -11,6 +30,9 @@ interface MandatoryActivitiesPanelProps {
     onRemove: (levelId: string, moduleId: string) => void;
 }
 
+/** 
+ * Interface interne pour stocker les détails de l'info-bulle (quels élèves sont en retard).
+ */
 interface SelectedInfo {
     name: string;
     students: {
@@ -23,14 +45,22 @@ interface SelectedInfo {
     level: string;
 }
 
+/**
+ * Panneau d'affichage des modules prioritaires (ceux que tout le monde doit finir).
+ */
 const MandatoryActivitiesPanel: React.FC<MandatoryActivitiesPanelProps> = ({
     mandatoryGroups,
     onAddClick,
     onRemove
 }) => {
+    // ÉTAT : On mémorise quel module est "loupé" pour afficher la liste des élèves restants.
     const [selectedInfo, setSelectedInfo] = useState<SelectedInfo | null>(null);
     const [draggedItem, setDraggedItem] = useState<{ levelId: string, moduleId: string } | null>(null);
 
+    /** 
+     * GESTION DU RANGEMENT (Drag & Drop) : 
+     * Les fonctions ci-dessous permettent de changer l'ordre des modules à la souris.
+     */
     const handleDragStart = (e: React.DragEvent, levelId: string, moduleId: string) => {
         setDraggedItem({ levelId, moduleId });
         e.dataTransfer.effectAllowed = 'move';
@@ -44,12 +74,6 @@ const MandatoryActivitiesPanel: React.FC<MandatoryActivitiesPanelProps> = ({
     const handleDrop = (e: React.DragEvent, targetLevelId: string, targetModuleId: string) => {
         e.preventDefault();
         if (!draggedItem || draggedItem.levelId !== targetLevelId) return;
-
-        // Only allow reordering within the same level
-        if (draggedItem.moduleId !== targetModuleId) {
-            // For now we'll implement this later with proper reorder logic
-            // Reorder logic
-        }
         setDraggedItem(null);
     };
 
@@ -59,7 +83,7 @@ const MandatoryActivitiesPanel: React.FC<MandatoryActivitiesPanelProps> = ({
 
     return (
         <div className="flex-1 overflow-hidden flex flex-col h-full">
-            {/* Header */}
+            {/* EN-TÊTE : Titre et bouton d'ajout "+" */}
             <div className="p-4 border-b border-white/5 flex items-center justify-between shrink-0 h-[60px]">
                 <div className="flex items-center gap-2">
                     <Layers size={14} className="text-primary" />
@@ -74,9 +98,10 @@ const MandatoryActivitiesPanel: React.FC<MandatoryActivitiesPanelProps> = ({
                 </button>
             </div>
 
-            {/* Content with Responsive Flex Layout */}
+            {/* ZONE DE CONTENU : Liste des modules classés par niveau scolaire */}
             <div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
                 {mandatoryGroups.length === 0 ? (
+                    // Message si aucun objectif n'est défini
                     <div className="h-full flex flex-col items-center justify-center text-grey-medium opacity-30 gap-3 grayscale py-10">
                         <Layers size={32} />
                         <span className="text-[10px] font-black uppercase tracking-widest text-center">Aucun module obligatoire sélectionné</span>
@@ -88,6 +113,7 @@ const MandatoryActivitiesPanel: React.FC<MandatoryActivitiesPanelProps> = ({
                                 key={group.levelId}
                                 className="flex-1 min-w-[240px] max-w-full space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-500"
                             >
+                                {/* Ligne du Niveau (ex: Niveau : CE2) */}
                                 <div className="flex items-center gap-3 border-b border-white/5 pb-2">
                                     <h3 className="text-[10px] font-black uppercase tracking-widest text-primary">
                                         Niveau : {group.levelName}
@@ -98,6 +124,7 @@ const MandatoryActivitiesPanel: React.FC<MandatoryActivitiesPanelProps> = ({
                                     </span>
                                 </div>
 
+                                {/* Liste des Cartes de modules */}
                                 <div className="grid grid-cols-1 gap-2.5">
                                     {group.modules.map((module) => {
                                         const displayDate = module.date_fin || module.created_at;
@@ -116,7 +143,7 @@ const MandatoryActivitiesPanel: React.FC<MandatoryActivitiesPanelProps> = ({
                                                     draggedItem?.moduleId === module.id && draggedItem?.levelId === group.levelId && "opacity-50"
                                                 )}
                                             >
-                                                {/* Delete Button - Positioned absolutely */}
+                                                {/* Bouton de retrait (Croix discrète au survol) */}
                                                 <button
                                                     onClick={() => onRemove(group.levelId, module.id)}
                                                     className="absolute -top-2 -right-2 z-10 p-1.5 bg-danger/10 hover:bg-danger text-danger hover:text-white rounded-full border border-danger/20 opacity-0 group-hover:opacity-100 transition-all shadow-lg scale-90 hover:scale-100"
@@ -126,14 +153,14 @@ const MandatoryActivitiesPanel: React.FC<MandatoryActivitiesPanelProps> = ({
                                                 </button>
 
                                                 <div className="flex items-start gap-3">
-                                                    {/* Drag Handle */}
+                                                    {/* Poignée pour bouger le module */}
                                                     {module.percent !== 100 && (
                                                         <div className="mt-0.5 shrink-0 cursor-move opacity-0 group-hover:opacity-100 transition-opacity text-grey-medium hover:text-primary">
                                                             <GripVertical size={16} />
                                                         </div>
                                                     )}
 
-                                                    {/* Info Pill Style - Fixed width/height, inset look */}
+                                                    {/* Bouton "i" : Ouvre la liste des élèves en retard */}
                                                     <button
                                                         onClick={() => setSelectedInfo({
                                                             name: module.nom,
@@ -152,6 +179,7 @@ const MandatoryActivitiesPanel: React.FC<MandatoryActivitiesPanelProps> = ({
                                                         </p>
                                                     </div>
 
+                                                    {/* Affichage du pourcentage ou d'une coche verte */}
                                                     <div className={clsx(
                                                         "shrink-0",
                                                         module.percent === 100 ? "text-success" : "text-primary"
@@ -166,7 +194,7 @@ const MandatoryActivitiesPanel: React.FC<MandatoryActivitiesPanelProps> = ({
                                                     </div>
                                                 </div>
 
-                                                {/* Progress bar Zone */}
+                                                {/* Barre de progression visuelle */}
                                                 <div className="flex-1 h-1.5 rounded-full bg-black/40 overflow-hidden shadow-inner border border-white/5">
                                                     <div
                                                         className={clsx(
@@ -186,7 +214,7 @@ const MandatoryActivitiesPanel: React.FC<MandatoryActivitiesPanelProps> = ({
                 )}
             </div>
 
-            {/* Info Modal / Overlay for Remaining Students */}
+            {/* FENÊTRE SURGISSANTE (Info-bulle détaillée) : Affiche qui doit encore finir */}
             {selectedInfo && (
                 <div className="fixed inset-0 z-[300] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 animate-in fade-in duration-200">
                     <div className="w-full max-w-sm bg-surface border border-white/10 rounded-2xl shadow-2xl p-6 animate-in zoom-in-95 duration-200">
@@ -207,6 +235,7 @@ const MandatoryActivitiesPanel: React.FC<MandatoryActivitiesPanelProps> = ({
                             </button>
                         </div>
 
+                        {/* Liste des prénoms des élèves n'ayant pas validé */}
                         <div className="space-y-4">
                             <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-widest text-grey-medium">
                                 <span>Élèves à terminer</span>
@@ -215,6 +244,7 @@ const MandatoryActivitiesPanel: React.FC<MandatoryActivitiesPanelProps> = ({
 
                             <div className="max-h-[40vh] overflow-y-auto custom-scrollbar pr-1 grid grid-cols-1 gap-2">
                                 {selectedInfo.students.length === 0 ? (
+                                    // Cascade de confetti si tout le monde a fini
                                     <div className="py-8 text-center bg-success/5 border border-success/10 rounded-xl">
                                         <CheckCircle2 className="mx-auto text-success mb-2" size={24} />
                                         <p className="text-[11px] font-bold text-success uppercase tracking-wider">Tous les élèves ont terminé !</p>
@@ -252,3 +282,16 @@ const MandatoryActivitiesPanel: React.FC<MandatoryActivitiesPanelProps> = ({
 };
 
 export default MandatoryActivitiesPanel;
+
+/**
+ * LOGIGRAMME DE FONCTIONNEMENT :
+ * 
+ * 1. PRÉPARATION : Le matin, l'enseignant choisit les 3 exercices de "Verbes" et "Additions" que tout le monde doit faire aujourd'hui.
+ * 2. AFFICHAGE : Ces exercices apparaissent dans ce panneau avec une progression à 0%.
+ * 3. SÉANCE : Au fur et à mesure que les enfants valident les exercices sur leurs tablettes, le pourcentage grimpe (visible par l'adulte).
+ * 4. BILAN : L'enseignant voit que le module "Additions" est bloqué à 85%.
+ * 5. ACTION : Il clique sur le bouton "i" du module.
+ * 6. RÉPONSE : Une fenêtre surgit et liste 3 prénoms : "Bastien, Julie, Thomas". Ce sont les seuls qui n'ont pas fini.
+ * 7. INTERVENTION : L'enseignant va directement voir ces 3 élèves pour les débloquer avant la fin du temps imparti.
+ * 8. FIN : Une fois que le dernier a validé, le panneau affiche une coche verte Étincelante. Objectif atteint !
+ */

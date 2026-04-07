@@ -1,9 +1,18 @@
 /**
- * @component AddStudentToGroupModal
- * @description Modale permettant de sélectionner et d'ajouter plusieurs élèves à un groupe spécifique.
- * Inclut des fonctionnalités de recherche, de filtrage par classe/niveau/groupe et de sélection multiple.
+ * Nom du module/fichier : AddStudentToGroupModal.tsx
  * 
- * @param {AddStudentToGroupModalProps} props - Propriétés du composant.
+ * Données en entrée : 
+ *   - `groupId` : L'identifiant interne du groupe qui va recevoir les nouveaux élèves.
+ *   - `groupName` : Le nom de l'atelier (pour personnaliser le titre de la fenêtre).
+ *   - `showModal` : Un interrupteur (vrai/faux) qui commande l'apparition ou la disparition de la fenêtre.
+ * 
+ * Données en sortie : 
+ *   - L'enregistrement effectif des élèves sélectionnés dans le groupe (en base de données).
+ *   - Un signal `onAdded` prévenant le reste de l'application qu'il faut rafraîchir l'affichage.
+ * 
+ * Objectif principal : Offrir une interface de "Recrutement massif" pour un groupe ou un atelier. Au lieu d'ajouter les élèves un par un, cette fenêtre permet de parcourir tout l'annuaire de l'école, d'utiliser des filtres intelligents (par nom, par classe, par niveau scolaire) et de cocher plusieurs élèves d'un coup pour les inscrire instantanément dans l'atelier sélectionné.
+ * 
+ * Ce que ça affiche : Une grande fenêtre surgissante avec une barre de recherche, des boutons de filtres (Classes, Niveaux, Autres groupes...) et une galerie de cartes d'élèves interactives munies de cases à cocher.
  */
 
 import React from 'react';
@@ -20,6 +29,9 @@ interface AddStudentToGroupModalProps {
     onAdded?: () => void;
 }
 
+/**
+ * Fenêtre interactive pour l'inscription de plusieurs élèves dans un groupe.
+ */
 export const AddStudentToGroupModal: React.FC<AddStudentToGroupModalProps> = ({
     showModal,
     handleCloseModal,
@@ -27,36 +39,25 @@ export const AddStudentToGroupModal: React.FC<AddStudentToGroupModalProps> = ({
     groupName,
     onAdded
 }) => {
+    /** 
+     * ASSISTANT DE FLUX (Hook) : 
+     * On confie toute la complexité (recherche, filtrage, calculs, appels serveur) 
+     * à `useAddStudentToGroupFlow`. Ce fichier se contente de dessiner ce que l'assistant lui dit.
+     */
     const { states, actions } = useAddStudentToGroupFlow(showModal, groupId, onAdded, handleCloseModal);
 
     const {
-        students,
-        classes,
-        groups,
-        niveaux,
-        loading,
-        saving,
-        searchQuery,
-        selectedClasses,
-        selectedGroups,
-        selectedNiveaux,
-        sortBy,
-        showFilters,
-        selectedStudentIds
+        students, classes, groups, niveaux, loading, saving,
+        searchQuery, selectedClasses, selectedGroups, selectedNiveaux,
+        sortBy, showFilters, selectedStudentIds
     } = states;
 
     const {
-        setSearchQuery,
-        setSelectedClasses,
-        setSelectedGroups,
-        setSelectedNiveaux,
-        setSortBy,
-        setShowFilters,
-        handleToggleStudent,
-        handleSelectAll,
-        handleSave
+        setSearchQuery, setSelectedClasses, setSelectedGroups, setSelectedNiveaux,
+        setSortBy, setShowFilters, handleToggleStudent, handleSelectAll, handleSave
     } = actions;
 
+    // Si la fenêtre n'est pas censée être ouverte, on ne dessine rien.
     if (!showModal) return null;
 
     return (
@@ -78,16 +79,16 @@ export const AddStudentToGroupModal: React.FC<AddStudentToGroupModalProps> = ({
                         icon={Plus}
                         disabled={selectedStudentIds.length === 0}
                     >
-                        Ajouter ({selectedStudentIds.length})
+                        Inscrire les {selectedStudentIds.length} élèves
                     </Button>
                 </>
             }
         >
-            {/* Search & Filters - Sticky Header */}
+            {/* --- ZONE DE PILOTAGE : Recherche et Boutons de Filtres --- */}
             <div className="sticky top-0 z-20 bg-surface border-b border-white/10 p-4 space-y-3 shadow-md">
                 <div className="flex gap-2">
                     <Input
-                        placeholder="Rechercher un enfant..."
+                        placeholder="Trouver un élève par son nom..."
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
                         icon={Search}
@@ -102,10 +103,10 @@ export const AddStudentToGroupModal: React.FC<AddStudentToGroupModalProps> = ({
                         )}
                         icon={Filter}
                     >
-                        <span className="hidden sm:inline">Filtres</span>
+                        <span className="hidden sm:inline">Options</span>
                         {(selectedClasses.length > 0 || selectedGroups.length > 0 || selectedNiveaux.length > 0) && (
                             <Badge variant="primary" size="xs" className="ml-1">
-                                {selectedClasses.length + selectedGroups.length + selectedNiveaux.length}
+                                {selectedClasses.length + selectedGroups.length + selectedNiveaux.length} actif(s)
                             </Badge>
                         )}
                     </Button>
@@ -113,18 +114,18 @@ export const AddStudentToGroupModal: React.FC<AddStudentToGroupModalProps> = ({
                         onClick={() => handleSelectAll(students.map(s => s.id))}
                         className="px-3 py-2 rounded-xl border border-white/10 bg-black/20 text-gray-400 hover:text-white hover:bg-white/5 transition-colors text-sm font-medium"
                     >
+                        <span className="hidden sm:inline">Tout sélectionner</span>
                         <Check size={18} className="sm:hidden" />
-                        <span className="hidden sm:inline">Tout sélect.</span>
                     </button>
                 </div>
 
-                {/* Expanded Filters */}
+                {/* --- TIROIR DES FILTRES (Classes, Niveaux...) --- */}
                 {showFilters && (
                     <div className="pt-2 animate-in slide-in-from-top-2 space-y-4 border-t border-white/5 mt-2 overflow-y-auto max-h-[40vh]">
-                        {/* Levels Filter */}
+                        {/* Filtre par Niveau scolaire */}
                         <div>
                             <p className="text-xs font-bold text-gray-500 uppercase mb-2 flex items-center gap-1">
-                                <Layers size={12} /> Niveaux
+                                <Layers size={12} /> Niveaux scolaires
                             </p>
                             <div className="flex flex-wrap gap-2">
                                 {niveaux.map(niv => (
@@ -143,11 +144,10 @@ export const AddStudentToGroupModal: React.FC<AddStudentToGroupModalProps> = ({
                                         {niv.nom}
                                     </button>
                                 ))}
-                                {niveaux.length === 0 && <span className="text-xs text-gray-600 italic">Aucun niveau</span>}
                             </div>
                         </div>
 
-                        {/* Classes Filter */}
+                        {/* Filtre par Nom de Classe */}
                         <div>
                             <p className="text-xs font-bold text-gray-500 uppercase mb-2 flex items-center gap-1">
                                 <GraduationCap size={12} /> Classes
@@ -169,39 +169,12 @@ export const AddStudentToGroupModal: React.FC<AddStudentToGroupModalProps> = ({
                                         {cls.nom}
                                     </button>
                                 ))}
-                                {classes.length === 0 && <span className="text-xs text-gray-600 italic">Aucune classe</span>}
                             </div>
                         </div>
 
-                        {/* Groups Filter (Others) */}
-                        <div>
-                            <p className="text-xs font-bold text-gray-500 uppercase mb-2 flex items-center gap-1">
-                                <Layers size={12} /> Autres Groupes
-                            </p>
-                            <div className="flex flex-wrap gap-2">
-                                {groups.filter(g => g.id !== groupId).map(g => (
-                                    <button
-                                        key={g.id}
-                                        onClick={() => setSelectedGroups(prev =>
-                                            prev.includes(g.id) ? prev.filter(id => id !== g.id) : [...prev, g.id]
-                                        )}
-                                        className={clsx(
-                                            "px-2 py-1 rounded-lg text-xs font-medium border transition-colors",
-                                            selectedGroups.includes(g.id)
-                                                ? "bg-secondary/20 border-secondary text-secondary"
-                                                : "bg-white/5 border-transparent text-gray-400 hover:border-white/10"
-                                        )}
-                                    >
-                                        {g.nom}
-                                    </button>
-                                ))}
-                                {groups.length <= 1 && <span className="text-xs text-gray-600 italic">Aucun autre groupe</span>}
-                            </div>
-                        </div>
-
-                        {/* Sorting Options */}
+                        {/* Options de Tri */}
                         <div className="flex items-center gap-2 pt-2 border-t border-white/5">
-                            <span className="text-xs text-gray-400">Trier par :</span>
+                            <span className="text-xs text-gray-400">Classer par :</span>
                             <div className="flex bg-black/20 rounded-lg p-0.5">
                                 {['nom', 'prenom'].map(sort => (
                                     <button
@@ -221,12 +194,12 @@ export const AddStudentToGroupModal: React.FC<AddStudentToGroupModalProps> = ({
                 )}
             </div>
 
-            {/* Students List */}
+            {/* --- GRILLE DES ÉLÈVES (Résultats de la recherche) --- */}
             <div className="p-4">
                 {loading ? (
                     <div className="flex flex-col items-center justify-center py-12 text-gray-500">
                         <Loader2 className="animate-spin mb-2" size={32} />
-                        <p>Chargement des élèves...</p>
+                        <p>Préparation de l'annuaire...</p>
                     </div>
                 ) : students.length === 0 ? (
                     <div className="text-center py-12 px-4 rounded-xl bg-white/5 border border-dashed border-white/10 mx-auto max-w-sm">
@@ -234,8 +207,8 @@ export const AddStudentToGroupModal: React.FC<AddStudentToGroupModalProps> = ({
                         <h3 className="text-lg font-medium text-white">Aucun élève trouvé</h3>
                         <p className="text-gray-500 text-sm mt-1">
                             {searchQuery || selectedClasses.length > 0 || selectedGroups.length > 0
-                                ? "Essaie de modifier tes filtres."
-                                : "Tous les élèves sont déjà dans ce groupe !"}
+                                ? "Modifiez vos filtres de recherche."
+                                : "Tous les élèves de l'école sont déjà dans ce groupe !"}
                         </p>
                     </div>
                 ) : (
@@ -249,7 +222,7 @@ export const AddStudentToGroupModal: React.FC<AddStudentToGroupModalProps> = ({
                                     className={clsx(
                                         "relative group p-3 rounded-xl border cursor-pointer transition-all duration-200 select-none",
                                         isSelected
-                                            ? "bg-primary/10 border-primary shadow-[0_0_15px_-3px_rgba(var(--primary),0.2)]"
+                                            ? "bg-primary/20 border-primary shadow-[0_0_15px_-3px_rgba(var(--primary),0.2)]"
                                             : "bg-black/20 border-white/5 hover:border-white/10 hover:bg-black/40"
                                     )}
                                 >
@@ -270,18 +243,17 @@ export const AddStudentToGroupModal: React.FC<AddStudentToGroupModalProps> = ({
                                             <div className="flex flex-wrap gap-1 mt-1">
                                                 {student.Classe && (
                                                     <Badge variant="default" size="xs" className="opacity-70">
-                                                        <GraduationCap size={10} className="mr-1" />
                                                         {student.Classe.nom}
                                                     </Badge>
                                                 )}
-                                                {student.EleveGroupe && student.EleveGroupe.length > 0 && (
+                                                {student.Niveau && (
                                                     <Badge variant="default" size="xs" className="opacity-70">
-                                                        <Layers size={10} className="mr-1" />
-                                                        {student.EleveGroupe.length} grp
+                                                        {student.Niveau.nom}
                                                     </Badge>
                                                 )}
                                             </div>
                                         </div>
+                                        {/* Case à cocher visuelle */}
                                         <div className={clsx(
                                             "w-6 h-6 rounded-full border flex items-center justify-center transition-all",
                                             isSelected
@@ -301,4 +273,18 @@ export const AddStudentToGroupModal: React.FC<AddStudentToGroupModalProps> = ({
     );
 };
 
+/**
+ * LOGIGRAMME DE FONCTIONNEMENT :
+ * 
+ * 1. L'enseignant clique sur "Inscrire des élèves" dans son atelier "Lecture".
+ * 2. La fenêtre surgissante `AddStudentToGroupModal` s'ouvre au centre de l'écran.
+ * 3. L'assistant `useAddStudentToGroupFlow` télécharge immédiatement la liste de TOUS les élèves déjà inscrits dans l'application.
+ * 4. L'enseignant cherche les élèves de la classe "CM1" :
+ *    - Il ouvre "Options", clique sur "CM1".
+ *    - La liste se réduit en temps réel pour ne garder que les enfants de CM1.
+ * 5. L'enseignant tape "DU" pour trouver les "Dumont" et les "Dupont" :
+ *    - Il coche les cases à côté de leurs noms.
+ * 6. L'enseignant valide en cliquant sur le gros bouton "Inscrire les élèves".
+ * 7. L'application enregistre les nouveaux membres, ferme la fenêtre, et rafraîchit la page pour montrer les nouveaux élèves.
+ */
 export default AddStudentToGroupModal;

@@ -1,3 +1,20 @@
+/**
+ * Nom du module/fichier : useAttendanceConfig.ts
+ * 
+ * Données en entrée : 
+ *   - selectedGroup & selectedSetup : Les choix actuels de l'enseignant.
+ *   - currentDateForExport : La date servant de base aux calculs d'export.
+ *   - isOpen : Indique si la modale de configuration est affichée.
+ * 
+ * Données en sortie : 
+ *   - États de navigation interne (onglets, vues liste/édition).
+ *   - Liste des configurations (sets) et des catégories.
+ *   - Données préparées pour l'export (listes de dates par semaine/mois).
+ *   - Fonctions d'action (créer, sauver, supprimer, copier une période).
+ * 
+ * Objectif principal : Ce hook gère la "Face B" du module Présence : la configuration et les rapports. Il transforme la base de données brute en informations utilisables pour l'interface : il calcule par exemple quelles sont les dates disponibles pour créer un rapport mensuel ou hebdomadaire. C'est lui qui s'occupe de la sauvegarde complexe des types d'appels et de leurs catégories colorées.
+ */
+
 import { useState, useMemo, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getCurrentUser } from '../../../lib/database';
@@ -25,27 +42,27 @@ export const useAttendanceConfig = ({
 }: UseAttendanceConfigProps) => {
     const queryClient = useQueryClient();
     
-    // UI Local State
+    // --- ÉTATS LOCAUX DE NAVIGATION ---
     const [view, setView] = useState<'list' | 'edit'>('list');
     const [activeTab, setActiveTab] = useState<'general' | 'config' | 'export'>('general');
     
-    // Edit Internal State
+    // État temporaire durant l'édition d'une configuration
     const [currentSet, setCurrentSet] = useState<{ id: string | null; nom: string; description: string | null } | null>(null);
     const [categories, setCategories] = useState<CategoryWithTemp[]>([]);
 
-    // Export Internal State
+    // Paramètres d'export (Jour/Semaine/Mois)
     const [exportMode, setExportMode] = useState<'day' | 'week' | 'month'>('day');
     const [selectedPeriod, setSelectedPeriod] = useState('');
     const [selectedDay, setSelectedDay] = useState(currentDateForExport);
 
-    // 0. User fetching
+    // 0. Utilisateur actuel
     const { data: user } = useQuery({
         queryKey: ['user'],
         queryFn: getCurrentUser,
         staleTime: Infinity,
     });
 
-    // 1. Setups fetching
+    // 1. Récupération des configurations enregistrées
     const { data: sets = [], isLoading: loadingSets } = useQuery({
         queryKey: ['attendance-setup', user?.id],
         queryFn: async () => {
@@ -56,7 +73,7 @@ export const useAttendanceConfig = ({
         staleTime: 1000 * 60 * 5,
     });
 
-    // 2. Distinct dates for export
+    // 2. Recherche des dates où des appels ont eu lieu (pour l'onglet Export)
     const { data: distinctDates = [] } = useQuery({
         queryKey: ['attendance-dates', user?.id, selectedSetup?.id],
         queryFn: async () => {
@@ -66,7 +83,7 @@ export const useAttendanceConfig = ({
         enabled: activeTab === 'export' && !!selectedSetup && !!user,
     });
 
-    // 3. Export data fetching
+    // 3. Récupération des données brutes pour un intervalle donné
     const [exportRange, setExportRange] = useState<{ start: string; end: string } | null>(null);
     
     const { data: exportData = [], isLoading: loadingExport } = useQuery({
@@ -78,25 +95,18 @@ export const useAttendanceConfig = ({
         enabled: activeTab === 'export' && !!exportRange && !!user,
     });
 
-    // 4. Mutations
+    // --- ACTIONS DE MODIFICATION (MUTATIONS) ---
+
+    // Suppression d'une configuration
     const deleteSetupMutation = useMutation({
         mutationFn: (id: string) => attendanceService.deleteSetup(id),
-        onMutate: async (id) => {
-            const queryKey = ['attendance-setup', user?.id];
-            await queryClient.cancelQueries({ queryKey });
-            const previous = queryClient.getQueryData<SetupPresence[]>(queryKey) || [];
-            queryClient.setQueryData(queryKey, previous.filter(s => s.id !== id));
-            return { previous, queryKey };
-        },
-        onError: (_err, _variables, context) => {
-            if (context?.previous) queryClient.setQueryData(context.queryKey, context.previous);
-            toast.error('Erreur: ' + (_err as any).message);
-        },
         onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['attendance-setup', user?.id] });
             toast.success("Configuration supprimée");
         }
     });
 
+    // Sauvegarde (Création ou Mise à jour) d'une configuration et de ses sous-catégories
     const saveSetupMutation = useMutation({
         mutationFn: async ({ currentSet, categories, onConfigSaved }: { currentSet: any, categories: CategoryWithTemp[], onConfigSaved?: () => void }) => {
             if (!user) throw new Error("Non authentifié");
@@ -109,6 +119,7 @@ export const useAttendanceConfig = ({
                 setupId = newSetup.id;
             }
 
+            // Préparation des catégories pour l'envoi en salle de données
             const categoriesToUpsert = categories.map(c => ({
                 id: c.isTemp ? undefined : c.id,
                 setup_id: setupId!,
@@ -118,6 +129,7 @@ export const useAttendanceConfig = ({
             }));
 
             await attendanceService.upsertCategories(categoriesToUpsert);
+            // On s'assure que la catégorie 'Absent' existe toujours (système)
             await attendanceService.ensureAbsentCategory(setupId!, user.id);
             
             return { setupId, onConfigSaved };
@@ -127,10 +139,10 @@ export const useAttendanceConfig = ({
             setView('list');
             if (onConfigSaved) onConfigSaved();
             toast.success("Configuration sauvegardée");
-        },
-        onError: (err: any) => toast.error('Erreur: ' + err.message)
+        }
     });
 
+    /** Sert à dupliquer les données du matin vers l'après-midi pour gagner du temps. */
     const copyPeriodMutation = useMutation({
         mutationFn: async ({ source, target, onConfigSaved }: { source: string, target: string, onConfigSaved?: () => void }) => {
             if (!selectedSetup || !user) throw new Error("Sélection manquante");
@@ -140,13 +152,12 @@ export const useAttendanceConfig = ({
         onSuccess: (onConfigSaved) => {
             toast.success("Données copiées");
             if (onConfigSaved) onConfigSaved();
-            // Invalidate attendance queries in useAttendance's scope
             queryClient.invalidateQueries({ queryKey: ['attendance', user?.id] });
-        },
-        onError: (err: any) => toast.error("Erreur: " + err.message)
+        }
     });
 
-    // --- LOGIC FOR EXPORT PERIODS ---
+    // --- CALCUL DES PÉRIODES DISPONIBLES POUR L'EXPORT ---
+    // Cette partie génère la liste textuelle (ex: "Semaine du 4 au 8 mars") affichée dans le menu déroulant d'export
     const availablePeriods = useMemo(() => {
         if (activeTab !== 'export' || exportMode === 'day' || distinctDates.length === 0) return [];
         
@@ -166,6 +177,7 @@ export const useAttendanceConfig = ({
             let value: string, label: string;
 
             if (exportMode === 'week') {
+                // On calcule le lundi et le vendredi de la semaine de cette date
                 const day = date.getDay();
                 const daysToMonday = day === 0 ? 6 : day - 1;
                 const monday = new Date(date);
@@ -175,7 +187,7 @@ export const useAttendanceConfig = ({
 
                 value = `${toLocalISODate(monday)}:${toLocalISODate(friday)}`;
                 label = `Semaine du ${monday.toLocaleDateString('fr-FR')} au ${friday.toLocaleDateString('fr-FR')}`;
-            } else { // month
+            } else { // Mode Mois
                 const monthName = date.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' });
                 const firstDay = new Date(y, m - 1, 1, 12, 0, 0);
                 const lastDay = new Date(y, m, 0, 12, 0, 0);
@@ -191,12 +203,14 @@ export const useAttendanceConfig = ({
         return periods;
     }, [activeTab, exportMode, distinctDates]);
 
+    // Sélection automatique de la première période disponible
     useEffect(() => {
         if (availablePeriods.length > 0 && !selectedPeriod) {
             setSelectedPeriod(availablePeriods[0].value);
         }
     }, [availablePeriods, selectedPeriod]);
 
+    // Transforme une période (ex: "Lundi:Vendredi") en une liste de dates individuelles (Lundi, Mardi, Mercredi...)
     const exportDates = useMemo(() => {
         if (exportMode === 'day') return [selectedDay];
         if (!selectedPeriod) return [];
@@ -210,7 +224,7 @@ export const useAttendanceConfig = ({
 
         while (curr <= last) {
             const day = curr.getDay();
-            if (day !== 0 && day !== 6) {
+            if (day !== 0 && day !== 6) { // On ignore Samedi et Dimanche
                 const dayStr = String(curr.getDate()).padStart(2, '0');
                 const monthStr = String(curr.getMonth() + 1).padStart(2, '0');
                 dates.push(`${curr.getFullYear()}-${monthStr}-${dayStr}`);
@@ -220,6 +234,7 @@ export const useAttendanceConfig = ({
         return dates;
     }, [exportMode, selectedDay, selectedPeriod]);
 
+    // Synchronise la plage de dates avec le chargement des données
     useEffect(() => {
         if (activeTab !== 'export') return;
         if (exportMode === 'day') {
@@ -230,7 +245,8 @@ export const useAttendanceConfig = ({
         }
     }, [activeTab, exportMode, selectedDay, selectedPeriod]);
 
-    // Actions
+    // --- ACTIONS EXPOSÉES ---
+    
     const handleCreateNew = () => {
         setCurrentSet({ id: null, nom: '', description: '' });
         setCategories([
@@ -244,11 +260,10 @@ export const useAttendanceConfig = ({
         setCurrentSet(set);
         try {
             const data = await attendanceService.fetchCategories(set.id);
+            // On filtre 'Absent' car il est géré par le système, pas par l'utilisateur
             setCategories(data.filter((c: any) => c.nom !== 'Absent'));
             setView('edit');
-        } catch (error) {
-            console.error(error);
-        }
+        } catch (error) { console.error(error); }
     };
 
     const addCategory = () => {
@@ -306,3 +321,18 @@ export const useAttendanceConfig = ({
         fetchSets: () => queryClient.invalidateQueries({ queryKey: ['attendance-setup', user?.id] })
     };
 };
+
+/**
+ * LOGIGRAMME DE FONCTIONNEMENT :
+ * 
+ * 1. INITIALISATION : Le hook surveille l'ouverture de la modale.
+ * 2. CONFIGURATION : 
+ *    - L'utilisateur édite un type d'appel.
+ *    - Le hook maintient une copie locale (`currentSet`, `categories`).
+ *    - Au clic sur Enregistrer, il synchronise tout avec Supabase.
+ * 3. PRÉPARATION EXPORT :
+ *    - L'utilisateur choisit le mode "Semaine".
+ *    - Le hook scanne les dates existantes en DB et suggère des plages de lundis-vendredis.
+ *    - Quand l'utilisateur choisit une plage, le hook télécharge toutes les présences correspondantes.
+ * 4. SORTIE : Les données filtrées et formatées sont envoyées aux composants `AttendanceExportTab` et `AttendancePDF`.
+ */

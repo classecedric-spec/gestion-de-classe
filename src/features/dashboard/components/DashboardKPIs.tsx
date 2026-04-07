@@ -1,3 +1,16 @@
+/**
+ * Nom du module/fichier : DashboardKPIs.tsx
+ * 
+ * Données en entrée : 
+ *   - stats : Statistiques globales (nombre d'élèves, répartition garçons/filles, moyennes de présence).
+ *   - birthdays : Liste des élèves fêtant leur anniversaire ce mois-ci.
+ *   - planning : Nombre d'activités prévues pour la semaine.
+ * 
+ * Données en sortie : Une rangée de cartes d'indicateurs clés (KPIs) visuelles et colorées.
+ * 
+ * Objectif principal : Présenter en un clin d'œil les chiffres importants de la classe. Ce composant regroupe les "compteurs" essentiels : effectif total par niveau, taux de présence du jour, anniversaires à ne pas oublier et volume d'activités pédagogiques programmées.
+ */
+
 import React from 'react';
 import { Users, CheckCircle2, Calendar } from 'lucide-react';
 import { getInitials } from '../../../lib/helpers';
@@ -12,12 +25,15 @@ interface DashboardKPIsProps {
     onOpenPlanner: () => void;
 }
 
+/**
+ * Composant affichant les indicateurs de performance (KPIs) du tableau de bord.
+ */
 const DashboardKPIs: React.FC<DashboardKPIsProps> = ({ stats, birthdays, planning, onOpenPlanner }) => {
 
     return (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-4">
 
-            {/* 1. Students Count */}
+            {/* 1. CARTE EFFECTIF : Nombre total d'élèves et répartition par niveau/genre */}
             <StatCard
                 title="Élèves"
                 value={stats.totalStudents}
@@ -32,9 +48,11 @@ const DashboardKPIs: React.FC<DashboardKPIsProps> = ({ stats, birthdays, plannin
                                     <span className="font-bold text-grey-medium uppercase tracking-wider">{level.name}</span>
                                     <div className="flex items-center gap-2 text-grey-medium">
                                         <span className="text-white font-bold">{level.total}</span>
+                                        {/* Badge Garçons */}
                                         <Badge variant="primary" size="xs" style="ghost" className="px-0 min-w-0">
                                             <span className="w-1.5 h-1.5 rounded-full bg-blue-400/80 mr-1"></span>{level.boys}
                                         </Badge>
+                                        {/* Badge Filles */}
                                         <Badge variant="danger" size="xs" style="ghost" className="px-0 min-w-0">
                                             <span className="w-1.5 h-1.5 rounded-full bg-pink-400/80 mr-1"></span>{level.girls}
                                         </Badge>
@@ -46,7 +64,7 @@ const DashboardKPIs: React.FC<DashboardKPIsProps> = ({ stats, birthdays, plannin
                 }
             />
 
-            {/* 2. Attendance */}
+            {/* 2. CARTE PRÉSENCES : Écho de l'appel du jour */}
             <StatCard
                 title="Présences"
                 value={stats.attendance?.todayCount || 0}
@@ -59,7 +77,7 @@ const DashboardKPIs: React.FC<DashboardKPIsProps> = ({ stats, birthdays, plannin
                 }}
             />
 
-            {/* 4. Birthdays */}
+            {/* 3. CARTE ANNIVERSAIRES : Liste visuelle des enfants à fêter */}
             <StatCard
                 title="Anniversaires"
                 value={birthdays.length}
@@ -94,7 +112,7 @@ const DashboardKPIs: React.FC<DashboardKPIsProps> = ({ stats, birthdays, plannin
                 }
             />
 
-            {/* 5. Planning */}
+            {/* 4. CARTE ACTIVITÉS : Résumé du planning hebdomadaire */}
             <StatCard
                 title="Activités"
                 value={planning?.count || 0}
@@ -122,3 +140,14 @@ const DashboardKPIs: React.FC<DashboardKPIsProps> = ({ stats, birthdays, plannin
 };
 
 export default DashboardKPIs;
+
+/**
+ * LOGIGRAMME DE FONCTIONNEMENT :
+ * 
+ * 1. RÉCEPTION : Le composant reçoit les chiffres calculés par le hook `useDashboardData`.
+ * 2. DÉCOUPAGE : Il sépare les informations dans les 4 cartes thématiques (StatCards).
+ * 3. DÉTAILLAGE :
+ *    - Pour les élèves, il boucle sur les niveaux pour afficher les sous-totaux.
+ *    - Pour les anniversaires, il génère une pile d'avatars superposés.
+ * 4. INTERACTION : Si l'enseignant clique sur "Ouvrir le semainier", l'application navigue vers le module Planning.
+ */

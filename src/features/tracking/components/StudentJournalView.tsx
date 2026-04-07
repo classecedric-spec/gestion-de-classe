@@ -1,3 +1,19 @@
+/**
+ * Nom du module/fichier : StudentJournalView.tsx
+ * 
+ * Données en entrée : 
+ *   - `studentProgress` : Liste des activités et progrès d'un élève spécifique.
+ *   - `expandedModules` : État indiquant quels chapitres sont ouverts ou fermés.
+ *   - `showPendingOnly` : Filtre pour n'afficher que les travaux non terminés.
+ * 
+ * Données en sortie : 
+ *   - Une vue détaillée (Carnet de bord) montrant l'avancement d'un élève, module par module.
+ * 
+ * Objectif principal : Offrir une vision "Rayon X" sur le travail d'un élève. L'enseignant peut voir précisément quels ateliers l'enfant a réussis, lesquels sont en cours, et s'il y a des retards par rapport aux dates limites. C'est l'outil idéal pour les bilans individuels.
+ * 
+ * Ce que ça affiche : Une liste de modules (chapitres) avec barres de progression. Chaque module peut être déplié pour révéler la liste des exercices avec leurs statuts (Terminé, En cours, Besoin d'aide).
+ */
+
 import React from 'react';
 import clsx from 'clsx';
 import { ChevronRight, CheckCircle2, AlertCircle, Clock, X, ShieldCheck } from 'lucide-react';
@@ -14,6 +30,9 @@ interface StudentJournalViewProps {
     handleResetActivity?: (progressionId: string) => void;
 }
 
+/**
+ * Composant de visualisation du parcours individuel d'un élève.
+ */
 export const StudentJournalView: React.FC<StudentJournalViewProps> = ({
     studentProgress,
     expandedModules,
@@ -21,6 +40,7 @@ export const StudentJournalView: React.FC<StudentJournalViewProps> = ({
     showPendingOnly,
     handleResetActivity
 }) => {
+    // REGROUPEMENT : On transforme la liste brute d'activités en groupes par "Module" (ex: "Calcul Mental", "Géométrie").
     const moduleGroups = Object.values(studentProgress.reduce((acc: any, p) => {
         const mod = p.Activite?.Module;
         if (!mod) return acc;
@@ -33,6 +53,7 @@ export const StudentJournalView: React.FC<StudentJournalViewProps> = ({
         <>
             {moduleGroups
                 .sort((a: any, b: any) => {
+                    // TRI : On classe les modules par date de fin, puis par branche et sous-branche.
                     if (a.date_fin && b.date_fin) {
                         if (a.date_fin !== b.date_fin) return new Date(a.date_fin).getTime() - new Date(b.date_fin).getTime();
                     } else if (a.date_fin) return -1;
@@ -46,30 +67,29 @@ export const StudentJournalView: React.FC<StudentJournalViewProps> = ({
                     return a.nom.localeCompare(b.nom);
                 })
                 .map((module: any) => {
+                    // CALCULS DE STATISTIQUES : On compte combien sont terminés pour dessiner la barre de progrès.
                     const activities = module.activities;
                     const completedCount = activities.filter((a: any) => a.etat === 'termine').length;
                     const toVerifyCount = activities.filter((a: any) => a.etat === 'a_verifier').length;
                     const totalCount = activities.length;
                     const percent = Math.round(((completedCount + toVerifyCount) / totalCount) * 100);
 
-                    // Extracted style to avoid inline style warning
                     const progressBarStyle = { width: `${percent}%` } as React.CSSProperties;
-
-                    // Helper to bypass naive "no-inline-style" linting
                     const withStyle = (style: React.CSSProperties) => ({ style });
 
                     const isExpanded = expandedModules[module.id];
                     const isModuleOverdue = module.date_fin && new Date(module.date_fin) < new Date() && completedCount < totalCount;
 
+                    // FILTRE : Si le module est 100% fini et qu'on ne veut voir que le travail restant, on cache.
                     if (showPendingOnly && completedCount === totalCount) return null;
 
                     return (
                         <div key={module.id} className="bg-surface/50 border border-transparent rounded-xl overflow-hidden hover:border-white/10 hover:bg-surface transition-all group">
+                            {/* EN-TÊTE DU MODULE (Ligne récapitulative cliquable) */}
                             <div
                                 onClick={() => toggleModuleExpansion(module.id)}
                                 className="py-2.5 px-4 cursor-pointer hover:bg-white/5 transition-colors flex items-center justify-between gap-6"
                             >
-                                {/* Left: Title & Chevron (Takes remaining space) */}
                                 <div className="flex items-center gap-4 min-w-0 flex-1">
                                     <div className={clsx(
                                         "transition-all duration-300",
@@ -85,9 +105,8 @@ export const StudentJournalView: React.FC<StudentJournalViewProps> = ({
                                     </h3>
                                 </div>
 
-                                {/* Right: Metrics Block (40% width, anchored right) */}
+                                {/* BLOC DROIT : Date limite et Barre de progression */}
                                 <div className="flex items-center gap-6 w-[40%] shrink-0">
-                                    {/* Date Badge (Before the bar) */}
                                     <div className="shrink-0">
                                         {module.date_fin ? (
                                             <Badge variant="primary" size="xs" className="px-2 py-0.5 font-black">
@@ -98,7 +117,6 @@ export const StudentJournalView: React.FC<StudentJournalViewProps> = ({
                                         )}
                                     </div>
 
-                                    {/* Progress Bar Area */}
                                     <div className="flex-1 flex items-center gap-4">
                                         <div className="flex-1 h-1.5 bg-background/50 rounded-full overflow-hidden border border-white/5">
                                             <div
@@ -115,11 +133,13 @@ export const StudentJournalView: React.FC<StudentJournalViewProps> = ({
                                 </div>
                             </div>
 
+                            {/* DÉTAILS DÉPLIÉS : La liste des exercices du module */}
                             {isExpanded && (
                                 <div className="border-t border-white/5 bg-black/20">
                                     {activities.sort((a: any, b: any) => (a.Activite?.ordre || 0) - (b.Activite?.ordre || 0)).map((p: any) => (
                                         <div key={p.id} className="p-3 pl-10 border-b border-white/5 last:border-0 flex items-center justify-between hover:bg-white/5 transition-colors group/item">
                                             <div className="flex items-center gap-3 min-w-0">
+                                                {/* Bouton pour réinitialiser un travail (Reset) */}
                                                 {p.etat !== 'a_commencer' && handleResetActivity && (
                                                     <button
                                                         onClick={(e) => {
@@ -168,3 +188,17 @@ export const StudentJournalView: React.FC<StudentJournalViewProps> = ({
         </>
     );
 };
+
+/**
+ * LOGIGRAMME DE FONCTIONNEMENT :
+ * 
+ * 1. L'enseignant consulte la fiche de Julie pour voir où elle en est.
+ * 2. Le composant reçoit toute la liste des progrès de Julie (venant de la base de données).
+ * 3. Il trie Julie par "Modules" pour que ce soit plus lisible (ex: tout ce qui touche aux Maths est groupé).
+ * 4. Pour chaque module, il dessine une barre de progression bleue. Plus la barre est longue, plus Julie a terminé d'exercices.
+ * 5. L'enseignant déplie le module "Grammaire" :
+ *    - Il voit que Julie a fini l'exercice "Le sujet", mais qu'elle est bloquée ("Besoin d'aide") sur "Le verbe".
+ * 6. L'enseignant peut décider de remettre un exercice à zéro si Julie s'est trompée et doit recommencer.
+ * 7. Si le module est en rouge, c'est que Julie a dépassé la date limite de rendu.
+ */
+export default StudentJournalView;

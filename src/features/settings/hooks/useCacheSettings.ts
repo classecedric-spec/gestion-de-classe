@@ -27,7 +27,7 @@ export const useCacheSettings = () => {
     const [branches, setBranches] = useState<Partial<Tables<'Branche'>>[]>([]);
     const [allStudents, setAllStudents] = useState<Partial<Tables<'Eleve'>>[]>([]);
     const [selectedBulkBranch, setSelectedBulkBranch] = useState('');
-    const [selectedBulkIndex, setSelectedBulkIndex] = useState<number | string>(50);
+    const [selectedBulkIndex, setSelectedBulkIndex] = useState<number>(50);
     const [isUpdatingBulk, setIsUpdatingBulk] = useState(false);
     const [isLoadingBulkData, setIsLoadingBulkData] = useState(false);
     const [defaultLuckyCheckIndex, setDefaultLuckyCheckIndex] = useState<number>(50);
@@ -174,7 +174,7 @@ export const useCacheSettings = () => {
             allStudents.forEach(student => {
                 if (student.id) {
                     if (!newPrefs[student.id]) newPrefs[student.id] = {};
-                    newPrefs[student.id][selectedBulkBranch] = typeof selectedBulkIndex === 'string' ? parseInt(selectedBulkIndex, 10) : selectedBulkIndex;
+                    newPrefs[student.id][selectedBulkBranch] = selectedBulkIndex;
                 }
             });
 

@@ -1,10 +1,14 @@
 /**
- * @hook useAdultsPageFlow
- * @description Gère la logique complexe de la page d'administration des adultes. 
- * Inclut la gestion des modales, les formulaires d'édition, et la synchronisation de l'affichage.
+ * Nom du module/fichier : useAdultsPageFlow.ts
  * 
- * @example
- * const { states, actions } = useAdultsPageFlow();
+ * Données en entrée : 
+ *   - Utilise les hooks métier useAdults et useActivityTypes.
+ * 
+ * Données en sortie : 
+ *   - states : Ensemble des états de la page (adultes, sélection, modales, recherche...).
+ *   - actions : Fonctions pour manipuler ces états (ouvrir modales, soumettre formulaires...).
+ * 
+ * Objectif principal : Ce "hook de flux" centralise toute la logique d'interaction de la page "Adultes". Il fait le pont entre les composants visuels (boutons, listes) et les services de données. Il gère notamment la synchronisation visuelle (hauteur des colonnes) et le cycle de vie des formulaires.
  */
 
 import { useState, useRef, useLayoutEffect } from 'react';
@@ -15,24 +19,28 @@ import { Database } from '../../../types/supabase';
 type AdultRow = Database['public']['Tables']['Adulte']['Row'];
 
 export function useAdultsPageFlow() {
+    // RÉCUPÉRATION DES SERVICES DE DONNÉES
     const adultsHook = useAdults();
     const activityTypesHook = useActivityTypes();
 
+    // ÉTATS DE SÉLECTION ET NAVIGATION
     const [selectedAdult, setSelectedAdult] = useState<AdultRow | null>(null);
     const [activeTab, setActiveTab] = useState<'types' | 'details'>('types');
 
-    // Modals state
+    // ÉTATS DES FENÊTRES FLOTTANTES (Modales) - ADULTES
     const [showAdultModal, setShowAdultModal] = useState(false);
     const [isEditingAdult, setIsEditingAdult] = useState(false);
     const [currentAdultForm, setCurrentAdultForm] = useState<any>({ nom: '', prenom: '', fonction: '' });
     const [adultToDelete, setAdultToDelete] = useState<AdultRow | null>(null);
 
+    // ÉTATS DES FENÊTRES FLOTTANTES (Modales) - ACTIONS
     const [showActivityModal, setShowActivityModal] = useState(false);
     const [isEditingActivity, setIsEditingActivity] = useState(false);
     const [currentActivityForm, setCurrentActivityForm] = useState<any>({ label: '' });
     const [activityToDelete, setActivityToDelete] = useState<any>(null);
 
-    // --- Height Synchronization ---
+    // SYNCHRONISATION VISUELLE : Alignement des hauteurs de colonnes
+    // On utilise Refs et LayoutEffect pour s'assurer que les deux colonnes ont la même taille d'en-tête.
     const leftContentRef = useRef<HTMLDivElement>(null);
     const rightContentRef = useRef<HTMLDivElement>(null);
     const [headerHeight, setHeaderHeight] = useState<number | undefined>(undefined);
@@ -60,7 +68,7 @@ export function useAdultsPageFlow() {
         return () => clearTimeout(t);
     }, [adultsHook.filteredAdults.length, selectedAdult, adultsHook.searchTerm]);
 
-    // Handlers: Adults
+    // GESTIONNAIRES D'ÉVÉNEMENTS : MODULE ADULTES
     const handleOpenAddAdult = () => {
         setCurrentAdultForm({ nom: '', prenom: '', fonction: '' });
         setIsEditingAdult(false);
@@ -94,7 +102,7 @@ export function useAdultsPageFlow() {
         }
     };
 
-    // Handlers: Activities
+    // GESTIONNAIRES D'ÉVÉNEMENTS : MODULE TYPES D'ACTIONS
     const handleOpenAddActivity = () => {
         setCurrentActivityForm({ label: '' });
         setIsEditingActivity(false);
@@ -125,6 +133,7 @@ export function useAdultsPageFlow() {
         }
     };
 
+    // EXPOSITION DES ÉTATS ET ACTIONS AU COMPOSANT VISUEL
     return {
         states: {
             adultsHook,
@@ -163,3 +172,12 @@ export function useAdultsPageFlow() {
         }
     };
 }
+
+/**
+ * LOGIGRAMME DE FONCTIONNEMENT :
+ * 
+ * 1. INITIALISATION : Le hook orchestre deux autres hooks métier (données) et gère lui-même les états de "navigation" (sélection d'adulte, onglets).
+ * 2. FLUX DES FORMULAIRES : Centralise l'ouverture des fenêtres de saisie, le pré-remplissage des champs, et le nettoyage après envoi.
+ * 3. SYNCHRONISATION : Calcule dynamiquement les hauteurs d'en-tête pour garantir un design fluide.
+ * 4. SORTIE : Renvoie un objet structuré (states/actions) facilitant l'écriture du composant AdultsPage.tsx.
+ */

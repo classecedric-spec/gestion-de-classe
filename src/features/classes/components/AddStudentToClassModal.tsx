@@ -1,9 +1,21 @@
 /**
- * @component AddStudentToClassModal
- * @description Modale permettant de sélectionner et d'ajouter plusieurs élèves à une classe spécifique.
- * Inclut des fonctionnalités de recherche, de filtrage par classe/groupe et de sélection multiple.
+ * Nom du module/fichier : AddStudentToClassModal.tsx
  * 
- * @param {AddStudentToClassModalProps} props - Propriétés du composant.
+ * Données en entrée : 
+ *   - showModal : Indique si la fenêtre de sélection doit être affichée à l'écran.
+ *   - handleCloseModal : Fonction permettant de fermer la fenêtre (annulation).
+ *   - classId / className : Identifiant et nom de la classe qui va recevoir les nouveaux élèves (destination).
+ *   - onAdded : Fonction appelée automatiquement après un ajout réussi pour rafraîchir l'affichage principal.
+ * 
+ * Données en sortie : Une interface utilisateur interactive permettant de choisir visuellement des élèves.
+ * 
+ * Objectif principal : Permettre à l'enseignant de piocher des élèves dans sa base de données (ex: élèves sans classe ou venant d'une autre classe) pour les intégrer dans la classe qu'il consulte actuellement. L'interface propose une recherche rapide et des filtres puissants (par classe d'origine ou par groupe) pour retrouver facilement les enfants parmi une longue liste.
+ * 
+ * Ce que ça affiche : Une fenêtre modale contenant :
+ *    - Une barre de recherche "collante" (qui reste visible en haut lors du défilement).
+ *    - Des filtres avancés par classe et par groupe.
+ *    - Une grille de "cartes d'élèves" (trombinoscope) où chaque enfant peut être coché pour un ajout massif.
+ *    - Un compteur d'élèves sélectionnés sur le bouton de validation.
  */
 
 import React from 'react';
@@ -20,6 +32,9 @@ interface AddStudentToClassModalProps {
     onAdded: () => void;
 }
 
+/**
+ * Composant visuel pour la recherche et l'affectation massive d'élèves à une classe.
+ */
 export const AddStudentToClassModal: React.FC<AddStudentToClassModalProps> = ({
     showModal,
     handleCloseModal,
@@ -27,8 +42,10 @@ export const AddStudentToClassModal: React.FC<AddStudentToClassModalProps> = ({
     className,
     onAdded
 }) => {
+    // On récupère tout le "moteur" de logique via un Hook spécialisé
     const { states, actions } = useAddStudentToClassFlow(showModal, classId, onAdded, handleCloseModal);
 
+    // Extraction des informations d'état (ce qu'on voit)
     const {
         students,
         classes,
@@ -43,6 +60,7 @@ export const AddStudentToClassModal: React.FC<AddStudentToClassModalProps> = ({
         selectedStudentIds
     } = states;
 
+    // Extraction des fonctions d'action (ce qu'on peut faire)
     const {
         setSearchQuery,
         setSelectedClasses,
@@ -54,14 +72,15 @@ export const AddStudentToClassModal: React.FC<AddStudentToClassModalProps> = ({
         handleSave
     } = actions;
 
+    // Si la fenêtre n'est pas censée être ouverte, on n'affiche rien du tout
     if (!showModal) return null;
 
     return (
         <Modal
             isOpen={showModal}
             onClose={handleCloseModal}
-            title={`Ajouter à la classe : ${className}`}
-            noPadding={true}
+            title={`Ajouter élèves à : ${className}`}
+            noPadding={true} // On gère nous-mêmes les marges pour un effet "liste" plus propre
             className="max-w-2xl max-h-[85vh] h-[85vh]"
             footer={
                 <>
@@ -73,18 +92,18 @@ export const AddStudentToClassModal: React.FC<AddStudentToClassModalProps> = ({
                         loading={saving}
                         className="flex-1"
                         icon={Plus}
-                        disabled={selectedStudentIds.length === 0}
+                        disabled={selectedStudentIds.length === 0} // Bouton grisé si personne n'est coché
                     >
                         Ajouter ({selectedStudentIds.length})
                     </Button>
                 </>
             }
         >
-            {/* Search & Filters - Sticky Header */}
+            {/* EN-TÊTE FIXE : Recherche et Boutons de Filtres */}
             <div className="sticky top-0 z-20 bg-surface border-b border-white/10 p-4 space-y-3 shadow-md">
                 <div className="flex gap-2">
                     <Input
-                        placeholder="Rechercher un élève..."
+                        placeholder="Rechercher un élève par son nom..."
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
                         icon={Search}
@@ -106,22 +125,23 @@ export const AddStudentToClassModal: React.FC<AddStudentToClassModalProps> = ({
                             </Badge>
                         )}
                     </Button>
+                    {/* Bouton rapide pour tout cocher d'un coup */}
                     <button
                         onClick={() => handleSelectAll(students.map(s => s.id))}
                         className="px-3 py-2 rounded-xl border border-white/10 bg-black/20 text-gray-400 hover:text-white hover:bg-white/5 transition-colors text-sm font-medium"
                     >
                         <Check size={18} className="sm:hidden" />
-                        <span className="hidden sm:inline">Tout sélect.</span>
+                        <span className="hidden sm:inline">Tout sélectionner</span>
                     </button>
                 </div>
 
-                {/* Expanded Filters */}
+                {/* ZONE DE FILTRES AVANCÉS (S'affiche au clic sur "Filtres") */}
                 {showFilters && (
                     <div className="pt-2 animate-in slide-in-from-top-2 space-y-4 border-t border-white/5 mt-2">
-                        {/* Class Filter */}
+                        {/* Filtre par classe d'origine */}
                         <div>
                             <p className="text-xs font-bold text-gray-500 uppercase mb-2 flex items-center gap-1">
-                                <GraduationCap size={12} /> Classe actuelle
+                                <GraduationCap size={12} /> Selon sa classe actuelle
                             </p>
                             <div className="flex flex-wrap gap-2">
                                 {classes.map(cls => (
@@ -143,10 +163,10 @@ export const AddStudentToClassModal: React.FC<AddStudentToClassModalProps> = ({
                             </div>
                         </div>
 
-                        {/* Group Filter */}
+                        {/* Filtre par appartenance à un groupe (ex: soutien, cantine) */}
                         <div>
                             <p className="text-xs font-bold text-gray-500 uppercase mb-2 flex items-center gap-1">
-                                <Layers size={12} /> Groupe
+                                <Layers size={12} /> Selon ses groupes
                             </p>
                             <div className="flex flex-wrap gap-2">
                                 {groups.length === 0 && <span className="text-xs text-gray-500 italic">Aucun groupe disponible</span>}
@@ -169,7 +189,7 @@ export const AddStudentToClassModal: React.FC<AddStudentToClassModalProps> = ({
                             </div>
                         </div>
 
-                        {/* Sorting Options */}
+                        {/* Options de tri alphabétique */}
                         <div className="flex items-center gap-2 pt-2 border-t border-white/5">
                             <span className="text-xs text-gray-400">Trier par :</span>
                             <div className="flex bg-black/20 rounded-lg p-0.5">
@@ -191,18 +211,18 @@ export const AddStudentToClassModal: React.FC<AddStudentToClassModalProps> = ({
                 )}
             </div>
 
-            {/* Students List */}
+            {/* LISTE DES ÉLÈVES (TROMBINOSCOPE DE SÉLECTION) */}
             <div className="p-4">
                 {loading ? (
                     <div className="flex flex-col items-center justify-center py-12 text-gray-500">
                         <Loader2 className="animate-spin mb-2" size={32} />
-                        <p>Chargement des élèves...</p>
+                        <p>Préparation de la liste...</p>
                     </div>
                 ) : students.length === 0 ? (
                     <div className="text-center py-12 px-4 rounded-xl bg-white/5 border border-dashed border-white/10 mx-auto max-w-sm">
                         <UserIcon className="mx-auto h-12 w-12 text-gray-600 mb-3" />
                         <h3 className="text-lg font-medium text-white">Aucun élève trouvé</h3>
-                        <p className="text-gray-500 text-sm mt-1">Essaie de modifier tes filtres ou ta recherche.</p>
+                        <p className="text-gray-500 text-sm mt-1">Modifie ta recherche ou tes filtres pour trouver les enfants.</p>
                     </div>
                 ) : (
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -220,6 +240,7 @@ export const AddStudentToClassModal: React.FC<AddStudentToClassModalProps> = ({
                                     )}
                                 >
                                     <div className="flex items-start gap-3">
+                                        {/* Avatar de l'élève */}
                                         <Avatar
                                             size="md"
                                             src={student.photo_url}
@@ -233,6 +254,7 @@ export const AddStudentToClassModal: React.FC<AddStudentToClassModalProps> = ({
                                             <h4 className={clsx("font-bold truncate", isSelected ? "text-primary" : "text-white")}>
                                                 {student.prenom} {student.nom}
                                             </h4>
+                                            {/* Informations secondaires (classe, groupes) */}
                                             <div className="flex flex-wrap gap-1 mt-1">
                                                 {student.Classe && (
                                                     <Badge variant="default" size="xs" className="opacity-70">
@@ -248,6 +270,7 @@ export const AddStudentToClassModal: React.FC<AddStudentToClassModalProps> = ({
                                                 )}
                                             </div>
                                         </div>
+                                        {/* Petite coche de confirmation de sélection */}
                                         <div className={clsx(
                                             "w-6 h-6 rounded-full border flex items-center justify-center transition-all",
                                             isSelected
@@ -268,3 +291,17 @@ export const AddStudentToClassModal: React.FC<AddStudentToClassModalProps> = ({
 };
 
 export default AddStudentToClassModal;
+
+/**
+ * LOGIGRAMME DE FONCTIONNEMENT :
+ * 
+ * 1. L'enseignant consulte la classe 'MS Verte' et s'aperçoit qu'il manque des élèves.
+ * 2. Il clique sur "Ajouter". La fenêtre surgissante s'affiche.
+ * 3. Par défaut, il voit tous les élèves de l'école (environ 150).
+ * 4. Il tape "Emma" dans la barre de recherche : la liste se réduit à 3 élèves.
+ * 5. Il active le filtre 'Classe actuelle' pour vérifier qu'elles ne sont pas déjà ailleurs.
+ * 6. Il clique sur la carte d'Emma Bernard : la carte devient bleutée et cochée.
+ * 7. Il valide en cliquant sur "Ajouter (1)".
+ * 8. Le Hook met à jour la fiche d'Emma pour la lier à 'MS Verte', ferme la fenêtre 
+ *    et rafraîchit l'écran pour que l'enseignant voit Emma apparaître dans sa liste.
+ */

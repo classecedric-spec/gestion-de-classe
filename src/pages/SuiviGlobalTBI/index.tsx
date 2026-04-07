@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { Users, Clock } from 'lucide-react';
 // @ts-ignore
 import { useUpdateProgression } from '../../hooks/useUpdateProgression';
+import { useKioskAutoClose } from '../../hooks/useKioskAutoClose';
+import KioskClosedScreen from '../../components/KioskClosedScreen';
 
 import { useTBIData } from './hooks/useTBIData';
 import { useAdultTracking, useTimer } from './hooks/useAdultTimer';
@@ -18,6 +20,7 @@ import { TBIAdultTimerPanel } from './components/TBIAdultTimerPanel';
 const SuiviGlobalTBI: React.FC = () => {
     const { updateProgression } = useUpdateProgression();
     const [currentTime, setCurrentTime] = useState(new Date());
+    const { isClosed, timeNow } = useKioskAutoClose({ closeHour: 16 });
 
     // Hooks
     const {
@@ -56,6 +59,8 @@ const SuiviGlobalTBI: React.FC = () => {
 
     return (
         <div className="h-screen w-screen bg-background flex flex-col overflow-hidden max-w-[960px] max-h-[540px]">
+            {/* Fermeture automatique à 16h (heure de Bruxelles) */}
+            {isClosed && <KioskClosedScreen timeNow={timeNow} />}
             {/* HEADER */}
             <div className="bg-surface/80 border-b border-white/10 px-2 py-1 flex items-center justify-between shrink-0">
                 <div className="flex items-center gap-2">

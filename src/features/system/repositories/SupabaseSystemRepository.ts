@@ -1,9 +1,26 @@
+/**
+ * Nom du module/fichier : SupabaseSystemRepository.ts
+ * 
+ * Données en entrée : Identifiants utilisateur et données de structures scolaires.
+ * 
+ * Données en sortie : Confirmations d'écritures ou de suppressions en base de données.
+ * 
+ * Objectif principal : Exécuter techniquement les commandes de maintenance sur la base de données Supabase. Ce fichier contient le code de "bas niveau" qui discute directement avec les tables SQL pour créer une classe entière de test, réparer des lignes corrompues ou vider le compte de l'utilisateur.
+ * 
+ * Ce que ça fait : 
+ *   - `checkAndFixProgressions` : Corrige les états de progression vides.
+ *   - `generateDemoData` : Crée une structure complète (Niveaux, Classes, Groupes, Élèves, Activités) en une seule fois.
+ *   - `hardReset` : Vide systématiquement toutes les tables liées à l'utilisateur pour une remise à zéro usine.
+ */
 
 import { ISystemRepository } from './ISystemRepository';
 import { supabase } from '../../../lib/database';
 
 export class SupabaseSystemRepository implements ISystemRepository {
 
+    /**
+     * RÉPARATION : Trouve les progressions qui n'ont pas d'état ("etat is null") et les initialise à "a_commencer".
+     */
     async checkAndFixProgressions(): Promise<number> {
         const { data: invalidProgs, error } = await supabase
             .from('Progression')
@@ -27,8 +44,12 @@ export class SupabaseSystemRepository implements ISystemRepository {
         return invalidProgs.length;
     }
 
+    /**
+     * GÉNÉRATION DÉMO : Crée un environnement pédagogique complet pour permettre à un nouvel utilisateur de tester l'app.
+     * Étapes : Niveaux -> Classe -> Groupes -> Élèves -> Structure pédagogique -> Modules -> Activités.
+     */
     async generateDemoData(userId: string): Promise<void> {
-        // 1. Niveaux
+        // 1. Création des Niveaux par défaut (Niveau 1 et 2)
         const { data: levels, error: lErr } = await supabase.from('Niveau').insert([
             { nom: 'Niveau 1', ordre: 1, user_id: userId },
             { nom: 'Niveau 2', ordre: 2, user_id: userId }
@@ -37,14 +58,14 @@ export class SupabaseSystemRepository implements ISystemRepository {
         const n1 = levels.find(l => l.nom === 'Niveau 1')!.id;
         const n2 = levels.find(l => l.nom === 'Niveau 2')!.id;
 
-        // 2. Classe
+        // 2. Création de la Classe
         const { data: classe, error: cErr } = await supabase.from('Classe').insert([
             { nom: 'Classe de test', user_id: userId }
         ]).select().single();
         if (cErr || !classe) throw cErr;
         const classeId = classe.id;
 
-        // 3. Groupes
+        // 3. Création des Groupes de travail
         const { data: groups, error: gErr } = await supabase.from('Groupe').insert([
             { nom: 'Groupe A', acronyme: 'GA', user_id: userId, classe_id: classeId },
             { nom: 'Groupe B', acronyme: 'GB', user_id: userId, classe_id: classeId },
@@ -55,7 +76,7 @@ export class SupabaseSystemRepository implements ISystemRepository {
         const gB = groups.find(g => g.nom === 'Groupe B')!.id;
         const gAB = groups.find(g => g.nom === 'Groupe AB')!.id;
 
-        // 4. Élèves (22 au total)
+        // 4. Création de 22 Élèves fictifs
         const studentsData = [];
         for (let i = 1; i <= 10; i++) {
             studentsData.push({
@@ -80,7 +101,7 @@ export class SupabaseSystemRepository implements ISystemRepository {
         const { data: insertedStudents, error: sErr } = await supabase.from('Eleve').insert(studentsData).select();
         if (sErr || !insertedStudents) throw sErr;
 
-        // Liens élèves-groupes
+        // Liaison des élèves aux groupes (A, B ou AB)
         const eleveGroupeLinks: any[] = [];
         insertedStudents.forEach(student => {
             const isN1 = student.nom!.startsWith('1.');
@@ -94,7 +115,7 @@ export class SupabaseSystemRepository implements ISystemRepository {
         });
         await supabase.from('EleveGroupe').insert(eleveGroupeLinks);
 
-        // 5. Structure pédagogique
+        // 5. Création de la structure pédagogique (Français, Math, Eveil)
         const branchesConfig = [
             { nom: 'Français', subs: ['Lecture', 'Écriture', 'Grammaire'] },
             { nom: 'Mathématiques', subs: ['Numération', 'Géométrie', 'Calcul'] },
@@ -112,7 +133,7 @@ export class SupabaseSystemRepository implements ISystemRepository {
             }
         }
 
-        // 6. Modules et activités
+        // 6. Création des Modules et Activités liées aux élèves (Progressions)
         const createModuleWithActivities = async (moduleName: string, subId: string, levelIds: string[]) => {
             const { data: mod } = await supabase.from('Module').insert({
                 nom: moduleName,
@@ -165,8 +186,11 @@ export class SupabaseSystemRepository implements ISystemRepository {
         }
     }
 
+    /**
+     * RESET COMPLET : Supprime toutes les données de l'enseignant dans l'ordre pour respecter les contraintes d'intégrité (FK).
+     */
     async hardReset(_userId: string): Promise<void> {
-        // Tables dans l'ordre des dépendances FK
+        // Suppression par couches (les enfants d'abord, les parents après)
         await supabase.from('SuiviAdulte').delete().not('id', 'is', null);
         await supabase.from('Progression').delete().not('id', 'is', null);
         await supabase.from('Attendance').delete().not('id', 'is', null);
@@ -193,3 +217,13 @@ export class SupabaseSystemRepository implements ISystemRepository {
         await supabase.from('UserPreference').delete().not('id', 'is', null);
     }
 }
+
+/**
+ * LOGIGRAMME DE RÉINITIALISATION :
+ * 
+ * 1. DANGER -> L'enseignant confirme vouloir tout effacer.
+ * 2. RÉCURSION -> Le code commence par effacer les "détails" (ex: présences, progressions).
+ * 3. NETTOYAGE -> Une fois les détails effacés, il supprime les "objets" (ex: élèves, classes).
+ * 4. FINALISATION -> Il termine par les réglages de base (préférences, types de matériel).
+ * 5. RÉSULTAT -> L'utilisateur se retrouve avec un compte vierge comme au premier jour.
+ */

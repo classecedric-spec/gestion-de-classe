@@ -1,5 +1,17 @@
+/**
+ * Nom du module/fichier : EvaluationsTableExcel.tsx
+ * 
+ * Données en entrée : La liste globale de toutes les évaluations créées par le professeur.
+ * 
+ * Données en sortie : Un tableau interactif riche affichant ces évaluations avec leurs moyennes, permettant de trier, filtrer et réorganiser l'affichage.
+ * 
+ * Objectif principal : Offrir une vue d'ensemble puissante (façon "Excel") de tous les devoirs, pour faciliter la recherche et la comparaison des résultats entre les classes.
+ * 
+ * Ce que ça affiche : Un grand tableau listant les devoirs avec leurs attributs (date, moyenne, matière). Les colonnes peuvent être cliquées pour trier, glissées pour réorganiser, ou étirées pour s'élargir.
+ */
+
 import React, { useState, useRef, useEffect } from 'react';
-import { Table, Filter, ArrowUp, ArrowDown, Search, X, ChevronRight, Loader2, BarChart3, Trash2 } from 'lucide-react';
+import { Table, Filter, ArrowUp, ArrowDown, Search, X, ChevronRight, Loader2, BarChart3, Trash2, Edit2, Download } from 'lucide-react';
 import { CardInfo, ConfirmModal } from '../../../core';
 import { useAllEvaluations } from '../hooks/useAllEvaluations';
 import { useGradeMutations } from '../hooks/useGrades';
@@ -37,14 +49,15 @@ const COLUMN_LABELS: Record<ColumnId, string> = {
 
 interface EvaluationsTableExcelProps {
     onSelectEvaluation: (evalId: string) => void;
+    onEditEvaluation: (ev: any) => void;
 }
 
-const EvaluationsTableExcel: React.FC<EvaluationsTableExcelProps> = ({ onSelectEvaluation }) => {
+const EvaluationsTableExcel: React.FC<EvaluationsTableExcelProps> = ({ onSelectEvaluation, onEditEvaluation }) => {
     const { evaluations, loading } = useAllEvaluations();
     const { deleteEvaluation } = useGradeMutations();
     const [evalToDelete, setEvalToDelete] = useState<string | null>(null);
 
-    // Column Preferences & Resize/Drag State
+    // Prépare un lien avec la mémoire locale pour mémoriser et restaurer la largeur des colonnes choisie par l'utilisateur d'une session à l'autre.
     const [savedColumns, setSavedColumns, loadingColumns] = useUserPreferences<ColumnConfig[]>('evaluations_table_columns_v1', DEFAULT_COLUMNS);
     const [columns, setColumns] = useState<ColumnConfig[]>(DEFAULT_COLUMNS);
 
@@ -61,7 +74,7 @@ const EvaluationsTableExcel: React.FC<EvaluationsTableExcelProps> = ({ onSelectE
         setSavedColumns(newCols);
     };
 
-    // Drag & Drop Reordering
+    // Prépare la mécanique complexe permettant de cliquer, maintenir et glisser une colonne (drag and drop) pour la déplacer ailleurs dans le tableau.
     const [draggedColumnIndex, setDraggedColumnIndex] = useState<number | null>(null);
 
     const handleDragStart = (e: React.DragEvent, index: number) => {
@@ -85,7 +98,7 @@ const EvaluationsTableExcel: React.FC<EvaluationsTableExcelProps> = ({ onSelectE
         setDraggedColumnIndex(null);
     };
 
-    // Column Resizing
+    // Prépare la mécanique visuelle qui permet d'attraper le bord d'une colonne avec la souris pour l'élargir ou la rétrécir.
     const [resizingColumnIndex, setResizingColumnIndex] = useState<number | null>(null);
     const [startX, setStartX] = useState<number | null>(null);
     const [startWidth, setStartWidth] = useState<number | null>(null);
@@ -133,7 +146,7 @@ const EvaluationsTableExcel: React.FC<EvaluationsTableExcelProps> = ({ onSelectE
         };
     }, [resizingColumnIndex, startX, startWidth, setSavedColumns]);
 
-    // Sorting
+    // Prépare la mécanique pour mettre le tableau en ordre (ex: classer alphabétiquement par titre, ou par moyenne de la plus haute à la plus basse).
     const [sortColumn, setSortColumn] = useState<ColumnId | null>(null);
     const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
 
@@ -181,12 +194,12 @@ const EvaluationsTableExcel: React.FC<EvaluationsTableExcelProps> = ({ onSelectE
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, []);
 
-    // Derived filter data
+    // Scanne toutes les évaluations existantes pour en extraire et bâtir astucieusement les listes des matières et groupes disponibles pour les menus de filtrage.
     const availableBranches = Array.from(new Set(evaluations.map((e: any) => e._brancheName))).filter(Boolean).sort() as string[];
     const availableGroups = Array.from(new Set(evaluations.map((e: any) => e._groupeName))).filter(Boolean).sort() as string[];
     const availablePeriodes = Array.from(new Set(evaluations.map((e: any) => e.periode))).filter(Boolean).sort() as string[];
 
-    // Apply filters and sorting
+    // En comparant la liste brute aux "filtres actifs" choisis par le prof, le système construit la liste définitive des évaluations à afficher à l'écran.
     const displayedEvaluations = evaluations
         .filter((ev: any) => {
             if (searchQuery && !ev.titre.toLowerCase().includes(searchQuery.toLowerCase())) return false;
@@ -308,7 +321,7 @@ const EvaluationsTableExcel: React.FC<EvaluationsTableExcelProps> = ({ onSelectE
                                                     if (col.id === 'titre') onSelectEvaluation(ev.id);
                                                 }}
                                             >
-                                                {renderCellContent(col.id, ev, onSelectEvaluation, setEvalToDelete)}
+                                                {renderCellContent(col.id, ev, onSelectEvaluation, setEvalToDelete, onEditEvaluation)}
                                             </td>
                                         ))}
                                     </tr>
@@ -337,7 +350,7 @@ const EvaluationsTableExcel: React.FC<EvaluationsTableExcelProps> = ({ onSelectE
     );
 };
 
-// Helper: get sortable value
+// Petite aide : convertit les informations compliquées d'une case (ex: une date) en un simple texte ou chiffre facilement triable par le système.
 function getCellSortValue(ev: any, colId: ColumnId): string | number | null {
     switch (colId) {
         case 'titre': return ev.titre || '';
@@ -505,7 +518,8 @@ function renderCellContent(
     colId: ColumnId, 
     ev: any, 
     onSelectEvaluation: (id: string) => void,
-    setEvalToDelete: (id: string | null) => void
+    setEvalToDelete: (id: string | null) => void,
+    onEditEvaluation: (ev: any) => void
 ) {
     switch (colId) {
         case 'titre':
@@ -537,7 +551,8 @@ function renderCellContent(
                 </span>
             ) : <span className="text-white/20">—</span>;
         case 'note_max':
-            return <span className="text-text-main font-semibold">/ {ev.note_max}</span>;
+            const displayMax = ev._real_note_max !== undefined ? ev._real_note_max : ev.note_max;
+            return <span className="text-text-main font-semibold">/ {displayMax}</span>;
         case 'type_note':
             return (
                 <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-white/5 text-grey-medium border border-white/10 truncate inline-block">
@@ -551,21 +566,55 @@ function renderCellContent(
                 </span>
             );
         case 'moyenne':
+            const realAvgMax = ev._real_note_max !== undefined ? ev._real_note_max : ev.note_max;
+            let displayAvg = ev._moyenne;
+            let percentage = 0;
+            if (ev._moyenne !== null && ev.note_max > 0) {
+                percentage = (ev._moyenne / ev.note_max) * 100;
+                if (ev._real_note_max !== undefined) {
+                    displayAvg = (ev._moyenne / ev.note_max) * ev._real_note_max;
+                }
+            }
             return ev._moyenne !== null ? (
-                <div className="flex items-center gap-2">
+                <div className="flex flex-col items-start justify-center gap-0.5">
                     <span className={clsx(
-                        "font-bold text-sm",
-                        (ev._moyenne / ev.note_max) >= 0.8 ? "text-emerald-500" :
-                        (ev._moyenne / ev.note_max) >= 0.5 ? "text-blue-500" : "text-rose-500"
+                        "font-black text-base tabular-nums leading-none",
+                        percentage >= 80 ? "text-emerald-500" :
+                        percentage >= 50 ? "text-blue-500" : "text-rose-500"
                     )}>
-                        {ev._moyenne.toFixed(1)}
+                        {Math.round(percentage)}%
                     </span>
-                    <span className="text-grey-medium text-[10px]">/ {ev.note_max}</span>
+                    <div className="flex items-baseline gap-1">
+                        <span className="font-bold text-[10px] text-grey-light leading-none">
+                            {displayAvg.toFixed(1)}
+                        </span>
+                        <span className="text-[9px] text-grey-medium leading-none">/ {realAvgMax}</span>
+                    </div>
                 </div>
             ) : <span className="text-white/20 italic text-xs">—</span>;
         case 'actions':
             return (
                 <div className="flex justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                    <button
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            exportEvaluationData(ev);
+                        }}
+                        className="p-2 rounded-lg text-emerald-400 hover:text-emerald-500 hover:bg-emerald-500/10 transition-colors mr-1"
+                        title="Télécharger Excel/CSV"
+                    >
+                        <Download size={16} />
+                    </button>
+                    <button
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            onEditEvaluation(ev);
+                        }}
+                        className="p-2 rounded-lg text-grey-medium hover:text-white hover:bg-white/10 transition-colors mr-1"
+                        title="Modifier"
+                    >
+                        <Edit2 size={16} />
+                    </button>
                     <button
                         onClick={(e) => {
                             e.stopPropagation();
@@ -580,6 +629,116 @@ function renderCellContent(
             );
         default:
             return null;
+    }
+}
+
+/**
+ * 1. Le composant principal est lancé et télécharge la quasi-totalité des évaluations inscrites sur le compte de l'enseignant.
+ * 2. Rapidement, il interroge les préférences du navigateur pour retrouver la disposition des colonnes (largeur, ordre) telle que le prof l'avait laissée.
+ * 3. Il inventorie lui-même tous les mots-clés présents dans ces évaluations (noms de branches, de trimestres, etc.) pour créer automatiquement les options de filtrage dans les entêtes du tableau.
+ * 4. De base, il liste l'intégralité du travail avec une moyenne globale calculée de façon automatique montrant la réussite de la classe.
+ * 5. L'utilisateur peut interagir d'un clic pour trier une colonne, taper dans une barre de recherche cachée sous le titre, ou bien glisser les colonnes entières de gauche à droite. Le tableau réagit en temps réel et masque les éléments indésirables.
+ * 6. S'il clique enfin sur le titre de l'une des lignes existantes, le module range son tableau et transporte l'utilisateur vers l'outil détaillé de cette évaluation (ce qui clôt l'usage de ce fichier).
+ */
+
+async function exportEvaluationData(ev: any) {
+    try {
+        const { toast } = await import('sonner');
+        toast.loading("Génération du fichier Excel/CSV...", { id: `export_${ev.id}` });
+
+        const { supabase } = await import('../../../lib/database');
+        const { trackingService } = await import('../../tracking/services/trackingService');
+
+        // 1. Get Students
+        const studentData = await trackingService.fetchStudentsInGroup(ev.group_id);
+        const students = studentData.full || [];
+
+        // Sort Students
+        students.sort((a: any, b: any) => {
+            const niveauA = a.Niveau?.ordre ?? 0;
+            const niveauB = b.Niveau?.ordre ?? 0;
+            if (niveauA !== niveauB) return niveauA - niveauB;
+
+            const niveauCmp = (a.Niveau?.nom || '').localeCompare(b.Niveau?.nom || '');
+            if (niveauCmp !== 0) return niveauCmp;
+            const prenomCmp = (a.prenom || '').localeCompare(b.prenom || '');
+            if (prenomCmp !== 0) return prenomCmp;
+            return (a.nom || '').localeCompare(b.nom || '');
+        });
+
+        // 2. Get Global Results
+        const { data: resultsData } = await supabase.from('Resultat').select('*').eq('evaluation_id', ev.id);
+        const results = resultsData || [];
+
+        // 3. Get Questions and Question Results
+        const { data: qData } = await supabase.from('EvaluationQuestion').select('*').eq('evaluation_id', ev.id).order('ordre', { ascending: true });
+        const questions = qData || [];
+
+        let questionResults: any[] = [];
+        if (questions.length > 0) {
+            const questionIds = questions.map((q: any) => q.id);
+            const { data: qrData } = await supabase.from('ResultatQuestion').select('*').in('question_id', questionIds);
+            questionResults = qrData || [];
+        }
+
+        // 4. Build CSV
+        const sep = ";";
+        const headers = ["Élève", "Niveau", "Statut", `Total (/${ev.note_max})`];
+        questions.forEach((q: any) => {
+            headers.push(`${q.titre} (/${q.note_max})`);
+        });
+        headers.push("Commentaire");
+
+        let csvContent = headers.join(sep) + "\n";
+
+        students.forEach((student: any) => {
+            const res = results.find((r: any) => r.eleve_id === student.id);
+
+            const formatField = (field: any) => {
+                if (field === null || field === undefined) return "";
+                let str = String(field);
+                if (str.includes(sep) || str.includes('"') || str.includes('\n')) {
+                    str = `"${str.replace(/"/g, '""')}"`;
+                }
+                return str;
+            };
+
+            const stat = res?.statut || "present";
+            const total = res?.note ?? "";
+
+            const row = [
+                `${student.prenom} ${student.nom}`,
+                student.Niveau?.nom || "",
+                stat,
+                total
+            ];
+
+            questions.forEach((q: any) => {
+                const qRes = questionResults.find((qr: any) => qr.question_id === q.id && qr.eleve_id === student.id);
+                row.push(qRes?.note ?? "");
+            });
+
+            row.push(res?.commentaire || "");
+
+            csvContent += row.map(formatField).join(sep) + "\n";
+        });
+
+        // 5. Download
+        const blob = new Blob(["\uFEFF" + csvContent], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.setAttribute("href", url);
+        let safeTitle = (ev.titre || 'evaluation').replace(/[^a-z0-9]/gi, '_').toLowerCase();
+        link.setAttribute("download", `export_${safeTitle}.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+
+        toast.success("Fichier Excel généré avec succès !", { id: `export_${ev.id}` });
+    } catch (error) {
+        console.error("Export error", error);
+        const { toast } = await import('sonner');
+        toast.error("Erreur lors de la génération de l'export", { id: `export_${ev.id}` });
     }
 }
 

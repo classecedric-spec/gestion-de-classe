@@ -21,9 +21,9 @@ export function useUserPreferences<T>(key: string, defaultValue: T) {
                 .select('value')
                 .eq('user_id', userId)
                 .eq('key', key)
-                .single();
+                .maybeSingle();
 
-            if (error && error.code !== 'PGRST116') { // PGRST116 = JSON object requested, multiple (or no) rows returned
+            if (error) {
                 console.error(`Error loading preference ${key}:`, error);
                 return;
             }

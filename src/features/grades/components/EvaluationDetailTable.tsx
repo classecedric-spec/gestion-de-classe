@@ -1,3 +1,15 @@
+/**
+ * Nom du module/fichier : EvaluationDetailTable.tsx
+ * 
+ * Données en entrée : L'identifiant d'une évaluation spécifique.
+ * 
+ * Données en sortie : L'enregistrement et la mise à jour en temps réel des notes, des statuts (présent/absent) et des commentaires des élèves pour cette évaluation.
+ * 
+ * Objectif principal : Ce fichier gère la page de type "tableau de bord" où l'enseignant peut voir tous les élèves et saisir leurs résultats pour un contrôle donné.
+ * 
+ * Ce que ça affiche : Un grand tableau listant les élèves d'un groupe, avec des colonnes pour la note globale, les notes détaillées par question, le statut de présence et des commentaires.
+ */
+
 import React, { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { 
@@ -56,6 +68,7 @@ const EvaluationDetailTable: React.FC<EvaluationDetailTableProps> = ({ evaluatio
 
     const { deleteEvaluation } = useGradeMutations();
 
+    // Prépare une action pour modifier l'état de l'élève (ex: marquer "absent" ou "malade") et le sauvegarder immédiatement.
     const handleStatutChange = async (studentId: string, newStatut: string) => {
         if (!userId) return;
         const currentResult = currentResults.find((r: any) => r.eleve_id === studentId);
@@ -70,6 +83,7 @@ const EvaluationDetailTable: React.FC<EvaluationDetailTableProps> = ({ evaluatio
         });
     };
 
+    // Prépare une action pour enregistrer directement la note globale rentrée par l'enseignant pour un élève, en vérifiant les limites.
     const handleNoteChange = async (studentId: string, note: string) => {
         if (!userId) return;
         const val = note === '' ? null : parseFloat(note);
@@ -93,13 +107,57 @@ const EvaluationDetailTable: React.FC<EvaluationDetailTableProps> = ({ evaluatio
         const val = note === '' ? null : parseFloat(note);
         if (q && val !== null && (val < 0 || val > q.note_max)) return;
 
+        let maxWeightedTotal = 0;
+        let weightedTotal = 0;
+        let hasAnyAnswer = false;
+        
+        const otherQuestionsResults = questionResults.filter(qr => qr.eleve_id === studentId && qr.question_id !== questionId);
+
+        for (const currentQ of questions) {
+            const ratio = currentQ.ratio != null ? parseFloat(currentQ.ratio.toString()) : 1;
+            const qMax = parseFloat(currentQ.note_max.toString());
+            maxWeightedTotal += qMax * ratio;
+
+            if (currentQ.id === questionId) {
+                 if (val !== null) {
+                     weightedTotal += val * ratio;
+                     hasAnyAnswer = true;
+                 }
+            } else {
+                 const qr = otherQuestionsResults.find(r => r.question_id === currentQ.id);
+                 if (qr && qr.note !== null) {
+                     weightedTotal += parseFloat(qr.note.toString()) * ratio;
+                     hasAnyAnswer = true;
+                 }
+            }
+        }
+
+        const evalMax = parseFloat(evaluation?.note_max?.toString() || '20');
+        let newTotal: number | null = null;
+        if (hasAnyAnswer && maxWeightedTotal > 0) {
+            const finalNote = (weightedTotal / maxWeightedTotal) * evalMax;
+            newTotal = parseFloat(finalNote.toFixed(2));
+        }
+
         await saveQuestionResults([{
             eleve_id: studentId,
             question_id: questionId,
             note: val
         }]);
+
+        const currentResult = currentResults.find((r: any) => r.eleve_id === studentId);
+        await saveResult({
+            id: currentResult?.id,
+            eleve_id: studentId,
+            evaluation_id: evaluationId,
+            note: newTotal,
+            statut: currentResult?.statut || 'present',
+            commentaire: currentResult?.commentaire,
+            user_id: userId
+        });
     };
 
+    // Prépare une action pour sauvegarder de façon permanente un texte d'appréciation libre rédigé par le professeur.
     const handleCommentChange = async (studentId: string, comment: string) => {
         if (!userId) return;
         const currentResult = currentResults.find((r: any) => r.eleve_id === studentId);
@@ -114,12 +172,12 @@ const EvaluationDetailTable: React.FC<EvaluationDetailTableProps> = ({ evaluatio
         });
     };
 
-    // Set the evaluation ID in the hook to fetch its questions/results
+    // Synchronise la page en lui indiquant sur quelle évaluation on se trouve pour qu'elle prépare le téléchargement des notes.
     useEffect(() => {
         setSelectedEvaluationId(evaluationId);
     }, [evaluationId, setSelectedEvaluationId]);
 
-    // Fetch evaluation details (branche/groupe names)
+    // Va chercher dans la base de données numérique le "contexte" de l'évaluation (quelle matière, quel groupe d'élèves).
     const { data: evalDetails } = useQuery({
         queryKey: ['evaluation_meta', evaluationId],
         queryFn: async () => {
@@ -134,7 +192,7 @@ const EvaluationDetailTable: React.FC<EvaluationDetailTableProps> = ({ evaluatio
         enabled: !!evaluationId
     });
 
-    // Fetch students in the group
+    // Identifie tous les élèves inscrits dans le groupe de l'évaluation pour constuire la liste du tableau.
     const { data: studentData, isLoading: loadingStudents } = useQuery<StudentQueryResult>({
         queryKey: ['students_group', evalDetails?.group_id || evaluation?.group_id],
         queryFn: async (): Promise<StudentQueryResult> => {
@@ -146,6 +204,7 @@ const EvaluationDetailTable: React.FC<EvaluationDetailTableProps> = ({ evaluatio
         enabled: !!(evalDetails?.group_id || evaluation?.group_id)
     });
 
+    // Trie rigoureusement les élèves pour l'affichage (d'abord par section/niveau, puis par ordre alphabétique de prénom).
     const students = [...(studentData?.full || [])].sort((a: any, b: any) => {
         // 1. Sort by Niveau (Level)
         const niveauA = a.Niveau?.ordre ?? 0;
@@ -167,6 +226,7 @@ const EvaluationDetailTable: React.FC<EvaluationDetailTableProps> = ({ evaluatio
         return (a.nom || '').localeCompare(b.nom || '');
     });
 
+    // Vérifie si cet examen demande une conversion spéciale (ex: transformer une note sur 20 en code couleur A, B, C).
     const activeNoteType = noteTypes.find(nt => nt.id === evaluation?.type_note_id);
     const isConversion = activeNoteType?.systeme === 'conversion';
     const hasQuestions = questions.length > 0;
@@ -282,7 +342,13 @@ const EvaluationDetailTable: React.FC<EvaluationDetailTableProps> = ({ evaluatio
 
                                         const isRowComplete = hasQuestions
                                             ? questions.every(q => questionResults.some(qr => qr.eleve_id === student.id && qr.question_id === q.id && qr.note != null))
-                                            : result?.note != null;
+                                            : result?.note != null && result?.note !== '';
+
+                                        const hasAtLeastOneData = hasQuestions
+                                            ? questions.some(q => questionResults.some(qr => qr.eleve_id === student.id && qr.question_id === q.id && qr.note != null))
+                                            : false;
+
+                                        const isDataMissing = !isRowComplete && hasAtLeastOneData && (!result?.statut || result.statut === 'present');
 
                                         const colorMap: Record<string, string> = {
                                             emerald: 'text-emerald-400',
@@ -316,7 +382,8 @@ const EvaluationDetailTable: React.FC<EvaluationDetailTableProps> = ({ evaluatio
                                                     className={clsx(
                                                         "group transition-all border-b border-white/5",
                                                         !isBulkEdit && "cursor-pointer hover:bg-white/[0.05]",
-                                                        isRowComplete && !isBulkEdit && "bg-emerald-500/[0.02]"
+                                                        isRowComplete && !isBulkEdit && "bg-emerald-500/[0.02]",
+                                                        isDataMissing && "bg-danger/[0.15]"
                                                     )}
                                                 >
                                                     <td className="p-4 sticky left-0 bg-surface z-20 border-r border-white/5 transition-colors group-hover:bg-white/10">
@@ -434,6 +501,7 @@ const EvaluationDetailTable: React.FC<EvaluationDetailTableProps> = ({ evaluatio
                                                                     <button
                                                                         key={s.id}
                                                                         onClick={() => handleStatutChange(student.id, s.id)}
+                                                                        tabIndex={-1}
                                                                         className={clsx(
                                                                             "w-8 h-8 rounded-lg flex items-center justify-center transition-all border",
                                                                             result?.statut === s.id || (s.id === 'present' && !result?.statut)
@@ -477,6 +545,7 @@ const EvaluationDetailTable: React.FC<EvaluationDetailTableProps> = ({ evaluatio
                                                                     }}
                                                                     placeholder="Note libre..."
                                                                     className="flex-1 h-10 border-white/10 bg-grey-dark/40 focus:border-primary text-sm"
+                                                                    tabIndex={-1}
                                                                 />
                                                             </div>
                                                         ) : (
@@ -530,4 +599,15 @@ const EvaluationDetailTable: React.FC<EvaluationDetailTableProps> = ({ evaluatio
     );
 };
 
+/**
+ * 1. Le composant s'allume avec le jeton d'une évaluation bien définie.
+ * 2. Il lance deux recherches : il collecte les informations du contrôle d'un côté, et la liste de la classe concernée de l'autre.
+ * 3. En attendant le retour, une petite icône de chargement fait patienter.
+ * 4. Une fois reçu, il trie minutieusement la classe par groupe de niveau puis par ordre alphabétique.
+ * 5. L'enseignant peut alors utiliser le tableau selon deux méthodes :
+ *    - Mode rapide ("Encodage à la suite") : Les cases du tableau se transforment pour être saisies directement, les couleurs des boutons alertent des présences/absences.
+ *    - Mode détaillé : En cliquant sur une ligne, l'enseignant affiche la fiche grand format de cet élève particulier.
+ * 6. Lors de toute tentative de changement, le système vérifie toujours que les points de l'étudiant ne dépassent pas frauduleusement le plafond fixé.
+ * 7. A chaque étape, que ce soit une note ajoutée ou une absence cochée, le système expédie discrètement la donnée validée dans le serveur cloud pour une sauvegarde permanente et instantanée.
+ */
 export default EvaluationDetailTable;

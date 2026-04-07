@@ -1,3 +1,19 @@
+/**
+ * Nom du module/fichier : AddSubBranchModal.tsx
+ * 
+ * Données en entrée : 
+ *   - `isOpen` : Indique si la fenêtre doit être affichée.
+ *   - `branches` : Liste des branches parentes disponibles (pour le menu déroulant).
+ *   - `subBranchToEdit` : (Optionnel) Données d'une sous-branche existante pour modification.
+ * 
+ * Données en sortie : 
+ *   - L'appel à `onSubmit` avec les données de la sous-branche (nom, branche parente, photo).
+ * 
+ * Objectif principal : Permettre de créer ou modifier une "sous-matière" ou une spécialité liée à une branche principale (ex: "Géométrie" rattachée à "Mathématiques").
+ * 
+ * Ce que ça affiche : Une fenêtre surgissante avec un champ de texte, un menu de sélection pour la branche parente, et une zone de téléchargement d'image.
+ */
+
 import React, { useState, useEffect } from 'react';
 import { GitBranch } from 'lucide-react';
 import { FormModal, ImageUpload } from '../../../core';
@@ -22,6 +38,7 @@ const AddSubBranchModal: React.FC<AddSubBranchModalProps> = ({ isOpen, onClose, 
     const [photoUrl, setPhotoUrl] = useState<string | null>(null);
     const [loading, setLoading] = useState<boolean>(false);
 
+    // Initialise les champs lors de l'ouverture, en gérant le mode "création" ou "édition".
     useEffect(() => {
         if (isOpen) {
             if (subBranchToEdit) {
@@ -38,6 +55,7 @@ const AddSubBranchModal: React.FC<AddSubBranchModalProps> = ({ isOpen, onClose, 
         }
     }, [isOpen, subBranchToEdit]);
 
+    // Valide et envoie les données vers le serveur via la fonction onSubmit
     const handleSubmit = async () => {
         if (!nom.trim() || !branchId) return;
 
@@ -70,6 +88,7 @@ const AddSubBranchModal: React.FC<AddSubBranchModalProps> = ({ isOpen, onClose, 
             size="sm"
         >
             <div className="space-y-4">
+                {/* Champ pour le nom de la spécialité */}
                 <div className="space-y-2">
                     <label className="text-sm font-medium text-gray-300">Nom de la Sous-branche</label>
                     <input
@@ -82,6 +101,7 @@ const AddSubBranchModal: React.FC<AddSubBranchModalProps> = ({ isOpen, onClose, 
                     />
                 </div>
 
+                {/* Sélecteur de la matière parente obligatoire */}
                 <div className="space-y-2">
                     <label className="text-sm font-medium text-gray-300">Branche Parente</label>
                     <select
@@ -97,6 +117,7 @@ const AddSubBranchModal: React.FC<AddSubBranchModalProps> = ({ isOpen, onClose, 
                     </select>
                 </div>
 
+                {/* Zone optionnelle pour charger un logo spécifique */}
                 <div className="space-y-2">
                     <label className="text-sm font-medium text-gray-300">Logo (Optionnel)</label>
                     <ImageUpload
@@ -116,4 +137,14 @@ const AddSubBranchModal: React.FC<AddSubBranchModalProps> = ({ isOpen, onClose, 
     );
 };
 
+/**
+ * LOGIGRAMME DE FONCTIONNEMENT :
+ * 
+ * 1. L'enseignant souhaite créer une sous-catégorie (ex: "Grammaire") sous la branche "Français".
+ * 2. Il ouvre la fenêtre `AddSubBranchModal`.
+ * 3. Il saisit le nom et sélectionne "Français" dans la liste déroulante des branches parentes.
+ * 4. L'enseignant peut ajouter une icône pour illustrer cette sous-matière.
+ * 5. Lors de la validation, le programme vérifie qu'un nom est présent et qu'une branche parente est bien choisie.
+ * 6. Les informations sont envoyées pour stockage et la fenêtre se referme.
+ */
 export default AddSubBranchModal;

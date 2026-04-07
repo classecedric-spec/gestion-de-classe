@@ -1,3 +1,15 @@
+/**
+ * Nom du module/fichier : PeriodSettings.tsx
+ * 
+ * Données en entrée : Les périodes existantes de l'utilisateur (Trimestre 1, Semestre A, etc.).
+ * 
+ * Données en sortie : Un ordre nouveau ou de nouvelles périodes créées et sauvegardées.
+ * 
+ * Objectif principal : Gérer le découpage de l'année scolaire de manière personnalisée pour l'enseignant.
+ * 
+ * Ce que ça affiche : Une liste des périodes existantes sous forme de petits blocs qu'on peut attraper avec la souris pour changer leur ordre, les renommer ou les effacer. 
+ */
+
 import React, { useState } from 'react';
 import { Calendar, Plus, Trash2, Edit2, Save, X, GripVertical, Check } from 'lucide-react';
 import Card from '../../../core/Card';
@@ -20,6 +32,7 @@ const PeriodSettings: React.FC = () => {
     const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
     const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
 
+    // Intercepte le clic sur "Ajouter" pour créer officiellement la nouvelle période en base de données, à la stricte condition que le nom ne soit pas composé que d'espaces vides.
     const handleAdd = async () => {
         if (!newLabel.trim()) return;
         await addPeriod(newLabel.trim());
@@ -60,6 +73,7 @@ const PeriodSettings: React.FC = () => {
         setDragOverIndex(null);
     };
 
+    // S'occupe du moment magique où le professeur lâche le bloc qu'il était en train de glisser (Drag & Drop), calcule sa nouvelle position, et demande au système d'enregistrer ce nouvel ordre.
     const handleDrop = (e: React.DragEvent, dropIndex: number) => {
         e.preventDefault();
         if (draggedIndex === null || draggedIndex === dropIndex) {
@@ -272,4 +286,11 @@ const PeriodSettings: React.FC = () => {
     );
 };
 
+/**
+ * 1. L'application charge les périodes de l'enseignant (la mémoire demande quelques dixièmes de seconde, l'interface affiche d'abord un faux chargement clignotant 'animate-pulse').
+ * 2. Une fois chargé, si le professeur clique sur "Nouvelle période", une boîte de saisie apparaît.
+ * 3. Chaque période trouvée s'affiche sur une ligne avec ses boutons d'action au survol ("Modifier", "Supprimer").
+ * 4. Les blocs de périodes utilisent la mécanique "Drag & Drop" : quand l'enseignant clique et glisse les 6 petits points (GripVertical) d'une ligne, le composant mémorise son numéro de départ.
+ * 5. Quand la souris est relâchée (le "Drop"), le programme réorganise un copie virtuelle de son tableau avant de la sauvegarder définitivement.
+ */
 export default PeriodSettings;

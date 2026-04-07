@@ -1,3 +1,24 @@
+/**
+ * Nom du module/fichier : useLayoutPreferences.ts
+ * 
+ * Données en entrée : 
+ *   - `selectedGroupId` : L'identifiant de la classe actuelle.
+ *   - `showPendingOnly` : Filtre d'affichage des exercices.
+ * 
+ * Données en sortie : 
+ *   - `columnWidths` / `rowHeights` : Les dimensions personnalisées des colonnes et lignes du Dashboard.
+ *   - `isEditMode` : Est-ce qu'on est en train de redimensionner les colonnes ?
+ *   - `actions` : Fonctions pour attraper et déplacer les bords des colonnes.
+ * 
+ * Objectif principal : Mémoriser "l'Atelier sur-mesure" de l'enseignant. Chaque enseignant a ses habitudes : certains veulent une grande colonne pour les aides, d'autres préfèrent voir tout le monde en petit. Ce hook permet de redimensionner chaque zone de l'écran à la souris et enregistre automatiquement ces réglages dans la base de données. Ainsi, quand l'enseignant change d'ordinateur ou de tablette, il retrouve son bureau exactement comme il l'avait laissé.
+ * 
+ * Ce que ça contient : 
+ *   - La détection du mouvement de la souris (Drag & Drop) pour les bordures.
+ *   - La conversion des pixels en pourcentages (pour que l'affichage reste beau sur tous les écrans).
+ *   - La sauvegarde automatique et silencieuse des réglages (Debounce).
+ *   - La gestion du mode "Édition" pour déplacer les séparateurs.
+ */
+
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../../lib/database';
 import { trackingService } from '../services/trackingService';
@@ -10,28 +31,21 @@ export interface LayoutValue {
 }
 
 /**
- * useLayoutPreferences
- * Manages resizable layout preferences, edit mode, and auto-save
- * 
- * @param {string | null} selectedGroupId - Currently selected group ID for saving preferences
- * @param {boolean} showPendingOnly - Filter state to save
- * @returns {object} Layout state and actions
+ * Hook de personnalisation de l'affichage du Dashboard.
  */
 export function useLayoutPreferences(selectedGroupId: string | null, showPendingOnly: boolean) {
-    // Container and column refs
+    // RÉFÉRENCES : Pour mesurer la taille réelle de l'écran.
     const containerRef = useRef<HTMLDivElement>(null);
     const columnRefs = useRef<(HTMLDivElement | null)[]>([null, null, null, null]);
 
-    // Resize state (PERCENTAGES)
-    // Columns: Width of first 3 columns in %. 4th column is flex-1.
+    // ÉTATS : Dimensions en POURCENTAGES (pour être adaptable).
     const [columnWidths, setColumnWidths] = useState<number[]>([25, 25, 25]);
-    // Rows: Height of TOP section in %. Bottom section is flex-1.
     const [rowHeights, setRowHeights] = useState<number[]>([50, 50, 50, 50]);
 
     const activeColumnResize = useRef<number | null>(null);
     const activeRowResize = useRef<number | null>(null);
 
-    // UI state
+    // ÉTATS : Interface
     const [isEditMode, setIsEditMode] = useState(false);
     const [showConfigBtn, setShowConfigBtn] = useState(true);
     const [isSaving, setIsSaving] = useState(false);
@@ -39,29 +53,30 @@ export function useLayoutPreferences(selectedGroupId: string | null, showPending
     const [isPreferencesLoaded, setIsPreferencesLoaded] = useState(false);
     const [showSyncSuccess, setShowSyncSuccess] = useState(false);
 
-    // Hide config button after 5s
+    /** 
+     * ERGONOMIE : 
+     * On cache le bouton de config après 5 secondes pour libérer de l'espace visuel.
+     */
     useEffect(() => {
-        const timer = setTimeout(() => {
-            setShowConfigBtn(false);
-        }, 5000);
+        const timer = setTimeout(() => { setShowConfigBtn(false); }, 5000);
         return () => clearTimeout(timer);
     }, []);
 
-    // Show sync success when leaving edit mode
+    /** 
+     * FEEDBACK : 
+     * On affiche une petite confirmation quand les réglages sont bien synchronisés.
+     */
     useEffect(() => {
         if (!isEditMode && isPreferencesLoaded) {
-            // Avoid immediate state update to prevent sync issues or cascading renders
             const timer = setTimeout(() => setShowSyncSuccess(true), 0);
             const hideTimer = setTimeout(() => setShowSyncSuccess(false), 3000);
-            return () => {
-                clearTimeout(timer);
-                clearTimeout(hideTimer);
-            };
+            return () => { clearTimeout(timer); clearTimeout(hideTimer); };
         }
     }, [isEditMode, isPreferencesLoaded]);
 
-
-    // Mouse handlers for resize
+    /** 
+     * ACTIONS : Détection du clic sur une bordure.
+     */
     const handleColumnMouseDown = (columnIndex: number) => () => {
         activeColumnResize.current = columnIndex;
         document.body.style.cursor = 'col-resize';
@@ -74,63 +89,42 @@ export function useLayoutPreferences(selectedGroupId: string | null, showPending
         document.body.style.userSelect = 'none';
     };
 
-    // Mouse move/up listeners
+    /** 
+     * LE MOTEUR DU REDIMENSIONNEMENT : 
+     * Calcule en temps réel la nouvelle largeur en fonction de la souris.
+     */
     useEffect(() => {
         const handleMouseMove = (e: MouseEvent) => {
-            // Column resize (PERCENTAGE)
+            // REDIMENSIONNEMENT DES COLONNES :
             if (activeColumnResize.current !== null && containerRef.current) {
                 const containerRect = containerRef.current.getBoundingClientRect();
                 const totalWidth = containerRect.width;
                 const colIndex = activeColumnResize.current;
 
-                // Previous columns width in %
                 let previousWidthPercent = 0;
-                for (let i = 0; i < colIndex; i++) {
-                    previousWidthPercent += columnWidths[i];
-                }
+                for (let i = 0; i < colIndex; i++) { previousWidthPercent += columnWidths[i]; }
 
-                // Calculate mouse position relative to container left
-                const mouseRawX = e.clientX - containerRect.left;
+                const mousePercent = ((e.clientX - containerRect.left) / totalWidth) * 100;
+                let newWidth = mousePercent - previousWidthPercent;
 
-                // Convert mouse position to overall percentage 
-                const mousePercent = (mouseRawX / totalWidth) * 100;
-
-                // New width for this column is Mouse% - Previous%
-                let newLabelWidth = mousePercent - previousWidthPercent;
-
-                // Constraints (min 10%, max 80% to imply some flex constraints)
-                const minWidth = 10;
-                const maxWidth = 80;
-
+                // On empêche de réduire une colonne à moins de 10%.
                 setColumnWidths(prev => {
                     const updated = [...prev];
-                    updated[colIndex] = Math.max(minWidth, Math.min(maxWidth, newLabelWidth));
+                    updated[colIndex] = Math.max(10, Math.min(80, newWidth));
                     return updated;
                 });
             }
 
-            // Row resize (PERCENTAGE)
+            // REDIMENSIONNEMENT DES LIGNES :
             if (activeRowResize.current !== null) {
                 const colIndex = activeRowResize.current;
                 const colRef = columnRefs.current[colIndex];
-
                 if (colRef) {
                     const colRect = colRef.getBoundingClientRect();
-                    const totalHeight = colRect.height;
-
-                    // Mouse relative to column top
-                    const mouseRawY = e.clientY - colRect.top;
-
-                    // Convert to percentage
-                    const newHeightPercent = (mouseRawY / totalHeight) * 100;
-
-                    // Constraints (min 10%, max 90%)
-                    const minHeight = 10;
-                    const maxHeight = 90;
-
+                    const newHeightPercent = ((e.clientY - colRect.top) / colRect.height) * 100;
                     setRowHeights(prev => {
                         const updated = [...prev];
-                        updated[colIndex] = Math.max(minHeight, Math.min(maxHeight, newHeightPercent));
+                        updated[colIndex] = Math.max(10, Math.min(90, newHeightPercent));
                         return updated;
                     });
                 }
@@ -146,99 +140,71 @@ export function useLayoutPreferences(selectedGroupId: string | null, showPending
 
         document.addEventListener('mousemove', handleMouseMove);
         document.addEventListener('mouseup', handleMouseUp);
+        return () => { document.removeEventListener('mousemove', handleMouseMove); document.removeEventListener('mouseup', handleMouseUp); };
+    }, [columnWidths, rowHeights]);
 
-        return () => {
-            document.removeEventListener('mousemove', handleMouseMove);
-            document.removeEventListener('mouseup', handleMouseUp);
-        };
-    }, [columnWidths, rowHeights, isEditMode]);
-
-
-
-    // ...
-
-    // Load preferences from Supabase
+    /** 
+     * CHARGEMENT : 
+     * Récupère les préférences enregistrées sur le compte Supabase.
+     */
     const loadLayoutPreferences = async (): Promise<string | false> => {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) return false;
 
         const value = await trackingService.loadUserPreference(user.id, 'suivi_pedagogique_layout');
-
         let foundGroup: string | false = false;
 
         if (value) {
             const val = value as any;
-
-            // Check for legacy pixel values (if any width > 100, it's pixels)
-            const isLegacy = (val.columnWidths && val.columnWidths.some((w: number) => w > 100)) ||
-                (val.rowHeights && val.rowHeights.some((h: number) => h > 100));
-
+            // On vérifie si ce sont de vieux réglages (pixels) pour les convertir ou les ignorer.
+            const isLegacy = (val.columnWidths?.some((w: number) => w > 100)) || (val.rowHeights?.some((h: number) => h > 100));
             if (isLegacy) {
-                // RESET defaults if legacy
                 setColumnWidths([25, 25, 25]);
                 setRowHeights([50, 50, 50, 50]);
             } else {
                 if (val.columnWidths) setColumnWidths(val.columnWidths);
                 if (val.rowHeights) setRowHeights(val.rowHeights);
             }
-
-            if (val.selectedGroupId) {
-                foundGroup = val.selectedGroupId;
-            }
+            if (val.selectedGroupId) foundGroup = val.selectedGroupId;
         }
 
         setIsPreferencesLoaded(true);
-        return foundGroup; // Return group ID if found
+        return foundGroup;
     };
 
-    // Save preferences (debounced)
+    /** 
+     * SAUVEGARDE AUTOMATIQUE : 
+     * On attend 3 secondes sans bouger la souris avant d'envoyer la nouvelle taille au serveur.
+     * C'est transparent pour l'utilisateur.
+     */
     useEffect(() => {
         if (!isPreferencesLoaded) return;
-
         const timer = setTimeout(async () => {
             const { data: { user } } = await supabase.auth.getUser();
             if (!user) return;
-
             setIsSaving(true);
             try {
-                await trackingService.saveUserPreference(
-                    user.id,
-                    'suivi_pedagogique_layout',
-                    {
-                        columnWidths,
-                        rowHeights,
-                        selectedGroupId,
-                        showPendingOnly
-                    }
-                );
+                await trackingService.saveUserPreference(user.id, 'suivi_pedagogique_layout', { columnWidths, rowHeights, selectedGroupId, showPendingOnly });
                 setLastSaved(new Date());
                 setTimeout(() => setIsSaving(false), 2000);
-            } catch (error) {
-                setIsSaving(false);
-            }
+            } catch (error) { setIsSaving(false); }
         }, 3000);
-
         return () => clearTimeout(timer);
     }, [columnWidths, rowHeights, selectedGroupId, showPendingOnly, isPreferencesLoaded]);
 
     return {
-        states: {
-            columnWidths,
-            rowHeights,
-            isEditMode,
-            showConfigBtn,
-            isSaving,
-            lastSaved,
-            isPreferencesLoaded,
-            showSyncSuccess,
-            containerRef,
-            columnRefs
-        },
-        actions: {
-            setIsEditMode,
-            handleColumnMouseDown,
-            handleRowMouseDown,
-            loadLayoutPreferences
-        }
+        states: { columnWidths, rowHeights, isEditMode, showConfigBtn, isSaving, lastSaved, isPreferencesLoaded, showSyncSuccess, containerRef, columnRefs },
+        actions: { setIsEditMode, handleColumnMouseDown, handleRowMouseDown, loadLayoutPreferences }
     };
 }
+
+/**
+ * LOGIGRAMME DE FONCTIONNEMENT :
+ * 
+ * 1. ACTION : L'enseignant veut voir plus d'élèves à la fois.
+ * 2. ÉDITION : Il active le mode édition. Les séparateurs entre les colonnes apparaissent.
+ * 3. MOUVEMENT : Il fait glisser la bordure de la colonne "Élèves" vers la droite.
+ * 4. MISE À JOUR : Le hook recalcule les pourcentages (ex: 25% devient 40%). L'écran s'étire en temps réel.
+ * 5. MÉMOIRE : Il lâche la souris. Trois secondes plus tard, le logiciel sauvegarde : "Ok, son bureau fait maintenant 40% de largeur pour les élèves".
+ * 6. RETOUR : Demain, en ouvrant son PC, l'enseignant retrouve ses colonnes exactement à 40%.
+ */

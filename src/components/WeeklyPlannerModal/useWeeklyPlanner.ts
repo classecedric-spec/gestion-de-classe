@@ -1,3 +1,24 @@
+/**
+ * Nom du module/fichier : WeeklyPlannerModal/useWeeklyPlanner.ts
+ * 
+ * Données en entrée : 
+ *   - `isOpen` : Indique si le semainier est ouvert.
+ * 
+ * Données en sortie : 
+ *   - État complet du planning (cours, modules, activités perso).
+ *   - Fonctions pour naviguer entre les semaines.
+ *   - Logique de Glisser-Déposer (Drag & Drop).
+ *   - Logique de redimensionnement des créneaux.
+ * 
+ * Objectif principal : Centraliser toute l'intelligence du semainier. Ce fichier calcule les dates de début de semaine (Lundi), gère le chargement des données depuis la base, et traite les actions complexes comme le déplacement d'un cours d'un jour à l'autre ou le changement de sa durée.
+ * 
+ * Ce que ça gère : 
+ *   - Le calendrier scolaire (début en Septembre).
+ *   - La synchronisation avec Supabase.
+ *   - Les "conflits" (pas plus de 4 activités par heure).
+ *   - L'extension visuelle d'un créneau (étirer vers le bas).
+ */
+
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../../lib/database';
 import { toast } from 'sonner';
@@ -9,27 +30,32 @@ import { SupabaseActivityRepository } from '../../features/activities/repositori
 
 const activityRepository = new SupabaseActivityRepository();
 
-// Helper: Get start of school year (Sept 1st)
+/**
+ * CALCUL : Trouve la date de rentrée (1er septembre) pour générer la liste des semaines.
+ */
 const getSchoolYearStart = (): Date => {
     const now = new Date();
     const currentYear = now.getFullYear();
-    if (now.getMonth() >= 7) {
+    if (now.getMonth() >= 7) { // Si on est en Août ou après
         return new Date(currentYear, 8, 1);
     } else {
         return new Date(currentYear - 1, 8, 1);
     }
 };
 
-// Helper: Format date to YYYY-MM-DD local
+/**
+ * FORMATAGE : Transforme une date en texte "AAAA-MM-JJ" pour la BDD.
+ */
 const formatDate = (date: Date): string => {
     const y = date.getFullYear();
-    // Use manual formatting to avoid timezone issues or easy string concat
     const m = String(date.getMonth() + 1).padStart(2, '0');
     const d = String(date.getDate()).padStart(2, '0');
     return `${y}-${m}-${d}`;
 };
 
-// Helper: Get current week Monday
+/**
+ * RÉFÉRENCE : Trouve le lundi de la semaine d'une date donnée.
+ */
 const getMonday = (d: Date | string): string => {
     const date = new Date(d);
     const day = date.getDay();
@@ -38,15 +64,15 @@ const getMonday = (d: Date | string): string => {
     return formatDate(newDate);
 };
 
-// Helper: Get weeks list
+/**
+ * GÉNÉRATION : Crée la liste des 45 semaines de l'année scolaire pour le menu déroulant.
+ */
 const getWeeksList = () => {
     const start = new Date(getSchoolYearStart());
     const weeks: { label: string; value: string; index: number }[] = [];
-
-    // Create a new date object to avoid mutating start
     const current = new Date(start);
 
-    // Adjust to Monday of that week
+    // Ajustement au lundi de la rentrée
     const day = current.getDay();
     const diff = current.getDate() - day + (day === 0 ? -6 : 1);
     current.setDate(diff);
@@ -62,7 +88,9 @@ const getWeeksList = () => {
     return weeks;
 };
 
-// Helper: Get relative week Monday
+/**
+ * UTILITAIRE : Trouve le lundi d'une semaine relative (ex: offset=1 pour la semaine prochaine).
+ */
 export const getRelativeWeekMonday = (offsetWeeks: number): string => {
     const d = new Date();
     const day = d.getDay();
@@ -96,8 +124,7 @@ export interface ModuleWithDetails extends Tables<'Module'> {
 }
 
 /**
- * useWeeklyPlanner
- * Hook principal pour la gestion du planning hebdomadaire
+ * HOOK PRINCIPAL : Gère toute la mécanique du Semainier.
  */
 export const useWeeklyPlanner = (isOpen: boolean) => {
     const [schedule, setSchedule] = useState<WeeklyPlanningItem[]>([]);
@@ -108,20 +135,20 @@ export const useWeeklyPlanner = (isOpen: boolean) => {
     const [isExporting, setIsExporting] = useState(false);
     const [customActivities, setCustomActivities] = useState<Tables<'custom_activities'>[]>([]);
 
-    // Drag & Drop state
+    // États du Glisser-Déposer
     const [activeDragItem, setActiveDragItem] = useState<any | null>(null);
     const [activeOver, setActiveOver] = useState<{ day: string; period: number } | null>(null);
 
-    // Resize state
+    // États du redimensionnement (étirer un cours)
     const [resizingItem, setResizingItem] = useState<WeeklyPlanningItem | null>(null);
     const [resizeTargetPeriod, setResizeTargetPeriod] = useState<number | null>(null);
 
-    // Setup weeks on mount
+    // Initialisation : Liste des semaines
     useEffect(() => {
         setWeeks(getWeeksList());
     }, []);
 
-    // Fetch data when modal open or week changes
+    // Chargement : Dès que la fenêtre s'ouvre ou que la semaine change
     useEffect(() => {
         if (isOpen) {
             fetchData();
@@ -130,6 +157,9 @@ export const useWeeklyPlanner = (isOpen: boolean) => {
         }
     }, [isOpen, currentWeek]);
 
+    /**
+     * CHARGEMENT : Récupère les créneaux déjà enregistrés.
+     */
     const fetchData = useCallback(async () => {
         setDbError(false);
         try {
@@ -139,11 +169,12 @@ export const useWeeklyPlanner = (isOpen: boolean) => {
             }
         } catch (err: any) {
             console.error("Database Error:", err);
-            // Fallback not easily implemented with service unless service handles filtering logic
-            // Assuming service handles db errors.
         }
     }, [currentWeek]);
 
+    /**
+     * BIBLIOTHÈQUE : Récupère tous les modules disponibles pour les glisser dans le planning.
+     */
     const fetchModules = useCallback(async () => {
         try {
             const { data, error } = await supabase
@@ -161,10 +192,6 @@ export const useWeeklyPlanner = (isOpen: boolean) => {
                     )
                 `)
                 .order('nom');
-            // This query is specific to planner (needs nested SousBranche details). 
-            // moduleService.getAllModulesWithDetails() has most of this but structure might differ slightly.
-            // Keeping raw query here for safety or moving to plannerRepository??
-            // For now, keeping raw query to avoid breaking complex types.
             if (error) throw error;
             setModules((data as any) || []);
         } catch (err) {
@@ -172,6 +199,9 @@ export const useWeeklyPlanner = (isOpen: boolean) => {
         }
     }, []);
 
+    /**
+     * ACTIVITÉS PERSO : Récupère les libellés créés par l'enseignant (ex: "Cantine").
+     */
     const fetchCustomActivities = useCallback(async () => {
         try {
             const data = await activityRepository.getCustomActivities();
@@ -205,10 +235,12 @@ export const useWeeklyPlanner = (isOpen: boolean) => {
         }
     }, []);
 
-    // Derived data
+    // Liste filtrée des éléments réellement présents dans la grille
     const plannerItems = schedule.filter(s => s.day_of_week !== 'DOCK');
 
-    // New helper functions for drag and drop
+    /**
+     * DROP (DÉPÔT) : Enregistre un nouveau module dans la grille.
+     */
     const handleDropFromLibrary = useCallback(async (module: ModuleWithDetails, day: string, period: number) => {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) return;
@@ -217,7 +249,7 @@ export const useWeeklyPlanner = (isOpen: boolean) => {
             day_of_week: day,
             period_index: period,
             activity_title: module.nom,
-            color_code: 'bg-indigo-500/20 text-indigo-300 border-indigo-500/30', // Default color for now
+            color_code: 'bg-indigo-500/20 text-indigo-300 border-indigo-500/30',
             duration: 1,
             week_start_date: currentWeek,
             user_id: user.id
@@ -237,7 +269,7 @@ export const useWeeklyPlanner = (isOpen: boolean) => {
             day_of_week: day,
             period_index: period,
             activity_title: activity.title,
-            color_code: 'bg-green-500/20 text-green-300 border-green-500/30', // Default color for custom activities
+            color_code: 'bg-green-500/20 text-green-300 border-green-500/30',
             duration: 1,
             week_start_date: currentWeek,
             user_id: user.id
@@ -249,7 +281,7 @@ export const useWeeklyPlanner = (isOpen: boolean) => {
         }
     }, [currentWeek]);
 
-    // Drag handlers
+    // GESTIONNAIRES DE DRAG & DROP
     const handleDragStart = useCallback((event: { active: Active }) => {
         const data = event.active.data.current;
         if (data?.type === 'libraryItem') {
@@ -284,34 +316,33 @@ export const useWeeklyPlanner = (isOpen: boolean) => {
         const { day, period } = overData;
 
         try {
+            // Vérification de la place disponible
             const targetItems = plannerItems.filter(p => p.day_of_week === day && p.period_index === period);
-
             if (targetItems.length >= 4) {
                 toast.error("Maximum 4 activités par créneau !");
                 return;
             }
 
-            // Handle New Module from Library
+            // Cas 1 : Nouvel élément venant des modules
             if (active.data.current?.type === 'libraryItem') {
                 const module = active.data.current.module as ModuleWithDetails;
                 handleDropFromLibrary(module, day, period);
                 return;
             }
 
-            // Handle New Custom Activity
+            // Cas 2 : Nouvel élément venant des activités perso
             if (active.data.current?.type === 'customItem') {
                 const activity = active.data.current.activity as Tables<'custom_activities'>;
                 handleDropFromCustom(activity, day, period);
                 return;
             }
 
-            // Existing item placement (grid)
+            // Cas 3 : Déplacement d'un élément déjà dans l'agenda
             const item = activeData.item as WeeklyPlanningItem;
             const isSameSlot = item.day_of_week === day && item.period_index === period;
 
             if (!isSameSlot) {
                 await plannerService.updatePlanningItem(item.id, { day_of_week: day, period_index: period, duration: 1 });
-
                 setSchedule(prev => prev.map(p =>
                     p.id === item.id ? { ...p, day_of_week: day, period_index: period, duration: 1 } : p
                 ));
@@ -322,7 +353,9 @@ export const useWeeklyPlanner = (isOpen: boolean) => {
         }
     }, [plannerItems, fetchData, handleDropFromLibrary, handleDropFromCustom]);
 
-    // Delete (permanent)
+    /**
+     * SUPPRESSION : Retire un créneau de l'agenda.
+     */
     const handleDelete = useCallback(async (id: string) => {
         try {
             await plannerService.deletePlanningItem(id);
@@ -332,28 +365,29 @@ export const useWeeklyPlanner = (isOpen: boolean) => {
         }
     }, []);
 
-    // Extend duration
+    /**
+     * EXTENSION : Allonge le cours d'une case vers le bas.
+     */
     const handleExtend = useCallback(async (item: WeeklyPlanningItem) => {
         const newDuration = (item.duration || 1) + 1;
-        if (item.period_index + newDuration - 1 > 6) return;
+        if (item.period_index + newDuration - 1 > 6) return; // Pas plus de 6 périodes par jour
 
         const targetPeriod = item.period_index + newDuration - 1;
         const conflict = plannerItems.find(p => p.day_of_week === item.day_of_week && p.period_index === targetPeriod);
 
+        // Si une activité bouchait le passage, on la supprime pour faire de la place
         if (conflict) {
             await plannerService.deletePlanningItem(conflict.id);
         }
 
         try {
             await plannerService.updatePlanningItem(item.id, { duration: newDuration });
-
             setSchedule(prev => {
                 const withoutConflict = prev.filter(p => !conflict || p.id !== conflict.id);
                 return withoutConflict.map(p =>
                     p.id === item.id ? { ...p, duration: newDuration } : p
                 );
             });
-
             setResizingItem(null);
             setResizeTargetPeriod(null);
         } catch (err) {
@@ -361,7 +395,7 @@ export const useWeeklyPlanner = (isOpen: boolean) => {
         }
     }, [plannerItems]);
 
-    // Resize handlers
+    // GESTIONNAIRES DE REDIMENSIONNEMENT À LA SOURIS
     const handleResizeStart = useCallback((e: React.MouseEvent, item: WeeklyPlanningItem) => {
         e.preventDefault();
         e.stopPropagation();
@@ -371,7 +405,6 @@ export const useWeeklyPlanner = (isOpen: boolean) => {
 
     const handleResizeMove = useCallback((e: any) => {
         if (!resizingItem) return;
-
         const elements = document.elementsFromPoint(e.clientX, e.clientY);
         const slotWithAttr = elements.map(el => el.closest('[data-period]')).find(el => el !== null);
 
@@ -385,49 +418,46 @@ export const useWeeklyPlanner = (isOpen: boolean) => {
 
     const handleResizeUp = useCallback(async () => {
         if (!resizingItem || resizeTargetPeriod === null) return;
-
         const newDuration = (resizeTargetPeriod - resizingItem.period_index) + 1;
         const finalDuration = Math.min(Math.max(1, newDuration), 6 - resizingItem.period_index + 1);
 
         try {
             await plannerService.updatePlanningItem(resizingItem.id, { duration: finalDuration });
-
             setSchedule(prev => prev.map(p =>
                 p.id === resizingItem.id ? { ...p, duration: finalDuration } : p
             ));
         } catch (err) {
             console.error(err);
         }
-
         setResizingItem(null);
         setResizeTargetPeriod(null);
     }, [resizingItem, resizeTargetPeriod]);
 
-    // Shrink from top (remove top slot)
+    /**
+     * RÉDUCTION : Rentre le haut du cours d'une case (le fait commencer plus tard).
+     */
     const handleShrinkFromTop = useCallback(async (item: WeeklyPlanningItem) => {
         if ((item.duration || 1) <= 1) return;
-
         const newPeriod = item.period_index + 1;
         const newDuration = (item.duration || 1) - 1;
 
         try {
-            // Optimistic update
             setSchedule(prev => prev.map(p =>
                 p.id === item.id ? { ...p, period_index: newPeriod, duration: newDuration } : p
             ));
-
             await plannerService.updatePlanningItem(item.id, {
                 period_index: newPeriod,
                 duration: newDuration
             });
         } catch (err) {
             console.error("Error shrinking item:", err);
-            // Revert on error (could reuse fetchData but let's just log for now)
             fetchData();
         }
     }, [fetchData]);
 
-    // Slot coverage check
+    /**
+     * VÉRIFICATION : Est-ce qu'un cours plus haut s'étend sur cette case ?
+     */
     const isSlotCovered = useCallback((day: string, period: number): boolean => {
         return plannerItems.some(item =>
             item.day_of_week === day &&
@@ -436,7 +466,7 @@ export const useWeeklyPlanner = (isOpen: boolean) => {
         );
     }, [plannerItems]);
 
-    // Week navigation
+    // NAVIGATION SEMAINE
     const handlePrevWeek = useCallback(() => {
         const currentIdx = weeks.findIndex(w => w.value === currentWeek);
         if (currentIdx > 0) setCurrentWeek(weeks[currentIdx - 1].value);
@@ -450,7 +480,7 @@ export const useWeeklyPlanner = (isOpen: boolean) => {
     const currentWeekLabel = weeks.find(w => w.value === currentWeek)?.label || 'Semaine...';
 
     return {
-        // Data
+        // Données brutes
         schedule,
         modules,
         weeks,
@@ -463,19 +493,19 @@ export const useWeeklyPlanner = (isOpen: boolean) => {
         isExporting,
         setIsExporting,
 
-        // Drag & Drop
+        // Glisser-Déposer
         activeDragItem,
         activeOver,
         handleDragStart,
         handleDragOver,
         handleDragEnd,
 
-        // Custom Activities
+        // Activités
         fetchCustomActivities,
         handleCreateCustomActivity,
         handleDeleteCustomActivity,
 
-        // Resize
+        // Redimensionnement
         resizingItem,
         resizeTargetPeriod,
         handleResizeStart,
@@ -483,7 +513,7 @@ export const useWeeklyPlanner = (isOpen: boolean) => {
         handleResizeUp,
         handleShrinkFromTop,
 
-        // Actions
+        // Actions CRUD
         handleDelete,
         handleExtend,
         isSlotCovered,
@@ -492,3 +522,13 @@ export const useWeeklyPlanner = (isOpen: boolean) => {
         fetchModules: fetchModules
     };
 };
+
+/**
+ * LOGIGRAMME DE RÉFLEXION DU HOOK :
+ * 
+ * 1. ÉVÈNEMENT -> L'utilisateur dépose un module sur Mardi Période 3.
+ * 2. ANALYSE -> `handleDragEnd` regarde : Y a-t-il déjà 4 choses là ? Non.
+ * 3. SAUVEGARDE -> Création d'un objet `WeeklyPlanningItem` et envoi vers `plannerService.createPlanningItem`.
+ * 4. SYNCHRO -> Dès que la BDD confirme, la liste locale `schedule` est mise à jour.
+ * 5. RENDU -> L'agenda se redessine avec le nouveau module affiché.
+ */

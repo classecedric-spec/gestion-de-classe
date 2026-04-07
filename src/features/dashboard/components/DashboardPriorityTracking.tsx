@@ -1,3 +1,15 @@
+/**
+ * Nom du module/fichier : DashboardPriorityTracking.tsx
+ * 
+ * Données en entrée : 
+ *   - priorityData : Données brutes sur les élèves nécessitant une attention particulière (les moins actifs, ceux qui valident le moins, etc.).
+ *   - onStudentClick : Fonction pour ouvrir la fiche de suivi d'un élève.
+ * 
+ * Données en sortie : Un tableau de bord en 3 colonnes ("Moins Actifs", "Validations Faibles", "Taux Achèvement Faible").
+ * 
+ * Objectif principal : Mettre en lumière les élèves "décrocheurs" ou en difficulté sur une période donnée (hier, cette semaine). Ce composant permet à l'enseignant d'identifier instantanément qui il doit aller voir en priorité dans la classe pour une présentation ou un soutien.
+ */
+
 import React from 'react';
 import { AlertCircle } from 'lucide-react';
 import clsx from 'clsx';
@@ -19,6 +31,9 @@ interface StudentListItemProps {
     onStudentClick: (student: any) => void;
 }
 
+/**
+ * Petit composant interne pour afficher une ligne d'élève dans la liste de priorité.
+ */
 const StudentListItem: React.FC<StudentListItemProps> = ({ student, badgeColor, badgeText, hoverContent, onStudentClick }) => (
     <div
         className="group flex flex-wrap items-center justify-between p-2 rounded-lg hover:bg-white/5 transition-colors gap-2 cursor-pointer relative"
@@ -36,6 +51,7 @@ const StudentListItem: React.FC<StudentListItemProps> = ({ student, badgeColor, 
             <Badge variant={badgeColor.includes('danger') ? 'danger' : 'warning'} size="sm" className="whitespace-nowrap">
                 {badgeText}
             </Badge>
+            {/* Infobulle affichée au survol pour voir le détail des statistiques */}
             {hoverContent && (
                 <div className="absolute bottom-full right-0 mb-2 hidden group-hover:block z-50 w-32 bg-zinc-900/95 backdrop-blur-xl border border-white/10 rounded-xl p-3 shadow-2xl pointer-events-none">
                     {hoverContent}
@@ -45,6 +61,9 @@ const StudentListItem: React.FC<StudentListItemProps> = ({ student, badgeColor, 
     </div>
 );
 
+/**
+ * Petit tableau de statistiques quotidiennes (affiché dans l'infobulle).
+ */
 const DailyStatsTable: React.FC<{ stats: Record<string, number>; label: string }> = ({ stats, label }) => (
     <>
         <p className="text-[10px] font-bold text-grey-light mb-2 border-b border-white/10 pb-1">{label}</p>
@@ -61,6 +80,9 @@ const DailyStatsTable: React.FC<{ stats: Record<string, number>; label: string }
     </>
 );
 
+/**
+ * Panneau principal de suivi des priorités pédagogiques.
+ */
 const DashboardPriorityTracking: React.FC<DashboardPriorityTrackingProps> = ({ priorityData, onStudentClick }) => {
 
     return (
@@ -71,7 +93,7 @@ const DashboardPriorityTracking: React.FC<DashboardPriorityTrackingProps> = ({ p
             </h2>
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
 
-                {/* Col 1: Least Active Yesterday */}
+                {/* COLONNE 1 : ÉLÈVES LES MOINS ACTIFS HIER (Saisie de travaux faible) */}
                 <div className="bg-surface p-5 rounded-2xl border border-white/5 h-full">
                     <h3 className="text-base font-bold text-grey-light uppercase tracking-wide mb-4">📉 Moins Actifs ({priorityData.lastActiveLabel || 'Hier'})</h3>
                     <div className="space-y-3">
@@ -91,7 +113,7 @@ const DashboardPriorityTracking: React.FC<DashboardPriorityTrackingProps> = ({ p
                     </div>
                 </div>
 
-                {/* Col 2: Least Validated This Week */}
+                {/* COLONNE 2 : VALIDATIONS FAIBLES CETTE SEMAINE */}
                 <div className="bg-surface p-5 rounded-2xl border border-white/5 h-full">
                     <h3 className="text-base font-bold text-grey-light uppercase tracking-wide mb-4">📅 Validations Faibles (Sem.)</h3>
                     <div className="space-y-3">
@@ -111,7 +133,7 @@ const DashboardPriorityTracking: React.FC<DashboardPriorityTrackingProps> = ({ p
                     </div>
                 </div>
 
-                {/* Col 3: Lowest Completion Rate */}
+                {/* COLONNE 3 : TAUX D'ACHÈVEMENT GLOBAL FAIBLE (Élèves qui rament sur le long terme) */}
                 <div className="bg-surface p-5 rounded-2xl border border-white/5 h-full">
                     <h3 className="text-base font-bold text-grey-light uppercase tracking-wide mb-4">⚠️ Taux Achèvement Faible</h3>
                     <div className="space-y-3">
@@ -131,6 +153,7 @@ const DashboardPriorityTracking: React.FC<DashboardPriorityTrackingProps> = ({ p
                                     </Badge>
                                     <span className="text-[10px] text-grey-dark whitespace-nowrap uppercase font-bold tracking-tight">{s.startedCount} en cours</span>
 
+                                    {/* Infobulle de détail par branche (Maths, Français, etc.) */}
                                     <div className="absolute bottom-full right-0 mb-2 hidden group-hover:block z-50 w-48 bg-zinc-900/95 backdrop-blur-xl border border-white/10 rounded-xl p-3 shadow-2xl pointer-events-none text-left">
                                         <p className="text-[10px] font-bold text-grey-light mb-2 border-b border-white/10 pb-1">Taux par Branche</p>
                                         <table className="w-full text-[10px]">
@@ -162,3 +185,13 @@ const DashboardPriorityTracking: React.FC<DashboardPriorityTrackingProps> = ({ p
 };
 
 export default DashboardPriorityTracking;
+
+/**
+ * LOGIGRAMME DE FONCTIONNEMENT :
+ * 
+ * 1. CLASSEMENT : Le système reçoit les scores d'activité de tous les élèves.
+ * 2. FILTRAGE : Il sélectionne les 3 ou 4 élèves ayant les scores les plus bas dans chaque catégorie.
+ * 3. AFFICHAGE : Il affiche ces noms sous forme de listes compactes avec des badges de couleur (Rouge pour Alerte, Orange pour Vigilance).
+ * 4. SURVOL : Si l'enseignant survole un nom, une infobulle apparaît pour expliquer le score (ex: détail jour par jour).
+ * 5. ACTION : Au clic sur une ligne, l'application ouvre directement la fiche de suivi de l'élève pour que l'enseignant agisse.
+ */

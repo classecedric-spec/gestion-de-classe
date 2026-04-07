@@ -1,3 +1,15 @@
+/**
+ * Nom du module/fichier : useActivityForm.ts
+ * 
+ * Données en entrée : Une activité à modifier (optionnel), les identifiants par défaut (module, ordre) et les fonctions de rappel (fermeture, succès).
+ * 
+ * Données en sortie : L'état complet du formulaire (titre, module, matériel, niveaux) et les fonctions pour manipuler ces données avant l'envoi.
+ * 
+ * Objectif principal : Gérer la complexité de la création ou de l'édition d'une activité. Ce Hook orchestre la saisie des informations de base, la sélection du matériel nécessaire, et la définition des exigences spécifiques pour chaque niveau scolaire (ex: 5 exercices pour les GS, 3 pour les MS).
+ * 
+ * Ce que ça affiche : Rien directement. Il fournit toute la "mécanique" au composant visuel `AddActivityModal`.
+ */
+
 import { useState, useEffect, Dispatch, SetStateAction } from 'react';
 import { supabase } from '../../../lib/database';
 import { activityService, ActivityWithRelations } from '../services/activityService';
@@ -46,6 +58,9 @@ interface UseActivityFormReturn {
     submitForm: () => Promise<boolean>;
 }
 
+/**
+ * Ce Hook est le moteur du formulaire d'activité. Il gère un état local riche et complexe.
+ */
 export const useActivityForm = ({
     activityToEdit,
     defaultModuleId,
@@ -54,37 +69,39 @@ export const useActivityForm = ({
     onAdded,
     onClose
 }: ActivityFormProps): UseActivityFormReturn => {
-    // Basic Info
+    // Informations de base (Titre et Module d'appartenance)
     const [title, setTitle] = useState('');
     const [moduleId, setModuleId] = useState('');
     const [moduleName, setModuleName] = useState('');
 
-    // Requirements
+    // Critères de réussite par défaut (utilisés si aucun niveau spécifique n'est défini)
     const [nbExercises, setNbExercises] = useState<number | string>('');
     const [nbErrors, setNbErrors] = useState<number | string>(1);
     const [requirementStatus, setRequirementStatus] = useState('obligatoire');
 
-    // Relations
+    // Relations complexes (Matériel sélectionné et Liste des exceptions par niveau)
     const [selectedMaterialTypes, setSelectedMaterialTypes] = useState<string[]>([]);
     const [activityLevels, setActivityLevels] = useState<ActivityLevelState[]>([]);
 
-    // Data Sources
+    // Sources de données pour remplir les listes déroulantes
     const [levels, setLevels] = useState<Tables<'Niveau'>[]>([]);
 
-    // UI State
+    // État de l'interface (chargement, erreurs)
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
-    // Initial Data Fetching
+    // Chargement initial : au démarrage, on récupère les niveaux scolaires et, si on est en mode édition, 
+    // on pré-remplit tous les champs avec les données de l'activité existante.
     useEffect(() => {
         const loadInitialData = async () => {
             try {
-                // Load Levels
+                // Récupération de la liste des niveaux (PS, MS, GS, etc.)
                 const levelsData = await activityService.getLevels();
                 setLevels(levelsData);
 
-                // Initialize Form Mode
+                // Initialisation du mode formulaire
                 if (activityToEdit) {
+                    // Mode ÉDITION : on remplit avec les données existantes
                     setTitle(activityToEdit.titre);
                     setModuleId(activityToEdit.module_id || '');
 
@@ -99,11 +116,11 @@ export const useActivityForm = ({
                     setNbErrors(activityToEdit.nombre_erreurs ?? 1);
                     setRequirementStatus(activityToEdit.statut_exigence || 'obligatoire');
 
-                    // Fetch existing relations
+                    // Récupération du matériel déjà lié
                     const materials = await activityService.getActivityMaterials(activityToEdit.id);
                     setSelectedMaterialTypes(materials.map(m => m.type_materiel_id).filter((id): id is string => id !== null));
 
-                    // Use existing relations from prop if available (faster & cleaner)
+                    // Récupération des réglages spécifiques par niveau
                     if (activityToEdit.ActiviteNiveau && activityToEdit.ActiviteNiveau.length > 0) {
                         setActivityLevels(activityToEdit.ActiviteNiveau.map(item => ({
                             id: item.id,
@@ -114,7 +131,7 @@ export const useActivityForm = ({
                             statut_exigence: item.statut_exigence!
                         })));
                     } else {
-                        // Fallback fetch
+                        // Secours si les données n'étaient pas déjà chargées
                         const actLevels = await activityService.getActivityLevels(activityToEdit.id);
                         if (actLevels) {
                             setActivityLevels(actLevels.map(item => ({
@@ -128,7 +145,7 @@ export const useActivityForm = ({
                         }
                     }
                 } else {
-                    // Reset / Defaults
+                    // Mode AJOUT : on réinitialise tout à zéro ou avec les valeurs par défaut
                     setTitle('');
                     setModuleId(defaultModuleId || '');
                     setModuleName(defaultModuleName || '');
@@ -147,7 +164,7 @@ export const useActivityForm = ({
         loadInitialData();
     }, [activityToEdit, defaultModuleId, defaultModuleName]);
 
-    // Actions
+    // Gestion multizone : permet d'ajouter une configuration spécifique pour un niveau scolaire (ex: ajouter une règle spéciale pour les CP).
     const handleAddLevel = (levelId: string, currentNbExercises: number | string, currentNbErrors: number | string, currentStatus: string) => {
         const level = levels.find(l => l.id === levelId);
         if (!level) return;
@@ -173,15 +190,19 @@ export const useActivityForm = ({
         });
     };
 
+    // Sélecteur de matériel : gère une liste d'identifiants que l'on ajoute ou retire d'un simple clic.
     const toggleMaterialType = (id: string) => {
         setSelectedMaterialTypes(prev =>
             prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
         );
     };
 
+    // Validation et Envoi : vérifie que le formulaire est complet et déclenche la sauvegarde via `activityService`.
     const submitForm = async () => {
+        // Validation minimale : un titre et un module sont obligatoires.
         if (!title.trim() || !moduleId) return false;
 
+        // Une activité doit être liée à au moins un niveau pour être visible des élèves concernés.
         if (activityLevels.length === 0) {
             setError("Veuillez lier au moins un niveau à cette activité.");
             return false;
@@ -208,7 +229,7 @@ export const useActivityForm = ({
                 (activityData as any).ordre = nextOrder || 0;
             }
 
-            // Save to DB
+            // Envoi au service de sauvegarde (le "cerveau" métier)
             const activityId = await activityService.saveActivity(
                 activityData,
                 selectedMaterialTypes,
@@ -216,17 +237,16 @@ export const useActivityForm = ({
                 !!activityToEdit
             );
 
-            // Construct optimistic object for UI
+            // Construction d'un objet "fictif" instantané pour mettre à jour l'écran sans attendre le rechargement de la base.
             const optimisticActivity = {
                 id: activityId,
                 ...activityData,
                 created_at: activityToEdit ? activityToEdit.created_at : new Date().toISOString(),
                 Module: {
                     id: moduleId,
-                    nom: moduleName || '...', // Best effort
+                    nom: moduleName || '...', 
                     statut: 'en_cours'
                 },
-                // Include real data in optimistic object to avoid empty UI after save
                 ActiviteNiveau: activityLevels.map(al => ({
                     id: al.id || Math.random().toString(),
                     niveau_id: al.niveau_id,
@@ -260,7 +280,7 @@ export const useActivityForm = ({
     };
 
     return {
-        // State
+        // État du formulaire
         title, setTitle,
         moduleId, setModuleId,
         moduleName, setModuleName,
@@ -273,7 +293,7 @@ export const useActivityForm = ({
         loading,
         error,
 
-        // Actions
+        // Actions (fonctions utilisables par l'interface)
         handleAddLevel,
         handleRemoveLevel,
         updateActivityLevel,
@@ -281,3 +301,24 @@ export const useActivityForm = ({
         submitForm
     };
 };
+
+/**
+ * LOGIGRAMME DE FONCTIONNEMENT :
+ * 
+ * 1. L'enseignant ouvre le formulaire (Ajout ou Édition).
+ * 2. Le Hook initialise les champs :
+ *    - Mode AJOUT : Champs vides ou valeurs par défaut.
+ *    - Mode ÉDITION : Récupération et affichage des données actuelles depuis Supabase.
+ * 3. L'enseignant remplit les données :
+ *    - Titre, dossier (module), matériel nécessaire.
+ *    - Critères de réussite (NB exercices, NB erreurs max).
+ * 4. Gestion fine par niveau :
+ *    - L'enseignant peut ajouter un niveau (ex: 'GS') pour lui donner des objectifs différents.
+ *    - Il peut en ajouter autant qu'il y a de niveaux dans sa base.
+ * 5. Lors de la validation (Valider) :
+ *    a. Le Hook effectue des contrôles de sécurité (titre présent, au moins un niveau lié).
+ *    b. Il prépare les données numériques (conversion de texte en chiffres).
+ *    c. Il appelle le service `activityService.saveActivity`.
+ *    d. Il prépare un objet "temporaire" (optimiste) pour que l'écran se mette à jour sans attendre.
+ *    e. Il ferme le formulaire et confirme le succès à l'écran appelant.
+ */

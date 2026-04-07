@@ -1,3 +1,19 @@
+/**
+ * Nom du module/fichier : DashboardControls.tsx
+ * 
+ * Données en entrée : 
+ *   - États d'affichage : Plein écran (`isFullScreen`), mode édition (`isEditMode`), état de sauvegarde (`isSaving`).
+ *   - Actions : Fonctions pour basculer le plein écran, ouvrir le sélecteur de groupe, activer le mode édition.
+ *   - États Kiosque : Autorisation et état d'ouverture des tablettes élèves.
+ * 
+ * Données en sortie : 
+ *   - Une barre d'outils flottante discrète située en bas à droite de l'écran.
+ * 
+ * Objectif principal : Fournir un accès rapide aux réglages techniques du tableau de bord sans encombrer l'espace de travail. C'est ici que l'enseignant peut "ouvrir" sa classe numériquement (Kiosques), ajuster la disposition des colonnes ou passer en plein écran pour une meilleure visibilité.
+ * 
+ * Ce que ça affiche : Une série de petits boutons élégants avec des icônes (Agrandir, Groupes, Paramètres, Clavier/Kiosque) qui s'illuminent selon leur état.
+ */
+
 import React from 'react';
 import { Users, Settings2, Maximize, Minimize, Check, Loader2, Keyboard, CalendarDays } from 'lucide-react';
 import { Button } from '../../../../core';
@@ -19,6 +35,9 @@ interface DashboardControlsProps {
     loadingKioskPlanning?: boolean;
 }
 
+/**
+ * Palette de commandes flottante pour la gestion du tableau de bord.
+ */
 export const DashboardControls: React.FC<DashboardControlsProps> = ({
     isFullScreen,
     setFullScreen,
@@ -35,6 +54,11 @@ export const DashboardControls: React.FC<DashboardControlsProps> = ({
     loadingKioskPlanning
 }) => {
 
+    /** 
+     * GESTION DE L'IMMERSION : 
+     * Cette fonction demande au navigateur de cacher les onglets et les barres d'outils 
+     * pour que l'enseignant ne voie que son application, comme s'il s'agissait d'un logiciel dédié.
+     */
     const handleFullScreenToggle = () => {
         const element = document.documentElement;
         // @ts-ignore
@@ -78,6 +102,7 @@ export const DashboardControls: React.FC<DashboardControlsProps> = ({
     return (
         <div className="absolute bottom-8 right-6 z-[90] flex flex-col items-end gap-2 group translate-y-[-50%] md:translate-y-0">
             <div className="flex items-center gap-2 transition-opacity duration-300">
+                {/* Bouton Plein Écran */}
                 <Button
                     onClick={handleFullScreenToggle}
                     variant="secondary"
@@ -86,6 +111,8 @@ export const DashboardControls: React.FC<DashboardControlsProps> = ({
                 >
                     {isFullScreen ? <Minimize size={20} /> : <Maximize size={20} />}
                 </Button>
+
+                {/* Bouton Choix du Groupe (Changement de classe/atelier) */}
                 <Button
                     onClick={onShowGroupSelector}
                     variant="secondary"
@@ -95,6 +122,7 @@ export const DashboardControls: React.FC<DashboardControlsProps> = ({
                     <Users size={20} />
                 </Button>
 
+                {/* Bouton Mode Édition (Redimensionnement des colonnes) */}
                 <Button
                     onClick={() => setIsEditMode(!isEditMode)}
                     variant={isEditMode ? "primary" : "secondary"}
@@ -113,6 +141,7 @@ export const DashboardControls: React.FC<DashboardControlsProps> = ({
                     )}
                 </Button>
                 
+                {/* Bouton Kiosque Encodage (Autorisation tablettes travail) */}
                 {toggleKiosk && (
                     <Button
                         onClick={toggleKiosk}
@@ -140,6 +169,7 @@ export const DashboardControls: React.FC<DashboardControlsProps> = ({
                     </Button>
                 )}
                 
+                {/* Bouton Kiosque Planification (Autorisation tablettes agenda) */}
                 {toggleKioskPlanning && (
                     <Button
                         onClick={toggleKioskPlanning}
@@ -168,7 +198,7 @@ export const DashboardControls: React.FC<DashboardControlsProps> = ({
                 )}
             </div>
 
-            {/* SAVING INDICATOR */}
+            {/* INDICATEUR DE SAUVEGARDE : Petit badge qui apparaît quand l'application écrit en base de données. */}
             <div className={
                 clsx(
                     "flex items-center gap-2 px-3 py-1.5 rounded-full bg-black/40 border border-white/10 backdrop-blur-md transition-all duration-500",
@@ -192,3 +222,17 @@ export const DashboardControls: React.FC<DashboardControlsProps> = ({
         </div>
     );
 };
+
+/**
+ * LOGIGRAMME DE FONCTIONNEMENT :
+ * 
+ * 1. L'enseignant veut se concentrer : il clique sur l'icône "Agrandir".
+ * 2. Le logiciel ordonne au navigateur Web de passer en Plein Écran. L'icône change en "Réduire".
+ * 3. L'enseignant veut autoriser les élèves à utiliser les tablettes : il clique sur l'icône "Clavier".
+ * 4. L'application envoie un signal au serveur : les tablettes connectées en mode "Kiosque" sont débloquées instantanément.
+ * 5. Le petit point passe du Rouge au Vert (clignotant) pour confirmer que le Kiosque est ouvert.
+ * 6. L'enseignant déplace une bordure de colonne pour agrandir sa zone de suivi :
+ *    - Un petit texte "Enregistrement..." apparaît brièvement en bas.
+ *    - Puis il laisse place à "Config. synchronisée" pour confirmer que sa nouvelle mise en page est mémorisée.
+ */
+export default DashboardControls;

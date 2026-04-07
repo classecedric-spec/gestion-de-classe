@@ -1,3 +1,15 @@
+/**
+ * Nom du module/fichier : StudentQRModal.tsx
+ * 
+ * Données en entrée : Les informations de l'élève et le mode d'affichage souhaité (Encodage, Planification ou les deux).
+ * 
+ * Données en sortie : Une fenêtre affichant un ou plusieurs QR Codes, avec des options pour copier le lien ou imprimer un PDF.
+ * 
+ * Objectif principal : Fournir aux élèves un "accès magique" à leur espace de travail personnel (Kiosque). En scannant ce code avec une tablette, l'élève arrive directement sur son suivi ou son planning sans avoir à taper d'identifiant. C'est l'outil clé pour l'autonomie des élèves en classe.
+ * 
+ * Ce que ça affiche : Une fenêtre sombre (overlay) contenant un QR Code noir sur fond blanc, très lisible, et des boutons d'action colorés.
+ */
+
 import React, { useState } from 'react';
 import QRCode from "react-qr-code";
 import { X, Printer, Copy, Keyboard, CalendarDays } from 'lucide-react';
@@ -37,12 +49,15 @@ const StudentQRModal: React.FC<StudentQRModalProps> = ({ isOpen, onClose, studen
     if (!isOpen || !student) return null;
 
     // Dynamic base URL with network IP fallback
+    // Calcule l'adresse internet de l'école pour que le QR Code fonctionne aussi bien sur ordinateur que sur tablette.
     const baseUrl = getAppBaseUrl();
     const token = (student as any).access_token || '';
+    // Lien secret : il contient un 'jeton' (token) qui permet à l'élève de se connecter automatiquement.
     const encodageUrl = `${baseUrl}/kiosk/${student.id}?token=${token}`;
     const planificationUrl = `${baseUrl}/kiosk/planning/${student.id}?token=${token}`;
     const currentUrl = activeTab === 'encodage' ? encodageUrl : planificationUrl;
 
+    // L'imprimeur : il transforme le QR Code en un document PDF propre, prêt à être découpé et collé sur le cahier ou le casier de l'élève.
     const handlePrint = async () => {
         setIsGenerating(true);
         try {
@@ -108,6 +123,7 @@ const StudentQRModal: React.FC<StudentQRModalProps> = ({ isOpen, onClose, studen
                 </div>
 
                 {/* Tabs */}
+                {/* Sélecteur de mode : permet de choisir si le QR Code doit mener vers la validation des activités (Encodage) ou vers l'emploi du temps (Planification). */}
                 <div className="flex border-b border-white/10">
                     <button
                         onClick={() => setActiveTab('encodage')}
@@ -238,3 +254,15 @@ const StudentQRModal: React.FC<StudentQRModalProps> = ({ isOpen, onClose, studen
 };
 
 export default StudentQRModal;
+
+/**
+ * 1. L'enseignant veut donner un accès tablette à un élève.
+ * 2. Il ouvre la `StudentQRModal`.
+ * 3. Il choisit le type d'accès (ex: "Encodage").
+ * 4. Le composant génère instantanément le QR Code correspondant.
+ * 5. Si l'enseignant veut le lien : il clique sur "Copier Lien".
+ * 6. Si l'enseignant veut une version papier :
+ *    a. Il clique sur "Exporter en PDF".
+ *    b. Le système crée un document avec le nom de l'élève et son QR Code.
+ *    c. Le PDF s'ouvre dans un nouvel onglet pour impression.
+ */

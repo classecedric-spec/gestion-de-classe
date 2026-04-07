@@ -1,3 +1,22 @@
+/**
+ * Nom du module/fichier : StudentColumnWrapper.tsx
+ * 
+ * Données en entrée : 
+ *   - `currentView` : Définit si l'on voit la liste globale des élèves ou le détail d'un élève précis.
+ *   - `selectedStudent` : L'élève actuellement sélectionné pour le suivi.
+ *   - `modules`, `activities`, `progressions` : Les données de travail (chapitres, exercices et états de réussite).
+ *   - `loading...` : États de chargement pour afficher des indicateurs visuels de patience.
+ * 
+ * Données en sortie : 
+ *   - Une colonne interactive (la n°1 du dashboard) qui change de visage selon le contexte.
+ * 
+ * Objectif principal : Être le menu de navigation principal du dashboard. Soit elle présente le "Trombinoscope" (vue d'ensemble), soit elle se transforme en "Journal de Travail" pour un élève choisi. C'est le point de départ de chaque interaction de suivi.
+ * 
+ * Ce que ça affiche : 
+ *   - Mode 'students' : Une grille de portraits miniatures avec des barres de progression.
+ *   - Mode 'modules' : Le portrait de l'élève choisi, ses informations de suivi, et la liste dépliable de ses exercices.
+ */
+
 import React from 'react';
 import { Filter, ChevronDown, Loader2 } from 'lucide-react';
 import clsx from 'clsx';
@@ -15,7 +34,7 @@ interface StudentColumnWrapperProps {
     selectedStudent: any;
     showPendingOnly: boolean;
     setShowPendingOnly: (show: boolean) => void;
-    // Data Props
+    // Données techniques
     students: any[];
     loadingStudents: boolean;
     modules: any[];
@@ -24,12 +43,15 @@ interface StudentColumnWrapperProps {
     activities: any[];
     loadingActivities: boolean;
     progressions: any;
-    // Actions
+    // Actions utilisateur
     onStudentSelect: (student: any) => void;
     onStatusClick: (activityId: string, status: string, currentStatus?: string) => void;
     onSelectModule: (module: any) => void;
 }
 
+/**
+ * Conteneur intelligent pour la première colonne du tableau de bord (Gestion des élèves).
+ */
 export const StudentColumnWrapper: React.FC<StudentColumnWrapperProps> = ({
     currentView,
     selectedStudent,
@@ -49,7 +71,7 @@ export const StudentColumnWrapper: React.FC<StudentColumnWrapperProps> = ({
 }) => {
     return (
         <div className="flex flex-col h-full">
-            {/* TOP HEADER */}
+            {/* EN-TÊTE : Titre fixe ou Portrait de l'élève sélectionné */}
             <div className="flex flex-col border-b border-white/5 shrink-0">
                 {currentView === 'students' ? (
                     <div className="p-4 flex items-center justify-between h-[60px]">
@@ -61,6 +83,7 @@ export const StudentColumnWrapper: React.FC<StudentColumnWrapperProps> = ({
                             {selectedStudent && (
                                 <div className="flex flex-col gap-3 animate-in fade-in duration-500">
                                     <div className="flex items-center gap-4">
+                                        {/* Avatar de l'élève */}
                                         <div className="w-16 h-16 rounded-2xl overflow-hidden border-2 border-primary/20 shadow-lg shrink-0 bg-surface">
                                             {selectedStudent.photo_base64 ? (
                                                 <img src={selectedStudent.photo_base64} alt="" className="w-full h-full object-cover" />
@@ -81,6 +104,7 @@ export const StudentColumnWrapper: React.FC<StudentColumnWrapperProps> = ({
                                                     )}
                                                 </h3>
 
+                                                {/* Bouton de filtrage rapide (À faire / Tous) */}
                                                 <button
                                                     onClick={() => setShowPendingOnly(!showPendingOnly)}
                                                     className={clsx(
@@ -103,8 +127,9 @@ export const StudentColumnWrapper: React.FC<StudentColumnWrapperProps> = ({
                 )}
             </div>
 
-            {/* CONTENT AREA */}
+            {/* ZONE DE CONTENU : Grille globale ou Liste détaillée */}
             <div className="flex-1 overflow-y-auto p-2 custom-scrollbar relative">
+                {/* VUE 1 : Le Trombinoscope complet (Grille d'élèves) */}
                 {currentView === 'students' && (
                     <StudentProgressionGrid
                         students={students}
@@ -113,6 +138,7 @@ export const StudentColumnWrapper: React.FC<StudentColumnWrapperProps> = ({
                     />
                 )}
 
+                {/* VUE 2 : Le parcours de l'élève choisi (Liste de modules) */}
                 {currentView === 'modules' && (
                     loadingModules ? (
                         <div className="flex justify-center p-4"><Loader2 className="animate-spin text-primary" /></div>
@@ -134,6 +160,7 @@ export const StudentColumnWrapper: React.FC<StudentColumnWrapperProps> = ({
                                                     : "bg-surface/30 border-white/10 hover:bg-surface/50 hover:border-primary/30"
                                         )}
                                     >
+                                        {/* Bouton pour déplier/replier un chapitre (ex: Grammaire) */}
                                         <button
                                             onClick={() => onSelectModule(isExpanded ? null : module)}
                                             className={clsx(
@@ -164,6 +191,7 @@ export const StudentColumnWrapper: React.FC<StudentColumnWrapperProps> = ({
                                                 )}
                                             </div>
 
+                                            {/* Petite barre de chargement d'avancement pour ce chapitre précisément */}
                                             <div className="flex items-center gap-3 w-full">
                                                 <div className="flex-grow h-2 rounded-full bg-white/10 overflow-hidden min-w-[60px]">
                                                     <div
@@ -184,6 +212,7 @@ export const StudentColumnWrapper: React.FC<StudentColumnWrapperProps> = ({
                                             </div>
                                         </button>
 
+                                        {/* Liste des exercices à l'intérieur du chapitre */}
                                         {isExpanded && (
                                             <div className="px-3 pb-4 space-y-2.5 animate-in slide-in-from-top-2 duration-300 border-t border-white/5 pt-3">
                                                 {loadingActivities ? (
@@ -217,3 +246,16 @@ export const StudentColumnWrapper: React.FC<StudentColumnWrapperProps> = ({
         </div>
     );
 };
+
+/**
+ * LOGIGRAMME DE FONCTIONNEMENT :
+ * 
+ * 1. ARRIVÉE : L'enseignant voit au départ la liste de tous ses élèves (Vue Trombinoscope).
+ * 2. ACTION : L'enseignant clique sur le visage de Bastien.
+ * 3. MÉTAMORPHOSE : La colonne "glisse" visuellement pour laisser place à la fiche de Bastien (Vue Modules).
+ * 4. NAVIGATION : L'enseignant voit les chapitres de Bastien. S'il y a du retard (date dépassée), la bordure devient rouge.
+ * 5. EXPLORATION : L'enseignant déplie le chapitre "Géométrie" pour voir si l'exercice "Les triangles" est Validé ou En cours.
+ * 6. MODIFICATION : En cliquant sur une petite pastille de statut, l'enseignant valide directement le travail de Bastien.
+ * 7. RETOUR : Si l'enseignant veut voir un autre élève, il désélectionne Bastien et revient à la grille globale.
+ */
+export default StudentColumnWrapper;

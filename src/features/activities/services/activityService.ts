@@ -1,3 +1,18 @@
+/**
+ * Nom du module/fichier : activityService.ts
+ * 
+ * Données en entrée : Informations sur les activités (données de base, matériel lié, exigences par niveau scolaire)
+ *   et les types de matériel.
+ * 
+ * Données en sortie : Activités sauvegardées, listes de matériels, ou confirmation de suppression.
+ * 
+ * Objectif principal : Agir comme le "cerveau" de la gestion des activités (ateliers). Il coordonne 
+ *   la création et la mise à jour des activités complexes qui touchent à plusieurs tables 
+ *   (l'activité elle-même, ses photos, son matériel et ses spécificités par niveau).
+ * 
+ * Ce que ça affiche : Rien directement. C'est un service de traitement de données.
+ */
+
 import { TablesInsert, TablesUpdate } from '../../../types/supabase';
 import { storageService } from '../../../lib/storage';
 import { validateWith, ActivitySchema } from '../../../lib/helpers';
@@ -6,6 +21,9 @@ import { SupabaseActivityRepository } from '../repositories/SupabaseActivityRepo
 
 export type { ActivityWithRelations, ActivityLevelInput };
 
+/**
+ * Le service Activities gère toute la logique métier liée aux ateliers pédagogiques.
+ */
 export class ActivityService {
     constructor(private repository: IActivityRepository) { }
 
@@ -101,30 +119,32 @@ export class ActivityService {
      * @returns {Promise<string>} ID de l'activité
      * @throws {Error} Si validation échoue ou erreur DB
      */
+    // La fonction la plus importante : elle sauvegarde une activité complète, y compris ses liens avec le matériel et les réglages par niveau scolaire.
     saveActivity = async (
         activityData: TablesInsert<'Activite'> | TablesUpdate<'Activite'>,
         materialTypeIds: string[],
         activityLevels: ActivityLevelInput[],
         isEdit = false
     ) => {
-        // Validation
+        // Étape 1 : On vérifie que les données envoyées respectent bien le format attendu pour éviter d'enregistrer n'importe quoi.
         const validation = validateWith(ActivitySchema.partial(), activityData);
         if (!validation.success) {
             throw new Error(`Erreur de validation: ${validation.errors.join(', ')}`);
         }
 
+        // Étape 2 : On gère l'ID. Si c'est une modification, on garde l'ID existant, sinon on en créera un nouveau.
         let activityId = activityData.id;
 
-        // Extract base64
+        // Extraction de la photo en format texte (base64) avant de préparer les données pour la base de données.
         const photoBase64 = (activityData as any).photo_base64;
         const dataToSave = { ...activityData };
 
-        // Remove base64 from payload
+        // On retire le format texte de la photo du paquet final car la base de données ne stocke que le lien URL.
         // @ts-ignore
         delete dataToSave.photo_base64;
 
         if (isEdit && activityId) {
-            // Upload photo if new
+            // Gestion de la photo en cas de modification.
             if (photoBase64 && photoBase64.startsWith('data:image')) {
                 const publicUrl = await this.uploadPhoto(activityId, photoBase64);
                 if (publicUrl) {
@@ -134,10 +154,11 @@ export class ActivityService {
 
             await this.repository.updateActivity(activityId, dataToSave as TablesUpdate<'Activite'>);
         } else {
+            // Création d'une nouvelle activité.
             const createdStart = await this.repository.createActivity(dataToSave as TablesInsert<'Activite'>);
             activityId = createdStart.id;
 
-            // Upload photo after creation
+            // Envoi de la photo juste après la création pour lier l'ID généré.
             if (photoBase64 && photoBase64.startsWith('data:image')) {
                 const publicUrl = await this.uploadPhoto(activityId, photoBase64);
                 if (publicUrl) {
@@ -148,7 +169,7 @@ export class ActivityService {
 
         if (!activityId) throw new Error("Erreur: ID de l'activité manquant après sauvegarde.");
 
-        // 2. Handle Materials Relations (Delete all & Re-insert)
+        // Gestion du matériel : on vide l'ancienne liste de matériel pour cette activité et on la remplace par la nouvelle (méthode 'nettoyer et recréer').
         await this.repository.clearActivityMaterials(activityId);
 
         if (materialTypeIds.length > 0) {
@@ -159,17 +180,11 @@ export class ActivityService {
             await this.repository.addActivityMaterials(links);
         }
 
-        // 3. Handle Activity Levels Relations
+        // Spécificités par niveau : on fait de même pour les réglages particuliers (ex: plus d'exercices demandés en GS qu'en MS pour la même activité).
         await this.repository.clearActivityLevels(activityId);
 
         if (activityLevels.length > 0) {
-            // Need user_id for ActiviteNiveau. Use from activityData if available, usually is.
-            // If not available in update, we might have an issue. 
-            // In original code: `user_id: activityData.user_id`
-            // Ensure activityData has user_id or we might assume current user? 
-            // Assuming activityData.user_id is present as per original code.
-
-            const userId = (activityData as any).user_id; // Cast because update type might not have it optional?
+            const userId = (activityData as any).user_id; 
 
             const levelLinks = activityLevels.map(al => ({
                 activite_id: activityId!,
@@ -228,3 +243,21 @@ export class ActivityService {
 }
 
 export const activityService = new ActivityService(new SupabaseActivityRepository());
+
+/**
+ * LOGIGRAMME DU FLUX DE SAUVEGARDE :
+ * 
+ * 1. L'utilisateur clique sur "Enregistrer" dans le formulaire d'activité.
+ * 2. Le service reçoit les données (activité, matériels choisis, exigences par niveau).
+ * 3. Validation des données via un schéma de contrôle pour éviter les erreurs.
+ * 4. Traitement de la photo :
+ *    - Si nouvelle photo : Envoi sur le serveur et récupération de l'URL.
+ *    - Mise à jour des informations de l'activité avec cette URL.
+ * 5. Sauvegarde en base de données :
+ *    - Si nouveau : Création d'une nouvelle ligne.
+ *    - Si existant : Mise à jour de la ligne actuelle.
+ * 6. Synchronisation des liens externes (Matériel et Niveaux) :
+ *    - On supprime tous les anciens liens pour cet ID d'activité.
+ *    - On recrée les nouveaux liens à partir de la sélection actuelle.
+ * 7. L'ID de l'activité finale est retourné pour confirmer le succès de l'opération.
+ */

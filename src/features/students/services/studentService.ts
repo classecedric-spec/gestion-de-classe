@@ -1,54 +1,60 @@
+/**
+ * Nom du module/fichier : studentService.ts
+ * 
+ * Données en entrée : 
+ *   - Les informations brutes d'un élève (nom, prénom, date de naissance, parents).
+ *   - Une photo au format image (base64) si fournie.
+ *   - La liste des groupes auxquels l'enfant doit appartenir.
+ * 
+ * Données en sortie : 
+ *   - L'identifiant (ID) de l'élève créé ou mis à jour.
+ *   - Les données synchronisées entre le profil de l'élève et ses appartenances aux groupes.
+ * 
+ * Objectif principal : Centraliser toute "l'intelligence métier" liée aux élèves. Ce service fait le pont entre l'interface utilisateur et la base de données. Il s'occupe de valider que les informations sont correctes, de ranger la photo de l'élève dans le cloud, et de gérer les étiquettes de groupes (ex: si on ajoute un élève dans le groupe "Soutien", il s'occupe de créer le lien technique).
+ * 
+ * Ce que ça affiche : Rien (c'est un moteur invisible de services).
+ */
+
 import { Tables, TablesInsert, TablesUpdate } from '../../../types/supabase';
 import { storageService } from '../../../lib/storage';
 import { validateWith, StudentSchema } from '../../../lib/helpers';
 import { SupabaseStudentRepository } from '../repositories/SupabaseStudentRepository';
 import { IStudentRepository } from '../repositories/IStudentRepository';
 
+/**
+ * Service orchestrant les opérations sur les élèves.
+ */
 export class StudentService {
     constructor(private repository: IStudentRepository) { }
 
     /**
-     * Récupère un élève par son ID
-     * @param {string} id - ID de l'élève
-     * @returns {Promise<Tables<'Eleve'> | null>} L'élève trouvé ou null
-     * @throws {PostgrestError} Si la requête échoue
+     * Récupère la fiche complète d'un élève par son identifiant unique.
      */
     getStudent = async (id: string): Promise<Tables<'Eleve'> | null> => {
         return await this.repository.findById(id);
     }
 
     /**
-     * Récupère les IDs des groupes liés à un élève
-     * @param {string} studentId - ID de l'élève
-     * @returns {Promise<string[]>} Liste des IDs de groupes
-     * @throws {PostgrestError} Si la requête échoue
+     * Liste les identifiants techniques des groupes auxquels l'élève est rattaché.
      */
     getStudentGroupIds = async (studentId: string): Promise<string[]> => {
         return await this.repository.getLinkedGroupIds(studentId);
     }
 
     /**
-     * Upload une photo d'élève vers Supabase Storage
-     * @param {string} studentId - ID de l'élève
-     * @param {string} base64Data - Données base64 de l'image
-     * @returns {Promise<string | null>} URL publique de la photo ou null en cas d'erreur
+     * Envoie la photo d'identité de l'élève vers le serveur de stockage.
+     * Renvoie l'adresse (URL) publique de l'image.
      */
     uploadStudentPhoto = async (studentId: string, base64Data: string): Promise<string | null> => {
+        // On délègue l'envoi physique au service de stockage global
         const result = await storageService.uploadImage('eleve', studentId, base64Data);
         return result.publicUrl;
     }
 
 
     /**
-     * Sauvegarde (Création ou Mise à jour) d'un élève et de ses groupes
-     * @param {TablesInsert<'Eleve'> | TablesUpdate<'Eleve'>} studentData - Données de l'élève
-     * @param {string[]} groupIds - IDs des groupes auxquels l'élève doit appartenir
-     * @param {string} userId - ID de l'utilisateur courant (professeur)
-     * @param {boolean} [isEdit=false] - Mode édition (true) ou création (false)
-     * @param {string | null} [editId=null] - ID de l'élève en cas d'édition
-     * @param {string | null} [photoBase64Arg=null] - Nouvelle photo en base64 si uploadée
-     * @returns {Promise<string>} ID de l'élève créé ou mis à jour
-     * @throws {Error} Si validation échoue ou erreur DB
+     * SAUVEGARDE GLOBALE : Crée ou met à jour un dossier élève complet.
+     * Cette fonction est complexe car elle gère à la fois le profil, la photo et les groupes.
      */
     saveStudent = async (
         studentData: TablesInsert<'Eleve'> | TablesUpdate<'Eleve'>,
@@ -58,70 +64,72 @@ export class StudentService {
         editId: string | null = null,
         photoBase64Arg: string | null = null
     ): Promise<string> => {
-        // Uniquify group IDs to prevent duplicate inserts (409 Conflict)
+        
+        // PROTECTION DOUBLONS : On s'assure que la liste des groupes ne contient pas de doublons techniques.
         const uniqueGroupIds = Array.from(new Set(groupIds));
 
-        // Validation des données
+        // VALIDATION : On vérifie que les données respectent les règles (ex: pas de nom vide).
         const validation = validateWith(StudentSchema.partial(), studentData);
 
         if (!validation.success) {
-            throw new Error(`Erreur de validation: ${validation.errors.join(', ')}`);
+            throw new Error(`Données invalides : ${validation.errors.join(', ')}`);
         }
 
         let studentId = editId;
-
-        // Prepare data for save
         const dataToSave = { ...studentData };
 
-        // Ensure titulaire_id is set
+        // SECURITÉ : On attache toujours l'ID de l'enseignant titulaire au dossier.
         (dataToSave as any).titulaire_id = userId;
 
-        // Handle Photo Upload if base64 is present
-        let photoUrl: string | null = null;
-        const photoBase64 = photoBase64Arg;
-
-        // 1. Insert or Update Student Core Data
+        // GESTION DU PROFIL (CRÉATION OU MODIFICATION)
         if (isEdit && editId) {
-            // Upload photo if new one provided
-            if (photoBase64 && photoBase64.startsWith('data:image')) {
-                photoUrl = await this.uploadStudentPhoto(editId, photoBase64);
+            /**
+             * Cas de la MODIFICATION :
+             * Si une nouvelle photo est fournie, on l'écrase dans le stockage avant de mettre à jour le profil.
+             */
+            if (photoBase64Arg && photoBase64Arg.startsWith('data:image')) {
+                const photoUrl = await this.uploadStudentPhoto(editId, photoBase64Arg);
                 if (photoUrl) {
                     (dataToSave as any).photo_url = photoUrl;
                 }
             }
-
-            // REPOSITORY UPDATE
             await this.repository.update(editId, dataToSave as TablesUpdate<'Eleve'>);
         } else {
-            // Create first (REPOSITORY CREATE)
+            /**
+             * Cas de la CRÉATION :
+             * 1. On crée d'abord le dossier vide pour obtenir un ID.
+             * 2. Si une photo est fournie, on utilise cet ID pour la nommer correctement dans le stockage.
+             * 3. On met enfin à jour le dossier avec l'adresse de la photo.
+             */
             const createdStudent = await this.repository.create(dataToSave as TablesInsert<'Eleve'>);
             studentId = createdStudent.id;
 
-            // Upload photo if provided
-            if (photoBase64 && photoBase64.startsWith('data:image')) {
-                photoUrl = await this.uploadStudentPhoto(studentId, photoBase64);
+            if (photoBase64Arg && photoBase64Arg.startsWith('data:image')) {
+                const photoUrl = await this.uploadStudentPhoto(studentId, photoBase64Arg);
                 if (photoUrl) {
-                    // Update the student with the photo URL (REPOSITORY UPDATE)
                     await this.repository.update(studentId, { photo_url: photoUrl } as TablesUpdate<'Eleve'>);
                 }
             }
         }
 
-        if (!studentId) throw new Error("Student ID could not be determined");
+        if (!studentId) throw new Error("Impossible de déterminer l'identifiant de l'élève.");
 
-        // 2. Manage Groups (Sync)
+        // SYNCHRONISATION DES GROUPES :
+        // L'objectif est de comparer les groupes actuels de l'élève avec la nouvelle liste cochée par le prof.
         const currentLinks = await this.repository.getStudentGroupLinks(studentId);
-
         const currentLinkedGroupIds = currentLinks.map(l => l.groupe_id);
+        
+        // Groupes que l'élève vient de rejoindre
         const groupsToAdd = uniqueGroupIds.filter(id => !currentLinkedGroupIds.includes(id));
+        // Groupes que l'élève doit quitter
         const groupsToRemove = currentLinkedGroupIds.filter(id => !uniqueGroupIds.includes(id));
 
-        // Add new links
+        // Application des ajouts
         for (const gid of groupsToAdd) {
             await this.repository.linkToGroup(studentId, gid, userId);
         }
 
-        // Remove old links
+        // Application des suppressions
         if (groupsToRemove.length > 0) {
             const linkIdsToRemove = currentLinks
                 .filter(link => groupsToRemove.includes(link.groupe_id))
@@ -136,50 +144,71 @@ export class StudentService {
     }
 
     /**
-         * Supprime un élève
-         * @param {string} id - ID de l'élève
-         */
+     * Supprime définitivement le dossier d'un élève.
+     */
     deleteStudent = async (id: string): Promise<void> => {
         return await this.repository.delete(id);
     }
 
     /**
-     * Récupère la liste complète des élèves pour un enseignant (avec joins)
-     * @param {string} teacherId - ID de l'enseignant
+     * Récupère la totalité des élèves d'un enseignant (pour le trombinoscope principal).
      */
     getStudentsForTeacher = async (teacherId: string): Promise<any[]> => {
         return await this.repository.findAllForTeacher(teacherId);
     }
 
     /**
-     * Récupère les élèves d'un groupe avec niveau
-     * @param {string} groupId - ID du groupe
+     * Récupère les élèves appartenant à un groupe spécifique.
      */
     getStudentsByGroup = async (groupId: string): Promise<any[]> => {
         return await this.repository.findByGroup(groupId);
     }
 
+    /**
+     * Récupère les élèves appartenant à une liste de groupes (ex: tous les groupes de soutien).
+     */
     getStudentsByGroups = async (groupIds: string[]): Promise<any[]> => {
         return await this.repository.findByGroups(groupIds);
     }
 
 
     /**
-     * Met à jour l'importance de suivi d'un élève
-     * @param {string} id - ID de l'élève
-     * @param {number | null} importance - Valeur d'importance (0-100 ou null)
+     * Met à jour le niveau "d'importance de suivi" (couleur visuelle sur la fiche élève).
      */
     updateStudentImportance = async (id: string, importance: number | null): Promise<void> => {
         return await this.repository.updateImportance(id, importance);
     }
 
+    /**
+     * Met à jour n'importe quel champ simple de l'élève (ex: changer le prénom).
+     */
     updateStudent = async (id: string, updates: TablesUpdate<'Eleve'>): Promise<void> => {
         await this.repository.update(id, updates);
     }
 
+    /**
+     * Récupère uniquement les changements effectués depuis la dernière synchronisation 
+     * pour économiser de la batterie et des données mobiles.
+     */
     getStudentsDelta = async (teacherId: string): Promise<{ delta: any[], isFirstSync: boolean }> => {
         return await this.repository.getStudentsDelta(teacherId);
     }
 }
 
+// Instance unique du service prête à l'emploi dans toute l'application.
 export const studentService = new StudentService(new SupabaseStudentRepository());
+
+/**
+ * LOGIGRAMME DE FONCTIONNEMENT :
+ * 
+ * 1. L'enseignant valide le formulaire d'un nouvel élève "Julie Martin" avec sa photo.
+ * 2. Le `studentService` reçoit cette demande massive.
+ * 3. ÉTAPE VALIDATION : Il vérifie que le nom n'est pas vide par exemple.
+ * 4. ÉTAPE PROFIL : 
+ *    - Il crée la ligne brute de Julie en base de données pour avoir son ID.
+ *    - Il envoie la photo sur le serveur Cloud en la nommant "id_julie.jpg".
+ *    - Il récupère l'adresse web de cette photo et l'enregistre dans le profil de Julie.
+ * 5. ÉTAPE GROUPES : 
+ *    - Si l'enseignant a coché "Groupe Rouge", le service crée le lien entre Julie et ce groupe.
+ * 6. FIN : Il renvoie le signal "Succès" à l'interface qui ferme alors la fenêtre.
+ */

@@ -1,3 +1,15 @@
+/**
+ * Nom du module/fichier : StudentDetailsUrgent.tsx
+ * 
+ * Données en entrée : Le nombre de travaux en retard, la liste des modules concernés, et les fonctions pour valider les activités.
+ * 
+ * Données en sortie : Une liste prioritaire des activités que l'élève n'a pas encore terminées ou pour lesquelles il a demandé de l'aide.
+ * 
+ * Objectif principal : Agir comme un "tableau de bord des urgences" pour un élève spécifique. L'enseignant voit immédiatement quels ateliers sont en souffrance, les dates butoirs, et peut valider d'un clic les demandes d'aide ("Besoin d'aide") ou les travaux finis qui attendent une vérification ("À vérifier").
+ * 
+ * Ce que ça affiche : Un compteur d'ateliers, des barres de progression par module, et une liste détaillée d'activités avec des badges de couleur vive (ambre, violet, bleu).
+ */
+
 import React from 'react';
 import { AlertCircle, CheckCircle2, ChevronRight, Clock, ShieldCheck } from 'lucide-react';
 import clsx from 'clsx';
@@ -28,6 +40,7 @@ export const StudentDetailsUrgent: React.FC<StudentDetailsUrgentProps> = ({
 }) => {
     return (
         <div className="space-y-2 animate-in fade-in slide-in-from-bottom-2 duration-300">
+            {/* Titre et compteur : donne immédiatement l'ampleur du travail restant (ex: '3 ateliers à terminer'). */}
             <h3 className="text-xl font-bold text-text-main flex items-center gap-2 mb-4">
                 <div className="flex items-center gap-2">
                     <AlertCircle size={24} className="text-primary" />
@@ -38,6 +51,7 @@ export const StudentDetailsUrgent: React.FC<StudentDetailsUrgentProps> = ({
                 </span>
             </h3>
 
+            {/* Message de félicitations : si l'élève est à jour, une icône de succès verte s'affiche pour rassurer l'enseignant. */}
             {!hasOverdueWork ? (
                 <div className="flex flex-col items-center justify-center p-12 text-center text-grey-medium opacity-60">
                     <CheckCircle2 size={48} className="mb-4 text-success" />
@@ -50,6 +64,7 @@ export const StudentDetailsUrgent: React.FC<StudentDetailsUrgentProps> = ({
                     const activities = module.activities;
                     const completedCount = activities.filter((a: any) => a.etat === 'termine').length;
                     const totalCount = activities.length;
+                    // Calcul de l'avancement : permet d'afficher une barre de progression visuelle pour chaque module de travail.
                     const percent = Math.round((completedCount / totalCount) * 100);
 
                     return (
@@ -76,6 +91,7 @@ export const StudentDetailsUrgent: React.FC<StudentDetailsUrgentProps> = ({
                                 {/* Right: Metrics Block */}
                                 <div className="flex items-center gap-6 w-[40%] shrink-0">
                                     {/* Date Badge */}
+                                    {/* Échéance : affiche la date de fin prévue pour le module, pour aider l'enseignant à prioriser les interventions. */}
                                     <div className="shrink-0">
                                         {module.date_fin ? (
                                             <Badge variant="primary" size="xs" className="px-2 py-0.5 font-black">
@@ -110,6 +126,7 @@ export const StudentDetailsUrgent: React.FC<StudentDetailsUrgentProps> = ({
                                                 {p.Activite?.titre}
                                             </h4>
                                             <div className="flex items-center gap-3">
+                                                {/* Bouton d'action rapide : permet de valider l'activité directement depuis cette vue sans avoir à chercher dans tout le journal de suivi. */}
                                                 <div
                                                     onClick={(e) => {
                                                         e.stopPropagation();
@@ -141,3 +158,15 @@ export const StudentDetailsUrgent: React.FC<StudentDetailsUrgentProps> = ({
         </div>
     );
 };
+
+/**
+ * 1. L'enseignant ouvre l'onglet "Suivi Urgent".
+ * 2. Le composant `StudentDetailsUrgent` trie les modules de l'élève pour ne garder que ceux qui ont des activités inachevées.
+ * 3. Pour chaque module, il affiche :
+ *    a. Le titre et la date limite.
+ *    b. Une barre de progression jaune (couleur primaire).
+ * 4. L'enseignant clique sur un module pour voir le détail des exercices.
+ * 5. Il repère une activité clignotante en ambre ("Besoin d'aide").
+ * 6. Il va voir l'élève, l'aide, puis clique sur le bouton pour marquer l'activité comme réussie.
+ * 7. La liste se met à jour automatiquement et le compteur d'urgences diminue.
+ */

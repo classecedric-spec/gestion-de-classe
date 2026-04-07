@@ -1,3 +1,19 @@
+/**
+ * Nom du module/fichier : TrackingDashboard.tsx
+ * 
+ * Données en entrée : 
+ *   - `timer` et `setTimer` : L'état du chronomètre global de la classe.
+ *   - États du Kiosque : Indicateurs d'ouverture et de chargement pour les modes tablette.
+ * 
+ * Données en sortie : 
+ *   - Une interface de pilotage multi-colonnes regroupant le suivi de toute la classe.
+ *   - L'enregistrement des changements de statut d'activité en temps réel.
+ * 
+ * Objectif principal : Être la "Tour de Contrôle" de l'enseignant pendant sa séance d'ateliers. Ce tableau de bord centralise tout ce qu'il se passe dans la classe : qui travaille sur quoi, qui a besoin d'aide, et quels sont les objectifs obligatoires du moment. Il permet de réagir instantanément aux besoins des élèves tout en gardant un œil sur le temps restant.
+ * 
+ * Ce que ça affiche : Un écran divisé en 4 colonnes redimensionnables (Élèves/Modules, Demandes d'aide, Ateliers obligatoires, Suivi des adultes) avec des boutons de contrôle flottants.
+ */
+
 import React, { useState, useEffect } from 'react';
 import { Check, Activity } from 'lucide-react';
 import clsx from 'clsx';
@@ -8,11 +24,11 @@ import ColumnResizeHandle from './desktop/ColumnResizeHandle';
 import MandatoryActivitiesPanel from './desktop/MandatoryActivitiesPanel';
 import MandatoryActivitiesModal from './desktop/MandatoryActivitiesModal';
 
-// Hooks
+// Hooks : Les assistants qui gèrent les données et les calculs pour nous.
 import { Timer } from '../hooks/useTimerIntegration';
 import { useTrackingDashboardFlow } from '../hooks/useTrackingDashboardFlow';
 
-// Components
+// Composants spécialisés pour chaque zone du tableau de bord.
 import { DashboardControls } from './dashboard/DashboardControls';
 import { DashboardRecapModal } from './dashboard/DashboardRecapModal';
 import { StudentColumnWrapper } from './dashboard/columns/StudentColumnWrapper';
@@ -35,13 +51,7 @@ interface TrackingDashboardProps {
 const withStyle = (style: React.CSSProperties) => ({ style });
 
 /**
- * @component TrackingDashboard
- * @description Page principale du tableau de bord de suivi (DASHBOARD). 
- * Orchestre les différents panneaux de suivi (élèves, demandes d'aide, activités obligatoires) 
- * et gère les interactions temps réel.
- * @param {TrackingDashboardProps} props - Propriétés du dashboard incluant le timer.
- * @example
- * <TrackingDashboard timer={globalTimer} setTimer={setGlobalTimer} />
+ * Centre de commandement de la classe en cours.
  */
 const TrackingDashboard: React.FC<TrackingDashboardProps> = ({
     timer,
@@ -53,10 +63,17 @@ const TrackingDashboard: React.FC<TrackingDashboardProps> = ({
     toggleKioskPlanning,
     loadingKioskPlanning
 }) => {
+    // ÉTAT : On mémorise si on veut voir tout le monde ou seulement ceux qui n'ont pas fini.
     const [showPendingOnly, setShowPendingOnly] = useState(true);
+
+    /** 
+     * ASSISTANT DE FLUX (Hook) : 
+     * Toute l'intelligence (chargement, synchronisation, glisser-déposer) 
+     * est déléguée à cet assistant pour garder ce fichier clair.
+     */
     const { states, actions } = useTrackingDashboardFlow(timer, setTimer, showPendingOnly);
 
-    // Aliases for readability (preserving existing component structure)
+    // Extraction des états pour une lecture plus naturelle
     const {
         timerHook,
         groupsHook,
@@ -74,13 +91,14 @@ const TrackingDashboard: React.FC<TrackingDashboardProps> = ({
 
     const [pickerPool, setPickerPool] = useState<any[]>([]);
 
+    // EFFET : Mise à jour de la liste des élèves pour le tirage au sort (Random Picker).
     useEffect(() => {
         if (groupsHook.states.students && groupsHook.states.students.length > 0 && pickerPool.length === 0) {
             setPickerPool(groupsHook.states.students);
         }
     }, [groupsHook.states.students]);
 
-    // Extracted styles to avoid inline style warnings
+    // PRÉPARATION DES TAILLES : On calcule les largeurs/hauteurs des colonnes selon les préférences de l'enseignant.
     const column1Style = { width: `${layoutHook.states.columnWidths[0]}%` };
     const row1Style = { height: `${layoutHook.states.rowHeights[0]}%` };
     const column2Style = { width: `${layoutHook.states.columnWidths[1]}%` };
@@ -94,7 +112,7 @@ const TrackingDashboard: React.FC<TrackingDashboardProps> = ({
                 "w-full h-full flex bg-background relative overflow-hidden transition-all duration-300",
                 timerHook.states.isFullScreen && "fixed inset-0 z-[100]"
             )}>
-                {/* FLOATING CONTROLS */}
+                {/* PILOTAGE FLOTTANT : Les boutons de contrôle du haut de l'écran. */}
                 <DashboardControls
                     isFullScreen={timerHook.states.isFullScreen}
                     setFullScreen={timerHook.actions.setIsFullScreen}
@@ -117,7 +135,8 @@ const TrackingDashboard: React.FC<TrackingDashboardProps> = ({
                     onSelect={groupsHook.actions.handleGroupSelect}
                 />
 
-                {/* COLUMN 1: STUDENTS / MODULES */}
+                {/* COLONNE 1 : ÉLÈVES ET MODULES 
+                    C'est ici qu'on voit chaque enfant et l'avancement dans ses ateliers. */}
                 <div
                     ref={el => { layoutHook.states.columnRefs.current[0] = el; }}
                     className="h-full bg-surface/5 flex flex-col transition-colors duration-300 shrink-0 relative"
@@ -140,16 +159,16 @@ const TrackingDashboard: React.FC<TrackingDashboardProps> = ({
                             onStudentSelect={groupsHook.actions.setSelectedStudent}
                             onStatusClick={(activityId: string, statusOrCurrent: string, previousStatus?: string) => {
                                 if (previousStatus) {
-                                    // Explicit update from ProgressionCell (id, newStatus, currentStatus)
+                                    // Mise à jour explicite (ex: passage à Validé)
                                     progressionsHook.actions.handleStatusClick(activityId, statusOrCurrent, previousStatus);
                                 } else {
-                                    // Toggle/Cycle update (id, currentStatus)
+                                    // Cycle de statut (Non commencé -> En cours -> Fini)
                                     const newStatus = getNextStatus(statusOrCurrent);
                                     progressionsHook.actions.handleStatusClick(activityId, newStatus, statusOrCurrent);
                                 }
                             }}
-                            onSelectModule={(module: any) => { // Wrapper logic for toggle
-                                if (!module) { // Collapsed
+                            onSelectModule={(module: any) => { 
+                                if (!module) { 
                                     branchesHook.actions.setSelectedModule(null);
                                     branchesHook.actions.setActivities([]);
                                 } else {
@@ -159,9 +178,9 @@ const TrackingDashboard: React.FC<TrackingDashboardProps> = ({
                         />
                     </div>
 
+                    {/* Poignées de redimensionnement pour que l'enseignant ajuste ses colonnes. */}
                     <ColumnResizeHandle orientation="horizontal" onMouseDown={layoutHook.actions.handleRowMouseDown(0)} isEditMode={layoutHook.states.isEditMode} />
 
-                    {/* BOTTOM ZONE 1B (Action Button) - kept here as it's layout specific */}
                     <div className="flex-1 overflow-y-auto p-4 flex flex-col items-center justify-center gap-4">
                         {groupsHook.states.selectedStudent && (
                             <button
@@ -181,7 +200,8 @@ const TrackingDashboard: React.FC<TrackingDashboardProps> = ({
 
                 <ColumnResizeHandle orientation="vertical" onMouseDown={layoutHook.actions.handleColumnMouseDown(0)} isEditMode={layoutHook.states.isEditMode} />
 
-                {/* COLUMN 2: HELP REQUESTS */}
+                {/* COLONNE 2 : DEMANDES D'AIDE 
+                    Liste en temps réel des élèves bloqués ou ayant levé la main numériquement. */}
                 <div
                     ref={el => { layoutHook.states.columnRefs.current[1] = el; }}
                     className="h-full bg-surface/5 flex flex-col shrink-0"
@@ -199,10 +219,8 @@ const TrackingDashboard: React.FC<TrackingDashboardProps> = ({
                             }}
                             onStatusClick={(activityId: string, statusOrCurrent: string, previousStatus?: string, studentId?: string) => {
                                 if (previousStatus) {
-                                    // Explicit update (id, newStatus, currentStatus, studentId)
                                     progressionsHook.actions.handleStatusClick(activityId, statusOrCurrent, previousStatus, studentId || null);
                                 } else {
-                                    // Cycle update
                                     const newStatus = getNextStatus(statusOrCurrent);
                                     progressionsHook.actions.handleStatusClick(activityId, newStatus, statusOrCurrent, studentId || null);
                                 }
@@ -212,7 +230,6 @@ const TrackingDashboard: React.FC<TrackingDashboardProps> = ({
                     </div>
                     <ColumnResizeHandle orientation="horizontal" onMouseDown={layoutHook.actions.handleRowMouseDown(1)} isEditMode={layoutHook.states.isEditMode} />
 
-                    {/* BOTTOM ZONE 2B (Action Button) */}
                     <div className="flex-1 overflow-y-auto p-4 flex flex-col items-center justify-center gap-4">
                         <button
                             onClick={() => progressionsHook.actions.handleAddStudentsForSuivi()}
@@ -226,7 +243,8 @@ const TrackingDashboard: React.FC<TrackingDashboardProps> = ({
 
                 <ColumnResizeHandle orientation="vertical" onMouseDown={layoutHook.actions.handleColumnMouseDown(1)} isEditMode={layoutHook.states.isEditMode} />
 
-                {/* COLUMN 3: MANDATORY MODULES */}
+                {/* COLONNE 3 : ATELIERS OBLIGATOIRES 
+                    Rappel visuel des ateliers à finir impérativement par les élèves. */}
                 <div
                     ref={el => { layoutHook.states.columnRefs.current[2] = el; }}
                     className="h-full bg-surface/5 flex flex-col shrink-0"
@@ -241,7 +259,8 @@ const TrackingDashboard: React.FC<TrackingDashboardProps> = ({
 
                 <ColumnResizeHandle orientation="vertical" onMouseDown={layoutHook.actions.handleColumnMouseDown(2)} isEditMode={layoutHook.states.isEditMode} />
 
-                {/* COLUMN 4: ADULT TRACKING */}
+                {/* COLONNE 4 : SUIVI ADULTES 
+                    Zone pour savoir quel adulte de la classe aide quel groupe. */}
                 <div
                     ref={el => { layoutHook.states.columnRefs.current[3] = el; }}
                     className="flex-1 h-full bg-surface/5 flex flex-col"
@@ -271,6 +290,7 @@ const TrackingDashboard: React.FC<TrackingDashboardProps> = ({
                 </div>
             </div>
 
+            {/* FENÊTRES SURGISSANTES (Modales) */}
             <DashboardRecapModal
                 itemToDelete={progressionsHook.states.itemToDelete}
                 onCancel={() => progressionsHook.actions.setItemToDelete(null)}
@@ -310,3 +330,18 @@ const TrackingDashboard: React.FC<TrackingDashboardProps> = ({
 };
 
 export default TrackingDashboard;
+
+/**
+ * LOGIGRAMME DE FONCTIONNEMENT :
+ * 
+ * 1. DÉMARRAGE : L'enseignant lance le tableau de bord au début des ateliers.
+ * 2. CHARGEMENT : L'assistant `useTrackingDashboardFlow` télécharge les élèves, les aides levées et les objectifs du jour depuis Supabase.
+ * 3. ACTION ÉLÈVE : Un enfant valide un exercice sur sa tablette.
+ * 4. RÉCEPTION : Le tableau de bord reçoit le signal "Validé" instantanément.
+ * 5. MISE À JOUR : La petite case à côté du nom de l'élève s'allume en vert sur l'écran de l'enseignant.
+ * 6. DEMANDE D'AIDE : Un autre élève appuie sur "Besoin d'aide" sur son Kiosque.
+ * 7. ALERT : Une nouvelle fiche clignotante apparaît dans la colonne 2.
+ * 8. GESTION DU TEMPS : Pendant ce temps, l'enseignant peut lancer un chronomètre qui sera visible pour tous les enfants sur un écran déporté.
+ * 9. FIN : En fin de séance, l'enseignant ferme le dashboard, toutes les données de progrès sont en sécurité dans la base.
+ */
+

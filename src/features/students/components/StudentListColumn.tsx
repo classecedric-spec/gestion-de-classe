@@ -1,3 +1,20 @@
+/**
+ * Nom du module/fichier : StudentListColumn.tsx
+ * 
+ * Données en entrée : 
+ *   - students / filteredStudents : Les listes intégrale et filtrée des élèves de l'enseignant.
+ *   - searchQuery / filterClass / filterGroup : Les réglages actuels de recherche et de tri.
+ *   - selectedStudent : L'élève sur lequel l'enseignant a cliqué.
+ *   - Fonctions d'action : Fonctions pour sélectionner, créer, éditer ou supprimer un élève.
+ *   - Logique Photo : Outils pour gérer le changement de photo par glisser-déposer.
+ * 
+ * Données en sortie : Une colonne latérale interactive servant de trombinoscope et de moteur de recherche pour la classe.
+ * 
+ * Objectif principal : Offrir une navigation fluide et visuelle dans l'effectif de la classe. L'enseignant peut trouver un élève en un clin d'œil en tapant son nom ou en filtrant par classe/groupe. Le composant affiche des indicateurs de "tendance" (flèches colorées) pour savoir d'un coup d'œil quels élèves progressent ou stagnent. C'est également le point d'entrée pour ajouter de nouveaux élèves ou mettre à jour leurs portraits.
+ * 
+ * Ce que ça affiche : Une barre de recherche, des menus de filtrage escamotables, et une liste défilante de fiches élèves avec photos et indicateurs.
+ */
+
 import React from 'react';
 import {
     Search, GraduationCap, Loader2, Filter, Plus, Users, SlidersHorizontal, TrendingUp, TrendingDown, Minus
@@ -29,6 +46,9 @@ interface StudentListColumnProps {
     processAndSavePhoto: (file: File, student: any) => void;
 }
 
+/**
+ * Composant affichant la colonne de gauche (Trombinoscope et Recherche).
+ */
 export const StudentListColumn: React.FC<StudentListColumnProps> = ({
     students,
     filteredStudents,
@@ -53,24 +73,26 @@ export const StudentListColumn: React.FC<StudentListColumnProps> = ({
 }) => {
     return (
         <div className="w-1/4 flex flex-col gap-6 overflow-hidden">
-            {/* Card 1: Title & Controls */}
+            {/** 
+             * BLOC 1 : TITRE, RECHERCHE ET FILTRES
+             * C'est ici que l'enseignant paramètre ce qu'il souhaite voir.
+             */}
             <CardInfo contentClassName="space-y-5">
-                {/* Header Row: Title & Badge */}
                 <div className="flex items-center justify-between">
                     <h2 className="text-cq-xl font-bold text-text-main flex items-center gap-2">
                         <GraduationCap className="text-primary" size={24} />
-                        Liste
+                        Trombinoscope
                     </h2>
                     <Badge variant="default" size="xs">{filteredStudents.length} / {students.length}</Badge>
                 </div>
 
-                {/* Separator */}
                 <div className="border-t border-white/10" />
 
-                {/* Search & Filters */}
                 <div className="space-y-4">
-                    {/* Search & Toggle Row */}
                     <div className="flex gap-3">
+                        {/** 
+                         * RECHERCHE : Filtre la liste instantanément pendant la frappe.
+                         */}
                         <SearchBar
                             placeholder="Rechercher un élève..."
                             value={searchQuery}
@@ -78,7 +100,9 @@ export const StudentListColumn: React.FC<StudentListColumnProps> = ({
                             iconColor="text-primary"
                         />
 
-                        {/* Filters Toggle Button */}
+                        {/** 
+                         * BOUTON FILTRES : Affiche ou masque les menus de sélection par Classe/Groupe.
+                         */}
                         <button
                             onClick={() => setShowFilters(!showFilters)}
                             className={clsx(
@@ -87,18 +111,21 @@ export const StudentListColumn: React.FC<StudentListColumnProps> = ({
                                     ? "bg-primary text-text-dark border-primary shadow-lg shadow-primary/20"
                                     : "bg-surface/50 border-white/10 text-grey-medium hover:text-white hover:border-white/20"
                             )}
-                            title="Afficher les filtres"
+                            title="Filtrer la liste"
                         >
                             <SlidersHorizontal size={20} />
                         </button>
                     </div>
 
-                    {/* Filters Row - Collapsible */}
+                    {/** 
+                     * ZONE DE FILTRAGE (Escamotable) :
+                     * Permet d'isoler une classe ou un groupe de besoin précis.
+                     */}
                     {showFilters && (
                         <div className="flex gap-2 animate-in slide-in-from-top-2 fade-in duration-200">
                             <FilterSelect
                                 options={[
-                                    { value: 'all', label: 'Groupes: Tous' },
+                                    { value: 'all', label: 'Tous les Groupes' },
                                     ...Array.from(new Set(students.flatMap(s => s.EleveGroupe?.map((eg: any) => eg.Groupe?.nom)).filter(Boolean)))
                                         .sort()
                                         .map(g => ({ value: g as string, label: g as string }))
@@ -111,7 +138,7 @@ export const StudentListColumn: React.FC<StudentListColumnProps> = ({
 
                             <FilterSelect
                                 options={[
-                                    { value: 'all', label: 'Classes: Tous' },
+                                    { value: 'all', label: 'Toutes les Classes' },
                                     ...Array.from(new Set(students.map(s => s.Classe?.nom).filter(Boolean)))
                                         .map(c => ({ value: c as string, label: c as string }))
                                 ]}
@@ -125,7 +152,10 @@ export const StudentListColumn: React.FC<StudentListColumnProps> = ({
                 </div>
             </CardInfo>
 
-            {/* Card 2: List Only */}
+            {/** 
+             * BLOC 2 : LISTE DES ÉLÈVES
+             * Affiche chaque enfant avec sa photo et ses indicateurs.
+             */}
             <CardList
                 actionLabel="Ajouter un élève"
                 onAction={handleOpenCreate}
@@ -146,6 +176,10 @@ export const StudentListColumn: React.FC<StudentListColumnProps> = ({
                             onEdit={() => handleEdit(student)}
                             onDelete={() => setStudentToDelete(student)}
                             rightElement={
+                                /** 
+                                 * INDICATEUR DE TENDANCE :
+                                 * Petite flèche colorée indiquant la dynamique de progrès de l'élève.
+                                 */
                                 student.trust_trend && (
                                     <div className={clsx(
                                         "p-1 rounded-full",
@@ -159,18 +193,22 @@ export const StudentListColumn: React.FC<StudentListColumnProps> = ({
                                     </div>
                                 )
                             }
-                            deleteTitle="Supprimer l'élève"
+                            deleteTitle="Supprimer l'élève de la base"
                             avatar={{
                                 src: student.photo_url,
                                 initials: `${student.prenom[0]}${student.nom[0]}`,
                                 editable: true,
+                                // État de chargement si une photo est en cours d'envoi.
                                 loading: updatingPhotoId === student.id,
                                 onImageChange: (file) => processAndSavePhoto(file, student),
+                                /**
+                                 * MAGIE DU GLISSER-DÉPOSER :
+                                 * Supporte le changement de photo d'un simple geste sur l'avatar.
+                                 */
                                 onDragOver: (e) => { e.preventDefault(); e.stopPropagation(); setDraggingPhotoId(student.id); },
                                 onDragLeave: (e) => { e.preventDefault(); e.stopPropagation(); setDraggingPhotoId(null); },
                                 onDrop: (e, file) => {
-                                    e.preventDefault();
-                                    e.stopPropagation();
+                                    e.preventDefault(); e.stopPropagation();
                                     setDraggingPhotoId(null);
                                     processAndSavePhoto(file, student);
                                 },
@@ -183,8 +221,8 @@ export const StudentListColumn: React.FC<StudentListColumnProps> = ({
                 ) : (
                     <EmptyState
                         icon={Search}
-                        title="Aucun élève trouvé"
-                        description="Essayez d'ajuster vos filtres de recherche"
+                        title="Aucun élève correspondant"
+                        description="Veuillez modifier votre recherche ou vos filtres de classe."
                         size="sm"
                     />
                 )}
@@ -192,3 +230,18 @@ export const StudentListColumn: React.FC<StudentListColumnProps> = ({
         </div>
     );
 };
+
+export default StudentListColumn;
+
+/**
+ * LOGIGRAMME DE FONCTIONNEMENT :
+ * 
+ * 1. L'enseignant arrive sur sa page de classe : il voit la liste complète de ses élèves avec leurs photos.
+ * 2. Il tape "Ba" dans la recherche : `StudentListColumn` n'affiche plus que Baptiste et Basile.
+ * 3. Il s'aperçoit qu'il y a trop de monde, il active les filtres :
+ *    - Il sélectionne "Groupe : Soutien".
+ *    - La liste se réduit aux élèves dont le nom contient "Ba" ET qui sont en soutien.
+ * 4. Il remarque une flèche rouge à côté de Basile : il clique sur son nom pour voir ses difficultés à droite.
+ * 5. Pour mettre à jour la photo de Basile, il prend le fichier sur son ordinateur, 
+ *    le fait glisser sur le visage de Basile dans la liste, et lâche : la photo s'enregistre.
+ */

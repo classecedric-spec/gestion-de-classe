@@ -1,3 +1,15 @@
+/**
+ * Nom du module/fichier : useGrades.ts
+ * 
+ * Données en entrée : Les actions de l'enseignant (créer un devoir, taper une note, supprimer une évaluation) et le contexte (dans quelle branche/trimestre sommes-nous).
+ * 
+ * Données en sortie : L'enregistrement immédiat de ces actions en base de données, accompagné de mécanismes d'interface fluides (Optimistic Updates) pour que l'écran réagisse sans aucune latence.
+ * 
+ * Objectif principal : C'est le chef d'orchestre de la tuyauterie des notes. Il centralise toutes les requêtes serveurs et gère le fait que l'application doit paraître instantanée.
+ * 
+ * Ce que ça affiche : Rien visuellement. C'est un moteur invisible contenant des "Hooks" React.
+ */
+
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { gradeService } from '../services';
 import { TablesInsert } from '../../../types/supabase';
@@ -5,8 +17,7 @@ import { useState } from 'react';
 import { toast } from 'sonner';
 
 /**
- * useNoteTypes
- * Hook to fetch available note types/scales
+ * Ce petit hook récupère simplement la liste des barèmes configurés par l'enseignant (ex: "Interro sur 20", "Lettres A-E").
  */
 export const useNoteTypes = () => {
     return useQuery({
@@ -16,8 +27,11 @@ export const useNoteTypes = () => {
 };
 
 /**
- * useGradeMutations
- * Hook providing all grading-related actions without triggering any data fetches
+ * Ce méga-Hook regroupe tous les "ordres de modification" (Mutations) qu'on peut donner au système : 
+ * Créer un devoir, enregistrer une note, supprimer un barème, etc.
+ * Il actionne aussi le miracle technologique nommé "Optimisation Optimiste" (Optimistic Updates) : 
+ * Dès que l'enseignant tape une note, ce fichier l'affiche sur l'écran *avant même* que le serveur 
+ * n'ait confirmé sa sauvegarde dans le cloud, pour éviter toute sensation de ralentissement (zéro latence).
  */
 export const useGradeMutations = (selectedEvaluationId?: string | null) => {
     const queryClient = useQueryClient();
@@ -29,6 +43,17 @@ export const useGradeMutations = (selectedEvaluationId?: string | null) => {
             queryClient.invalidateQueries({ queryKey: ['evaluations'] });
             queryClient.invalidateQueries({ queryKey: ['all_evaluations_detailed'] });
             toast.success("Évaluation créée avec succès");
+        }
+    });
+
+    const updateEvaluationMutation = useMutation({
+        mutationFn: ({ id, evaluation, questions }: { id: string, evaluation: any, questions?: any[] }) => 
+            gradeService.updateEvaluation(id, evaluation, questions),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['evaluations'] });
+            queryClient.invalidateQueries({ queryKey: ['all_evaluations_detailed'] });
+            queryClient.invalidateQueries({ queryKey: ['evaluation_questions'] });
+            toast.success("Évaluation mise à jour avec succès");
         }
     });
 
@@ -58,6 +83,7 @@ export const useGradeMutations = (selectedEvaluationId?: string | null) => {
 
     const saveResultMutation = useMutation({
         mutationFn: (result: TablesInsert<'Resultat'>) => gradeService.saveResult(result),
+        // L'"Optimistic Update" en action : le professeur encode une note. On annule les chargements en cours, on affiche la note de suite sur son écran, et s'il y a un bug côté serveur (onError), on remettra l'ancienne note incognito.
         onMutate: async (newResult) => {
             if (!selectedEvaluationId) return;
             const queryKey = ['evaluation_results', selectedEvaluationId];
@@ -144,6 +170,7 @@ export const useGradeMutations = (selectedEvaluationId?: string | null) => {
 
     return {
         createEvaluation: createEvaluationMutation.mutateAsync,
+        updateEvaluation: updateEvaluationMutation.mutateAsync,
         deleteEvaluation: deleteEvaluationMutation.mutate,
         saveResult: saveResultMutation.mutate,
         saveQuestionResults: saveQuestionResultsMutation.mutate,
@@ -153,8 +180,9 @@ export const useGradeMutations = (selectedEvaluationId?: string | null) => {
 };
 
 /**
- * useGrades
- * Main hook for grades management (backward compatibility + context-based fetching)
+ * Le Hook "useGrades" original. C'est lui qui alimente les pages d'une classe spécifique.
+ * En fonction d'une matière et d'un trimestre donnés ("context-based fetching"), 
+ * il aspire tout ce qu'il faut depuis la base de données (les devoirs existants, les élèves, les notes) pour que l'interface du prof soit tout de suite prête à l'emploi.
  */
 export const useGrades = (brancheId?: string, periode?: string) => {
     const [selectedEvaluationId, setSelectedEvaluationId] = useState<string | null>(null);
@@ -229,3 +257,11 @@ export const useGrades = (brancheId?: string, periode?: string) => {
         getConversionPalier: gradeService.getConversionPalier.bind(gradeService)
     };
 };
+
+/**
+ * 1. Une page liée aux carnets de cotes s'ouvre, elle appelle `useGrades(brancheId, trimestre)`.
+ * 2. L'assistant `useGrades` lance plusieurs agents de liaison (`useQuery`) en parallèle pour aller chercher sur le cloud : les devoirs, les questions, tous les résultats des élèves, et les types de notes.
+ * 3. En même temps, il prépare l'arsenal "mutations" (l'autorisation de modifier, d'ajouter ou de supprimer des éléments) via `useGradeMutations`.
+ * 4. Si l'enseignant ajoute une note, le module `onMutate` insère cette valeur immédiatement sur l'écran pour que l'interface reste fluide et ultra-rapide au clic, pendant qu'en arrière-plan le serveur travaille silencieusement.
+ * 5. Quand le serveur répond "OK, j'ai sauvegardé", les données sont certifiées conformes et la boucle est bouclée.
+ */

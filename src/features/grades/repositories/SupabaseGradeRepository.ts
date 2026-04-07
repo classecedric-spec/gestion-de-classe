@@ -1,3 +1,15 @@
+/**
+ * Nom du module/fichier : SupabaseGradeRepository.ts
+ * 
+ * Données en entrée : Les ordres de gestion des notes (ex: "Enregistre cette liste de cotes", "Donne-moi toutes les évaluations de ce trimestre").
+ * 
+ * Données en sortie : Les données fraîchement récupérées du serveur distant, ou une confirmation d'enregistrement.
+ * 
+ * Objectif principal : C'est le traducteur technique officiel. Il prend les ordres simples de notre application (ex: "Crée l'interro") et les traduit en langage serveur sécurisé pour "Supabase". C'est le seul fichier du module 'grades' autorisé à parler directement à la base de données.
+ * 
+ * Ce que ça affiche : Rien, c'est un fichier de communication pur base de données (Back-End invisible).
+ */
+
 import { supabase } from '../../../lib/database';
 import { Tables, TablesInsert, TablesUpdate } from '../../../types/supabase';
 import { IGradeRepository } from './IGradeRepository';
@@ -20,6 +32,7 @@ export class SupabaseGradeRepository implements IGradeRepository {
         return data || [];
     }
 
+    // Récupère toutes les évaluations, tout en exigeant du serveur qu'il utilise des "Jointures" (Joins) pour rapatrier "en même temps" le nom en clair du Groupe, de la Branche et du Barème (sinon on n'aurait que des suites de chiffres).
     async findAllEvaluationsDetailed(): Promise<any[]> {
         const { data, error } = await supabase
             .from('EvaluationWithStats')
@@ -89,6 +102,16 @@ export class SupabaseGradeRepository implements IGradeRepository {
         return data || [];
     }
 
+    async upsertQuestions(questions: TablesInsert<'EvaluationQuestion'>[]): Promise<Tables<'EvaluationQuestion'>[]> {
+        const { data, error } = await supabase
+            .from('EvaluationQuestion')
+            .upsert(questions, { onConflict: 'id' })
+            .select();
+            
+        if (error) throw error;
+        return data || [];
+    }
+
     async deleteQuestion(id: string): Promise<void> {
         const { error } = await supabase
             .from('EvaluationQuestion')
@@ -143,6 +166,7 @@ export class SupabaseGradeRepository implements IGradeRepository {
         return data || [];
     }
 
+    // "Upsert" est la contraction de 'Update' (Mettre à jour) et 'Insert' (Insérer). C'est un ordre intelligent : "Si cet élève a déjà une note pour ce devoir précis, alors écrase-la. Sinon, crée-lui une nouvelle case".
     async upsertResult(result: TablesInsert<'Resultat'>): Promise<Tables<'Resultat'>> {
         const { data, error } = await supabase
             .from('Resultat')
@@ -246,3 +270,11 @@ export class SupabaseGradeRepository implements IGradeRepository {
         return data || [];
     }
 }
+
+/**
+ * 1. Un service métier de l'application (ex: `gradeService`) a besoin de stocker un résultat d'examen.
+ * 2. Il appelle `upsertResult` en lui donnant la note brute et la carte d'identité de l'élève.
+ * 3. Ce `SupabaseGradeRepository` prend son "téléphone rouge" (`supabase.from(...)`) et dicte l'ordre exact au gros serveur central en langage technique.
+ * 4. Le serveur base de données exécute le calcul et répond avec ses résultats dans `data` (succès) ou un avertissement dans `error` (mauvaise connexion internet par exemple).
+ * 5. Le Repository intercepte la réponse, s'assure qu'elle n'est pas cassée, et retransmet la donnée pure au reste de l'application graphique qui l'affichera à l'enseignant.
+ */

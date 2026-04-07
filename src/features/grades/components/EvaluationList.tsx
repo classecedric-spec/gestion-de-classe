@@ -1,3 +1,15 @@
+/**
+ * Nom du module/fichier : EvaluationList.tsx
+ * 
+ * Données en entrée : La liste des évaluations existantes pour une branche et une période données.
+ * 
+ * Données en sortie : Un affichage visuel de ces évaluations, permettant à l'utilisateur d'en sélectionner une pour saisir les notes ou de la supprimer.
+ * 
+ * Objectif principal : Afficher sous forme de "cartes" résumées la liste des contrôles ou devoirs déjà programmés.
+ * 
+ * Ce que ça affiche : Soit un message guidant l'utilisateur s'il n'a rien sélectionné, soit un message "Aucune évaluation", soit une grille de cartes (avec le titre, la date, et des boutons "Saisir" ou "Supprimer").
+ */
+
 import React, { useState } from 'react';
 import { Tables } from '../../../types/supabase';
 import { Card, Button, Badge, EmptyState, ConfirmModal } from '../../../core';
@@ -20,6 +32,7 @@ const EvaluationList: React.FC<EvaluationListProps> = ({
 }) => {
     const [evalToDelete, setEvalToDelete] = useState<string | null>(null);
 
+    // Vérifie si l'utilisateur a bien sélectionné un contexte (ex: la matière et le trimestre). Si non, affiche un message d'aide pour l'inviter à le faire.
     if (!brancheId || !periode) {
         return (
             <EmptyState
@@ -30,6 +43,7 @@ const EvaluationList: React.FC<EvaluationListProps> = ({
         );
     }
 
+    // Vérifie s'il n'y a pas encore de contrôle créé pour cette matière/période. Si la liste est vide, affiche un message l'invitant à créer la première évaluation.
     if (evaluations.length === 0) {
         return (
             <EmptyState
@@ -40,6 +54,7 @@ const EvaluationList: React.FC<EvaluationListProps> = ({
         );
     }
 
+    // Construit visuellement la grille contenant toutes les évaluations sous forme de petites cartes rectangulaires.
     return (
         <>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -112,4 +127,12 @@ const EvaluationList: React.FC<EvaluationListProps> = ({
     );
 };
 
+/**
+ * 1. Le composant s'allume et reçoit la liste des évaluations de la classe sélectionnée.
+ * 2a. S'il ignore encore quelle matière ou quel trimestre regarder, il demande d'abord à l'utilisateur de les choisir en haut de page.
+ * 2b. S'il sait où regarder mais qu'il n'y a aucun devoir enregistré, il l'annonce clairement au milieu de l'écran.
+ * 3. S'il y a des devoirs, il les affiche joliment dans une grille. Chaque devoir est résumé dans une "carte" avec son titre et sa date.
+ * 4a. L'enseignant a la possibilité de cliquer sur le petit bouton "Poubelle" pour détruire l'évaluation (une fenêtre de confirmation de sécurité apparaîtra alors).
+ * 4b. Ou bien, il peut cliquer sur "Saisir" pour entrer dans le détail de l'évaluation et commencer à encoder les résultats de ses élèves.
+ */
 export default EvaluationList;

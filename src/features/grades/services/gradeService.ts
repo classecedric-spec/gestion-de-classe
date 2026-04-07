@@ -1,4 +1,16 @@
-import { Tables, TablesInsert } from '../../../types/supabase';
+/**
+ * Nom du module/fichier : gradeService.ts
+ * 
+ * Données en entrée : Les demandes brutes provenant de l'interface (enregistrer, créer un devoir) et des informations à analyser.
+ * 
+ * Données en sortie : L'exécution de la mécanique intelligente de l'application (calculer une moyenne, vérifier des paliers) et la sous-traitance à la base de données.
+ * 
+ * Objectif principal : Agir comme le "cerveau" administratif. Ce classeur connaît les règles mathématiques de l'école (comment faire une moyenne en ignorant un élève absent) et protège la base de données de requêtes mal formées.
+ * 
+ * Ce que ça affiche : Rien, c'est purement du calcul ("Application Service").
+ */
+
+import { Tables, TablesInsert, TablesUpdate } from '../../../types/supabase';
 import { IGradeRepository } from '../repositories/IGradeRepository';
 
 export interface GradeStats {
@@ -24,13 +36,39 @@ export class GradeService {
         return this.repository.findAllResultsDetailed();
     }
 
-    async createEvaluation(evaluation: TablesInsert<'Evaluation'>, questions?: { titre: string, note_max: number, ordre: number }[]) {
+    // Processus de création d'un devoir : on crée d'abord la coquille vide (l'évaluation physique en DB), puis s'il y a des petites questions dictées par le prof, le service les greffe automatiquement à la nouvelle coquille.
+    async createEvaluation(evaluation: TablesInsert<'Evaluation'>, questions?: { titre: string, note_max: number, ratio: number, ordre: number }[]) {
         const ev = await this.repository.createEvaluation(evaluation);
         if (questions && questions.length > 0) {
             await this.repository.createQuestions(questions.map(q => ({
                 ...q,
                 evaluation_id: ev.id
             })));
+        }
+        return ev;
+    }
+
+    async updateEvaluation(id: string, evaluation: TablesUpdate<'Evaluation'>, questions?: { id?: string, titre: string, note_max: number, ratio: number, ordre: number }[]) {
+        const ev = await this.repository.updateEvaluation(id, evaluation);
+        
+        if (questions) {
+            // Find existing questions to know what to delete
+            const existingQuestions = await this.repository.findQuestionsByEvaluation(id);
+            const newQuestionIds = questions.map(q => q.id).filter(qid => qid !== undefined);
+            const toDelete = existingQuestions.filter(eq => !newQuestionIds.includes(eq.id));
+            
+            // Delete removed questions
+            for (const q of toDelete) {
+                await this.repository.deleteQuestion(q.id);
+            }
+            
+            // Upsert remaining/new questions
+            if (questions.length > 0) {
+                await this.repository.upsertQuestions(questions.map(q => ({
+                    ...q,
+                    evaluation_id: ev.id
+                })));
+            }
         }
         return ev;
     }
@@ -93,6 +131,7 @@ export class GradeService {
         return this.repository.deleteNoteType(id);
     }
 
+    // La calculette interne : elle prend toutes les notes d'un devoir, enlève intelligemment les absents ou les cases vides, puis sort la moyenne, la meilleure et la pire performance.
     calculateStats(results: Tables<'Resultat'>[], noteMax: number): GradeStats {
         const validGrades = results
             .filter(r => r.statut === 'present' && r.note !== null && r.note !== undefined)
@@ -129,6 +168,7 @@ export class GradeService {
         }
     }
 
+    // La machine à convertir : on lui donne une note sur 20 chiffrée, elle la transforme en pourcentage et fouille dans les règles du prof ("Paliers") pour savoir quelle note alphabétique (Lettres) recracher.
     getConversionPalier(note: number | null, noteMax: number, typeNote: any): any | null {
         if (note === null || note === undefined || !typeNote || typeNote.systeme !== 'conversion') return null;
         const config = typeNote.config as any;
@@ -149,3 +189,10 @@ export class GradeService {
         return palier ? palier.letter : null;
     }
 }
+
+/**
+ * 1. Les Hooks ou les fenêtres de l'application ont besoin de réaliser une action liée aux notes.
+ * 2. Ils s'adressent à ce "gradeService" unique au lieu de refaire des maths complexes à chaque composant visuel.
+ * 3. Le Service exécute la logique "métier" (calculs de stats, filtres pour absents, pourcentages).
+ * 4. S'il faut enregistrer le fruit de ces calculs ou aller lire le grand registre, le `gradeService` délègue poliment cette tâche technique à son sous-traitant spécialisé en base de données (le `repository`).
+ */

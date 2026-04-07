@@ -1,9 +1,28 @@
+/**
+ * Nom du module/fichier : useClasses.ts
+ * 
+ * Données en entrée : Aucune directe (utilise l'identité de l'utilisateur connecté et l'état global du cache React Query).
+ * 
+ * Données en sortie : 
+ *   - Liste des classes filtrée par la recherche.
+ *   - Liste des élèves de la classe actuellement sélectionnée.
+ *   - États de chargement et de synchronisation (loading).
+ *   - Fonctions d'action (sélectionner une classe, trier, supprimer, piloter les fenêtres modales).
+ * 
+ * Objectif principal : Centraliser toute la "vie" et la logique de l'écran de gestion des classes. Ce Hook gère le chargement des classes, la mémorisation de celle qui est active, le rafraîchissement automatique de la liste des élèves lors d'un changement, ainsi que toutes les interactions (ouverture des fenêtres de saisie, suppressions avec effet "instant" côté utilisateur).
+ * 
+ * Ce que ça affiche : Rien directement. Il alimente les composants de l'interface (ClassList, ClassDetails).
+ */
+
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { classService, ClassWithAdults, StudentWithRelations } from '../services/classService';
 import { getCurrentUser } from '../../../lib/database';
 import { getCachedPhoto, setCachedPhoto, isCacheEnabled } from '../../../lib/storage';
 
+/**
+ * État interne complet de l'écran des classes.
+ */
 export interface ClassesState {
     classes: ClassWithAdults[];
     loading: boolean;
@@ -26,16 +45,19 @@ export interface ClassesState {
     };
 }
 
+/**
+ * Ce Hook est le chef d'orchestre de l'écran des classes.
+ */
 export const useClasses = () => {
     const queryClient = useQueryClient();
     const [selectedClassId, setSelectedClassId] = useState<string | null>(null);
 
-    // Filters & Sort
+    // États pour le filtrage et le tri (Filters & Sort)
     const [searchQuery, setSearchQuery] = useState('');
     const [viewMode, setViewMode] = useState<'grid' | 'table'>('grid');
     const [sortConfig, setSortConfig] = useState<{ key: string | null; direction: 'asc' | 'desc' }>({ key: null, direction: 'asc' });
 
-    // Modals visibility state
+    // États pour la visibilité des fenêtres modales (Modals visibility)
     const [modals, setModals] = useState({
         createEditClass: false,
         studentDetails: false,
@@ -43,7 +65,7 @@ export const useClasses = () => {
         deleteConfirm: false
     });
 
-    // Selection state for modals
+    // États pour les objets en cours d'édition (Selection state for modals)
     const [activeItem, setActiveItem] = useState<{
         classToEdit: ClassWithAdults | null;
         studentToEditId: string | null;
@@ -54,14 +76,19 @@ export const useClasses = () => {
         classToDelete: null
     });
 
-    // 0. User fetching
+    /**
+     * Identification : récupère l'utilisateur connecté pour filtrer les données.
+     */
     const { data: user } = useQuery({
         queryKey: ['user'],
         queryFn: getCurrentUser,
-        staleTime: Infinity,
+        staleTime: Infinity, // On ne change pas d'utilisateur en cours de route
     });
 
-    // 1. Fetching des classes
+    /**
+     * Récupération des classes : va chercher toutes les classes de l'enseignant 
+     * et les garde en mémoire (cache) pour éviter les rechargements inutiles.
+     */
     const { data: classes = [], isLoading: loading } = useQuery({
         queryKey: ['classes', user?.id],
         queryFn: async () => {
@@ -69,23 +96,29 @@ export const useClasses = () => {
             return await classService.getClasses();
         },
         enabled: !!user,
-        staleTime: 1000 * 60 * 5,
+        staleTime: 1000 * 60 * 5, // Cache valide 5 minutes
     });
 
-    // 2. Sélection de la classe courante
+    /**
+     * Sélection intelligente : détermine quelle classe afficher. 
+     * Par défaut, on prend la première de la liste si aucune n'est cliquée.
+     */
     const selectedClass = useMemo(() => {
         if (!selectedClassId && classes.length > 0) return classes[0];
         return classes.find(c => c.id === selectedClassId) || (classes.length > 0 ? classes[0] : null);
     }, [classes, selectedClassId]);
 
-    // 3. Fetching des élèves de la classe sélectionnée
+    /**
+     * Synchronisation automatique des élèves : dès qu'on change de classe sélectionnée, 
+     * le Hook va chercher la liste des élèves correspondante automatique.
+     */
     const { data: studentsInClass = [], isLoading: loadingStudents } = useQuery({
         queryKey: ['students-in-class', user?.id, selectedClass?.id],
         queryFn: async () => {
             if (!selectedClass || !user) return [];
             const data = await classService.getStudentsByClass(selectedClass.id);
 
-            // Fetching & caching photo logic stays similar but encapsulated in queryFn
+            // Optimisation : on charge les photos depuis le cache local du navigateur si possible
             if (isCacheEnabled() && data) {
                 return await Promise.all(
                     data.map(async (student) => {
@@ -106,19 +139,25 @@ export const useClasses = () => {
         staleTime: 1000 * 60 * 5,
     });
 
-    // Sync selectedClassId if current selection disappears
+    // Gardien de la sélection : maintient l'ID synchronisé
     useEffect(() => {
         if (selectedClass && selectedClass.id !== selectedClassId) {
             setSelectedClassId(selectedClass.id);
         }
     }, [selectedClass, selectedClassId]);
 
-    // --- Actions ---
+    // --- ACTIONS DE L'INTERFACE ---
 
+    /**
+     * Change la classe affichée à l'écran.
+     */
     const handleSelectClass = (classe: ClassWithAdults) => {
         setSelectedClassId(classe.id);
     };
 
+    /**
+     * Organise la liste des élèves (tri par nom, prénom, etc.).
+     */
     const handleSort = (key: string) => {
         let direction: 'asc' | 'desc' = 'asc';
         if (sortConfig.key === key && sortConfig.direction === 'asc') {
@@ -127,6 +166,9 @@ export const useClasses = () => {
         setSortConfig({ key, direction });
     };
 
+    /**
+     * Ouvre ou ferme une fenêtre modale en précisant quel objet elle doit manipuler.
+     */
     const toggleModal = (modalName: keyof typeof modals, isOpen: boolean, item: any = null) => {
         setModals(prev => ({ ...prev, [modalName]: isOpen }));
 
@@ -141,6 +183,10 @@ export const useClasses = () => {
         }
     };
 
+    /**
+     * Suppression réactive (Optimiste) : retire la classe visuellement de l'écran 
+     * AVANT que le serveur réponde pour une sensation de rapidité absolue.
+     */
     const deleteClassMutation = useMutation({
         mutationFn: (id: string) => classService.deleteClass(id),
         onMutate: async (id) => {
@@ -148,10 +194,12 @@ export const useClasses = () => {
             await queryClient.cancelQueries({ queryKey });
             const previousClasses = queryClient.getQueryData<ClassWithAdults[]>(queryKey) || [];
 
+            // Retire immédiatement de la vue
             queryClient.setQueryData<ClassWithAdults[]>(queryKey,
                 previousClasses.filter(c => c.id !== id)
             );
 
+            // Si on a supprimé la classe qu'on regardait, on en sélectionne une autre
             if (selectedClassId === id) {
                 const remaining = previousClasses.filter(c => c.id !== id);
                 setSelectedClassId(remaining.length > 0 ? remaining[0].id : null);
@@ -160,11 +208,15 @@ export const useClasses = () => {
             return { previousClasses, queryKey };
         },
         onError: (_err, _variables, context) => {
+            // En cas d'erreur réseau, on remet la classe
             if (context?.previousClasses) queryClient.setQueryData(context.queryKey, context.previousClasses);
             queryClient.invalidateQueries({ queryKey: ['classes', user?.id] });
         }
     });
 
+    /**
+     * Enregistre une nouvelle classe.
+     */
     const addClassMutation = useMutation({
         mutationFn: (newClass: any) => classService.createClass(newClass),
         onSuccess: () => {
@@ -172,6 +224,9 @@ export const useClasses = () => {
         }
     });
 
+    /**
+     * Retire un élève de la classe sélectionnée (remet sa classe à nul).
+     */
     const removeStudentMutation = useMutation({
         mutationFn: (studentId: string) => classService.removeStudentFromClass(studentId),
         onMutate: async (studentId) => {
@@ -187,10 +242,12 @@ export const useClasses = () => {
         onError: (_err, _variables, context) => {
             if (context?.previous) queryClient.setQueryData(context.queryKey, context.previous);
             queryClient.invalidateQueries({ queryKey: ['students-in-class', user?.id, selectedClass?.id] });
-            queryClient.invalidateQueries({ queryKey: ['students', user?.id] });
         }
     });
 
+    /**
+     * Modifie un champ précis d'un élève.
+     */
     const updateStudentMutation = useMutation({
         mutationFn: ({ studentId, field, value }: { studentId: string, field: string, value: any }) =>
             classService.updateStudentField(studentId, field as any, value),
@@ -206,8 +263,6 @@ export const useClasses = () => {
         },
         onError: (_err, _variables, context) => {
             if (context?.previous) queryClient.setQueryData(context.queryKey, context.previous);
-            queryClient.invalidateQueries({ queryKey: ['students-in-class', user?.id, selectedClass?.id] });
-            queryClient.invalidateQueries({ queryKey: ['students', user?.id] });
         }
     });
 
@@ -239,8 +294,11 @@ export const useClasses = () => {
         updateStudentMutation.mutate({ studentId, field, value });
     };
 
-    // --- Computed ---
+    // --- LOGIQUE DE CALCUL ET FILTRAGE ---
 
+    /**
+     * Filtrage instantané des classes selon la barre de recherche.
+     */
     const filteredClasses = useMemo(() => {
         return classes.filter(c =>
             (c.nom || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -248,6 +306,9 @@ export const useClasses = () => {
         );
     }, [classes, searchQuery]);
 
+    /**
+     * Tri de la liste des élèves selon le choix de l'utilisateur.
+     */
     const sortedStudents = useMemo(() => {
         if (!sortConfig.key) return studentsInClass;
         return [...studentsInClass].sort((a: any, b: any) => {
@@ -262,7 +323,7 @@ export const useClasses = () => {
     }, [studentsInClass, sortConfig]);
 
     return {
-        // State
+        // Informations brutes
         classes,
         loading,
         loadingStudents,
@@ -272,10 +333,10 @@ export const useClasses = () => {
         viewMode, setViewMode,
         sortConfig,
 
-        // Computed
+        // Informations calculées (Filtres)
         filteredClasses,
 
-        // Actions
+        // Actions disponibles pour l'interface
         handleSelectClass,
         handleSort,
         handleAddClass,
@@ -287,9 +348,24 @@ export const useClasses = () => {
         refreshClasses: () => queryClient.invalidateQueries({ queryKey: ['classes', user?.id] }),
         refreshStudents: () => queryClient.invalidateQueries({ queryKey: ['students-in-class', user?.id, selectedClass?.id] }),
 
-        // Modals / Active Items
+        // État des fenêtres et objets actifs
         modals,
         activeItem,
         toggleModal
     };
 };
+
+/**
+ * LOGIGRAMME DE FONCTIONNEMENT :
+ * 
+ * 1. L'enseignant arrive sur la page "Classes".
+ * 2. Le Hook charge automatiquement la liste complète des dossiers de classes.
+ * 3. Par défaut, il sélectionne la première classe et affiche ses élèves.
+ * 4. L'enseignant effectue une recherche :
+ *    - Tape "GS" -> La liste des classes sur le côté se réduit instantanément.
+ * 5. L'enseignant change de classe :
+ *    - Le Hook détecte le changement, efface l'ancienne liste d'élèves et charge les nouveaux.
+ * 6. L'enseignant supprime une classe :
+ *    - La classe disparaît de l'écran en 1 milliseconde (effet optimiste).
+ *    - Le serveur valide la suppression en arrière-plan.
+ */

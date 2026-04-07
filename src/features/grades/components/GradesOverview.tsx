@@ -1,3 +1,15 @@
+/**
+ * Nom du module/fichier : GradesOverview.tsx
+ * 
+ * Données en entrée : Un tableau contenant le résumé de toutes les évaluations existantes créées par l'enseignant.
+ * 
+ * Données en sortie : Un tableau d'affichage "Métrique" (Overview) permettant de visualiser rapidement la liste et de cliquer sur un élément pour l'ouvrir.
+ * 
+ * Objectif principal : Offrir une vue d'ensemble basique et compacte (un tableau simple) listant tous les devoirs enregistrés, sans la complexité de la vue "Excel".
+ * 
+ * Ce que ça affiche : Si le prof n'a rien, un joli message d'accueil. Sinon, un tableau avec les colonnes : Groupe, Matière, Trimestre, Évaluation et Critère (Barème).
+ */
+
 import React from 'react';
 import { ClipboardList, Users, BookOpen, Calendar, Target } from 'lucide-react';
 
@@ -10,6 +22,7 @@ const GradesOverview: React.FC<GradesOverviewProps> = ({
     evaluations, 
     onSelect
 }) => {
+    // Si la machine constate que le professeur déballe son application pour la première fois (ou qu'il a tout effacé), elle lui affiche un message d'accueil vide.
     if (evaluations.length === 0) {
         return (
             <div className="py-20 text-center bg-surface rounded-3xl border border-dashed border-border/20 animate-in fade-in duration-500">
@@ -22,6 +35,7 @@ const GradesOverview: React.FC<GradesOverviewProps> = ({
         );
     }
 
+    // S'il existe des évaluations enregistrées, dessine l'immense tableau listant tous les travaux.
     return (
         <div className="bg-surface rounded-3xl border border-border/10 overflow-hidden shadow-sm animate-in fade-in slide-in-from-bottom-4 duration-500">
             <div className="overflow-x-auto">
@@ -112,4 +126,10 @@ const GradesOverview: React.FC<GradesOverviewProps> = ({
     );
 };
 
+/**
+ * 1. La page d'accueil "Aperçu de toutes les notes" se monte et observe la base de données.
+ * 2a. S'il n'y a absolument rien dans le système, elle affiche l'écran vide central ("Vous n'avez pas encore créé d'évaluations").
+ * 2b. Dès qu'il y a un devoir trouvé, elle trace un grand tableau et y insire une ligne de résumé par contrôle.
+ * 3. Le visiteur peut survoler ce registre (les lignes s'illuminent) et s'il clique sur une évaluation précise, ce fichier enverra l'ordre au programme principal d'ouvrir la page de correction du devoir choisi.
+ */
 export default GradesOverview;

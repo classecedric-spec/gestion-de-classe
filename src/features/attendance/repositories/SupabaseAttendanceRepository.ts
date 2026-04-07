@@ -1,3 +1,16 @@
+/**
+ * Nom du module/fichier : SupabaseAttendanceRepository.ts
+ * 
+ * Données en entrée : 
+ *   - Requêtes SQL via le client `supabase`.
+ *   - Identifiants (IDs) d'enseignants, d'élèves, de groupes et de dates.
+ * 
+ * Données en sortie : 
+ *   - Objets JavaScript typés (Groupes, Élèves, Présences) issus de la base de données.
+ * 
+ * Objectif principal : Être le moteur technique de la gestion des présences. Ce dépôt réalise concrètement les opérations en base de données : charger la liste des élèves d'un groupe, enregistrer un appel, vérifier les doublons, et générer les données nécessaires aux rapports PDF mensuels.
+ */
+
 import { supabase } from '../../../lib/database';
 import { TablesInsert } from '../../../types/supabase';
 import {
@@ -11,13 +24,13 @@ import {
 } from './IAttendanceRepository';
 
 /**
- * Supabase implementation of the Attendance Repository
- * Handles all database operations for attendance management
+ * Implémentation concrète de IAttendanceRepository utilisant Supabase (PostgreSQL).
  */
 export class SupabaseAttendanceRepository implements IAttendanceRepository {
 
-    // ==================== GROUPS ====================
+    // ==================== GESTION DES GROUPES ====================
 
+    /** Récupère tous les groupes d'élèves triés par nom. */
     async getGroups(): Promise<Group[]> {
         const { data, error } = await supabase
             .from('Groupe')
@@ -27,6 +40,7 @@ export class SupabaseAttendanceRepository implements IAttendanceRepository {
         return data || [];
     }
 
+    /** Lit une préférence utilisateur (ex: dernier groupe utilisé). */
     async getUserPreferences(userId: string, key: string): Promise<any> {
         const { data } = await supabase
             .from('UserPreference')
@@ -37,6 +51,7 @@ export class SupabaseAttendanceRepository implements IAttendanceRepository {
         return data?.value;
     }
 
+    /** Mémorise quel groupe l'enseignant utilisait en dernier pour l'appel. */
     async saveGroupPreference(userId: string, groupId: string): Promise<void> {
         const { error } = await supabase
             .from('UserPreference')
@@ -51,10 +66,14 @@ export class SupabaseAttendanceRepository implements IAttendanceRepository {
         if (error) throw error;
     }
 
-    // ==================== STUDENTS ====================
+    // ==================== GESTION DES ÉLÈVES ====================
 
+    /** 
+     * Récupère la liste des élèves d'un groupe précis.
+     * Cette fonction fait une double lecture : d'abord le lien élève<->groupe, puis les fiches élèves détaillées.
+     */
     async getStudentsByGroup(groupId: string): Promise<Student[]> {
-        // Get student IDs linked to the group
+        // Étape 1 : On trouve qui appartient au groupe
         const { data: links, error: linkError } = await supabase
             .from('EleveGroupe')
             .select('eleve_id')
@@ -65,7 +84,7 @@ export class SupabaseAttendanceRepository implements IAttendanceRepository {
         const studentIds = links?.map(l => l.eleve_id) || [];
         if (studentIds.length === 0) return [];
 
-        // Fetch students with their class and level information
+        // Étape 2 : On récupère les fiches avec le nom de la classe et du niveau pour l'affichage
         const { data, error } = await supabase
             .from('Eleve')
             .select('*, Classe(nom), Niveau(nom, ordre)')
@@ -76,8 +95,9 @@ export class SupabaseAttendanceRepository implements IAttendanceRepository {
         return (data || []) as Student[];
     }
 
-    // ==================== SETUPS & CATEGORIES ====================
+    // ==================== CONFIGURATION (SETUPS & CATÉGORIES) ====================
 
+    /** Liste les types d'appels configurés. */
     async getSetups(): Promise<SetupPresence[]> {
         const { data, error } = await supabase
             .from('SetupPresence')
@@ -87,6 +107,7 @@ export class SupabaseAttendanceRepository implements IAttendanceRepository {
         return data || [];
     }
 
+    /** Liste les statuts (ex: Présent, Absent) liés à un type d'appel. */
     async getCategories(setupId: string): Promise<CategoriePresence[]> {
         const { data, error } = await supabase
             .from('CategoriePresence')
@@ -97,6 +118,7 @@ export class SupabaseAttendanceRepository implements IAttendanceRepository {
         return data || [];
     }
 
+    /** Crée une nouvelle configuration d'appel (ex: 'Étude du soir'). */
     async createSetup(userId: string, name: string, description: string | null): Promise<SetupPresence> {
         const { data, error } = await supabase
             .from('SetupPresence')
@@ -123,6 +145,7 @@ export class SupabaseAttendanceRepository implements IAttendanceRepository {
         if (error) throw error;
     }
 
+    /** Met à jour plusieurs statuts d'un coup (ex: changer les couleurs des badges). */
     async upsertCategories(categories: TablesInsert<'CategoriePresence'>[]): Promise<void> {
         for (const cat of categories) {
             const { error } = await supabase
@@ -140,6 +163,10 @@ export class SupabaseAttendanceRepository implements IAttendanceRepository {
         if (error) throw error;
     }
 
+    /** 
+     * Sécurité métier : Vérifie qu'un statut 'Absent' existe. 
+     * S'il manque (ex: après une suppression), il est recréé automatiquement en rouge.
+     */
     async ensureAbsentCategory(setupId: string, userId: string): Promise<void> {
         const { count } = await supabase
             .from('CategoriePresence')
@@ -157,8 +184,9 @@ export class SupabaseAttendanceRepository implements IAttendanceRepository {
         }
     }
 
-    // ==================== ATTENDANCE ====================
+    // ==================== L'APPEL (ATTENDANCE) ====================
 
+    /** Récupère les lignes d'appel déjà enregistrées pour éviter d'écraser des données. */
     async getAttendances(date: string, period: string, studentIds: string[], setupId: string): Promise<Attendance[]> {
         const { data, error } = await supabase
             .from('Attendance')
@@ -172,6 +200,7 @@ export class SupabaseAttendanceRepository implements IAttendanceRepository {
         return data || [];
     }
 
+    /** Vérifie si un appel a déjà commencé pour ce moment de la journée. */
     async checkExistingSetup(date: string, period: string, studentIds: string[]): Promise<string | undefined> {
         const { data, error } = await supabase
             .from('Attendance')
@@ -185,9 +214,13 @@ export class SupabaseAttendanceRepository implements IAttendanceRepository {
         return data?.[0]?.setup_id;
     }
 
+    /** 
+     * Enregistre ou modifie la présence d'un élève. 
+     * Gère les identifiants temporaires pour une interface réactive.
+     */
     async upsertAttendance(attendanceRecord: Partial<Attendance> & { id?: string }): Promise<Attendance> {
         if (attendanceRecord.id && !attendanceRecord.id.toString().startsWith('temp-')) {
-            // Update existing record
+            // Modification d'une présence existante
             const { error } = await supabase
                 .from('Attendance')
                 .update({
@@ -198,8 +231,8 @@ export class SupabaseAttendanceRepository implements IAttendanceRepository {
             if (error) throw error;
             return attendanceRecord as Attendance;
         } else {
-            // Insert new record
-            const { id: _id, ...payload } = attendanceRecord; // Remove temp ID
+            // Création d'une nouvelle ligne de présence
+            const { id: _id, ...payload } = attendanceRecord; 
             const { data, error } = await supabase
                 .from('Attendance')
                 .insert([payload as TablesInsert<'Attendance'>])
@@ -218,6 +251,7 @@ export class SupabaseAttendanceRepository implements IAttendanceRepository {
         if (error) throw error;
     }
 
+    /** Enregistre l'appel pour toute une classe en une seule requête (plus rapide). */
     async bulkInsertAttendances(records: TablesInsert<'Attendance'>[]): Promise<Attendance[]> {
         const { data, error } = await supabase
             .from('Attendance')
@@ -227,8 +261,9 @@ export class SupabaseAttendanceRepository implements IAttendanceRepository {
         return data || [];
     }
 
-    // ==================== REPORTING ====================
+    // ==================== RAPPORTS ET EXPORTS ====================
 
+    /** Liste les jours où l'enseignant a fait l'appel (pour naviguer dans l'historique). */
     async getDistinctDates(setupId: string): Promise<string[]> {
         const { data, error } = await supabase
             .from('Attendance')
@@ -241,13 +276,16 @@ export class SupabaseAttendanceRepository implements IAttendanceRepository {
         return [...new Set(dates)].sort().reverse();
     }
 
+    /** 
+     * Récupère TOUTES les données de présence pour une période (ex: un mois entier).
+     * Utilise une boucle de chargement par pages (Pagination) pour ne pas saturer le réseau 
+     * si l'école a des milliers de données.
+     */
     async getAttendanceRange(start: string, end: string): Promise<AttendanceWithCategory[]> {
         let allData: any[] = [];
         let hasMore = true;
         let page = 0;
         const pageSize = 1000;
-
-        console.log(`[Repository] Fetching attendance range: ${start} to ${end}`);
 
         try {
             while (hasMore) {
@@ -262,8 +300,6 @@ export class SupabaseAttendanceRepository implements IAttendanceRepository {
 
                 if (data && data.length > 0) {
                     allData = [...allData, ...data];
-                    console.log(`[Repository] Page ${page} fetched: ${data.length} records. Total so far: ${allData.length}`);
-
                     if (data.length < pageSize) {
                         hasMore = false;
                     } else {
@@ -274,16 +310,19 @@ export class SupabaseAttendanceRepository implements IAttendanceRepository {
                 }
             }
         } catch (err) {
-            console.error('[Repository] Error fetching attendance range:', err);
+            console.error('[Repository] Erreur lors de la lecture de la période :', err);
             throw err;
         }
 
-        console.log(`[Repository] Total records fetched: ${allData.length}`);
         return allData as AttendanceWithCategory[];
     }
 
+    /**
+     * Gain de temps : Recopie l'appel du matin vers l'après-midi.
+     * Très utile si les élèves ne changent presque jamais entre les deux demi-journées.
+     */
     async copyPeriodData(date: string, setupId: string, fromPeriod: string, toPeriod: string, userId: string): Promise<void> {
-        // Fetch source period data
+        // 1. Lire les données sources
         const { data: sourceData, error: fetchError } = await supabase
             .from('Attendance')
             .select('*')
@@ -296,7 +335,7 @@ export class SupabaseAttendanceRepository implements IAttendanceRepository {
             throw new Error(`Aucune donnée trouvée pour la période ${fromPeriod}`);
         }
 
-        // Delete existing target period data
+        // 2. Supprimer les données cibles si elles existent déjà (nettoyage)
         const { error: deleteError } = await supabase
             .from('Attendance')
             .delete()
@@ -306,7 +345,7 @@ export class SupabaseAttendanceRepository implements IAttendanceRepository {
 
         if (deleteError) throw deleteError;
 
-        // Copy data to target period
+        // 3. Préparer les nouvelles lignes et les insérer
         const newRecords: TablesInsert<'Attendance'>[] = sourceData.map(record => ({
             eleve_id: record.eleve_id,
             date: record.date,
@@ -324,14 +363,14 @@ export class SupabaseAttendanceRepository implements IAttendanceRepository {
         if (insertError) throw insertError;
     }
 
+    // ==================== INTERFACE MOBILE ====================
+
+    /** Récupère les données d'appel optimisées pour l'affichage en liste sur mobile. */
     async getMobileData(userId: string, date: string): Promise<{ student: any, attendances: any }[]> {
-        // 1. Get user's groups
         const { data: groups } = await supabase.from('Groupe').select('id').eq('user_id', userId);
         const groupIds = groups?.map(g => g.id) || [];
-
         if (groupIds.length === 0) return [];
 
-        // 2. Get students in these groups
         const { data: students } = await supabase
             .from('Eleve')
             .select('id, prenom, nom, photo_url, EleveGroupe!inner(groupe_id)')
@@ -342,15 +381,12 @@ export class SupabaseAttendanceRepository implements IAttendanceRepository {
 
         const studentIds = students.map(s => s.id);
 
-        // 3. Get attendance for target date
-        // Note: We fetch ALL attendances for these students on this date, regardless of setup, matching legacy behavior.
         const { data: attendances } = await supabase
             .from('Attendance')
             .select('eleve_id, status, periode')
             .eq('date', date)
             .in('eleve_id', studentIds);
 
-        // 4. Merge data
         return students.map(student => {
             const matinRecord = attendances?.find(a => a.eleve_id === student.id && a.periode === 'matin');
             const apresMidiRecord = attendances?.find(a => a.eleve_id === student.id && a.periode === 'apres_midi');
@@ -363,26 +399,21 @@ export class SupabaseAttendanceRepository implements IAttendanceRepository {
         });
     }
 
+    /** Calcule en temps réel le décompte des présents/absents pour le résumé d'accueil. */
     async getDailySummary(userId: string, date: string, period: string): Promise<{ present: number; absent: number; hasEncoding: boolean }> {
-        // 1. Get user's groups
         const { data: groups } = await supabase.from('Groupe').select('id').eq('user_id', userId);
         const groupIds = groups?.map(g => g.id) || [];
-
         if (groupIds.length === 0) return { present: 0, absent: 0, hasEncoding: false };
 
-        // 2. Get students ids for these groups
         const { data: students } = await supabase
             .from('Eleve')
             .select('id, EleveGroupe!inner(groupe_id)')
             .in('EleveGroupe.groupe_id', groupIds);
 
         if (!students) return { present: 0, absent: 0, hasEncoding: false };
-
         const studentIds = students.map(s => s.id);
-
         if (studentIds.length === 0) return { present: 0, absent: 0, hasEncoding: false };
 
-        // 3. Get attendance for today AND current period only
         const { data: attendances } = await supabase
             .from('Attendance')
             .select('status, eleve_id')
@@ -393,21 +424,24 @@ export class SupabaseAttendanceRepository implements IAttendanceRepository {
         const hasData = attendances && attendances.length > 0;
 
         if (!hasData) {
-            return {
-                present: 0,
-                absent: 0,
-                hasEncoding: false
-            };
+            return { present: 0, absent: 0, hasEncoding: false };
         } else {
             const totalStudents = studentIds.length;
             const absentCount = attendances.filter(a => a.status === 'absent').length;
             const presentCount = totalStudents - absentCount;
 
-            return {
-                present: presentCount,
-                absent: absentCount,
-                hasEncoding: true
-            };
+            return { present: presentCount, absent: absentCount, hasEncoding: true };
         }
     }
 }
+
+/**
+ * LOGIGRAMME DE FONCTIONNEMENT :
+ * 
+ * 1. ACTION : L'enseignant appuie sur "Matin" pour faire l'appel.
+ * 2. LECTURE : Le dépôt charge la liste des élèves (`getStudentsByGroup`) et l'appel s'il existe déjà (`getAttendances`).
+ * 3. SAISIE : L'enseignant change le statut d'un élève.
+ * 4. SAUVEGARDE : Le dépôt envoie une requête `upsert` à Supabase.
+ * 5. RÉHABILITATION : Si l'enseignant demande l'appel de l'après-midi, le dépôt offre de copier les données du matin (`copyPeriodData`).
+ * 6. SYNCHRONISATION : Toutes les données sont renvoyées à l'interface pour mettre à jour les jauges de présence en temps réel.
+ */

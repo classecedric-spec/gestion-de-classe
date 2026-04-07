@@ -1,3 +1,19 @@
+/**
+ * Nom du module/fichier : AttendanceExportTab.tsx
+ * 
+ * Données en entrée : 
+ *   - mode d'export (jour, semaine, mois).
+ *   - Groupe sélectionné.
+ *   - Dates et présences récupérées depuis la base de données.
+ *   - Liste des élèves et des statuts de présence.
+ * 
+ * Données en sortie : 
+ *   - Une interface de prévisualisation PDF.
+ *   - Un lien de téléchargement pour le fichier PDF généré.
+ * 
+ * Objectif principal : Permettre à l'enseignant de générer des rapports officiels de présence (PDF). L'interface offre une grande flexibilité : on peut sortir le rapport d'un seul jour, d'une semaine complète ou d'un mois entier pour les archives administratives de l'école.
+ */
+
 import React from 'react';
 import { FileText, Download, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Input, Button, Select } from '../../../core';
@@ -16,11 +32,14 @@ interface AttendanceExportTabProps {
     selectedPeriod: string;
     setSelectedPeriod: (val: string) => void;
     exportDates: string[];
-    exportData: any[]; // Extended Attendance type
+    exportData: any[]; // Type Attendance étendu
     activeCategories: CategoriePresence[];
     studentsForExport: Student[];
 }
 
+/**
+ * Composant d'onglet dédié à la génération et à l'exportation des PDF de présences.
+ */
 export const AttendanceExportTab: React.FC<AttendanceExportTabProps> = ({
     exportMode,
     setExportMode,
@@ -36,7 +55,10 @@ export const AttendanceExportTab: React.FC<AttendanceExportTabProps> = ({
     studentsForExport
 }) => {
 
-    // Day navigation helpers
+    /** 
+     * Utilitaire pour naviguer de jour en jour (Précédent / Suivant).
+     * Manipule les dates de manière sécurisée pour éviter les erreurs de fuseau horaire.
+     */
     const changeDay = (delta: number) => {
         const [y, m, d] = selectedDay.split('-').map(Number);
         const curr = new Date(y, m - 1, d, 12, 0, 0);
@@ -49,7 +71,8 @@ export const AttendanceExportTab: React.FC<AttendanceExportTabProps> = ({
 
     return (
         <div className="flex h-[600px] gap-6 animate-in fade-in zoom-in-95 duration-200">
-            {/* Left Control Panel */}
+            
+            {/* --- COLONNE GAUCHE : PANNEAU DE CONTRÔLE --- */}
             <div className="w-1/3 flex flex-col gap-4 p-4 bg-surface border border-white/10 rounded-xl h-full">
                 <div className="text-center space-y-2 mb-2">
                     <div className="w-12 h-12 bg-primary/20 rounded-full flex items-center justify-center mx-auto text-primary">
@@ -58,6 +81,7 @@ export const AttendanceExportTab: React.FC<AttendanceExportTabProps> = ({
                     <h3 className="text-lg font-bold text-text-main">Export PDF</h3>
                 </div>
 
+                {/* Sélecteur de mode : JOUR, SEMAINE ou MOIS */}
                 <div className="grid grid-cols-3 gap-1 p-1 bg-black/20 rounded-lg">
                     {(['day', 'week', 'month'] as const).map(mode => (
                         <button
@@ -78,6 +102,7 @@ export const AttendanceExportTab: React.FC<AttendanceExportTabProps> = ({
                         Rapport pour <strong>{selectedGroup?.nom || '...'}</strong>
                     </p>
 
+                    {/* Options spécifiques pour l'export journalier */}
                     {exportMode === 'day' && (
                         <div className="w-full space-y-3">
                             <Input
@@ -108,6 +133,7 @@ export const AttendanceExportTab: React.FC<AttendanceExportTabProps> = ({
                         </div>
                     )}
 
+                    {/* Options spécifiques pour l'export hebdomadaire ou mensuel */}
                     {exportMode !== 'day' && (
                         <Select
                             label="Période"
@@ -119,6 +145,7 @@ export const AttendanceExportTab: React.FC<AttendanceExportTabProps> = ({
                     )}
                 </div>
 
+                {/* BOUTON FINAL DE TÉLÉCHARGEMENT : n'apparaît que si des données sont prêtes */}
                 {exportDates.length > 0 ? (
                     <PDFDownloadLink
                         document={
@@ -149,7 +176,7 @@ export const AttendanceExportTab: React.FC<AttendanceExportTabProps> = ({
                 )}
             </div>
 
-            {/* Right Preview Panel */}
+            {/* --- COLONNE DROITE : APERÇU EN DIRECT DU PDF --- */}
             <div className="flex-1 rounded-xl border border-white/10 overflow-hidden bg-white/5 h-full relative">
                 {exportDates.length > 0 ? (
                     <PDFViewer width="100%" height="100%" className="w-full h-full border-none">
@@ -171,3 +198,16 @@ export const AttendanceExportTab: React.FC<AttendanceExportTabProps> = ({
         </div>
     );
 };
+
+/**
+ * LOGIGRAMME DE FONCTIONNEMENT :
+ * 
+ * 1. L'enseignant se rend sur l'onglet "Export".
+ * 2. Il choisit l'étendue du rapport (ex: "Mois").
+ * 3. Il sélectionne le mois spécifique (ex: "Mars 2024").
+ * 4. L'application prépare les données et génère un aperçu visuel dans la partie droite.
+ * 5. Si l'aperçu convient :
+ *    - L'enseignant clique sur "Télécharger".
+ *    - Le système compile le document PDF final incluant le tableau des absences et les statistiques.
+ *    - Le fichier est enregistré sur l'ordinateur de l'enseignant.
+ */

@@ -736,6 +736,7 @@ export type Database = {
           id: string
           note_max: number
           ordre: number | null
+          ratio: number
           titre: string
         }
         Insert: {
@@ -744,6 +745,7 @@ export type Database = {
           id?: string
           note_max?: number
           ordre?: number | null
+          ratio?: number
           titre: string
         }
         Update: {
@@ -752,6 +754,7 @@ export type Database = {
           id?: string
           note_max?: number
           ordre?: number | null
+          ratio?: number
           titre?: string
         }
         Relationships: [

@@ -1,3 +1,19 @@
+/**
+ * Nom du module/fichier : useAttendance.ts
+ * 
+ * Données en entrée : 
+ *   - L'état local de la page (date sélectionnée, période du matin ou après-midi).
+ *   - Les données provenant de Supabase (élèves, groupes, catégories de présence).
+ * 
+ * Données en sortie : 
+ *   - Une interface de programmation (API) complète pour la page de présence.
+ *   - Fonctions de déplacement d'élèves (`moveStudent`).
+ *   - Fonctions de marquage en masse (`markUnassignedAbsent`).
+ *   - État de chargement et verrouillage de la configuration.
+ * 
+ * Objectif principal : Ce "Hook" est le chef d'orchestre de la fonctionnalité Présence. Il centralise toute la logique métier : chargement des données, synchronisation avec la base de données après chaque déplacement d'élève, et gestion des préférences de l'enseignant (se souvenir de la dernière classe ouverte). Il garantit que l'interface reste réactive grâce à des "mises à jour optimistes" (on change l'UI avant même que le serveur n'ait répondu).
+ */
+
 import { useState, useEffect, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getCurrentUser } from '../../../lib/database';
@@ -7,24 +23,25 @@ import { toast } from 'sonner';
 export const useAttendance = () => {
     const queryClient = useQueryClient();
 
-    // UI Local State
+    // --- ÉTAT LOCAL DE L'INTERFACE ---
+    // On garde trace de la date et de la période (Matin/AM) choisies par l'utilisateur
     const [currentDate, setCurrentDate] = useState(new Date().toISOString().split('T')[0]);
     const [currentPeriod, setCurrentPeriod] = useState('matin');
     const [isEditing, setIsEditing] = useState(false);
     const [isSetupLocked, setIsSetupLocked] = useState(false);
 
-    // Selection Local State (IDs)
+    // Identifiants techniques de la classe et du type d'appel sélectionnés
     const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
     const [selectedSetupId, setSelectedSetupId] = useState<string | null>(null);
 
-    // 0. User fetching
+    // 0. Récupération de l'utilisateur connecté
     const { data: user } = useQuery({
         queryKey: ['user'],
         queryFn: getCurrentUser,
         staleTime: Infinity,
     });
 
-    // 1. Groups fetching
+    // 1. Chargement de la liste des classes (Groupes)
     const { data: groups = [] } = useQuery({
         queryKey: ['groups', user?.id],
         queryFn: async () => {
@@ -35,7 +52,7 @@ export const useAttendance = () => {
         staleTime: 1000 * 60 * 5,
     });
 
-    // Handle initial group selection and preference
+    // Automatisme : au chargement, on essaie de rouvrir la dernière classe utilisée par l'enseignant
     useEffect(() => {
         if (!selectedGroupId && groups.length > 0 && user) {
             attendanceService.getUserPreferences(user.id, 'presence_last_group_id').then(lastGroupId => {
@@ -47,7 +64,7 @@ export const useAttendance = () => {
 
     const selectedGroup = useMemo(() => groups.find(g => g.id === selectedGroupId) || null, [groups, selectedGroupId]);
 
-    // 2. Students fetching (by group)
+    // 2. Chargement des élèves de la classe sélectionnée
     const { data: students = [] } = useQuery({
         queryKey: ['students', user?.id, selectedGroupId],
         queryFn: async () => {
@@ -58,7 +75,7 @@ export const useAttendance = () => {
         staleTime: 1000 * 60 * 5,
     });
 
-    // 3. Setups fetching
+    // 3. Chargement des types d'appels configurés (Matin, Cantine, Ateliers...)
     const { data: setups = [] } = useQuery({
         queryKey: ['attendance-setup', user?.id],
         queryFn: async () => {
@@ -69,7 +86,7 @@ export const useAttendance = () => {
         staleTime: 1000 * 60 * 5,
     });
 
-    // 4. Categories fetching (by setup)
+    // 4. Chargement des statuits de présence (Présent, Absent, Retard...) pour l'appel choisi
     const { data: categories = [] } = useQuery({
         queryKey: ['attendance-categories', user?.id, selectedSetupId],
         queryFn: async () => {
@@ -82,12 +99,13 @@ export const useAttendance = () => {
 
     const selectedSetup = useMemo(() => setups.find(s => s.id === selectedSetupId) || (setups.length > 0 ? setups[0] : null), [setups, selectedSetupId]);
 
-    // 5. Existing setup check (Auto-select)
+    // 5. Détection automatique : si un appel a déjà commencé, on verrouille le choix du type d'appel
     const { data: existingSetupId } = useQuery({
         queryKey: ['attendance-check-setup', user?.id, currentDate, currentPeriod, selectedGroupId],
         queryFn: async () => {
             if (!selectedGroupId || students.length === 0) return null;
-            return await attendanceService.checkExistingSetup(currentDate, currentPeriod, students.map(s => s.id));
+            const existingSetup = await attendanceService.checkExistingSetup(currentDate, currentPeriod, students.map(s => s.id));
+            return existingSetup || null;
         },
         enabled: !!user && !!selectedGroupId && students.length > 0,
     });
@@ -95,14 +113,14 @@ export const useAttendance = () => {
     useEffect(() => {
         if (existingSetupId) {
             setSelectedSetupId(existingSetupId);
-            setIsSetupLocked(true);
+            setIsSetupLocked(true); // Sécurité : impossible de changer de type d'appel si des données existent déjà
         } else {
             setIsSetupLocked(false);
             if (setups.length > 0 && !selectedSetupId) setSelectedSetupId(setups[0].id);
         }
     }, [existingSetupId, setups, selectedSetupId]);
 
-    // 6. Attendances fetching
+    // 6. Chargement des données de présence réelles
     const { data: attendances = [], isLoading: loading } = useQuery({
         queryKey: ['attendance', user?.id, currentDate, currentPeriod, selectedGroupId, selectedSetupId],
         queryFn: async () => {
@@ -113,10 +131,13 @@ export const useAttendance = () => {
         staleTime: 1000 * 60,
     });
 
-    // 7. Mutations
+    // --- OPÉRATIONS DE SAUVEGARDE (MUTATIONS) ---
+
+    // Sauvegarde unitaire (quand on déplace UN élève)
     const upsertMutation = useMutation({
         mutationFn: (rec: Attendance) => attendanceService.upsertAttendance(rec),
         onMutate: async (newRecord) => {
+            // Logique optimiste : on met à jour l'écran immédiatement avant confirmation du serveur
             const queryKey = ['attendance', user?.id, currentDate, currentPeriod, selectedGroupId, selectedSetupId];
             await queryClient.cancelQueries({ queryKey });
             const previous = queryClient.getQueryData<Attendance[]>(queryKey) || [];
@@ -130,20 +151,13 @@ export const useAttendance = () => {
             return { previous, queryKey };
         },
         onError: (_err, _variables, context) => {
+            // En cas d'erreur serveur, on annule le changement visuel
             if (context?.previous) queryClient.setQueryData(context.queryKey, context.previous);
-            queryClient.invalidateQueries({ queryKey: ['attendance', user?.id, currentDate, currentPeriod, selectedGroupId, selectedSetupId] });
-        },
-        onSuccess: (_data, variables) => {
-            // Update the temp ID with the real server ID in the cache
-            if (variables.id?.toString().startsWith('temp-') && _data?.id) {
-                const queryKey = ['attendance', user?.id, currentDate, currentPeriod, selectedGroupId, selectedSetupId];
-                queryClient.setQueryData<Attendance[]>(queryKey, (old = []) =>
-                    old.map(a => a.id === variables.id ? { ...a, id: _data.id } : a)
-                );
-            }
+            queryClient.invalidateQueries({ queryKey: context?.queryKey });
         }
     });
 
+    // Suppression (quand un élève revient dans la zone "Non assigné")
     const deleteMutation = useMutation({
         mutationFn: (id: string) => attendanceService.deleteAttendance(id),
         onMutate: async (id) => {
@@ -155,36 +169,20 @@ export const useAttendance = () => {
         },
         onError: (_err, _variables, context) => {
             if (context?.previous) queryClient.setQueryData(context.queryKey, context.previous);
-            queryClient.invalidateQueries({ queryKey: ['attendance', user?.id, currentDate, currentPeriod, selectedGroupId, selectedSetupId] });
         }
     });
 
+    // Sauvegarde groupée (ex: "Tout le monde présent")
     const bulkMutation = useMutation({
         mutationFn: (recs: any[]) => attendanceService.bulkInsertAttendances(recs),
-        onMutate: async (newRecords) => {
-            const queryKey = ['attendance', user?.id, currentDate, currentPeriod, selectedGroupId, selectedSetupId];
-            await queryClient.cancelQueries({ queryKey });
-            const previous = queryClient.getQueryData<Attendance[]>(queryKey) || [];
-
-            const optimisticRecords: Attendance[] = newRecords.map((r: any, i: number) => ({
-                id: `bulk-temp-${Date.now()}-${i}`,
-                ...r,
-                created_at: new Date().toISOString(),
-                updated_at: null
-            }));
-            queryClient.setQueryData<Attendance[]>(queryKey, [...previous, ...optimisticRecords]);
-            return { previous, queryKey };
-        },
-        onError: (_err, _variables, context) => {
-            if (context?.previous) queryClient.setQueryData(context.queryKey, context.previous);
-        },
         onSuccess: () => {
-            // After bulk insert succeeds, sync with server to get real IDs
             queryClient.invalidateQueries({ queryKey: ['attendance', user?.id, currentDate, currentPeriod, selectedGroupId, selectedSetupId] });
         }
     });
 
-    // Actions
+    // --- ACTIONS EXPOSÉES À L'INTERFACE ---
+
+    /** Déplace un élève d'un statut à un autre. */
     const moveStudent = async (studentId: string, targetId: string) => {
         if (!selectedSetup || !user) return;
 
@@ -211,6 +209,7 @@ export const useAttendance = () => {
         }
     };
 
+    /** Met tous les élèves restants en 'Absent'. */
     const markUnassignedAbsent = async () => {
         const unassigned = students.filter(s => !attendances.find(a => a.eleve_id === s.id));
         if (unassigned.length === 0 || !user || !selectedSetup) return;
@@ -229,6 +228,7 @@ export const useAttendance = () => {
         bulkMutation.mutate(newRecords);
     };
 
+    /** Met tous les élèves restants en 'Présent' (première catégorie disponible). */
     const markUnassignedPresent = async () => {
         const unassigned = students.filter(s => !attendances.find(a => a.eleve_id === s.id));
         if (unassigned.length === 0 || !user || !selectedSetup) return;
@@ -247,7 +247,9 @@ export const useAttendance = () => {
         bulkMutation.mutate(newRecords);
     };
 
-    // Helpers used in UI
+    // --- UTILITAIRES POUR L'AFFICHAGE ---
+    
+    // Récupère les élèves d'une catégorie précise
     const getStudentsForCategory = (catId: string) => {
         return students.filter(s => {
             const att = attendances.find(a => a.eleve_id === s.id);
@@ -255,6 +257,7 @@ export const useAttendance = () => {
         });
     };
 
+    // Récupère les élèves qui n'ont pas encore été pointés
     const getUnassignedStudents = () => {
         return students.filter(s => !attendances.find(a => a.eleve_id === s.id && a.status === 'present'));
     };
@@ -271,6 +274,7 @@ export const useAttendance = () => {
     };
 
     return {
+        // Données
         groups, selectedGroup,
         students,
         setups, selectedSetup,
@@ -280,6 +284,7 @@ export const useAttendance = () => {
         loading, error: null,
         isEditing, isSetupLocked,
 
+        // Actions de sélection
         setSelectedGroup: (group: Group | null) => {
             setSelectedGroupId(group?.id || null);
             if (group && user) attendanceService.saveGroupPreference(user.id, group.id);
@@ -299,10 +304,12 @@ export const useAttendance = () => {
             queryClient.invalidateQueries({ queryKey: ['attendance-categories', user?.id, selectedSetupId] });
         },
 
+        // Actions métier
         moveStudent,
         markUnassignedAbsent,
         markUnassignedPresent,
 
+        // Sélecteurs de données
         getStudentsForCategory,
         getUnassignedStudents,
         getPureUnassignedStudents,
@@ -311,3 +318,14 @@ export const useAttendance = () => {
 };
 
 export default useAttendance;
+
+/**
+ * LOGIGRAMME DE FONCTIONNEMENT :
+ * 
+ * 1. INITIALISATION : Le hook vérifie l'utilisateur et charge sa classe préférée.
+ * 2. CHARGEMENT : Il télécharge en parallèle les élèves, les types d'appels et les présences du jour.
+ * 3. INTERACTION : L'enseignant déplace une carte élève (ex: 'Marc' vers 'Cantine').
+ * 4. MISE À JOUR OPTIMISTE : Le hook met à jour l'écran immédiatement (Marc apparaît dans Cantine).
+ * 5. PERSISTANCE : Il envoie la commande à Supabase en arrière-plan.
+ * 6. SYNCHRONISATION : Si une autre tablette change une donnée, le hook rafraîchit l'écran grâce au cache de `TanStack Query`.
+ */

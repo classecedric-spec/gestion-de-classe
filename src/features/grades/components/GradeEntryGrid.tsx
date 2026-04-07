@@ -1,3 +1,15 @@
+/**
+ * Nom du module/fichier : GradeEntryGrid.tsx
+ * 
+ * Données en entrée : L'identifiant du contrôle (pour savoir qui noter et sur quoi).
+ * 
+ * Données en sortie : Un enregistrement ligne par ligne des résultats (points, présences, remarques) expédié dans la base de données.
+ * 
+ * Objectif principal : Fournir un outil d'encodage de type "tableur/Excel" ultra-rapide pour saisir à la chaîne les notes de toute une classe.
+ * 
+ * Ce que ça affiche : Une bannière résumant les statistiques en haut (moyenne de classe, max/min), suivi du grand tableau où chaque ligne est un élève avec des cases de saisie pour ses notes.
+ */
+
 import React, { useState, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { trackingService } from '../../tracking/services/trackingService';
@@ -56,7 +68,7 @@ const GradeEntryGrid: React.FC<GradeEntryGridProps> = ({
         setSelectedEvaluationId(evaluationId);
     }, [evaluationId, setSelectedEvaluationId]);
 
-    // Fetch students in this group
+    // Télécharge la liste complète de la classe concernée par ce devoir depuis le serveur internet.
     const { data: studentData, isLoading: loadingStudents } = useQuery<StudentQueryResult>({
         queryKey: ['students_group', evaluation?.group_id],
         queryFn: async (): Promise<StudentQueryResult> => {
@@ -67,6 +79,7 @@ const GradeEntryGrid: React.FC<GradeEntryGridProps> = ({
         enabled: !!evaluation?.group_id
     });
 
+    // Range les élèves parfaitement par ordre alphabétique (d'abord par le prénom, puis le nom) pour que la liste suive le registre de l'enseignant.
     const students = [...(studentData?.full || [])].sort((a, b) => {
         const prenomA = a.prenom || '';
         const prenomB = b.prenom || '';
@@ -81,7 +94,7 @@ const GradeEntryGrid: React.FC<GradeEntryGridProps> = ({
 
     const hasQuestions = questions.length > 0;
 
-    // Handle navigation
+    // Permet à l'enseignant d'appuyer sur la touche "Entrée" pour sauter instantanément à la case du dessous (l'élève suivant) sans utiliser la souris.
     const handleKeyDown = (e: React.KeyboardEvent, studentIndex: number, colId: string | 'total') => {
         if (e.key === 'Enter') {
             e.preventDefault();
@@ -91,7 +104,7 @@ const GradeEntryGrid: React.FC<GradeEntryGridProps> = ({
         }
     };
 
-    // Handle individual question score entry
+    // Se déclenche dès que l'enseignant quitte la case d'une "sous-question". Le système sauvegarde le point et met à jour le total automatiquement.
     const handleQuestionBlur = (studentId: string, questionId: string, val: string) => {
         if (val === '' || !userId) return;
         const note = parseFloat(val);
@@ -117,6 +130,7 @@ const GradeEntryGrid: React.FC<GradeEntryGridProps> = ({
         }
     };
 
+    // Se déclenche dès que l'enseignant quitte la case du "Total" d'un élève. Le chiffre tapé est verrouillé et validé dans la base cloud.
     const handleTotalBlur = (studentId: string, val: string) => {
         if (val === '' || !userId) return;
         const note = parseFloat(val);
@@ -131,6 +145,7 @@ const GradeEntryGrid: React.FC<GradeEntryGridProps> = ({
         }
     };
 
+    // Mécanique secrète "Gain de temps" : si on tape un "A" au lieu d'une note, l'élève est instantanément marqué Absent. Un "M" le signale Malade.
     const handleShortcut = (e: React.KeyboardEvent, studentId: string) => {
         const val = (e.target as HTMLInputElement).value.toUpperCase();
         if (val === 'A' && userId) {
@@ -410,4 +425,12 @@ const GradeEntryGrid: React.FC<GradeEntryGridProps> = ({
     );
 };
 
+/**
+ * 1. La grille de correction s'anime, elle réclame la liste de ses élèves et attend sagement son arrivée (message "Chargement...").
+ * 2. Dès réception, elle alphabetise soigneusement la classe pour dessiner le tableau.
+ * 3. Au-dessus du tableau, elle compte les devoirs et calcule en direct la moyenne générale pour le professeur.
+ * 4. Dans le tableau, elle colorie des lignes d'une légère teinte orangée si l'élève a bien été corrigé en totalité, le distinguant visuellement des autres.
+ * 5. L'enseignant a les mains libres : il peut taper un chiffre et presser "Entrée" pour descendre au suivant, ou taper la lettre M/A pour renseigner l'absence en un éclair.
+ * 6. De manière invisible, dès que le curseur de souris quitte une case validée, l'application expédie silencieusement une sauvegarde sur le serveur cloud, éliminant tout risque de perdre son travail.
+ */
 export default GradeEntryGrid;

@@ -1,3 +1,23 @@
+/**
+ * Nom du module/fichier : Presence.tsx
+ * 
+ * Données en entrée : 
+ *   - Liste des élèves et des classes (via le Hook `useAttendance`).
+ *   - Dates et périodes (Matin/Après-midi).
+ *   - Configuration des types d'appels (Matin, Cantine, Étude, etc.).
+ * 
+ * Données en sortie : 
+ *   - Une interface interactive de type "Tableau Blanc" avec des colonnes.
+ *   - Des actions d'enregistrement des présences en temps réel.
+ * 
+ * Objectif principal : Offrir la page maîtresse pour faire l'appel en classe. L'enseignant voit tout son effectif d'un coup. Il peut faire l'appel de manière ludique en faisant glisser les photos des élèves dans les colonnes correspondantes (ex: glisser 'Léa' dans la colonne 'Cantine'). La page gère aussi l'historique et l'impression des rapports PDF.
+ * 
+ * Ce que ça affiche : 
+ *   - En haut : le sélecteur de date, le choix "Matin / Après-midi" et l'accès aux réglages.
+ *   - À gauche : les élèves qui n'ont pas encore été pointés ("Non assignés").
+ *   - Au centre : les différentes colonnes de présence colorées.
+ */
+
 import React, { useState } from 'react';
 import { DndContext, DragOverlay, useSensor, useSensors, MouseSensor, TouchSensor, DragStartEvent, DragEndEvent } from '@dnd-kit/core';
 import { Settings } from 'lucide-react';
@@ -11,9 +31,13 @@ import AttendanceColumn from '../features/attendance/components/AttendanceColumn
 import AttendanceConfigModal from '../features/attendance/components/AttendanceConfigModal';
 import { Student } from '../features/attendance/services/attendanceService';
 
+/**
+ * Composant de page pour la gestion quotidienne des appels.
+ */
 const Presence: React.FC = () => {
+    // On extrait toute la "mécanique" (données et actions) du Hook spécialisé
     const {
-        // State
+        // État de l'application
         groups, selectedGroup, setSelectedGroup,
         setups, selectedSetup, setSelectedSetup,
         categories,
@@ -26,40 +50,47 @@ const Presence: React.FC = () => {
         refreshData,
         unlockEditing,
 
-        // Actions
+        // Actions déclenchables par l'enseignant
         moveStudent,
         markUnassignedAbsent,
         markUnassignedPresent,
 
-        // Getters
+        // Outils de filtrage des données
         getStudentsForCategory,
     } = useAttendance();
 
+    // États locaux pour l'affichage des fenêtres surgissantes (Modales)
     const [isConfigOpen, setIsConfigOpen] = useState(false);
     const [activeDragItem, setActiveDragItem] = useState<Student | null>(null);
 
-    // Sensors
+    // Configuration des capteurs pour le "Glisser-Déposer" (supporte Souris et Écrans Tactiles)
     const sensors = useSensors(
-        useSensor(MouseSensor, { activationConstraint: { distance: 10 } }),
-        useSensor(TouchSensor, { activationConstraint: { delay: 250, tolerance: 5 } })
+        useSensor(MouseSensor, { activationConstraint: { distance: 10 } }), // Évite les déplacements accidentels
+        useSensor(TouchSensor, { activationConstraint: { delay: 250, tolerance: 5 } }) // Appui long sur tablette
     );
 
-    // HANDLERS
+    /**
+     * DÉBUT DU GLISSEMENT : Mémorise quel élève est en train d'être déplacé pour afficher sa photo sous le curseur.
+     */
     const handleDragStart = (event: DragStartEvent) => {
         if (event.active.data.current) {
             setActiveDragItem(event.active.data.current.student);
         }
     };
 
+    /**
+     * FIN DU GLISSEMENT : Détermine où l'élève a été "déposé" et déclenche la sauvegarde.
+     */
     const handleDragEnd = async (event: DragEndEvent) => {
         const { active, over } = event;
-        setActiveDragItem(null);
+        setActiveDragItem(null); // On efface la photo sous le curseur
 
-        if (!over) return;
+        if (!over) return; // Si déposé en dehors d'une colonne, on ne fait rien
 
         const studentId = active.id as string;
-        const targetId = over.id as string; // This is the Column ID (category ID or 'unassigned' or 'absent')
+        const targetId = over.id as string; // C'est l'ID de la colonne de destination (ex: 'Absent')
 
+        // Cas particulier : si déposé sur la zone 'Absent' mais qu'elle est virtuelle
         if (targetId === 'absent') {
             const absentCat = categories.find(c => c.nom === 'Absent');
             if (absentCat) {
@@ -68,10 +99,12 @@ const Presence: React.FC = () => {
                 toast.error("Catégorie 'Absent' introuvable");
             }
         } else {
+            // Sauvegarde classique dans la catégorie choisie
             await moveStudent(studentId, targetId);
         }
     };
 
+    // Gestion des cas d'erreur ou d'absence de données initiales
     if (error) {
         return <div className="p-10 text-center text-red-500">Erreur: {error}</div>;
     }
@@ -80,9 +113,12 @@ const Presence: React.FC = () => {
         return <div className="p-10 text-center text-grey-medium">Aucun groupe trouvé. Veuillez configurez vos classes.</div>;
     }
 
+    // Calcul des élèves qui n'ont pas encore été pointés aujourd'hui
     const trulyUnassigned = students.filter(s => !attendances.some(a => a.eleve_id === s.id));
 
-    // --- Header Content Props ---
+    // --- CONSTRUCTION DES ÉLÉMENTS DE L'EN-TÊTE ---
+    
+    // Le sélecteur "Matin / Après-midi"
     const centerContent = (
         <div className="hidden md:block">
             <Tabs
@@ -100,6 +136,7 @@ const Presence: React.FC = () => {
         </div>
     );
 
+    // Le bouton de réglages et le choix de la date
     const rightContent = (
         <div className="flex items-center gap-3 self-end md:self-auto">
             <div className="flex items-center gap-2 bg-surface p-1.5 rounded-xl border border-white/5 shadow-sm h-[52px] group transition-all duration-300 hover:border-primary/20">
@@ -114,7 +151,6 @@ const Presence: React.FC = () => {
                     <div className="w-px h-6 bg-white/10 mx-1" />
                 </div>
 
-                {/* Date Picker - Height matched to selector approx */}
                 <div className="relative h-full flex items-center">
                     <label htmlFor="presence-date-picker" className="sr-only">Date</label>
                     <input
@@ -147,7 +183,7 @@ const Presence: React.FC = () => {
             rightContent={rightContent}
             containerClassName="p-6"
         >
-            {/* Mobile Period Selector (visible only on small screens) */}
+            {/* Sélecteur de période mobile (visible uniquement sur petit écran) */}
             <div className="md:hidden flex justify-center mb-6">
                 <Tabs
                     tabs={[
@@ -162,7 +198,7 @@ const Presence: React.FC = () => {
                 />
             </div>
 
-            {/* MAIN CONTENT */}
+            {/* ZONE PRINCIPALE : LE TABLEAU DE BORD DES APPELS */}
             {selectedSetup ? (
                 <DndContext
                     sensors={sensors}
@@ -171,9 +207,8 @@ const Presence: React.FC = () => {
                 >
                     <div className="h-full flex gap-6 min-h-0 overflow-hidden">
 
-                        {/* LEFT: Unassigned & Absents */}
+                        {/* COLONNE GAUCHE : ÉLÈVES À POINTer */}
                         <div className="w-1/4 min-w-[280px] flex flex-col gap-4">
-                            {/* Unassigned Students */}
                             <div className="flex-1 min-h-0 flex flex-col">
                                 <AttendanceColumn
                                     id="unassigned"
@@ -192,7 +227,7 @@ const Presence: React.FC = () => {
                                 </AttendanceColumn>
                             </div>
 
-                            {/* Action: Mark rest as absent / present */}
+                            {/* Boutons d'action rapide pour terminer l'appel en un clic */}
                             {trulyUnassigned.length > 0 && !isSetupLocked && (
                                 <div className="flex flex-col gap-2">
                                     <Button
@@ -215,7 +250,7 @@ const Presence: React.FC = () => {
                             )}
                         </div>
 
-                        {/* RIGHT: Categories Grid */}
+                        {/* ZONE DE DROITE : GRILLE DES STATUTS (Colonnes Présents, Absents, Cantine, etc.) */}
                         <div className="flex-1 overflow-y-auto custom-scrollbar rounded-2xl p-1">
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 gap-4 pb-20">
                                 {categories.map(cat => {
@@ -255,6 +290,7 @@ const Presence: React.FC = () => {
 
                     </div>
 
+                    {/* L'image fantôme qui suit la souris pendant le glissement */}
                     <DragOverlay>
                         {activeDragItem ? (
                             <AttendanceStudentCard student={activeDragItem} isOverlay />
@@ -262,6 +298,7 @@ const Presence: React.FC = () => {
                     </DragOverlay>
                 </DndContext>
             ) : (
+                /* ÉTAT : AUCUNE CONFIGURATION CHOISIE */
                 <EmptyState
                     title="Configuration requise"
                     description="Sélectionnez ou créez une configuration pour commencer à gérer les présences."
@@ -274,11 +311,10 @@ const Presence: React.FC = () => {
                 />
             )}
 
-            {/* Config Modal */}
+            {/* Fenêtre surgissante des réglages (Modal) */}
             <AttendanceConfigModal
                 isOpen={isConfigOpen}
                 onClose={() => setIsConfigOpen(false)}
-                // Data
                 groups={groups}
                 selectedGroup={selectedGroup}
                 onSelectGroup={(group) => setSelectedGroup(group || null)}
@@ -287,11 +323,7 @@ const Presence: React.FC = () => {
                 onSelectSetup={setSelectedSetup}
                 isSetupLocked={isSetupLocked}
                 onUnlockEditing={unlockEditing}
-
-                // Callbacks
                 onConfigSaved={refreshData}
-
-                // Export Data
                 activeCategories={categories}
                 studentsForExport={students}
                 currentDateForExport={currentDate}
@@ -301,3 +333,19 @@ const Presence: React.FC = () => {
 };
 
 export default Presence;
+
+/**
+ * LOGIGRAMME DE FONCTIONNEMENT :
+ * 
+ * 1. L'enseignant arrive sur la page "Présence" (par défaut à la date du jour).
+ * 2. Il voit sa classe dans la colonne de gauche (Section "Non assignés").
+ * 3. Il commence l'appel :
+ *    - Pour 'Sophie', il fait glisser sa photo vers la colonne 'Cantine'.
+ *    - Pour les autres, il clique sur "Marquer restants comme présents".
+ * 4. À chaque action :
+ *    - L'interface se met à jour immédiatement (Sophie change de colonne).
+ *    - Le système enregistre l'information dans la base de données.
+ * 5. S'il veut faire une modification après coup :
+ *    - Il déplace à nouveau les cartes.
+ *    - Ou il clique sur "Réactiver l'édition" pour modifier les paramètres globaux.
+ */

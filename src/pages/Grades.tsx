@@ -12,6 +12,7 @@ import EvaluationDetailTable from '../features/grades/components/EvaluationDetai
 import AddEvaluationModal from '../features/grades/components/AddEvaluationModal';
 import GradeSettings from '../features/grades/components/GradeSettings';
 import { useGradeMutations } from '../features/grades/hooks/useGrades';
+import { gradeService } from '../features/grades/services';
 import { TablesInsert } from '../types/supabase';
 
 const Grades: React.FC = () => {
@@ -19,6 +20,8 @@ const Grades: React.FC = () => {
     const [activeTab, setActiveTab] = useState('evaluations');
     const [selectedEvaluationId, setSelectedEvaluationId] = useState<string | null>(null);
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+    const [editingEvaluationData, setEditingEvaluationData] = useState<any>(null);
+    const [editingQuestions, setEditingQuestions] = useState<any[]>([]);
     const location = useLocation();
 
     // Reset view to evaluations table when navigating to this page (e.g. sidebar click)
@@ -31,18 +34,32 @@ const Grades: React.FC = () => {
 
     // Data for Add Modal (use mutations only to avoid over-fetching)
     const {
-        createEvaluation
+        createEvaluation,
+        updateEvaluation
     } = useGradeMutations();
 
     // Handlers
     const handleCreateEvaluation = async (data: TablesInsert<'Evaluation'>, questions: any[]) => {
         try {
-            const newEval = await createEvaluation({ evaluation: data, questions });
+            if (editingEvaluationData) {
+                await updateEvaluation({ id: editingEvaluationData.id, evaluation: data, questions });
+            } else {
+                const newEval = await createEvaluation({ evaluation: data, questions });
+                if (newEval) setSelectedEvaluationId(newEval.id);
+            }
             setIsAddModalOpen(false);
-            if (newEval) setSelectedEvaluationId(newEval.id);
+            setEditingEvaluationData(null);
+            setEditingQuestions([]);
         } catch (error) {
             console.error(error);
         }
+    };
+
+    const handleEditClick = async (evaluation: any) => {
+        setEditingEvaluationData(evaluation);
+        const fetchedQuestions = await gradeService.getQuestions(evaluation.id);
+        setEditingQuestions(fetchedQuestions);
+        setIsAddModalOpen(true);
     };
 
     const tabs = [
@@ -102,7 +119,11 @@ const Grades: React.FC = () => {
                         />
                         {activeTab === 'evaluations' && (
                             <Button
-                                onClick={() => setIsAddModalOpen(true)}
+                                onClick={() => {
+                                    setEditingEvaluationData(null);
+                                    setEditingQuestions([]);
+                                    setIsAddModalOpen(true);
+                                }}
                                 className="border border-primary/30"
                             >
                                 <Plus size={20} className="mr-2" />
@@ -126,17 +147,24 @@ const Grades: React.FC = () => {
             ) : (
                 <EvaluationsTableExcel
                     onSelectEvaluation={setSelectedEvaluationId}
+                    onEditEvaluation={handleEditClick}
                 />
             )}
 
             {/* Add Evaluation Modal */}
             <AddEvaluationModal
                 isOpen={isAddModalOpen}
-                onClose={() => setIsAddModalOpen(false)}
+                onClose={() => {
+                    setIsAddModalOpen(false);
+                    setEditingEvaluationData(null);
+                    setEditingQuestions([]);
+                }}
                 onSubmit={handleCreateEvaluation}
                 brancheId={''}
                 groupId={''}
                 periode={''}
+                initialData={editingEvaluationData}
+                initialQuestions={editingQuestions}
             />
         </div>
     );

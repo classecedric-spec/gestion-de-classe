@@ -1,3 +1,19 @@
+/**
+ * Nom du module/fichier : useDashboardData.ts
+ * 
+ * Données en entrée : 
+ *   - userId : L'identifiant de l'enseignant connecté.
+ *   - allStudents : La liste de tous les élèves de l'enseignant (chargée au préalable).
+ * 
+ * Données en sortie : Un objet "dashboardData" gigantesque contenant :
+ *   - Des statistiques globales (présences, progressions).
+ *   - Des listes d'élèves prioritaires (immobiles, en retard, anniversaires).
+ *   - Des suggestions pédagogiques automatisées.
+ *   - Des données pour les graphiques (distribution par branche, par niveau).
+ * 
+ * Objectif principal : Ce hook est le "moteur de calcul" du tableau de bord. Il interroge la base de données (Supabase) via de multiples requêtes, traite les chiffres bruts pour en extraire des indicateurs métier (ex: "Qui n'a rien fait hier ?", "Quels sont les domaines délaissés ?"), et fournit une structure de données prête à être affichée par les composants visuels.
+ */
+
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../../../lib/database';
 import { Student } from '../../attendance/services/attendanceService';
@@ -5,13 +21,13 @@ import { SupabaseModuleRepository } from '../../modules/repositories/SupabaseMod
 
 const moduleRepo = new SupabaseModuleRepository();
 
-// Level Colors for Charts
+// Couleurs standardisées pour chaque niveau scolaire dans les graphiques.
 export const LEVEL_COLORS: Record<string, string> = {
-    'CP': '#3b82f6',   // Blue
-    'CE1': '#8b5cf6',  // Purple
-    'CE2': '#ec4899',  // Pink
-    'CM1': '#f59e0b',  // Amber
-    'CM2': '#10b981',  // Emerald
+    'CP': '#3b82f6',   // Bleu
+    'CE1': '#8b5cf6',  // Violet
+    'CE2': '#ec4899',  // Rose
+    'CM1': '#f59e0b',  // Ambre
+    'CM2': '#10b981',  // Émeraude
     'Autre': '#6366f1' // Indigo
 };
 
@@ -99,19 +115,24 @@ const initialDashboardData: DashboardData = {
     overdueStudents: []
 };
 
+/**
+ * Hook principal pour récupérer et calculer toutes les données analytiques du Dashboard.
+ */
 export const useDashboardData = (userId?: string, allStudents: Student[] = []) => {
     const queryClient = useQueryClient();
 
     const { data: dashboardData = initialDashboardData, isLoading: loading } = useQuery({
         queryKey: ['dashboard-stats', userId],
         queryFn: async (): Promise<DashboardData> => {
+            // Sécurité : si on n'a pas d'utilisateur ou d'élèves, on renvoie une structure vide.
             if (!userId || !allStudents || allStudents.length === 0) return initialDashboardData;
 
             const today = new Date().toISOString().split('T')[0];
             const lastWeek = new Date();
             lastWeek.setDate(lastWeek.getDate() - 7);
 
-            // Determine Last Active School Day
+            // --- PHASE 1 : IDENTIFIER LE DERNIER JOUR D'ÉCOLE ACTIF ---
+            // Utile pour comparer les données avec "le dernier jour où il s'est passé quelque chose".
             const [
                 { data: lastProgression },
                 { data: lastAttendance }
@@ -155,7 +176,7 @@ export const useDashboardData = (userId?: string, allStudents: Student[] = []) =
             const classId = allStudents[0]?.classe_id;
             const studentIds = allStudents.map(s => s.id);
 
-            // Execute all independent queries concurrently
+            // --- PHASE 2 : RÉCUPÉRATION MULTIPLE ET PARALLÈLE DES DONNÉES ---
             const [
                 { data: attendanceData },
                 { data: recentActivity },
@@ -166,7 +187,7 @@ export const useDashboardData = (userId?: string, allStudents: Student[] = []) =
                 { count: plannedActivitiesCount },
                 rawLateActivities
             ] = await Promise.all([
-                // 1. Attendance Today & Monthly Average
+                // 1. Présences du mois
                 supabase
                     .from('Attendance')
                     .select('status, date, categorie_id, CategoriePresence(nom)')
@@ -174,7 +195,7 @@ export const useDashboardData = (userId?: string, allStudents: Student[] = []) =
                     .gte('date', firstOfMonthISO)
                     .lte('date', today),
                 
-                // 2. Recent Activity
+                // 2. Activités récentes (flux en direct)
                 supabase
                     .from('Progression')
                     .select('*, Eleve(prenom, nom, photo_url), Activite(titre)')
@@ -182,27 +203,27 @@ export const useDashboardData = (userId?: string, allStudents: Student[] = []) =
                     .order('updated_at', { ascending: false })
                     .limit(5),
                 
-                // 3. Monthly Actions & Progression Calc (monthly only)
+                // 3. Actions du mois pour calcul de dynamique
                 supabase
                     .from('Progression')
                     .select('id, updated_at, etat')
                     .in('eleve_id', studentIds)
                     .gte('updated_at', firstOfMonthISO),
                 
-                // 3b. All progressions
+                // 3b. Toutes les progressions (pour les taux globaux)
                 supabase
                     .from('Progression')
                     .select('etat, updated_at, eleve_id')
                     .in('eleve_id', studentIds),
                 
-                // 7. Branch Distribution
+                // 7. Données par branche (Maths, Langage...)
                 supabase
                     .from('Progression')
                     .select('etat, eleve_id, Activite(Module(SousBranche(Branche(nom))))')
                     .in('eleve_id', studentIds)
                     .not('etat', 'eq', 'non_commence'),
                 
-                // 9. Absentees
+                // 9. Liste des absents du dernier jour actif
                 supabase
                     .from('Attendance')
                     .select('eleve_id, status')
@@ -210,7 +231,7 @@ export const useDashboardData = (userId?: string, allStudents: Student[] = []) =
                     .eq('status', 'absent')
                     .in('eleve_id', studentIds),
                 
-                // 12. Planning
+                // 12. Comptage du planning de la semaine
                 supabase
                     .from('weekly_planning')
                     .select('*', { count: 'exact', head: true })
@@ -221,12 +242,12 @@ export const useDashboardData = (userId?: string, allStudents: Student[] = []) =
                     })())
                     .neq('day_of_week', 'DOCK'),
                 
-                // 13. Overdue Students
+                // 13. Travaux en retard (via le repository spécialisé)
                 classId ? moduleRepo.getDetailedLateActivities(classId) : Promise.resolve([])
             ]);
 
+            // --- PHASE 3 : CALCUL DES PRÉSENCES ---
             const todayAttendance = (attendanceData as any[])?.filter(a => a.date === today) || [];
-            
             const presentCount = todayAttendance.filter(a => {
                 if (a.status === 'present') return true;
                 if (a.CategoriePresence && a.CategoriePresence.nom !== 'Absent') return true;
@@ -244,6 +265,7 @@ export const useDashboardData = (userId?: string, allStudents: Student[] = []) =
                 averagePresence = Math.round(totalPresentsMonth / daysWithAttendance.length);
             }
 
+            // --- PHASE 4 : CALCUL DES TAUX DE PROGRESSION ---
             const countTermine = (progressionAll as any[])?.filter(p => p.etat === 'termine').length || 0;
             const countAVerifier = (progressionAll as any[])?.filter(p => p.etat === 'a_verifier').length || 0;
             const countEnCours = (progressionAll as any[])?.filter(p => p.etat === 'en_cours').length || 0;
@@ -256,7 +278,7 @@ export const useDashboardData = (userId?: string, allStudents: Student[] = []) =
             const todayActions = (monthlyData as any[])?.filter(p => p.updated_at.startsWith(today)).length || 0;
             const todayValidationRate = todayActions > 0 ? Math.round((todayValidations / todayActions) * 100) : 0;
 
-            // 4. Birthdays
+            // --- PHASE 5 : ANNIVERSAIRES ---
             const currentMonth = new Date().getMonth() + 1;
             const nextMonth = currentMonth === 12 ? 1 : currentMonth + 1;
 
@@ -272,7 +294,7 @@ export const useDashboardData = (userId?: string, allStudents: Student[] = []) =
                 return (d.getMonth() + 1) === nextMonth;
             }).sort((a, b) => new Date(a.date_naissance || '').getDate() - new Date(b.date_naissance || '').getDate());
 
-            // 5. Immobile Students
+            // --- PHASE 6 : ÉLÈVES IMMOBILES (Aucune action depuis 1 semaine) ---
             const immobileStudents = allStudents.filter(s => {
                 const studentActivity = (progressionAll as any[])?.filter(p => p.eleve_id === s.id);
                 if (!studentActivity || studentActivity.length === 0) return true;
@@ -280,16 +302,15 @@ export const useDashboardData = (userId?: string, allStudents: Student[] = []) =
                 return lastUpdate < lastWeek;
             });
 
-            // 6. Distribution
+            // DISTRIBUTION DES ÉTATS (Cercle type camembert)
             const states: Record<string, number> = { termine: 0, a_verifier: 0, en_cours: 0, besoin_d_aide: 0 };
             (progressionAll as any[])?.forEach(p => { if (states[p.etat as string] !== undefined) states[p.etat as string]++; });
             const distribution = Object.entries(states).map(([name, value]) => ({ name, value }));
 
+            // --- PHASE 7 : CALCUL DES STATISTIQUES PAR BRANCHE (RADAR/GRAPH) ---
             const branchCounts: Record<string, { total: number; done: number; byLevel: Record<string, number> }> = {};
             const studentLevelMap: Record<string, string> = {};
-            allStudents.forEach(s => {
-                studentLevelMap[s.id] = s.Niveau?.nom || 'Autre';
-            });
+            allStudents.forEach(s => { studentLevelMap[s.id] = s.Niveau?.nom || 'Autre'; });
 
             (branchData as any[])?.forEach(p => {
                 const bNom = p.Activite?.Module?.SousBranche?.Branche?.nom || "Inconnu";
@@ -328,7 +349,7 @@ export const useDashboardData = (userId?: string, allStudents: Student[] = []) =
                 };
             }).sort((a, b) => b.count - a.count);
 
-            // 8. Suggestions
+            // --- PHASE 8 : GÉNÉRATION AUTOMATIQUE DE SUGGESTIONS ---
             const suggestions: DashboardSuggestion[] = [];
             const enCoursStudents = allStudents.map(s => {
                 const count = progressionAll?.filter(p => p.eleve_id === s.id && p.etat === 'en_cours').length || 0;
@@ -354,11 +375,11 @@ export const useDashboardData = (userId?: string, allStudents: Student[] = []) =
                 });
             }
 
-            // 9. Absentees
+            // --- PHASE 9 : ABSENCES ---
             const absentIds = (absentData as any[])?.map(a => a.eleve_id) || [];
             const absentees = allStudents.filter(s => absentIds.includes(s.id));
 
-            // 10. Priority Lists
+            // --- PHASE 10 : CLASSEMENTS DE PRIORITÉ (MOINS ACTIFS, ETC.) ---
             const getDailyStats = (studentId: string, activityList: any[], startDate: Date) => {
                 const stats: Record<string, number> = { 'Lun': 0, 'Mar': 0, 'Mer': 0, 'Jeu': 0, 'Ven': 0 };
                 const days = ['Dim', 'Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam'];
@@ -415,7 +436,7 @@ export const useDashboardData = (userId?: string, allStudents: Student[] = []) =
                 return { ...s, score: rate, displayScore: Math.round(rate), startedCount: started, branchStats: [] };
             }).filter(s => s.score !== 999).sort((a, b) => a.score - b.score).slice(0, 8);
 
-            // 11. Student Breakdown
+            // --- PHASE 11 : RÉPARTITION PAR NIVEAU ---
             const studentBreakdownRaw: Record<string, any> = allStudents.reduce((acc, student) => {
                 const levelName = student.Niveau?.nom || 'Sans Niveau';
                 const levelOrder = student.Niveau?.ordre || 999;
@@ -428,15 +449,14 @@ export const useDashboardData = (userId?: string, allStudents: Student[] = []) =
             }, {} as Record<string, any>);
             const studentBreakdown = Object.values(studentBreakdownRaw).sort((a, b) => a.order - b.order);
 
-            // 12. Planning
+            // --- PHASE 12 : PLANNING SEMAINE ---
             const monday = new Date();
             monday.setDate(monday.getDate() - (monday.getDay() || 7) + 1);
-            const mondayISO = monday.toISOString().split('T')[0];
             const Friday = new Date(monday);
             Friday.setDate(monday.getDate() + 4);
             const weekLabel = `${monday.getDate().toString().padStart(2, '0')}/${(monday.getMonth() + 1).toString().padStart(2, '0')} au ${Friday.getDate().toString().padStart(2, '0')}/${(Friday.getMonth() + 1).toString().padStart(2, '0')}`;
 
-            // 13. Overdue Students
+            // --- PHASE 13 : TRAVAUX EN RETARD (GROUPEMENT PAR NIVEAU) ---
             const overdueByLevel: Record<string, any> = {};
 
             rawLateActivities.forEach(item => {
@@ -460,6 +480,7 @@ export const useDashboardData = (userId?: string, allStudents: Student[] = []) =
                 }))
             }));
 
+            // --- FIN : RETOUR DE L'OBJET FINAL ---
             return {
                 stats: {
                     totalStudents: allStudents.length,
@@ -498,3 +519,16 @@ export const useDashboardData = (userId?: string, allStudents: Student[] = []) =
         LEVEL_COLORS
     };
 };
+
+/**
+ * LOGIGRAMME DE FONCTIONNEMENT :
+ * 
+ * 1. DÉCLENCHEMENT : Le hook s'active quand un `userId` est présent et que la liste des élèves est fournie.
+ * 2. RECHERCHE SUPABASE : Il lance une dizaine de requêtes en parallèle (Promise.all) pour gagner en vitesse (présences, progressions, planning, retards).
+ * 3. ANALYSE TEMPORELLE : Il identifie le "Dernier jour actif" pour fournir des comparaisons pertinentes (Hier vs Aujourd'hui).
+ * 4. TRANSFORMATIONS MÉTIER :
+ *    - Pour les branches : Il calcule les pourcentages de réussite et prépare les gradients de couleur pour les graphiques.
+ *    - Pour les priorités : Il trie les élèves par score d'activité pour faire remonter les "décrocheurs".
+ *    - Pour les suggestions : Il détecte les enfants qui ont trop de travaux "en cours" non validés.
+ * 5. MISE EN CACHE : L'objet final est stocké via React Query (pendant 5 min) pour éviter de recalculer ces statistiques lourdes à chaque changement de page.
+ */

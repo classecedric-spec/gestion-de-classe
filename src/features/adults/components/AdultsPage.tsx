@@ -1,10 +1,15 @@
 /**
- * @component AdultsPage
- * @description Page de gestion de l'équipe pédagogique et des types d'activités.
- * Permet d'ajouter, modifier ou supprimer des membres de l'équipe et de configurer les actions disponibles.
+ * Nom du module/fichier : AdultsPage.tsx
  * 
- * @example
- * <AdultsPage />
+ * Données en entrée : 
+ *   - Liste des adultes et types d'activités (via le hook useAdultsPageFlow).
+ *   - États de recherche et de sélection.
+ * 
+ * Données en sortie : 
+ *   - Interface interactive de gestion de l'équipe.
+ *   - Formulaires de création/édition d'adultes et de types d'activités.
+ * 
+ * Objectif principal : Ce composant est la page principale pour gérer "l'humain" dans la classe, hors élèves. Il permet de lister, ajouter et modifier les membres de l'équipe pédagogique (ATSEM, AESH, etc.) ainsi que de définir les types d'actions qu'ils peuvent effectuer (Aide, Surveillance, etc.).
  */
 
 import React from 'react';
@@ -13,6 +18,8 @@ import { Users, Activity, Plus, BookOpen, Clock, ChevronDown, Save, X, ShieldChe
 import { useAdultsPageFlow } from '../hooks/useAdultsPageFlow';
 
 export const AdultsPage: React.FC = () => {
+    // RÉCUPÉRATION DE LA LOGIQUE MÉTIER
+    // On extrait tous les états et fonctions du hook spécialisé pour garder ce composant purement visuel.
     const { states, actions } = useAdultsPageFlow();
 
     const {
@@ -54,8 +61,9 @@ export const AdultsPage: React.FC = () => {
 
     return (
         <div className="h-full flex gap-6 animate-in fade-in duration-500 relative">
-            {/* Left Column: List - 1/4 weight */}
+            {/* COLONNE GAUCHE : LISTE DES ADULTES (1/4 de la largeur) */}
             <div className="w-1/4 flex flex-col gap-6 h-full">
+                {/* En-tête de la liste avec compteur */}
                 <CardInfo ref={leftContentRef} height={headerHeight} contentClassName="space-y-5">
                     <div className="flex items-center justify-between">
                         <h2 className="text-cq-xl font-bold text-text-main flex items-center gap-2">
@@ -69,6 +77,7 @@ export const AdultsPage: React.FC = () => {
 
                     <div className="border-t border-white/10" />
 
+                    {/* Barre de recherche d'adultes */}
                     <div className="space-y-4">
                         <SearchBar
                             placeholder="Rechercher un adulte..."
@@ -79,6 +88,7 @@ export const AdultsPage: React.FC = () => {
                     </div>
                 </CardInfo>
 
+                {/* Liste cliquable des adultes */}
                 <CardList
                     actionLabel="Nouvel Adulte"
                     onAction={handleOpenAddAdult}
@@ -119,9 +129,10 @@ export const AdultsPage: React.FC = () => {
                 </CardList>
             </div>
 
-            {/* Right Column: Content */}
+            {/* COLONNE DROITE : DÉTAILS ET CONFIGURATION */}
             <div className="flex-1 flex flex-col gap-6 h-full min-w-0">
                 {!selectedAdult ? (
+                    // État vide si aucun adulte n'est sélectionné
                     <div className="flex-1 card-flat overflow-hidden">
                         <EmptyState
                             icon={Users}
@@ -132,6 +143,7 @@ export const AdultsPage: React.FC = () => {
                     </div>
                 ) : (
                     <>
+                        {/* En-tête du profil sélectionné */}
                         <CardInfo ref={rightContentRef} height={headerHeight}>
                             <div className="flex gap-6 items-center">
                                 <Avatar
@@ -154,6 +166,7 @@ export const AdultsPage: React.FC = () => {
                             </div>
                         </CardInfo>
 
+                        {/* Onglets : Actions et Informations */}
                         <CardTabs
                             tabs={[
                                 { id: 'types', label: "Types d'actions", icon: Activity },
@@ -165,6 +178,7 @@ export const AdultsPage: React.FC = () => {
                             onAction={activeTab === 'types' ? handleOpenAddActivity : undefined}
                             actionIcon={Plus}
                         >
+                            {/* Onglet : Grille des types d'actions disponibles */}
                             {activeTab === 'types' ? (
                                 <div className="flex flex-col h-full">
                                     <div className="flex-1 overflow-y-auto px-2 pt-2 custom-scrollbar">
@@ -200,6 +214,7 @@ export const AdultsPage: React.FC = () => {
                                     </div>
                                 </div>
                             ) : (
+                                // Onglet : Détails administratifs
                                 <div className="space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-300">
                                     <InfoSection title="Profil de l'Adulte">
                                         <InfoRow
@@ -215,7 +230,7 @@ export const AdultsPage: React.FC = () => {
                                         <InfoRow
                                             icon={Clock}
                                             label="Membre depuis"
-                                            value={new Date(selectedAdult.created_at).toLocaleDateString()}
+                                            value={selectedAdult.created_at ? new Date(selectedAdult.created_at).toLocaleDateString() : 'Non renseigné'}
                                         />
                                     </InfoSection>
                                 </div>
@@ -225,7 +240,7 @@ export const AdultsPage: React.FC = () => {
                 )}
             </div>
 
-            {/* Modals Adults */}
+            {/* FENÊTRE MODALE : AJOUT / MODIFICATION D'UN ADULTE */}
             {showAdultModal && (
                 <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in">
                     <div className="w-full max-w-md bg-surface border border-white/10 rounded-2xl shadow-2xl p-8 animate-in zoom-in-95">
@@ -276,6 +291,7 @@ export const AdultsPage: React.FC = () => {
                 </div>
             )}
 
+            {/* MODALE DE CONFIRMATION DE SUPPRESSION D'ADULTE */}
             <ConfirmModal
                 isOpen={!!adultToDelete}
                 onClose={() => setAdultToDelete(null)}
@@ -287,7 +303,7 @@ export const AdultsPage: React.FC = () => {
                 variant="danger"
             />
 
-            {/* Modals Activities */}
+            {/* FENÊTRE MODALE : AJOUT / MODIFICATION D'UN TYPE D'ACTION */}
             {showActivityModal && (
                 <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in">
                     <div className="w-full max-w-md bg-surface border border-white/10 rounded-2xl shadow-2xl p-8 animate-in zoom-in-95">
@@ -312,6 +328,7 @@ export const AdultsPage: React.FC = () => {
                 </div>
             )}
 
+            {/* MODALE DE CONFIRMATION DE SUPPRESSION DE TYPE D'ACTION */}
             <ConfirmModal
                 isOpen={!!activityToDelete}
                 onClose={() => setActivityToDelete(null)}
@@ -327,3 +344,13 @@ export const AdultsPage: React.FC = () => {
 };
 
 export default AdultsPage;
+
+/**
+ * LOGIGRAMME DE FONCTIONNEMENT :
+ * 
+ * 1. CHARGEMENT : La page récupère les listes d'adultes et d'actions via useAdultsPageFlow.
+ * 2. RECHERCHE : L'utilisateur peut filtrer la liste de gauche en tapant un nom.
+ * 3. SÉLECTION : Cliquer sur un adulte affiche son profil détaillé dans la colonne de droite.
+ * 4. CONFIGURATION : Via l'onglet "Types d'actions", on définit ce que les adultes font en classe.
+ * 5. SAUVEGARDE : Les modales permettent de créer/modifier ces données qui sont envoyées au serveur au clic sur "Enregistrer".
+ */

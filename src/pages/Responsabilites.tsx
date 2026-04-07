@@ -1,3 +1,23 @@
+/**
+ * Nom du module/fichier : Responsabilites.tsx
+ * 
+ * Données en entrée : 
+ *   - Liste des responsabilités (via TanStack Query).
+ *   - État de l'utilisateur (Session).
+ * 
+ * Données en sortie : 
+ *   - Interface de gestion (CRUD) des métiers de la classe.
+ *   - Attribution des élèves aux tâches.
+ * 
+ * Objectif principal : Fournir à l'enseignant un outil pour organiser la vie de la classe. Il peut créer des "rôles" (ex: 'Rangement des jeux'), assigner des élèves à ces rôles, et supprimer les tâches inutiles. L'interface utilise des "mutations" pour que les changements soient visibles instantanément (mises à jour optimistes).
+ * 
+ * Ce que ça orchestre : 
+ *   - La lecture en temps réel des responsabilités.
+ *   - L'ajout rapide d'une nouvelle tâche via le champ en haut à droite.
+ *   - L'ouverture d'un sélecteur d'élèves (Modal) pour chaque tâche.
+ *   - Le retrait individuel d'un élève d'une mission.
+ */
+
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Card, Button, Avatar, Input, SuspenseLoader } from '../core';
@@ -8,23 +28,28 @@ import { useAuth } from '../hooks/useAuth';
 import { toast } from 'react-hot-toast';
 import { getInitials } from '../lib/helpers';
 
+/**
+ * Page de gestion des Responsabilités / Métiers de la classe.
+ */
 const Responsabilites: React.FC = () => {
     const { session } = useAuth();
     const queryClient = useQueryClient();
     const [newTaskTitle, setNewTaskTitle] = useState('');
     const [searchQuery, setSearchQuery] = useState('');
 
-    // Assignment modal state
+    // État pour savoir quelle tâche on est en train de modifier (pour l'assignation)
     const [selectedTask, setSelectedTask] = useState<ResponsabiliteWithEleves | null>(null);
 
-    // 1. Fetch data
+    // 1. RÉCUPÉRATION DES DONNÉES : Charge la liste au démarrage
     const { data: tasks = [], isLoading } = useQuery({
         queryKey: ['responsibilities', session?.user.id],
         queryFn: () => responsabiliteService.getResponsibilities(session!.user.id),
         enabled: !!session?.user.id,
     });
 
-    // 2. Mutations
+    // 2. MUTATIONS (Actions de modification)
+    
+    // ACTION : Créer une nouvelle responsabilité
     const createTaskMutation = useMutation({
         mutationFn: (titre: string) => responsabiliteService.createResponsibility(session!.user.id, titre),
         onMutate: async (titre) => {
@@ -32,6 +57,7 @@ const Responsabilites: React.FC = () => {
             await queryClient.cancelQueries({ queryKey });
             const previous = queryClient.getQueryData<ResponsabiliteWithEleves[]>(queryKey) || [];
 
+            // Ajout visuel immédiat avant même que le serveur réponde
             const tempTask: ResponsabiliteWithEleves = {
                 id: `temp-${Date.now()}`,
                 titre,
@@ -53,6 +79,7 @@ const Responsabilites: React.FC = () => {
         }
     });
 
+    // ACTION : Supprimer une responsabilité
     const deleteTaskMutation = useMutation({
         mutationFn: (id: string) => responsabiliteService.deleteResponsibility(id),
         onMutate: async (id) => {
@@ -72,6 +99,7 @@ const Responsabilites: React.FC = () => {
         }
     });
 
+    // ACTION : Assigner des élèves à une tâche
     const assignMutation = useMutation({
         mutationFn: ({ taskId, eleveIds }: { taskId: string, eleveIds: string[] }) =>
             responsabiliteService.assignStudents(session!.user.id, taskId, eleveIds),
@@ -83,6 +111,7 @@ const Responsabilites: React.FC = () => {
         onError: () => toast.error("Erreur lors de l'assignation")
     });
 
+    // ACTION : Retirer un élève d'une tâche
     const unassignMutation = useMutation({
         mutationFn: (assignmentId: string) => responsabiliteService.unassignStudent(assignmentId),
         onMutate: async (assignmentId) => {
@@ -106,13 +135,14 @@ const Responsabilites: React.FC = () => {
         }
     });
 
-    // Handlers
+    // GESTIONNAIRES DE FORMULAIRE
     const handleAddTask = (e: React.FormEvent) => {
         e.preventDefault();
         if (!newTaskTitle.trim()) return;
         createTaskMutation.mutate(newTaskTitle.trim());
     };
 
+    // Filtrage visuel de la table
     const filteredTasks = tasks.filter(task =>
         task.titre.toLowerCase().includes(searchQuery.toLowerCase())
     );
@@ -121,7 +151,7 @@ const Responsabilites: React.FC = () => {
 
     return (
         <div className="space-y-6 animate-in fade-in duration-500">
-            {/* Header */}
+            {/* 1. Barre d'en-tête (Titre + Ajout rapide) */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
                 <div className="flex items-center gap-3">
                     <div className="p-3 bg-primary/10 rounded-xl">
@@ -151,8 +181,9 @@ const Responsabilites: React.FC = () => {
                 </form>
             </div>
 
-            {/* Content Table */}
+            {/* 2. Tableau Principal */}
             <Card variant="glass" className="overflow-hidden border-none shadow-premium">
+                {/* Barre de recherche interne au tableau */}
                 <div className="p-4 border-b border-white/5 bg-white/5 flex items-center justify-between">
                     <div className="flex items-center gap-2">
                         <Search className="w-4 h-4 text-grey-medium" />
@@ -169,6 +200,7 @@ const Responsabilites: React.FC = () => {
                     </div>
                 </div>
 
+                {/* Contenu : Grille ou Message vide */}
                 {filteredTasks.length === 0 ? (
                     <div className="py-20 text-center flex flex-col items-center justify-center">
                         <div className="p-4 bg-white/5 rounded-full mb-4">
@@ -204,6 +236,7 @@ const Responsabilites: React.FC = () => {
                                         </td>
                                         <td className="px-6 py-6 align-top">
                                             <div className="flex flex-wrap gap-2 min-h-[44px]">
+                                                {/* Liste des enfants sous forme de badges (Chips) */}
                                                 {task.eleves && task.eleves.length > 0 ? (
                                                     task.eleves.map((assignment) => (
                                                         <div
@@ -233,6 +266,7 @@ const Responsabilites: React.FC = () => {
                                                     </span>
                                                 )}
 
+                                                {/* Bouton pour ouvrir la sélection d'élèves */}
                                                 <button
                                                     onClick={() => setSelectedTask(task)}
                                                     className="flex items-center gap-1 text-xs font-bold text-primary hover:bg-primary/10 px-3 py-1.5 rounded-full transition-all border border-primary/20 hover:border-primary/50"
@@ -263,7 +297,7 @@ const Responsabilites: React.FC = () => {
                 )}
             </Card>
 
-            {/* Modals */}
+            {/* FENÊTRES SURGISSANTES (MODALES) */}
             {selectedTask && (
                 <AddStudentToTaskModal
                     isOpen={!!selectedTask}
@@ -278,3 +312,14 @@ const Responsabilites: React.FC = () => {
 };
 
 export default Responsabilites;
+
+/**
+ * LOGIGRAMME DE PAGE :
+ * 
+ * 1. CHARGEMENT -> La page liste tous les métiers configurés par l'enseignant.
+ * 2. CRÉATION -> L'enseignant tape le nom d'un métier et valide. Le métier apparaît immédiatement (effet miroir).
+ * 3. ASSIGNATION -> L'enseignant clique sur "Assigner" dans une ligne.
+ * 4. CHOIX -> Une fenêtre s'ouvre pour choisir les enfants.
+ * 5. VALIDATION -> Les enfants choisis apparaissent sous forme de badges ronds à côté du métier.
+ * 6. RETRAIT -> L'enseignant clique sur la croix d'un badge pour libérer un élève de sa mission.
+ */

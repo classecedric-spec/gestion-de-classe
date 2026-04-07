@@ -1,7 +1,18 @@
 /**
- * @component SettingsSystemTab
- * @description Onglet Système des paramètres. Permet de gérer le thème, 
- * l'environnement de test, le cache, la synchronisation et l'optimisation des photos.
+ * Nom du module/fichier : SettingsSystemTab.tsx
+ * 
+ * Données en entrée : 
+ *   - `setProfile` / `refreshProfile` : Fonctions pour mettre à jour les infos de l'utilisateur après un changement.
+ * 
+ * Données en sortie : 
+ *   - Une interface de configuration regroupant tous les réglages techniques (Thème, Cache, Exports).
+ * 
+ * Objectif principal : Centraliser l'accès à tous les réglages "système" de l'application. Cet onglet permet à l'enseignant de personnaliser l'apparence (Mode sombre/clair), de gérer les données de test (pour s'entraîner), d'optimiser le stockage des photos de classe et de réinitialiser complètement ses données en cas de besoin.
+ * 
+ * Ce que ça orchestre : 
+ *   - L'affichage de plusieurs "sections" thématiques (Apparence, Environnement, Photos...).
+ *   - La "Zone de Danger" pour l'effacement définitif de toutes les données.
+ *   - La synchronisation et le nettoyage du cache local du navigateur.
  */
 
 import React from 'react';
@@ -10,7 +21,7 @@ import { Trash2, AlertTriangle } from 'lucide-react';
 import { useSettingsSystemTabFlow } from '../hooks/useSettingsSystemTabFlow';
 import { ConfirmModal, Card, Button } from '../../../core';
 
-// Sections
+// IMPORT DES SOUS-SECTIONS (Composants spécialisés)
 import { AppearanceSection } from './AppearanceSection';
 import { EnvironmentSection } from './EnvironmentSection';
 import { LuckyCheckSection } from './LuckyCheckSection';
@@ -23,12 +34,17 @@ interface SettingsSystemTabProps {
     refreshProfile?: () => void;
 }
 
+/**
+ * COMPOSANT : Onglet de configuration Système.
+ */
 export const SettingsSystemTab: React.FC<SettingsSystemTabProps> = ({
     setProfile,
     refreshProfile,
 }) => {
+    // RÉCUPÉRATION DE TOUS LES ÉTATS ET ACTIONS via un Hook "Chef d'orchestre"
     const { system, cache, photos } = useSettingsSystemTabFlow(setProfile, refreshProfile);
 
+    // Extraction des fonctions pour la manipulation globale (reset, demo...)
     const {
         isGenerating,
         handleGenerateDemoData,
@@ -39,6 +55,7 @@ export const SettingsSystemTab: React.FC<SettingsSystemTabProps> = ({
         isResetting
     } = system;
 
+    // Extraction des fonctions liées à la mémoire (Cache) et aux élèves
     const {
         cacheStats,
         cacheEnabled,
@@ -62,6 +79,7 @@ export const SettingsSystemTab: React.FC<SettingsSystemTabProps> = ({
         handleSaveDefaultLuckyCheckIndex
     } = cache;
 
+    // Extraction des fonctions liées aux photos
     const {
         isOptimizingPhotos,
         optimizationProgress,
@@ -76,17 +94,17 @@ export const SettingsSystemTab: React.FC<SettingsSystemTabProps> = ({
 
     return (
         <div className="space-y-8 animate-in fade-in slide-in-from-right-4 duration-300">
-            {/* Apparence */}
+            {/* SECTION 1 : Couleurs et mode d'affichage */}
             <AppearanceSection />
 
-            {/* Environnement */}
+            {/* SECTION 2 : Outils techniques (Données de démo, réparations) */}
             <EnvironmentSection
                 handleGenerateDemoData={handleGenerateDemoData}
                 isGenerating={isGenerating}
                 handleCheckAndFixProgressions={handleCheckAndFixProgressions}
             />
 
-            {/* Lucky Check Configuration */}
+            {/* SECTION 3 : Tirage au sort (Lucky Check) */}
             <LuckyCheckSection
                 defaultLuckyCheckIndex={defaultLuckyCheckIndex}
                 setDefaultLuckyCheckIndex={setDefaultLuckyCheckIndex}
@@ -94,7 +112,7 @@ export const SettingsSystemTab: React.FC<SettingsSystemTabProps> = ({
                 handleSaveDefaultLuckyCheckIndex={handleSaveDefaultLuckyCheckIndex}
             />
 
-            {/* Bulk Index Update */}
+            {/* SECTION 4 : Mise à jour par lots des indices élèves */}
             <BulkIndexSection
                 branches={branches}
                 allStudents={allStudents}
@@ -108,7 +126,7 @@ export const SettingsSystemTab: React.FC<SettingsSystemTabProps> = ({
                 handleBulkUpdateIndices={handleBulkUpdateIndices}
             />
 
-            {/* Photo Optimization */}
+            {/* SECTION 5 : Gain de place (Optimisation des photos) */}
             <PhotoOptimizationSection
                 isOptimizingPhotos={isOptimizingPhotos}
                 optimizationProgress={optimizationProgress}
@@ -121,7 +139,7 @@ export const SettingsSystemTab: React.FC<SettingsSystemTabProps> = ({
                 handleOptimizeAllPhotos={handleOptimizeAllPhotos}
             />
 
-            {/* Cache & Sync */}
+            {/* SECTION 6 : Mémoire du navigateur (Cache) */}
             <CacheAndSyncSection
                 cacheStats={cacheStats}
                 cacheEnabled={cacheEnabled}
@@ -131,7 +149,7 @@ export const SettingsSystemTab: React.FC<SettingsSystemTabProps> = ({
                 handleClearSyncData={handleClearSyncData}
             />
 
-            {/* Danger Zone */}
+            {/* SECTION 7 : ZONE CRITIQUE (Effacement total) */}
             <Card variant="default" className="bg-danger/5 border-danger/10 p-6">
                 <h2 className="text-lg font-bold text-danger mb-6 flex items-center gap-2">
                     <AlertTriangle size={20} /> Zone de Danger
@@ -151,7 +169,7 @@ export const SettingsSystemTab: React.FC<SettingsSystemTabProps> = ({
                 </div>
             </Card>
 
-            {/* Hard Reset Confirmation */}
+            {/* FENÊTRE DE SÉCURITÉ : Demande de confirmation avant suicide des données */}
             <ConfirmModal
                 isOpen={showResetModal}
                 onClose={() => setShowResetModal(false)}
@@ -167,3 +185,12 @@ export const SettingsSystemTab: React.FC<SettingsSystemTabProps> = ({
 };
 
 export default SettingsSystemTab;
+
+/**
+ * LOGIGRAMME DE CONFIGURATION :
+ * 
+ * 1. CHARGEMENT -> Le composant récupère tous les réglages actuels depuis la base de données.
+ * 2. AFFICHAGE -> Il découpe les réglages en sections lisibles (Photos, Cache, etc.).
+ * 3. INTERACTION -> Si l'enseignant modifie un paramètre (ex: Thème sombre), le changement est immédiat.
+ * 4. SÉCURITÉ -> Pour les actions graves (Réinitialiser), une fenêtre de confirmation bloque l'action jusqu'à une deuxième validation consciente.
+ */

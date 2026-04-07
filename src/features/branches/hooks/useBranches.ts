@@ -1,3 +1,20 @@
+/**
+ * Nom du module/fichier : useBranches.ts
+ * 
+ * Données en entrée : 
+ *   - L'identifiant de l'enseignant connecté (récupéré via le contexte d'authentification).
+ *   - Les termes de recherche saisis par l'utilisateur.
+ * 
+ * Données en sortie : 
+ *   - La liste des branches filtrées.
+ *   - Les fonctions de gestion (créer, modifier, supprimer, réordonner).
+ *   - L'état de chargement (`loading`).
+ * 
+ * Objectif principal : Servir de "cerveau" pour la gestion des matières. Ce hook orchestre les appels au service de données, gère la mémoire locale (état) pour un affichage instantané, et s'occupe de la sélection de la branche active.
+ * 
+ * Ce que ça affiche : Rien (c'est un hook de logique), mais il alimente les composants de la vue "Matières".
+ */
+
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { branchService } from '../services/branchService';
 import { toast } from 'sonner';
@@ -9,20 +26,6 @@ type BrancheUpdate = Database['public']['Tables']['Branche']['Update'];
 
 type SousBrancheRow = Database['public']['Tables']['SousBranche']['Row'];
 
-// Extended Update types matching what reorder functions expect (containing just enough info)
-// interface BranchReorderItem extends BrancheUpdate {
-//     id: string;
-//     nom: string;
-//     ordre: number;
-// }
-
-// interface SubBranchReorderItem extends SousBrancheUpdate {
-//     id: string;
-//     nom: string;
-//     branche_id: string;
-//     ordre: number;
-// }
-
 export const useBranches = () => {
     const [branches, setBranches] = useState<BrancheRow[]>([]);
     const [loading, setLoading] = useState<boolean>(true);
@@ -31,30 +34,15 @@ export const useBranches = () => {
     const [subBranches, setSubBranches] = useState<SousBrancheRow[]>([]);
     const [loadingSub, setLoadingSub] = useState<boolean>(false);
 
-    // Fetch Branches
+    /**
+     * RÉCUPÉRATION DES MATIÈRES :
+     * Interroge le service pour obtenir toutes les branches de l'enseignant.
+     */
     const fetchBranches = useCallback(async () => {
         setLoading(true);
         try {
             const data = await branchService.fetchBranches();
             setBranches(data);
-
-            // Set initial selection only if none exists and we have data
-            // We use a functional update check or just trust current state
-            // But here inside callback, we can't see current 'selectedBranch' effectively if we remove it from deps without a ref
-            // Actually, best practice: do this logic in useEffect, not in fetchBranches
-            // But since I'm minimally changing:
-            // I'll leave the logic but remove the dep. It will use the stale closure 'selectedBranch' which is likely null on first run, which is fine.
-            // On subsequent runs (manual refetch), strict linting would complain, but for this bug fix it's crucial
-            // properly, I should move the selection logic out.
-
-            // Let's refine:
-            // The goal is just to populate data. Selection logic can handle itself.
-
-            if (data.length > 0) {
-                // Check if we need to select default.
-                // We can't easily check 'selectedBranch' here without adding it to deps.
-                // So we'll dispatch a separate action or just rely on the effect that calls this.
-            }
         } catch (error) {
             console.error("Error fetching branches:", error);
             toast.error("Erreur lors du chargement des branches");
@@ -64,22 +52,20 @@ export const useBranches = () => {
     }, []);
 
     useEffect(() => {
-        fetchBranches().then(() => {
-            // We can check if we need to select a default here if we had access to the data just fetched.
-            // But fetchBranches doesn't return data.
-            // Let's modify fetchBranches to return data if possible, or just rely on 'branches' state effect?
-            // Actually, 'branches' state changes will trigger re-renders.
-        });
+        fetchBranches();
     }, [fetchBranches]);
 
-    // Effect to select first branch if none selected and branches exist
+    // Sélection automatique de la première branche de la liste si aucune n'est choisie.
     useEffect(() => {
         if (branches.length > 0 && !selectedBranch) {
             setSelectedBranch(branches[0]);
         }
     }, [branches, selectedBranch]);
 
-    // Fetch SubBranches
+    /**
+     * RÉCUPÉRATION DES SOUS-BRANCHES :
+     * Dès qu'une branche est sélectionnée, on va chercher ses sous-matières rattachées.
+     */
     const fetchSubBranches = useCallback(async (branchId: string) => {
         if (!branchId) {
             setSubBranches([]);
@@ -91,7 +77,6 @@ export const useBranches = () => {
             setSubBranches(data);
         } catch (error) {
             console.error("Error fetching sub-branches:", error);
-            // toast.error("Erreur chargement sous-branches"); // Optional, might be too noisy
         } finally {
             setLoadingSub(false);
         }
@@ -105,44 +90,44 @@ export const useBranches = () => {
         }
     }, [selectedBranch, fetchSubBranches]);
 
-    // Computed
+    // Filtrage dynamique de la liste selon l'ordinateur de recherche
     const filteredBranches = useMemo(() => {
         return branches.filter(b =>
             b.nom.toLowerCase().includes(searchTerm.toLowerCase())
         );
     }, [branches, searchTerm]);
 
-    // Actions
+    /**
+     * CRÉATION D'UNE BRANCHE :
+     * Ajoute une nouvelle matière et met à jour immédiatement la liste affichée.
+     */
     const createBranch = async (branchData: BrancheInsert): Promise<boolean> => {
         try {
-            // 1. Service Call (Should return full object)
             const newBranch = await branchService.createBranch(branchData);
-
-            // 2. Optimistic Update (Trust the result)
             setBranches(prev => {
-                // Sort alphabetically or by order if needed, assuming name sort for now as per Groups
                 const updated = [...prev, newBranch];
                 return updated.sort((a, b) => (a.nom || '').localeCompare(b.nom || ''));
             });
-
-            // 3. Selection
             setSelectedBranch(newBranch);
-
             toast.success("Branche créée");
             return true;
         } catch (error) {
             console.error("Error creating branch:", error);
             toast.error("Erreur lors de la création");
-            // No rollback needed as we strictly additive here and didn't touch state before success
             return false;
         }
     };
 
+    /**
+     * MISE À JOUR (Optimiste) :
+     * On modifie visuellement la branche avant même d'avoir la réponse du serveur
+     * pour que l'interface soit ultra-réactive. On annule en cas d'erreur.
+     */
     const updateBranch = async (id: string, branchData: BrancheUpdate): Promise<boolean> => {
         const previousBranches = [...branches];
         const previousSelected = selectedBranch;
 
-        // Optimistic UI Update
+        // Mise à jour visuelle immédiate
         setBranches(prev => prev.map(b => b.id === id ? { ...b, ...branchData } as BrancheRow : b));
         if (selectedBranch && selectedBranch.id === id) {
             setSelectedBranch(prev => prev ? ({ ...prev, ...branchData } as BrancheRow) : null);
@@ -150,7 +135,6 @@ export const useBranches = () => {
 
         try {
             const updated = await branchService.updateBranch(id, branchData);
-            // Update with actual server data for consistency
             setBranches(prev => prev.map(b => b.id === id ? updated : b));
             if (selectedBranch && selectedBranch.id === id) {
                 setSelectedBranch(updated);
@@ -159,7 +143,7 @@ export const useBranches = () => {
             return true;
         } catch (error) {
             console.error("Error updating branch:", error);
-            // Revert on error
+            // Retour en arrière si le serveur a échoué
             setBranches(previousBranches);
             setSelectedBranch(previousSelected);
             toast.error("Erreur lors de la mise à jour");
@@ -167,11 +151,14 @@ export const useBranches = () => {
         }
     };
 
+    /**
+     * SUPPRESSION :
+     * Retire la branche de la liste et sélectionne la suivante par défaut.
+     */
     const deleteBranch = async (id: string): Promise<boolean> => {
         const previousBranches = [...branches];
         const previousSelected = selectedBranch;
 
-        // Optimistic UI Update
         const newBranches = branches.filter(b => b.id !== id);
         setBranches(newBranches);
 
@@ -185,7 +172,6 @@ export const useBranches = () => {
             return true;
         } catch (error: any) {
             console.error("Error deleting branch:", error);
-            // Revert on error
             setBranches(previousBranches);
             setSelectedBranch(previousSelected);
             toast.error(error.message || "Erreur lors de la suppression");
@@ -193,6 +179,10 @@ export const useBranches = () => {
         }
     };
 
+    /**
+     * RÉORGANISATION :
+     * Sauvegarde le nouvel ordre des branches principales.
+     */
     const reorderBranches = async (newBranches: BrancheRow[]) => {
         setBranches(newBranches);
         try {
@@ -211,6 +201,10 @@ export const useBranches = () => {
         }
     };
 
+    /**
+     * RÉORGANISATION DES SOUS-BRANCHES :
+     * Sauvegarde le nouvel ordre des spécialités (ex: mettre Géométrie avant Algèbre).
+     */
     const reorderSubBranches = async (newSubBranches: SousBrancheRow[]) => {
         setSubBranches(newSubBranches);
         try {
@@ -252,3 +246,14 @@ export const useBranches = () => {
         refreshSubBranches
     };
 };
+
+/**
+ * LOGIGRAMME DE FONCTIONNEMENT :
+ * 
+ * 1. Le composant demande au hook `useBranches` de s'activer.
+ * 2. ÉTAPE CHARGEMENT : Le hook va chercher toutes les matières de l'enseignant.
+ * 3. ÉTAPE SÉLECTION : Si aucune matière n'est choisie, il sélectionne automatiquement la première de la liste.
+ * 4. ÉTAPE DÉPENDANCE : Dès qu'une matière est sélectionnée, il lance une seconde recherche pour trouver toutes les sous-matières liées.
+ * 5. INTERACTION TECHNIQUE : Si l'enseignant crée une nouvelle branche, le hook envoie la demande au serveur, et s'il réussit, il l'ajoute instantanément à l'écran en la classant par ordre alphabétique.
+ * 6. SÉCURITÉ : Pour les modifications et suppressions, il pratique le "Mise à jour optimiste" : il change l'écran d'abord, et si le serveur renvoie une erreur, il rétablit silencieusement l'état précédent.
+ */

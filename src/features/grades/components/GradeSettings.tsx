@@ -1,3 +1,15 @@
+/**
+ * Nom du module/fichier : GradeSettings.tsx
+ * 
+ * Données en entrée : Les réglages actuels de l'enseignant (ses systèmes de notation et ses périodes scolaires enregisrés).
+ * 
+ * Données en sortie : La création, modification ou suppression de "barèmes types" (ex: "Interro sur 20", "Lettres A-E") et de trimestres/semestres.
+ * 
+ * Objectif principal : Fournir un panneau de configuration propre et centralisé où l'enseignant prépare les règles du jeu de son carnet de cotes.
+ * 
+ * Ce que ça affiche : Deux gros onglets. Le premier permet de construire ses propres systèmes de notation (avec de belles couleurs pour les lettres). Le second permet de découper l'année en périodes (géré par un autre fichier).
+ */
+
 import React, { useState } from 'react';
 import { Settings, Plus, Trash2, Edit2, Save, X, Calculator, CalendarDays } from 'lucide-react';
 import Card from '../../../core/Card';
@@ -21,6 +33,7 @@ const GradeSettings: React.FC = () => {
         config: {} as any
     });
 
+    // Prépare l'envoi sécurisé du nouveau barème (ou de ses modifications) vers la base de données du professeur.
     const handleSave = async () => {
         if (!session?.user) return;
         
@@ -45,6 +58,7 @@ const GradeSettings: React.FC = () => {
         setEditingId(null);
     };
 
+    // Ouvre le formulaire pré-rempli lorsqu'on clique sur le bouton "Modifier" d'un barème existant.
     const startEdit = (type: Tables<'TypeNote'>) => {
         setFormData({
             nom: type.nom,
@@ -55,6 +69,7 @@ const GradeSettings: React.FC = () => {
         setIsAdding(true);
     };
 
+    // Mécanique spéciale pour les barèmes de type "Lettres" : ajoute une nouvelle ligne vide pour définir une nouvelle lettre (ex: 'TB') et sa couleur.
     const addPalier = () => {
         const paliers = [...(formData.config.paliers || [])];
         paliers.push({ letter: '', minPercent: 0, maxPercent: 0, color: 'emerald' });
@@ -85,6 +100,7 @@ const GradeSettings: React.FC = () => {
         });
     };
 
+    // Range automatiquement les paliers (les lettres) du pourcentage le plus faible au plus fort pour éviter les erreurs de logique lors de la création d'un barème.
     const sortPaliers = () => {
         const paliers = [...(formData.config.paliers || [])];
         paliers.sort((a, b) => (a.minPercent || 0) - (b.minPercent || 0));
@@ -407,4 +423,12 @@ const GradeSettings: React.FC = () => {
     );
 };
 
+/**
+ * 1. Le panneau de configuration s'ouvre, par défaut sur l'onglet "Systèmes de Notation".
+ * 2. Il lit la base de données et affiche sous forme de belles cartes tous les barèmes déjà créés par le prof.
+ * 3. Si l'enseignant clique sur "Nouveau", un formulaire intelligent apparaît.
+ * 4. Selon qu'il choisisse "Numérique" ou "Conversion", les options changent (ex: demander juste une note max, ou demander de colorier un système de lettres complexe).
+ * 5. Lors de la conception d'un système de lettres (paliers), le code surveille en temps réel qu'il n'y ait pas d'incohérence entre les pourcentages (ex: qu'un pourcentage max ne soit pas inférieur à un min).
+ * 6. Une fois parfait, l'enseignant clique sur "Enregistrer", l'information part dans le cloud, la surcouche disparaît, et la nouvelle carte apparaît instantanément dans la liste de ses réglages.
+ */
 export default GradeSettings;

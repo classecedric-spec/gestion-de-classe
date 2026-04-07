@@ -1,3 +1,22 @@
+/**
+ * Nom du module/fichier : AddStudentToTaskModal.tsx
+ * 
+ * Données en entrée : 
+ *   - `isOpen` : Affiche ou cache la fenêtre.
+ *   - `alreadyAssignedIds` : Liste des élèves qui ont déjà cette responsabilité (pour éviter les doublons).
+ *   - `taskTitle` : Nom de la mission (ex: 'Arrosage des plantes').
+ * 
+ * Données en sortie : 
+ *   - `onSelect` : Renvoie la liste des identifiants des nouveaux élèves choisis.
+ * 
+ * Objectif principal : Permettre à l'enseignant de choisir visuellement un ou plusieurs élèves pour une tâche précise. La fenêtre affiche un trombinoscope complet de la classe, permet de chercher par nom, et grise automatiquement les enfants qui sont déjà affectés à ce rôle.
+ * 
+ * Ce que ça affiche : 
+ *   - Une barre de recherche.
+ *   - Une grille de "cartes" d'élèves (Photo, Prénom, Nom) que l'on peut cocher.
+ *   - Un bouton de validation qui indique le nombre de sélections.
+ */
+
 import React, { useState, useMemo } from 'react';
 import { Modal, Input, Avatar, Button } from '../../../core';
 import { Search, Check } from 'lucide-react';
@@ -13,6 +32,9 @@ interface AddStudentToTaskModalProps {
     taskTitle: string;
 }
 
+/**
+ * Fenêtre de sélection d'élèves pour une responsabilité.
+ */
 const AddStudentToTaskModal: React.FC<AddStudentToTaskModalProps> = ({
     isOpen,
     onClose,
@@ -20,10 +42,14 @@ const AddStudentToTaskModal: React.FC<AddStudentToTaskModalProps> = ({
     alreadyAssignedIds,
     taskTitle
 }) => {
+    // Récupération de la liste des élèves depuis le service dédié
     const { students, loading } = useStudentsData();
     const [search, setSearch] = useState('');
     const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
+    /**
+     * FILTRAGE : Filtre les élèves selon ce que l'utilisateur tape dans la barre de recherche.
+     */
     const filteredStudents = useMemo(() => {
         return students.filter(s => {
             const fullName = `${s.prenom} ${s.nom}`.toLowerCase();
@@ -31,6 +57,9 @@ const AddStudentToTaskModal: React.FC<AddStudentToTaskModalProps> = ({
         });
     }, [students, search]);
 
+    /**
+     * SÉLECTION : Ajoute ou retire un élève de la liste temporaire.
+     */
     const handleToggleSelect = (eleveId: string) => {
         setSelectedIds(prev =>
             prev.includes(eleveId)
@@ -39,6 +68,9 @@ const AddStudentToTaskModal: React.FC<AddStudentToTaskModalProps> = ({
         );
     };
 
+    /**
+     * VALIDATION : Envoie le choix final au parent.
+     */
     const handleValidate = () => {
         if (selectedIds.length > 0) {
             onSelect(selectedIds);
@@ -53,6 +85,7 @@ const AddStudentToTaskModal: React.FC<AddStudentToTaskModalProps> = ({
             className="!max-w-[800px]"
         >
             <div className="space-y-6">
+                {/* Barre de recherche et Bouton de validation */}
                 <div className="flex flex-col sm:flex-row gap-4 items-center justify-between">
                     <div className="relative w-full sm:w-2/3">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-grey-medium" />
@@ -75,6 +108,7 @@ const AddStudentToTaskModal: React.FC<AddStudentToTaskModalProps> = ({
                     </Button>
                 </div>
 
+                {/* Trombinoscope / Liste des élèves */}
                 <div className="max-h-[500px] overflow-y-auto pr-2 custom-scrollbar">
                     {loading ? (
                         <div className="py-20 text-center text-grey-medium animate-pulse">
@@ -93,7 +127,7 @@ const AddStudentToTaskModal: React.FC<AddStudentToTaskModalProps> = ({
                                 return (
                                     <button
                                         key={student.id}
-                                        disabled={isAlreadyAssigned}
+                                        disabled={isAlreadyAssigned} // Grise l'élève s'il a déjà cet emploi
                                         onClick={() => handleToggleSelect(student.id)}
                                         className={clsx(
                                             "flex items-center gap-3 p-2 rounded-2xl transition-all group relative border",
@@ -115,6 +149,7 @@ const AddStudentToTaskModal: React.FC<AddStudentToTaskModalProps> = ({
                                                     isSelected && "ring-primary shadow-lg shadow-primary/20"
                                                 )}
                                             />
+                                            {/* Petit 'vu' si sélectionné */}
                                             {isSelected && (
                                                 <div className="absolute -bottom-1 -right-1 bg-primary text-text-dark p-0.5 rounded-full z-10">
                                                     <Check className="w-3 h-3 stroke-[3]" />
@@ -133,6 +168,7 @@ const AddStudentToTaskModal: React.FC<AddStudentToTaskModalProps> = ({
                                             </p>
                                         </div>
 
+                                        {/* Déjà assigné : petit badge vert permanent */}
                                         {isAlreadyAssigned && (
                                             <div className="absolute top-1 right-1 bg-emerald-500 text-white p-0.5 rounded-full shadow-lg">
                                                 <Check className="w-2.5 h-2.5 stroke-[4]" />
@@ -150,3 +186,13 @@ const AddStudentToTaskModal: React.FC<AddStudentToTaskModalProps> = ({
 };
 
 export default AddStudentToTaskModal;
+
+/**
+ * LOGIGRAMME DE SÉLECTION :
+ * 
+ * 1. OUVERTURE -> La fenêtre demande au système la liste de tous les élèves de l'école.
+ * 2. PRÉPARATION -> Elle regarde quels élèves sont déjà responsables de cette tâche et les grise.
+ * 3. RECHERCHE -> L'enseignant tape un nom pour trouver l'élève plus vite.
+ * 4. CHOIX -> L'enseignant clique sur une ou plusieurs photos. Le bouton "Valider" s'illumine.
+ * 5. VALIDATION -> L'enseignant clique sur "Valider". La fenêtre se ferme et transmet la liste des élus au service de sauvegarde.
+ */

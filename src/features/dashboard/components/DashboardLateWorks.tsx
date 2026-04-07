@@ -1,3 +1,15 @@
+/**
+ * Nom du module/fichier : DashboardLateWorks.tsx
+ * 
+ * Données en entrée : 
+ *   - overdueStudents : Liste des élèves classés par niveau scolaire, ayant des travaux en retard (modules dont la date d'échéance est passée).
+ *   - onStudentClick : Fonction déclenchée au clic pour ouvrir le profil de l'élève.
+ * 
+ * Données en sortie : Un affichage en accordéon listant les élèves et le détail de leurs ateliers non terminés.
+ * 
+ * Objectif principal : Identifier visuellement les "retards" administratifs et pédagogiques. Le composant permet à l'enseignant de voir quel élève a dépassé la date limite d'un module, quelles activités spécifiques sont concernées, et dans quel domaine (Maths, Français, etc.). C'est un outil de relance indispensable.
+ */
+
 import React, { useState } from 'react';
 import { AlertCircle, Calendar, FileText, ChevronDown, BookOpen, Clock, Layers } from 'lucide-react';
 import { getInitials } from '../../../lib/helpers';
@@ -42,9 +54,14 @@ interface DashboardLateWorksProps {
     onStudentClick: (student: any) => void;
 }
 
+/**
+ * Composant listant les travaux en retard pour chaque élève.
+ */
 const DashboardLateWorks: React.FC<DashboardLateWorksProps> = ({ overdueStudents, onStudentClick }) => {
+    // État pour savoir quelle carte d'élève est "dépliée" (accordéon)
     const [expandedStudents, setExpandedStudents] = useState<Record<string, boolean>>({});
 
+    // Bascule l'affichage du détail pour un élève
     const toggleStudent = (studentId: string) => {
         setExpandedStudents(prev => ({
             ...prev,
@@ -52,11 +69,13 @@ const DashboardLateWorks: React.FC<DashboardLateWorksProps> = ({ overdueStudents
         }));
     };
 
+    // Formatage propre de la date pour l'affichage (ex: 25/03/2024)
     const formatDate = (dateStr: string) => {
         if (!dateStr) return '-';
         return new Date(dateStr).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' });
     };
 
+    // Si aucun retard n'est détecté, on affiche un message de félicitations
     if (overdueStudents.length === 0) {
         return (
             <div className="flex flex-col items-center justify-center py-20 bg-surface/30 rounded-3xl border border-white/5 border-dashed text-grey-medium space-y-4">
@@ -77,7 +96,7 @@ const DashboardLateWorks: React.FC<DashboardLateWorksProps> = ({ overdueStudents
         <div className="space-y-8">
             {overdueStudents.map((level) => (
                 <div key={level.name} className="space-y-4">
-                    {/* Level Separator */}
+                    {/* Séparateur par niveau (ex: Niveau 1, Niveau 2) */}
                     <div className="flex items-center gap-3 py-2 px-1 border-b border-white/5">
                         <Layers size={18} className="text-primary" />
                         <h2 className="text-lg font-bold text-white uppercase tracking-wider">
@@ -97,7 +116,7 @@ const DashboardLateWorks: React.FC<DashboardLateWorksProps> = ({ overdueStudents
                                     key={student.id}
                                     className={`bg-surface border border-white/5 rounded-2xl overflow-hidden transition-all duration-300 ${isExpanded ? 'ring-1 ring-primary/20 shadow-lg' : 'hover:border-white/10'}`}
                                 >
-                                    {/* Student Card Header */}
+                                    {/* En-tête de la carte élève (Cliquable pour déplier) */}
                                     <div
                                         className="p-4 flex items-center justify-between cursor-pointer group"
                                         onClick={() => toggleStudent(student.id)}
@@ -123,6 +142,7 @@ const DashboardLateWorks: React.FC<DashboardLateWorksProps> = ({ overdueStudents
                                         </div>
 
                                         <div className="flex items-center gap-2">
+                                            {/* Bouton pour ouvrir la fiche complète de l'élève */}
                                             <button
                                                 onClick={(e) => {
                                                     e.stopPropagation();
@@ -133,26 +153,26 @@ const DashboardLateWorks: React.FC<DashboardLateWorksProps> = ({ overdueStudents
                                             >
                                                 <Clock size={18} />
                                             </button>
+                                            {/* Icône de flèche pour indiquer l'état de l'accordéon */}
                                             <div className={`p-2 rounded-xl bg-white/5 text-grey-light transition-transform duration-300 ${isExpanded ? 'rotate-180 text-primary' : ''}`}>
                                                 <ChevronDown size={20} />
                                             </div>
                                         </div>
                                     </div>
 
-                                    {/* Expanded Details (Accordion) */}
+                                    {/* Détail des modules en retard (Affiché si la carte est dépliée) */}
                                     {isExpanded && (
                                         <div className="px-4 pb-4 border-t border-white/5 bg-white/[0.01]">
                                             <div className="mt-4 space-y-6">
                                                 {student.overdueModules.map((module) => (
                                                     <div key={module.id} className="space-y-3 pl-2 border-l-2 border-white/10">
-                                                        {/* Module Header */}
+                                                        {/* Nom du module et branche associée */}
                                                         <div className="flex flex-col md:flex-row md:items-center justify-between gap-2">
                                                             <div className="space-y-1">
                                                                 <div className="flex items-center gap-2">
                                                                     <BookOpen size={16} className="text-grey-medium" />
                                                                     <span className="font-bold text-white">{module.nom}</span>
                                                                 </div>
-                                                                {/* Breadcrumb: Branche > Sous-branche */}
                                                                 <div className="text-[10px] text-grey-medium flex items-center gap-1 uppercase tracking-wider">
                                                                     <span className="font-bold" style={{ color: module.SousBranche?.Branche?.couleur }}>
                                                                         {module.SousBranche?.Branche?.nom}
@@ -161,13 +181,14 @@ const DashboardLateWorks: React.FC<DashboardLateWorksProps> = ({ overdueStudents
                                                                     <span>{module.SousBranche?.nom}</span>
                                                                 </div>
                                                             </div>
+                                                            {/* Rappel de la date d'échéance dépassée */}
                                                             <div className="flex items-center gap-2 px-3 py-1 bg-danger/10 text-danger rounded-lg border border-danger/20 self-start md:self-center">
                                                                 <Calendar size={14} />
                                                                 <span className="text-xs font-bold">{formatDate(module.date_fin)}</span>
                                                             </div>
                                                         </div>
 
-                                                        {/* Activity List */}
+                                                        {/* Liste des exercices/activités spécifiques du module */}
                                                         <ul className="space-y-2 ml-6">
                                                             {module.activities.map((act) => (
                                                                 <li key={act.id} className="flex items-center gap-2 text-sm text-grey-light">
@@ -198,3 +219,16 @@ const DashboardLateWorks: React.FC<DashboardLateWorksProps> = ({ overdueStudents
 };
 
 export default DashboardLateWorks;
+
+/**
+ * LOGIGRAMME DE FONCTIONNEMENT :
+ * 
+ * 1. CHARGEMENT : Le composant reçoit les élèves ayant au moins un module "overdue" (en retard).
+ * 2. STRUCTURE : Il groupe ces élèves par niveau scolaire (ex: MS, GS).
+ * 3. SYNTHÈSE : Chaque carte élève affiche le nombre total d'ateliers en retard en rouge.
+ * 4. DÉTAILLAGE : Au clic sur un élève, le composant déplie un panneau montrant :
+ *    - Le nom du module concerné et sa date de fin prévue.
+ *    - La branche parente (couleur et nom).
+ *    - La liste précise des activités non validées.
+ * 5. ACTION : L'enseignant peut alors ouvrir la fiche élève pour corriger ou relancer le travail.
+ */

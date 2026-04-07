@@ -1,3 +1,18 @@
+/**
+ * Nom du module/fichier : AddBranchModal.tsx
+ * 
+ * Données en entrée : 
+ *   - `isOpen` : Indique si la fenêtre doit être affichée.
+ *   - `branchToEdit` : (Optionnel) Les données d'une branche existante si on est en mode modification.
+ * 
+ * Données en sortie : 
+ *   - L'appel à `onSubmit` avec le nom et la photo de la branche.
+ * 
+ * Objectif principal : Offrir une interface simple pour créer ou modifier une matière principale (une "Branche") comme les Français, les Mathématiques ou le Sport.
+ * 
+ * Ce que ça affiche : Une fenêtre surgissante contenant un champ de texte pour le nom et une zone pour télécharger une image ou un logo représentatif.
+ */
+
 import React, { useState, useEffect } from 'react';
 import { BookOpen } from 'lucide-react';
 import { FormModal, ImageUpload } from '../../../core';
@@ -19,6 +34,7 @@ const AddBranchModal: React.FC<AddBranchModalProps> = ({ isOpen, onClose, onSubm
     const [photoUrl, setPhotoUrl] = useState<string | null>(null);
     const [loading, setLoading] = useState<boolean>(false);
 
+    // Initialise les champs si on modifie une branche existante
     useEffect(() => {
         if (isOpen) {
             if (branchToEdit) {
@@ -35,6 +51,7 @@ const AddBranchModal: React.FC<AddBranchModalProps> = ({ isOpen, onClose, onSubm
 
     if (!isOpen) return null;
 
+    // Déclenche l'enregistrement des données vers le service parent
     const handleSubmit = async () => {
         if (!nom.trim()) return;
 
@@ -66,6 +83,7 @@ const AddBranchModal: React.FC<AddBranchModalProps> = ({ isOpen, onClose, onSubm
             size="sm"
         >
             <div className="space-y-4">
+                {/* Champ de saisie du nom */}
                 <div className="space-y-2">
                     <label className="text-sm font-medium text-gray-300">Nom de la Branche</label>
                     <input
@@ -78,6 +96,7 @@ const AddBranchModal: React.FC<AddBranchModalProps> = ({ isOpen, onClose, onSubm
                     />
                 </div>
 
+                {/* Zone de téléchargement du logo */}
                 <div className="space-y-2">
                     <label className="text-sm font-medium text-gray-300">Logo (Optionnel)</label>
                     <ImageUpload
@@ -97,4 +116,14 @@ const AddBranchModal: React.FC<AddBranchModalProps> = ({ isOpen, onClose, onSubm
     );
 };
 
+/**
+ * LOGIGRAMME DE FONCTIONNEMENT :
+ * 
+ * 1. L'enseignant décide de créer une nouvelle matière (ex: "Art").
+ * 2. La fenêtre `AddBranchModal` s'ouvre. Si c'est une modification, elle pré-remplit le nom "Art".
+ * 3. L'enseignant tape le nom et, s'il le souhaite, choisit une icône ou une photo sur son ordinateur.
+ * 4. Au clic sur "Créer" ou "Sauvegarder", l'ordinateur vérifie que le nom n'est pas vide.
+ * 5. La branche est envoyée au programme principal pour être sauvegardée dans la base de données.
+ * 6. La fenêtre se ferme automatiquement.
+ */
 export default AddBranchModal;

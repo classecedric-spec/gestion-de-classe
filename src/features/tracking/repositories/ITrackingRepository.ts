@@ -1,97 +1,143 @@
+/**
+ * Nom du module/fichier : ITrackingRepository.ts
+ * 
+ * Objectif principal : Définir le "Contrat de Service" pour les données du suivi. 
+ * Ce fichier est une Interface (un moule). Il liste toutes les actions que le logiciel doit pouvoir faire avec la base de données (enregistrer un progrès, chercher un élève tuteur, charger les préférences de l'enseignant). 
+ * Utiliser une interface permet de changer de base de données plus facilement à l'avenir sans casser le reste du code.
+ */
+
 import { TablesInsert, Tables } from '../../../types/supabase';
 import { ProgressionWithDetails, StudentBasicInfo } from '../types/tracking.types';
 
 /**
- * Repository interface for Tracking feature
- * Handles all data access operations for pedagogical tracking
+ * Interface du "Magasin de données" (Repository) pour le module Suivi.
  */
 export interface ITrackingRepository {
-    // ==================== PROGRESSIONS ====================
+    // ==================== LES AVANCEMENTS (PROGRESSIONS) ====================
 
     /**
-     * Fetch progressions for given students with specific states
-     * Includes related student, activity, module, and branch information
+     * Récupère l'historique des exercices pour un groupe d'élèves.
      */
     fetchProgressions(studentIds: string[], states: string[]): Promise<ProgressionWithDetails[]>;
 
     /**
-     * Update the status of a progression
+     * Change l'état d'un exercice (ex: passe de "En cours" à "Terminé").
      */
     updateProgressionStatus(id: string, newState: string, isSuivi: boolean): Promise<void>;
 
     /**
-     * Delete a progression record
+     * Supprime une trace d'avancement.
      */
     deleteProgression(id: string): Promise<void>;
 
     /**
-     * Create multiple progression records at once
+     * Enregistre plusieurs avancements d'un coup (importation massive).
      */
     createProgressions(progressions: TablesInsert<'Progression'>[]): Promise<void>;
 
     /**
-     * Upsert a progression record (insert or update on conflict)
+     * Enregistre ou met à jour un avancement s'il existe déjà.
      */
     upsertProgression(progression: TablesInsert<'Progression'>): Promise<void>;
 
-    // ==================== HELPERS ====================
+    // ==================== L'ENTRAIDE (HELPERS) ====================
 
     /**
-     * Find students who have a specific status for an activity
-     * Used to find potential helpers (students who finished an activity)
+     * Trouve les élèves qui ont déjà fini un exercice précis (pour suggérer des tuteurs).
      */
     findStudentsByActivityStatus(activityId: string, studentIds: string[], status: string): Promise<StudentBasicInfo[]>;
 
-    // ==================== GROUPS ====================
+    // ==================== LES GROUPES / CLASSES ====================
 
     /**
-     * Get group information by ID
+     * Récupère le nom d'une classe par son code.
      */
     getGroupInfo(groupId: string): Promise<{ nom: string } | null>;
 
     /**
-     * Get all students in a group
-     * Returns both IDs and full student records
+     * Récupère la liste complète des élèves d'une classe.
      */
     getStudentsInGroup(groupId: string): Promise<{ ids: string[], full: Tables<'Eleve'>[] }>;
 
-    // ==================== USER PREFERENCES ====================
+    // ==================== PRÉFÉRENCES DE L'UTILISATEUR ====================
 
     /**
-     * Save a user preference
+     * Mémorise un réglage choisi par l'enseignant (ex: taille des colonnes).
      */
     saveUserPreference(userId: string, key: string, value: any): Promise<void>;
 
     /**
-     * Load a user preference
+     * Relit un réglage mémorisé.
      */
     loadUserPreference(userId: string, key: string): Promise<any | null>;
 
-    // ==================== PEDAGOGICAL DATA ====================
+    // ==================== DONNÉES PÉDAGOGIQUES ====================
+    
+    /** Récupère les élèves pour l'affichage de la grille de suivi. */
     getStudentsForPedago(groupId: string): Promise<any[]>;
+    
+    /** Liste les chapitres disponibles pour un niveau scolaire donné. */
     fetchModulesForStudent(levelId: string | null): Promise<any[]>;
+    
+    /** Liste les chapitres pour l'interface mobile. */
     fetchMobileModules(): Promise<any[]>;
+    
+    /** Liste tous les exercices à l'intérieur d'un chapitre. */
     fetchActivitiesForModule(moduleId: string): Promise<any[]>;
+    
+    /** Récupère les avancées globales de toute la classe. */
     fetchGroupProgressions(studentIds: string[]): Promise<any[]>;
+    
+    /** Crée une carte (dictionnaire) des progrès d'un élève pour un accès rapide. */
     fetchStudentProgressionsMap(studentId: string): Promise<Record<string, string>>;
 
-    // ==================== DASHBOARD ====================
+    // ==================== TABLEAU DE BORD (STATS) ====================
+    
+    /** Calcule le nombre de mains levées et de validations faites aujourd'hui. */
     getDashboardStats(filterStudentIds: string[] | null): Promise<{ helpPending: number; validationsToday: number }>;
 
-    // ==================== TBI / SPECIFIC FETCHES ====================
+    // ==================== RECHERCHES SPÉCIFIQUES (TBI/Vision) ====================
+    
+    /** Récupère les chapitres avec leurs pourcentages d'avancement. */
     getModulesWithProgressions(studentId: string, levelId?: string): Promise<any[]>;
+    
+    /** Détaille tous les exercices d'un chapitre pour un élève précis. */
     getModuleActivitiesAndProgressions(moduleId: string, studentId: string): Promise<{ activities: any[], progressions: any[] }>;
+    
+    /** Liste toutes les demandes d'aide en cours pour la classe. */
     getHelpRequests(studentIds: string[]): Promise<any[]>;
+    
+    /** Statistiques d'état pour une liste d'exercices. */
     getProgressionStatsForActivities(activityIds: string[]): Promise<{ activite_id: string, etat: string }[]>;
+    
+    /** Qui a fait quoi sur un exercice précis. */
     fetchProgressionsByActivity(activityId: string): Promise<any[]>;
+    
+    /** Historique complet et détaillé d'un élève. */
     fetchStudentProgressDetails(studentId: string): Promise<any[]>;
+    
+    /** Liste les exercices appartenant à plusieurs chapitres. */
     getActivitiesByModules(moduleIds: string[]): Promise<any[]>;
+    
+    /** Récupère les liens entre élèves et exercices spécifiques. */
     getProgressionsForStudentsAndActivities(studentIds: string[], activityIds: string[]): Promise<any[]>;
+    
+    /** Met à jour le score de confiance algorithmique d'un élève. */
     updateStudentTrust(eleveId: string, branchId: string, adjustment: number, trend: 'up' | 'down' | 'stable'): Promise<void>;
 
-    // Avant Mail
+    // Gestion des envois hebdomadaires
+    /** Liste les exercices non terminés après une date limite. */
     getUnfinishedModulesByDate(studentId: string, date: string): Promise<any[]>;
 }
 
-// Re-export types for convenience
 export type { ProgressionWithDetails, StudentBasicInfo };
+
+/**
+ * LOGIGRAMME DE FONCTIONNEMENT :
+ * 
+ * 1. BESOIN : L'application veut afficher la liste des élèves de l'atelier "Maths".
+ * 2. APPEL : Elle appelle la méthode `getStudentsInGroup(code_classe)`.
+ * 3. CONTRAT : L'interface garantit que cette méthode renverra TOUJOURS une liste d'identifiants et de fiches élèves.
+ * 4. RÉALISATION : C'est le fichier "SupabaseTrackingRepository" qui fera le vrai travail de discussion avec la base de données pour remplir ce contrat.
+ * 5. AVANTAGE : Si demain on change de serveur, on crée un nouveau fichier mais on garde cette interface identique. Le reste de l'application (le Dashboard) n'y verra que du feu.
+ */

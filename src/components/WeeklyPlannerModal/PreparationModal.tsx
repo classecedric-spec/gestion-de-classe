@@ -1,3 +1,23 @@
+/**
+ * Nom du module/fichier : WeeklyPlannerModal/PreparationModal.tsx
+ * 
+ * Données en entrée : 
+ *   - `modules` : Liste des modules d'apprentissage existants.
+ *   - `dockedItems` : Éléments déjà sélectionnés pour la semaine.
+ *   - `onToggleDock` : Fonction pour ajouter/retirer un élément de la sélection.
+ * 
+ * Données en sortie : 
+ *   - Mise à jour de la liste des activités "prêtes à être planifiées".
+ * 
+ * Objectif principal : Permettre à l'enseignant de préparer ses supports AVANT de les placer dans la grille. C'est comme préparer ses livres sur son bureau avant de commencer son cours. On peut y piocher des modules existants ou créer des étiquettes de texte personnalisées (ex: "Sortie piscine").
+ * 
+ * Ce que ça orchestre : 
+ *   - La recherche et le filtrage des modules de la classe.
+ *   - La création rapide de nouvelles activités personnalisées.
+ *   - La mémorisation des activités perso pour une réutilisation ultérieure.
+ *   - L'ouverture de la fenêtre de création de module complet si besoin.
+ */
+
 import React, { useState, useEffect } from 'react';
 import { X, Search, Plus, Briefcase } from 'lucide-react';
 import { supabase } from '../../lib/database';
@@ -20,9 +40,10 @@ interface PreparationModalProps {
 const activityRepository = new SupabaseActivityRepository();
 
 /**
- * PreparationModal - Modal pour préparer le dock
+ * COMPOSANT : Fenêtre de préparation "DOCK".
  */
 const PreparationModal: React.FC<PreparationModalProps> = ({ isOpen, onClose, modules, dockedItems, onToggleDock, currentWeekDate, fetchModules }) => {
+    // ÉTATS LOCAUX : Navigation, recherche, filtrage
     const [activeTab, setActiveTab] = useState<'modules' | 'custom'>('modules');
     const [search, setSearch] = useState('');
     const [filter, setFilter] = useState('en_cours');
@@ -32,6 +53,7 @@ const PreparationModal: React.FC<PreparationModalProps> = ({ isOpen, onClose, mo
     const [showAddInput, setShowAddInput] = useState(false);
     const [showAddModuleModal, setShowAddModuleModal] = useState(false);
 
+    // Chargement des activités personnalisées mémorisées
     useEffect(() => {
         if (isOpen) fetchSavedCustom();
     }, [isOpen]);
@@ -45,6 +67,7 @@ const PreparationModal: React.FC<PreparationModalProps> = ({ isOpen, onClose, mo
         }
     };
 
+    // FILTRAGE : Liste des modules selon la recherche et le statut (En cours, Archivé...)
     const filteredModules = modules.filter(m => {
         const matchesSearch = m.nom.toLowerCase().includes(search.toLowerCase());
         if (search.length > 0) return matchesSearch;
@@ -54,12 +77,17 @@ const PreparationModal: React.FC<PreparationModalProps> = ({ isOpen, onClose, mo
 
     const filteredCustom = savedCustom.filter(s => s.title.toLowerCase().includes(customSearch.toLowerCase()));
 
+    /**
+     * ACTION : Ajoute une nouvelle étiquette personnalisée.
+     */
     const handleAddCustom = async (textToUse: string | null = null) => {
         const text = textToUse || customText;
         if (!text.trim()) return;
 
+        // Ajout immédiat au dock visuel
         onToggleDock({ nom: text, isCustom: true }, false);
 
+        // Si c'est une nouvelle saisie, on l'enregistre en BDD pour la retenir
         if (!textToUse) {
             setCustomText('');
             if (!savedCustom.some(s => s.title.toLowerCase() === text.toLowerCase())) {
@@ -76,6 +104,9 @@ const PreparationModal: React.FC<PreparationModalProps> = ({ isOpen, onClose, mo
         }
     };
 
+    /**
+     * ACTION : Supprime une activité personnalisée de la mémoire.
+     */
     const handleDeleteSaved = async (id: string, e: React.MouseEvent) => {
         e.stopPropagation();
         try {
@@ -90,6 +121,7 @@ const PreparationModal: React.FC<PreparationModalProps> = ({ isOpen, onClose, mo
 
     return (
         <div className="absolute inset-0 z-50 bg-background flex flex-col animate-in slide-in-from-bottom duration-300">
+            {/* EN-TÊTE DE LA MODALE */}
             <div className="p-6 border-b border-border flex justify-between items-center bg-surface">
                 <div>
                     <h3 className="text-xl font-black text-text-main uppercase flex items-center gap-3">
@@ -102,7 +134,7 @@ const PreparationModal: React.FC<PreparationModalProps> = ({ isOpen, onClose, mo
                 </button>
             </div>
 
-            {/* Tabs & Actions */}
+            {/* NAVIGATION : Onglets Modules / Activités Perso */}
             <div className="px-6 pt-4 flex justify-between items-end border-b border-white/5">
                 <div className="flex gap-4">
                     <button
@@ -119,7 +151,7 @@ const PreparationModal: React.FC<PreparationModalProps> = ({ isOpen, onClose, mo
                     </button>
                 </div>
 
-                {/* Ajout bouton Nouveau Module */}
+                {/* Raccourci vers la création d'un module complet */}
                 {activeTab === 'modules' && (
                     <button
                         onClick={() => setShowAddModuleModal(true)}
@@ -130,11 +162,12 @@ const PreparationModal: React.FC<PreparationModalProps> = ({ isOpen, onClose, mo
                 )}
             </div>
 
-            {/* Content: Modules */}
+            {/* CONTENU : Liste des Modules */}
             {activeTab === 'modules' && (
                 <>
                     <div className="p-4 border-b border-border bg-surface/50">
                         <div className="max-w-4xl mx-auto flex gap-4">
+                            {/* Recherche textuelle */}
                             <div className="relative flex-1">
                                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-grey-medium" size={16} />
                                 <input
@@ -145,6 +178,7 @@ const PreparationModal: React.FC<PreparationModalProps> = ({ isOpen, onClose, mo
                                     onChange={e => setSearch(e.target.value)}
                                 />
                             </div>
+                            {/* Filtres par statut */}
                             <div className="flex bg-input p-1 rounded-xl gap-1">
                                 {['en_cours', 'en_preparation', 'archive', 'all'].map(f => (
                                     <button
@@ -178,7 +212,7 @@ const PreparationModal: React.FC<PreparationModalProps> = ({ isOpen, onClose, mo
                 </>
             )}
 
-            {/* Content: Custom */}
+            {/* CONTENU : Activités Personnalisées */}
             {activeTab === 'custom' && (
                 <>
                     <div className="p-4 border-b border-border bg-surface/50">
@@ -198,6 +232,7 @@ const PreparationModal: React.FC<PreparationModalProps> = ({ isOpen, onClose, mo
 
                     <div className="flex-1 overflow-y-auto p-6 custom-scrollbar">
                         <div className="max-w-4xl mx-auto flex flex-col gap-6">
+                            {/* Liste de la mémoire */}
                             {savedCustom.length > 0 ? (
                                 <div>
                                     <h4 className="text-xs font-bold text-grey-medium uppercase tracking-widest mb-4 flex items-center gap-2">
@@ -231,6 +266,7 @@ const PreparationModal: React.FC<PreparationModalProps> = ({ isOpen, onClose, mo
                                 </div>
                             )}
 
+                            {/* Saisie d'une nouvelle activité */}
                             {!showAddInput ? (
                                 <div className="flex justify-center py-4">
                                     <button
@@ -280,7 +316,7 @@ const PreparationModal: React.FC<PreparationModalProps> = ({ isOpen, onClose, mo
                 </>
             )}
 
-            {/* Modal de création de module */}
+            {/* Fenêtre secondaire : Création de module complet */}
             <AddModuleModal
                 isOpen={showAddModuleModal}
                 onClose={() => setShowAddModuleModal(false)}
@@ -294,3 +330,13 @@ const PreparationModal: React.FC<PreparationModalProps> = ({ isOpen, onClose, mo
 };
 
 export default PreparationModal;
+
+/**
+ * LOGIGRAMME DE PRÉPARATION :
+ * 
+ * 1. ENTRÉE -> L'enseignant ouvre le mode "Préparation".
+ * 2. CHOIX -> Il sélectionne les modules qu'il compte enseigner cette semaine (ils s'allument en jaune).
+ * 3. CRÉATION -> Si besoin, il tape "Conseil de classe" pour l'ajouter à sa liste personnalisée.
+ * 4. VALIDATION -> En cliquant sur "Terminer", les éléments choisis sont envoyés vers le "DOCK".
+ * 5. PLANIFICATION -> Ces éléments sont maintenant prêts à être glissés dans l'agenda hebdomadaire.
+ */

@@ -1,15 +1,25 @@
+/**
+ * Nom du module/fichier : activityTypeService.ts
+ * 
+ * Données en entrée : 
+ *   - repository : Instance du dépôt de données (Supabase par défaut).
+ *   - Paramètres métiers : libellés, identifiants utilisateur.
+ * 
+ * Données en sortie : 
+ *   - ActivityType : Objet représentant un type d'action.
+ *   - ActivityType[] : Liste de types d'actions.
+ * 
+ * Objectif principal : Ce service contient les "règles métier" pour la gestion des types d'actions. Il s'assure que les données sont valides (pas de texte vide) et gère l'injection automatique des actions par défaut (Observation, Aide, etc.) lors de la première utilisation.
+ */
+
 import { ActivityType } from '../types/adult.types';
 import { IActivityTypeRepository } from '../repositories/IActivityTypeRepository';
 import { SupabaseActivityTypeRepository } from '../repositories/SupabaseActivityTypeRepository';
 
-/**
- * Service for Activity Type management
- * Handles business logic for managing activity types for adults
- */
 export class ActivityTypeService {
     constructor(private repository: IActivityTypeRepository) { }
 
-    // Default activity types to seed
+    // ACTIONS PAR DÉFAUT : Liste injectée si l'utilisateur n'en a aucune
     private readonly DEFAULT_TYPES = [
         "Observation de la classe",
         "Présentation",
@@ -19,15 +29,14 @@ export class ActivityTypeService {
     ];
 
     /**
-     * Fetch all activity types
+     * RÉCUPÉRATION : Liste complète ordonnée
      */
     async fetchAll(): Promise<ActivityType[]> {
         return await this.repository.getAll();
     }
 
     /**
-     * Seed default activity types if none exist
-     * Business logic: Only seeds if no types exist
+     * INJECTION INITIALE (Seed) : Règle métier - On n'injecte que si la liste est vide
      */
     async seedDefaults(userId: string): Promise<ActivityType[]> {
         const existing = await this.repository.getAll();
@@ -40,11 +49,10 @@ export class ActivityTypeService {
     }
 
     /**
-     * Create a new activity type
-     * Business logic: Validates that label is not empty
+     * CRÉATION : Avec validation métier du texte
      */
     async create(label: string, userId: string): Promise<ActivityType> {
-        // Validation
+        // VALIDATION : On refuse les textes vides ou uniquement composés d'espaces
         if (!label || label.trim().length === 0) {
             throw new Error('Le libellé du type d\'activité est requis');
         }
@@ -53,11 +61,9 @@ export class ActivityTypeService {
     }
 
     /**
-     * Update an activity type
-     * Business logic: Validates that label is not empty
+     * MISE À JOUR : Avec validation identique à la création
      */
     async update(id: string, label: string): Promise<ActivityType> {
-        // Validation
         if (!label || label.trim().length === 0) {
             throw new Error('Le libellé du type d\'activité est requis');
         }
@@ -66,15 +72,24 @@ export class ActivityTypeService {
     }
 
     /**
-     * Delete an activity type
+     * SUPPRESSION
      */
     async delete(id: string): Promise<void> {
         await this.repository.delete(id);
     }
 }
 
-// Export singleton instance
+// Instance unique (Singleton) utilisée par toute l'application
 export const activityTypeService = new ActivityTypeService(new SupabaseActivityTypeRepository());
 
-// Re-export type
+// Export du type pour faciliter les imports
 export type { ActivityType };
+
+/**
+ * LOGIGRAMME DE FONCTIONNEMENT :
+ * 
+ * 1. APPEL : Le hook demande une action (ex: Créer "Aide").
+ * 2. VÉRIFICATION : Le service nettoie le texte (trim) et vérifie qu'il n'est pas vide.
+ * 3. PERSISTANCE : Si valide, il délègue au "repository" l'écriture physique dans la base.
+ * 4. ERREUR : Si invalide, il renvoie une erreur explicite qui sera affichée à l'utilisateur.
+ */

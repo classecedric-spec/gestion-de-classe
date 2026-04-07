@@ -1,9 +1,28 @@
+/**
+ * Nom du module/fichier : SupabaseStudentRepository.ts
+ * 
+ * Données en entrée : Les ordres de mission envoyés par le service métier (ex: un identifiant d'élève, des coordonnées parentales ou une affectation de groupe).
+ * 
+ * Données en sortie : Les données réelles extraites de la base de données distante (Supabase) ou une confirmation technique de succès.
+ * 
+ * Objectif principal : Servir de "bras armé" technique pour la manipulation des données. Ce fichier est le seul à connaître les secrets de la base de données (noms des tables, structure SQL). Il traduit les besoins métier ("Trouve cet élève") en requêtes informatiques précises (".from('Eleve').select('*')..."). Il gère également les jointures complexes pour récupérer d'un seul coup les informations de la classe et des groupes d'un enfant.
+ * 
+ * Ce que ça affiche : Rien, c'est un moteur de données (Couche Infrastructure).
+ */
+
 import { supabase } from '../../../lib/database';
 import { fetchDelta } from '../../../lib/sync';
 import { Tables, TablesInsert, TablesUpdate } from '../../../types/supabase';
 import { IStudentRepository } from './IStudentRepository';
 
+/**
+ * Implémentation du dépôt d'élèves utilisant la technologie Supabase (PostgreSQL).
+ */
 export class SupabaseStudentRepository implements IStudentRepository {
+    
+    /**
+     * Recherche un élève spécifique par son identifiant unique.
+     */
     async findById(id: string): Promise<Tables<'Eleve'> | null> {
         const { data, error } = await supabase
             .from('Eleve')
@@ -15,6 +34,9 @@ export class SupabaseStudentRepository implements IStudentRepository {
         return data as Tables<'Eleve'> | null;
     }
 
+    /**
+     * Récupère la liste intégrale de tous les élèves (sans filtre particulier).
+     */
     async findAll(): Promise<Tables<'Eleve'>[]> {
         const { data, error } = await supabase
             .from('Eleve')
@@ -25,6 +47,9 @@ export class SupabaseStudentRepository implements IStudentRepository {
         return data || [];
     }
 
+    /**
+     * Crée une nouvelle ligne dans le registre des élèves.
+     */
     async create(student: TablesInsert<'Eleve'>): Promise<Tables<'Eleve'>> {
         const { data, error } = await supabase
             .from('Eleve')
@@ -36,6 +61,9 @@ export class SupabaseStudentRepository implements IStudentRepository {
         return data;
     }
 
+    /**
+     * Met à jour les informations d'un élève existant (ex: changement de niveau ou de mail parent).
+     */
     async update(id: string, student: TablesUpdate<'Eleve'>): Promise<Tables<'Eleve'>> {
         const { data, error } = await supabase
             .from('Eleve')
@@ -48,6 +76,9 @@ export class SupabaseStudentRepository implements IStudentRepository {
         return data;
     }
 
+    /**
+     * Supprime définitivement l'élève de la base de données.
+     */
     async delete(id: string): Promise<void> {
         const { error } = await supabase
             .from('Eleve')
@@ -57,6 +88,9 @@ export class SupabaseStudentRepository implements IStudentRepository {
         if (error) throw error;
     }
 
+    /**
+     * Liste tous les groupes auxquels un élève appartient en interrogeant la table de liaison.
+     */
     async getLinkedGroupIds(studentId: string): Promise<string[]> {
         const { data, error } = await supabase
             .from('EleveGroupe')
@@ -67,9 +101,9 @@ export class SupabaseStudentRepository implements IStudentRepository {
         return data ? data.map(g => g.groupe_id as string) : [];
     }
 
-    // Helper to get raw links if needed for deletion by ID, but interface just exposes business need.
-    // Actually for efficient deletion we might need the link IDs.
-    // Let's add a specialized method or keep it simple.
+    /**
+     * Récupère le détail des liens entre un élève et ses groupes (utile pour les suppressions ciblées).
+     */
     async getStudentGroupLinks(studentId: string): Promise<{ id: string, groupe_id: string }[]> {
         const { data, error } = await supabase
             .from('EleveGroupe')
@@ -80,6 +114,9 @@ export class SupabaseStudentRepository implements IStudentRepository {
         return data || [];
     }
 
+    /**
+     * Crée un nouveau lien technique entre un élève et un groupe de soutien/classe.
+     */
     async linkToGroup(studentId: string, groupId: string, userId: string): Promise<void> {
         const { error } = await supabase.from('EleveGroupe').insert({
             eleve_id: studentId,
@@ -89,6 +126,9 @@ export class SupabaseStudentRepository implements IStudentRepository {
         if (error) throw error;
     }
 
+    /**
+     * Supprime un lien spécifique entre un élève et un groupe.
+     */
     async unlinkFromGroup(linkId: string): Promise<void> {
         const { error } = await supabase
             .from('EleveGroupe')
@@ -97,6 +137,9 @@ export class SupabaseStudentRepository implements IStudentRepository {
         if (error) throw error;
     }
 
+    /**
+     * Supprime plusieurs liens d'un coup (nettoyage massif).
+     */
     async unlinkMultiFromGroup(linkIds: string[]): Promise<void> {
         if (linkIds.length === 0) return;
         const { error } = await supabase
@@ -106,6 +149,9 @@ export class SupabaseStudentRepository implements IStudentRepository {
         if (error) throw error;
     }
 
+    /**
+     * Filtre la liste des élèves pour ne garder que ceux d'une classe précise.
+     */
     async findByClass(classId: string): Promise<Tables<'Eleve'>[]> {
         const { data, error } = await supabase
             .from('Eleve')
@@ -117,6 +163,9 @@ export class SupabaseStudentRepository implements IStudentRepository {
         return data as Tables<'Eleve'>[] || [];
     }
 
+    /**
+     * Récupère tous les élèves d'un groupe en incluant leur niveau scolaire.
+     */
     async findByGroup(groupId: string): Promise<any[]> {
         const { data, error } = await supabase
             .from('Eleve')
@@ -132,6 +181,9 @@ export class SupabaseStudentRepository implements IStudentRepository {
         return data || [];
     }
 
+    /**
+     * Récupère tous les élèves rattachés à une liste de groupes.
+     */
     async findByGroups(groupIds: string[]): Promise<any[]> {
         if (groupIds.length === 0) return [];
         const { data, error } = await supabase
@@ -145,6 +197,11 @@ export class SupabaseStudentRepository implements IStudentRepository {
         return data || [];
     }
 
+    /**
+     * REQUÊTE RICHE : Récupère d'un seul coup tout ce qui concerne les élèves d'un professeur.
+     * Cette requête fait des "jointures" pour ramener les infos de classe, les professeurs secondaires 
+     * et les noms des groupes de soutien en un seul aller-retour réseau.
+     */
     async findAllForTeacher(teacherId: string): Promise<any[]> {
         const { data, error } = await supabase
             .from('Eleve')
@@ -169,6 +226,9 @@ export class SupabaseStudentRepository implements IStudentRepository {
         return data || [];
     }
 
+    /**
+     * Met à jour uniquement l'indicateur d'importance (couleur d'alerte) d'un élève.
+     */
     async updateImportance(id: string, importance: number | null): Promise<void> {
         const { error } = await supabase
             .from('Eleve')
@@ -178,6 +238,10 @@ export class SupabaseStudentRepository implements IStudentRepository {
         if (error) throw error;
     }
 
+    /**
+     * SYNCHRONISATION OPTIMISÉE : Demande à Supabase uniquement les fiches élèves 
+     * qui ont été modifiées depuis la dernière fois.
+     */
     async getStudentsDelta(teacherId: string): Promise<{ delta: any[], isFirstSync: boolean }> {
         const { delta, isFirstSync } = await fetchDelta(
             'Eleve',
@@ -187,3 +251,15 @@ export class SupabaseStudentRepository implements IStudentRepository {
         return { delta, isFirstSync };
     }
 }
+
+/**
+ * LOGIGRAMME DE FONCTIONNEMENT :
+ * 
+ * 1. Le Service `StudentService` ordonne : "Récupère-moi tous les élèves du Professeur Martin".
+ * 2. Le Repository prépare la requête technique (Jointures SQL complètes).
+ * 3. Il contacte le serveur Supabase distant.
+ * 4. Il attend la réponse. 
+ *    - Si le serveur met trop de temps ou renvoie une erreur (ex: jeton expiré), il lance une exception `throw error`.
+ * 5. Une fois les données reçues, il les transforme en une liste d'objets propres.
+ * 6. Il renvoie cette liste au service, qui la transmettra finalement aux composants visuels.
+ */

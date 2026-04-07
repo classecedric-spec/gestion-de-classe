@@ -1,3 +1,21 @@
+/**
+ * Nom du module/fichier : SubBranchDetails.tsx
+ * 
+ * Données en entrée : 
+ *   - `selectedSubBranch` : La spécialité choisie (ex: 'Grammaire').
+ * 
+ * Données en sortie : 
+ *   - Un panneau d'affichage avec le détail de la sous-matière.
+ *   - Information sur la branche parente.
+ * 
+ * Objectif principal : Montrer la fiche d'identité d'une spécialité (sous-branche). C'est ici qu'on vérifie à quelle grande catégorie elle appartient et, plus tard, quels modules d'apprentissage y sont rattachés.
+ * 
+ * Ce que ça affiche : 
+ *   - Le logo et le nom de la spécialité.
+ *   - Un badge avec le nom de la matière parente.
+ *   - Des onglets pour voir les informations détaillées ou les contenus liés.
+ */
+
 import React, { useState } from 'react';
 import { Layers, GitBranch, Info, FileText } from 'lucide-react';
 import { SubBranchWithParent } from '../services/subBranchService';
@@ -9,13 +27,18 @@ interface SubBranchDetailsProps {
     headerHeight?: number;
 }
 
+/**
+ * Composant présentant les détails d'une sous-branche et son lien de parenté.
+ */
 const SubBranchDetails: React.FC<SubBranchDetailsProps> = ({
     selectedSubBranch,
     rightContentRef,
     headerHeight
 }) => {
+    // Gestion de la navigation par onglets
     const [activeTab, setActiveTab] = useState('infos');
 
+    // Message d'attente si rien n'est sélectionné
     if (!selectedSubBranch) {
         return (
             <div className="flex-1 card-flat overflow-hidden">
@@ -33,6 +56,7 @@ const SubBranchDetails: React.FC<SubBranchDetailsProps> = ({
 
     return (
         <>
+            {/* -- EN-TÊTE : IDENTITÉ DE LA SOUS-BRANCHE -- */}
             <CardInfo
                 ref={rightContentRef}
                 height={headerHeight}
@@ -49,6 +73,7 @@ const SubBranchDetails: React.FC<SubBranchDetailsProps> = ({
                             {selectedSubBranch.nom}
                         </h2>
                         <div className="flex items-center gap-3 mt-1">
+                            {/* Rappel de la branche parente via un badge */}
                             {selectedSubBranch.Branche && (
                                 <Badge variant="secondary" size="sm" className="bg-white/5">
                                     <GitBranch size={14} className="mr-2" />
@@ -60,6 +85,7 @@ const SubBranchDetails: React.FC<SubBranchDetailsProps> = ({
                 </div>
             </CardInfo>
 
+            {/* -- CONTENU : DÉTAILS ET MODULES -- */}
             <CardTabs
                 tabs={[
                     { id: 'infos', label: 'Informations', icon: Info },
@@ -68,6 +94,7 @@ const SubBranchDetails: React.FC<SubBranchDetailsProps> = ({
                 activeTab={activeTab}
                 onChange={setActiveTab}
             >
+                {/* ONGLET 1 : FICHE TECHNIQUE */}
                 {activeTab === 'infos' && (
                     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -86,6 +113,7 @@ const SubBranchDetails: React.FC<SubBranchDetailsProps> = ({
                     </div>
                 )}
 
+                {/* ONGLET 2 : EXTENSIONS FUTURES */}
                 {activeTab === 'modules' && (
                     <div className="p-8 text-center text-grey-medium italic opacity-60 animate-in fade-in slide-in-from-bottom-2 duration-300">
                         La liste des modules liés sera disponible prochainement dans cette vue.
@@ -97,3 +125,13 @@ const SubBranchDetails: React.FC<SubBranchDetailsProps> = ({
 };
 
 export default React.memo(SubBranchDetails);
+
+/**
+ * LOGIGRAMME DE FONCTIONNEMENT :
+ * 
+ * 1. L'enseignant choisit la sous-matière "Orthographe".
+ * 2. Le composant s'actualise avec les données de "Orthographe".
+ * 3. Il affiche un grand logo "Orthographe" et un badge mentionnant "Français" (son parent).
+ * 4. L'enseignant consulte dans l'onglet "Informations" le résumé des liens hiérarchiques.
+ * 5. L'enseignant sait alors exactement où se situe cette spécialité dans son organisation scolaire.
+ */

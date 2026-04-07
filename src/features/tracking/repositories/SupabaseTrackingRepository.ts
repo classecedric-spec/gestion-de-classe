@@ -1,15 +1,31 @@
+/**
+ * Nom du module/fichier : SupabaseTrackingRepository.ts
+ * 
+ * Données en entrée : 
+ *   - Utilise l'objet `supabase` (lib/database) pour communiquer avec le serveur.
+ *   - Reçoit des identifiants d'élèves, de groupes ou d'activités.
+ * 
+ * Données en sortie : 
+ *   - Promesses (Promises) contenant les données brutes de la base de données, formatées selon les besoins de l'application.
+ * 
+ * Objectif principal : Être le "Bras Armé" du module de suivi. C'est ici que sont écrites les requêtes SQL (via Supabase) pour aller chercher ou enregistrer les progrès des élèves. Il implémente toutes les méthodes définies dans l'interface `ITrackingRepository`.
+ */
+
 import { supabase } from '../../../lib/database';
 import { TablesInsert, TablesUpdate, Tables } from '../../../types/supabase';
 import { ITrackingRepository, ProgressionWithDetails, StudentBasicInfo } from './ITrackingRepository';
 
 /**
- * Supabase implementation of the Tracking Repository
- * Handles all database operations for pedagogical tracking
+ * Implémentation concrète du magasin de données utilisant Supabase (PostgreSQL).
  */
 export class SupabaseTrackingRepository implements ITrackingRepository {
 
-    // ==================== PROGRESSIONS ====================
+    // ==================== LES AVANCEMENTS (PROGRESSIONS) ====================
 
+    /**
+     * Récupère les exercices en cours pour une liste d'élèves.
+     * Inclut les jointures pour avoir les noms des activités et des modules en une seule fois.
+     */
     async fetchProgressions(studentIds: string[], states: string[]): Promise<ProgressionWithDetails[]> {
         const { data, error } = await supabase
             .from('Progression')
@@ -31,17 +47,19 @@ export class SupabaseTrackingRepository implements ITrackingRepository {
             .order('updated_at', { ascending: true });
 
         if (error) throw error;
-
-        // Cast to the expected type
         return (data as unknown) as ProgressionWithDetails[];
     }
 
+    /**
+     * Met à jour le statut d'un exercice dans la base.
+     */
     async updateProgressionStatus(id: string, newState: string, isSuivi: boolean): Promise<void> {
         const payload: TablesUpdate<'Progression'> = {
             etat: newState,
             updated_at: new Date().toISOString()
         };
 
+        // Si c'était un suivi manuel, on retire le drapeau une fois validé.
         if (isSuivi) {
             (payload as any).is_suivi = false;
         }
@@ -54,6 +72,7 @@ export class SupabaseTrackingRepository implements ITrackingRepository {
         if (error) throw error;
     }
 
+    /** Supprime une ligne de progression. */
     async deleteProgression(id: string): Promise<void> {
         const { error } = await supabase
             .from('Progression')
@@ -63,6 +82,7 @@ export class SupabaseTrackingRepository implements ITrackingRepository {
         if (error) throw error;
     }
 
+    /** Insertion multiple (bulk insert). */
     async createProgressions(progressions: TablesInsert<'Progression'>[]): Promise<void> {
         const { error } = await supabase
             .from('Progression')
@@ -71,6 +91,7 @@ export class SupabaseTrackingRepository implements ITrackingRepository {
         if (error) throw error;
     }
 
+    /** Création ou Mise à jour (upsert) basée sur le couple (élève, activité). */
     async upsertProgression(progression: TablesInsert<'Progression'>): Promise<void> {
         const { error } = await supabase
             .from('Progression')
@@ -79,8 +100,11 @@ export class SupabaseTrackingRepository implements ITrackingRepository {
         if (error) throw error;
     }
 
-    // ==================== HELPERS ====================
+    // ==================== L'ENTRAIDE (HELPERS) ====================
 
+    /**
+     * Trouve les élèves "Experts" qui ont déjà fini une activité précise.
+     */
     async findStudentsByActivityStatus(activityId: string, studentIds: string[], status: string): Promise<StudentBasicInfo[]> {
         const { data, error } = await supabase
             .from('Progression')
@@ -90,12 +114,10 @@ export class SupabaseTrackingRepository implements ITrackingRepository {
             .in('eleve_id', studentIds);
 
         if (error) throw error;
-
-        // Extract student info from the join
         return data?.map((p: any) => p.eleve).filter(Boolean) || [];
     }
 
-    // ==================== GROUPS ====================
+    // ==================== LES GROUPES / CLASSES ====================
 
     async getGroupInfo(groupId: string): Promise<{ nom: string } | null> {
         const { data, error } = await supabase
@@ -108,6 +130,9 @@ export class SupabaseTrackingRepository implements ITrackingRepository {
         return data;
     }
 
+    /**
+     * Récupère tous les élèves d'un groupe avec leurs informations de niveau scolaire.
+     */
     async getStudentsInGroup(groupId: string): Promise<{ ids: string[], full: Tables<'Eleve'>[] }> {
         const { data, error } = await supabase
             .from('EleveGroupe')
@@ -122,8 +147,9 @@ export class SupabaseTrackingRepository implements ITrackingRepository {
         };
     }
 
-    // ==================== USER PREFERENCES ====================
+    // ==================== PRÉFÉRENCES (RÉGLAGES) ====================
 
+    /** Sauvegarde un réglage (ex: position des colonnes) pour un enseignant précis. */
     async saveUserPreference(userId: string, key: string, value: any): Promise<void> {
         const { error } = await supabase
             .from('UserPreference')
@@ -137,6 +163,7 @@ export class SupabaseTrackingRepository implements ITrackingRepository {
         if (error) throw error;
     }
 
+    /** Recharge un réglage mémorisé. */
     async loadUserPreference(userId: string, key: string): Promise<any | null> {
         const { data, error } = await supabase
             .from('UserPreference')
@@ -149,8 +176,11 @@ export class SupabaseTrackingRepository implements ITrackingRepository {
         return data?.value || null;
     }
 
-    // ==================== PEDAGOGICAL DATA ====================
+    // ==================== DONNÉES PÉDAGOGIQUES DÉTAILLÉES ====================
 
+    /**
+     * Récupère les fiches élèves pour le tableau de bord avec leurs intervenants adultes.
+     */
     async getStudentsForPedago(groupId: string): Promise<any[]> {
         const { data, error } = await supabase
             .from('Eleve')
@@ -177,9 +207,10 @@ export class SupabaseTrackingRepository implements ITrackingRepository {
         return data || [];
     }
 
+    /**
+     * Liste les chapitres actifs (en cours) pour l'affichage de progression.
+     */
     async fetchModulesForStudent(_levelId: string | null): Promise<any[]> {
-        // We fetch all 'en_cours' modules, filtering by level is often done in memory or can be improved here
-        // The original hook filtered active modules.
         const { data, error } = await supabase
             .from('Module')
             .select(`
@@ -201,6 +232,7 @@ export class SupabaseTrackingRepository implements ITrackingRepository {
         return data || [];
     }
 
+    /** Liste tous les modules actifs pour l'interface simplifiée (mobile). */
     async fetchMobileModules(): Promise<any[]> {
         const { data, error } = await supabase
             .from('Module')
@@ -227,7 +259,9 @@ export class SupabaseTrackingRepository implements ITrackingRepository {
         return data || [];
     }
 
-
+    /**
+     * Récupère tous les exercices d'un chapitre avec l'état de réussite de chaque élève.
+     */
     async fetchActivitiesForModule(moduleId: string): Promise<any[]> {
         const { data, error } = await supabase
             .from('Activite')
@@ -257,6 +291,7 @@ export class SupabaseTrackingRepository implements ITrackingRepository {
         return data || [];
     }
 
+    /** Récupère la liste de tous les avancements d'une liste d'élèves. */
     async fetchGroupProgressions(studentIds: string[]): Promise<any[]> {
         if (studentIds.length === 0) return [];
         const { data, error } = await supabase
@@ -279,6 +314,7 @@ export class SupabaseTrackingRepository implements ITrackingRepository {
         return data || [];
     }
 
+    /** Construit un dictionnaire (Map) Activité -> État pour un élève précis. */
     async fetchStudentProgressionsMap(studentId: string): Promise<Record<string, string>> {
         const { data, error } = await supabase
             .from('Progression')
@@ -296,15 +332,17 @@ export class SupabaseTrackingRepository implements ITrackingRepository {
         return progMap;
     }
 
-    // ==================== DASHBOARD ====================
+    // ==================== STATISTIQUES DU TABLEAU DE BORD ====================
 
+    /**
+     * Calcule les chiffres clés du jour : nombre de mains levées et nombre de réussites.
+     */
     async getDashboardStats(filterStudentIds: string[] | null): Promise<{ helpPending: number; validationsToday: number }> {
-        // Optimization: If filtering by group but no students found, return 0 immediately
         if (filterStudentIds !== null && filterStudentIds.length === 0) {
             return { helpPending: 0, validationsToday: 0 };
         }
 
-        // Get help pending count ONLY FOR ACTIVE MODULES
+        // 1. Compte des demandes d'aide et vérifications en attente.
         let queryHelp = supabase
             .from('Progression')
             .select('*, Activite!inner(Module!inner(statut))', { count: 'exact', head: true })
@@ -318,7 +356,7 @@ export class SupabaseTrackingRepository implements ITrackingRepository {
         const { count: helpCount, error: helpError } = await queryHelp;
         if (helpError) throw helpError;
 
-        // Get validations today ONLY FOR ACTIVE MODULES
+        // 2. Compte des exercices validés aujourd'hui (depuis minuit).
         const today = new Date();
         today.setHours(0, 0, 0, 0);
 
@@ -342,6 +380,9 @@ export class SupabaseTrackingRepository implements ITrackingRepository {
         };
     }
 
+    /**
+     * Récupère tous les modules avec les progressions filtrées pour un seul élève.
+     */
     async getModulesWithProgressions(studentId: string, _levelId?: string): Promise<any[]> {
         const { data, error } = await supabase
             .from('Module')
@@ -359,7 +400,7 @@ export class SupabaseTrackingRepository implements ITrackingRepository {
             `)
             .eq('statut', 'en_cours');
 
-        // Filter progressions for specific student in memory to maintain same structure
+        // On nettoie les données pour ne garder que ce qui concerne l'élève demandé.
         if (data) {
             data.forEach((m: any) => {
                 if (m.Activite) {
@@ -376,8 +417,8 @@ export class SupabaseTrackingRepository implements ITrackingRepository {
         return data || [];
     }
 
+    /** Récupère les exercices d'un module et l'avancement d'un élève précis. */
     async getModuleActivitiesAndProgressions(moduleId: string, studentId: string): Promise<{ activities: any[], progressions: any[] }> {
-        // Fetch activities
         const { data: activities, error: actError } = await supabase
             .from('Activite')
             .select(`
@@ -389,7 +430,6 @@ export class SupabaseTrackingRepository implements ITrackingRepository {
 
         if (actError) throw actError;
 
-        // Fetch progressions for this student
         const { data: progressions, error: progError } = await supabase
             .from('Progression')
             .select('*')
@@ -404,6 +444,9 @@ export class SupabaseTrackingRepository implements ITrackingRepository {
         };
     }
 
+    /**
+     * Récupère la liste prioritaire des demandes d'aide pour toute la classe.
+     */
     async getHelpRequests(studentIds: string[]): Promise<any[]> {
         if (studentIds.length === 0) return [];
 
@@ -425,6 +468,7 @@ export class SupabaseTrackingRepository implements ITrackingRepository {
         return data || [];
     }
 
+    /** Calcule l'état de progression pour une liste d'exercices (utilisé pour les badges). */
     async getProgressionStatsForActivities(activityIds: string[]): Promise<{ activite_id: string, etat: string }[]> {
         if (activityIds.length === 0) return [];
         const { data, error } = await supabase
@@ -436,6 +480,7 @@ export class SupabaseTrackingRepository implements ITrackingRepository {
         return (data || []) as { activite_id: string, etat: string }[];
     }
 
+    /** Récupère qui travaille sur une activité précise (utilisé dans le détail d'une activité). */
     async fetchProgressionsByActivity(activityId: string): Promise<any[]> {
         const { data, error } = await supabase
             .from('Progression')
@@ -446,6 +491,7 @@ export class SupabaseTrackingRepository implements ITrackingRepository {
         return data || [];
     }
 
+    /** Historique pédagogique complet d'un élève (utilisé dans son dossier). */
     async fetchStudentProgressDetails(studentId: string): Promise<any[]> {
         const { data, error } = await supabase
             .from('Progression')
@@ -482,6 +528,7 @@ export class SupabaseTrackingRepository implements ITrackingRepository {
         return data || [];
     }
 
+    /** Liste tous les exercices appartenant à une série de modules. */
     async getActivitiesByModules(moduleIds: string[]): Promise<any[]> {
         if (moduleIds.length === 0) return [];
         const { data, error } = await supabase
@@ -511,10 +558,11 @@ export class SupabaseTrackingRepository implements ITrackingRepository {
         return data || [];
     }
 
+    /** Récupère les liens d'avancement pour un croisement Élèves / Activités. */
     async getProgressionsForStudentsAndActivities(studentIds: string[], activityIds: string[]): Promise<any[]> {
         if (studentIds.length === 0 || activityIds.length === 0) return [];
 
-        const CHUNK_SIZE = 50;
+        const CHUNK_SIZE = 50; // On traite par paquets de 50 pour éviter de saturer la connexion.
         let allProgs: any[] = [];
 
         for (let i = 0; i < activityIds.length; i += CHUNK_SIZE) {
@@ -533,8 +581,12 @@ export class SupabaseTrackingRepository implements ITrackingRepository {
         return allProgs;
     }
 
+    /**
+     * ALGORITHME DE CONFIANCE :
+     * Met à jour le score de maîtrise de l'élève (UserPreference) et sa tendance globale.
+     */
     async updateStudentTrust(eleveId: string, branchId: string, adjustment: number, trend: 'up' | 'down' | 'stable'): Promise<void> {
-        // 1. Update Branch Specific Index (User Preference)
+        // 1. Mise à jour de l'indice spécifique à la matière (Français, Maths, etc.)
         const { data: { user } } = await supabase.auth.getUser();
         if (user) {
             const currentIndices = await this.loadUserPreference(user.id, 'eleve_profil_competences') || {};
@@ -546,7 +598,7 @@ export class SupabaseTrackingRepository implements ITrackingRepository {
             await this.saveUserPreference(user.id, 'eleve_profil_competences', currentIndices);
         }
 
-        // 2. Update Global Student Trend
+        // 2. Mise à jour de l'icône de tendance (flèche qui monte/descend) sur la fiche élève.
         const { error } = await supabase
             .from('Eleve')
             .update({ trust_trend: trend })
@@ -555,9 +607,11 @@ export class SupabaseTrackingRepository implements ITrackingRepository {
         if (error) throw error;
     }
 
-    // Avant Mail Implementation
+    /**
+     * GESTION DES RELANCES (Avant Mail) :
+     * Trouve les exercices qui n'ont pas été terminés et dont la date limite est aujourd'hui.
+     */
     async getUnfinishedModulesByDate(studentId: string, date: string): Promise<any[]> {
-        // Fetch modulesENDING ON specific date
         const { data, error } = await supabase
             .from('Module')
             .select(`
@@ -576,16 +630,9 @@ export class SupabaseTrackingRepository implements ITrackingRepository {
 
         if (error) throw error;
 
-        // Note: Supabase doesn't easily support deep filtering on nested collections to Filter the Parent Row 
-        // entirely based on child state in a single select query without complex syntax or RPC.
-        // However, by filtering by DATE first, we have drastically reduced the dataset to usually 0-5 items,
-        // so filtering the "unfinished" status in memory is now extremely efficient and scalable.
-
-        // Filter progressions for specific student in memory 
-        // AND check if unfinished
         if (data) {
+            // On filtre manuellement pour ne garder que les modules où l'élève a au moins un exercice non validé.
             const unfinishedModules = data.filter((m: any) => {
-                // Ensure activities rely on this student's progression
                 if (m.Activite) {
                     m.Activite.forEach((act: any) => {
                         if (act.Progression) {
@@ -594,7 +641,6 @@ export class SupabaseTrackingRepository implements ITrackingRepository {
                     });
                 }
 
-                // Check unfinished logic
                 const hasUnfinishedActivity = m.Activite?.some((activity: any) => {
                     const progression = activity.Progression?.[0];
                     return !progression || progression.etat !== 'valide';
@@ -609,3 +655,14 @@ export class SupabaseTrackingRepository implements ITrackingRepository {
         return [];
     }
 }
+
+/**
+ * LOGIGRAMME DE FONCTIONNEMENT :
+ * 
+ * 1. ACTION : L'enseignant ouvre l'application. Elle demande `getDashboardStats`.
+ * 2. REQUÊTE : Le module envoie une requête SQL à Supabase : "Donne moi le nombre de lignes dans Progression où état = 'besoin_d_aide'".
+ * 3. RETOUR : Supabase répond "12".
+ * 4. TRAITEMENT : Le module transforme ce "12" en un objet propre et le renvoie au Dashboard.
+ * 5. AFFICHAGE : L'enseignant voit instantanément le chiffre "12" sur son badge de notification.
+ * 6. SÉCURITÉ : Si la base de données renvoie une erreur (ex: coupure réseau), le module "lance" une alerte (throw error) pour que l'application puisse afficher un message d'erreur poli à l'utilisateur.
+ */

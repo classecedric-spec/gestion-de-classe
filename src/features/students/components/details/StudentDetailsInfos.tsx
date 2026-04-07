@@ -1,3 +1,15 @@
+/**
+ * Nom du module/fichier : StudentDetailsInfos.tsx
+ * 
+ * Données en entrée : L'élève sélectionné, les matières (branches), et les réussites de l'élève.
+ * 
+ * Données en sortie : Un affichage détaillé des informations administratives et scolaires de l'élève.
+ * 
+ * Objectif principal : Présenter la "fiche de renseignement" complète de l'élève ainsi que son profil de réussite. C'est ici que l'enseignant voit l'âge de l'élève, ses parents, l'équipe enseignante qui l'encadre, et qu'il peut ajuster manuellement les pourcentages de réussite par matière (les indices de branche).
+ * 
+ * Ce que ça affiche : Des sections d'information claires (Parcours, Responsables) et une grille de jauges de performance éditables.
+ */
+
 import React from 'react';
 import { BookOpen, Layers, Calendar, ShieldCheck, User as UserIcon, GitBranch, Activity } from 'lucide-react';
 import { InfoSection, InfoRow, Badge } from '../../../../core';
@@ -21,6 +33,7 @@ export const StudentDetailsInfos: React.FC<StudentDetailsInfosProps> = ({
     return (
         <div className="grid md:grid-cols-2 gap-8 animate-in fade-in slide-in-from-bottom-2 duration-300">
             {/* Parcours Scolaire */}
+            {/* Affiche les données de base : quelle classe, quel niveau, et surtout l'âge calculé automatiquement à partir de la date de naissance. */}
             <InfoSection title="Parcours Scolaire">
                 <InfoRow
                     icon={BookOpen}
@@ -37,6 +50,7 @@ export const StudentDetailsInfos: React.FC<StudentDetailsInfosProps> = ({
             </InfoSection>
 
             {/* Informations & Responsables */}
+            {/* Regroupe les contacts : qui sont les parents et quels sont les autres enseignants qui interviennent auprès de cet élève. */}
             <InfoSection title="Informations & Responsables">
                 <InfoRow
                     icon={ShieldCheck}
@@ -74,6 +88,7 @@ export const StudentDetailsInfos: React.FC<StudentDetailsInfosProps> = ({
 
             {/* Branch Indices */}
             <div className="md:col-span-2">
+                {/* Tableau de bord des réussites : permet au professeur de noter manuellement l'avancement global de l'élève ainsi que ses progrès spécifiques dans chaque matière (ex: 75% en Français). */}
                 <InfoSection title="Indices de Branche (Performance)" columns={2}>
                     <InfoRow
                         icon={Activity}
@@ -101,3 +116,15 @@ export const StudentDetailsInfos: React.FC<StudentDetailsInfosProps> = ({
         </div>
     );
 };
+
+/**
+ * 1. Le professeur clique sur l'onglet "Informations" d'un élève.
+ * 2. Le composant `StudentDetailsInfos` récupère les données de l'élève.
+ * 3. Il calcule l'âge en temps réel.
+ * 4. Il va chercher la liste des enseignants affectés à la classe de cet élève.
+ * 5. Si l'enseignant veut modifier un score (ex: passer les Maths à 80%) :
+ *    a. Il clique sur le chiffre.
+ *    b. Il tape la nouvelle valeur.
+ *    c. Le système enregistre instantanément le changement.
+ * 6. Toutes les informations sont disposées sur deux colonnes pour une lecture facile sur grand écran.
+ */

@@ -1,26 +1,49 @@
+/**
+ * Nom du module/fichier : useMaterials.ts
+ * 
+ * Données en entrée : 
+ *   - L'identifiant de l'enseignant connecté.
+ *   - Termes de recherche de l'utilisateur.
+ * 
+ * Données en sortie : 
+ *   - Liste des objets matériels filtrés.
+ *   - Actions de gestion (créer, modifier, supprimer).
+ *   - État des leçons liées à un objet spécifique.
+ * 
+ * Objectif principal : Centraliser toute la logique de manipulation du matériel pour les écrans de l'application. Ce hook gère le chargement initial, la recherche en temps réel, et les mises à jour "optimistes" (on change l'écran avant même que le serveur réponde pour que l'app soit ultra-fluide).
+ * 
+ * Ce que ça pilote : 
+ *   - La liste de gauche (recherche et sélection).
+ *   - Le panneau de droite (détails et activités liées).
+ *   - Les fenêtres de création et de modification.
+ */
+
 import { useState, useCallback, useMemo, useEffect } from 'react';
 import { materialService, TypeMateriel, MaterialActivity, TypeMaterielInsert, TypeMaterielUpdate } from '../services/materialService';
 import { getCurrentUser } from '../../../lib/database';
 import { toast } from 'sonner';
 
+/**
+ * Hook personnalisé pour orchestrer la gestion du matériel de classe.
+ */
 export const useMaterials = () => {
     const [materiels, setMateriels] = useState<TypeMateriel[]>([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedMateriel, setSelectedMateriel] = useState<TypeMateriel | null>(null);
 
-    // Linked activities state
+    // État pour les leçons utilisant le matériel sélectionné
     const [linkedActivities, setLinkedActivities] = useState<MaterialActivity[]>([]);
     const [loadingActivities, setLoadingActivities] = useState(false);
 
-    // Fetch all materials
+    /**
+     * CHARGEMENT : Récupère la liste complète du matériel.
+     */
     const fetchMateriels = useCallback(async () => {
         setLoading(true);
         try {
             const data = await materialService.fetchAll();
             setMateriels(data);
-
-            // Auto-select logic moved to useEffect
         } catch (error) {
             console.error('Error fetching materiels:', error);
             toast.error('Erreur lors du chargement du matériel');
@@ -29,14 +52,16 @@ export const useMaterials = () => {
         }
     }, []);
 
-    // Initial selection effect
+    // Sélectionne automatiquement le premier matériel de la liste au démarrage
     useEffect(() => {
         if (materiels.length > 0 && !selectedMateriel) {
             setSelectedMateriel(materiels[0]);
         }
     }, [materiels, selectedMateriel]);
 
-    // Fetch linked activities when selected material changes
+    /**
+     * RECHERCHE DES LIENS : Trouve les activités liées à un matériel précis.
+     */
     const fetchLinkedActivitiesDetails = useCallback(async (id: string | undefined) => {
         if (!id) {
             setLinkedActivities([]);
@@ -55,7 +80,7 @@ export const useMaterials = () => {
         }
     }, []);
 
-    // Watch for selected material changes
+    // Déclenche la recherche des liens dès qu'on change de sélection
     useEffect(() => {
         if (selectedMateriel) {
             fetchLinkedActivitiesDetails(selectedMateriel.id);
@@ -64,7 +89,9 @@ export const useMaterials = () => {
         }
     }, [selectedMateriel, fetchLinkedActivitiesDetails]);
 
-    // Create material
+    /**
+     * CRÉATION : Enregistre un nouvel objet.
+     */
     const createMateriel = useCallback(async (materialData: Omit<TypeMaterielInsert, 'user_id'>) => {
         try {
             const user = await getCurrentUser();
@@ -82,12 +109,14 @@ export const useMaterials = () => {
         }
     }, []);
 
-    // Update material
+    /**
+     * MODIFICATION : Met à jour les infos d'un matériel.
+     */
     const updateMateriel = useCallback(async (id: string, materialData: TypeMaterielUpdate) => {
         const previousMateriels = [...materiels];
         const previousSelected = selectedMateriel;
 
-        // Optimistic UI Update
+        // Mise à jour OPTIMISTE : On change l'écran tout de suite
         setMateriels(prev =>
             prev.map(m => m.id === id ? { ...m, ...materialData } as TypeMateriel : m).sort((a, b) => (a.nom || '').localeCompare(b.nom || ''))
         );
@@ -98,7 +127,7 @@ export const useMaterials = () => {
 
         try {
             const updated = await materialService.update(id, materialData);
-            // Replace with server data for consistency
+            // On remplace par les données du serveur pour être sûr
             setMateriels(prev =>
                 prev.map(m => m.id === id ? updated : m).sort((a, b) => (a.nom || '').localeCompare(b.nom || ''))
             );
@@ -111,7 +140,7 @@ export const useMaterials = () => {
             return true;
         } catch (error) {
             console.error('Error updating material:', error);
-            // Revert on error
+            // En cas d'erreur, on remet tout comme avant (Rollback)
             setMateriels(previousMateriels);
             setSelectedMateriel(previousSelected);
             toast.error('Erreur lors de la modification');
@@ -119,12 +148,14 @@ export const useMaterials = () => {
         }
     }, [selectedMateriel, materiels]);
 
-    // Delete material
+    /**
+     * SUPPRESSION : Retire un objet de la liste.
+     */
     const deleteMateriel = useCallback(async (id: string) => {
         const previousMateriels = [...materiels];
         const previousSelected = selectedMateriel;
 
-        // Optimistic UI Update
+        // Mise à jour OPTIMISTE
         const updatedList = materiels.filter(m => m.id !== id);
         setMateriels(updatedList);
 
@@ -138,12 +169,11 @@ export const useMaterials = () => {
             return true;
         } catch (error: any) {
             console.error('Error deleting material:', error);
-            // Revert on error
+            // Retour en arrière si le serveur refuse (ex: matériel utilisé dans une leçon)
             setMateriels(previousMateriels);
             setSelectedMateriel(previousSelected);
 
-            // Specific error for constraint violation (linked activities)
-            if (error.code === '23503') { // Foreign key violation
+            if (error.code === '23503') { // Erreur de contrainte Supabase
                 toast.error("Impossible de supprimer : ce matériel est lié à des activités.");
             } else {
                 toast.error("Erreur lors de la suppression");
@@ -152,7 +182,9 @@ export const useMaterials = () => {
         }
     }, [selectedMateriel, materiels]);
 
-    // Create filtered list
+    /**
+     * FILTRAGE : Liste calculée selon ce que l'enseignant tape dans la barre de recherche.
+     */
     const filteredMateriels = useMemo(() => {
         return materiels.filter(m =>
             (m.nom || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -160,7 +192,7 @@ export const useMaterials = () => {
         );
     }, [materiels, searchTerm]);
 
-    // Load initial data
+    // Lancement du chargement au démarrage
     useEffect(() => {
         fetchMateriels();
     }, [fetchMateriels]);
@@ -183,3 +215,14 @@ export const useMaterials = () => {
 };
 
 export default useMaterials;
+
+/**
+ * LOGIGRAMME D'ACTION :
+ * 
+ * 1. ACTION -> L'utilisateur clique sur "Supprimer" pour une 'Tablette'.
+ * 2. VISUEL -> L'application cache immédiatement la tablette de l'écran (effet optimiste).
+ * 3. SERVEUR -> Une commande est envoyée au serveur pour supprimer la ligne.
+ * 4. CONTRÔLE -> 
+ *    - Si SUCCÈS : On reste tel quel, l'utilisateur a eu une expérience instantanée.
+ *    - Si ÉCHEC (ex: tablette liée à un prêt) : L'application fait réapparaître l'objet et affiche un message d'erreur expliquant pourquoi.
+ */

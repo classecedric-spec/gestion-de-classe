@@ -1,3 +1,15 @@
+/**
+ * Nom du module/fichier : ResultsExplorer.tsx
+ * 
+ * Données en entrée : La base de données complète contenant absolument toutes les cotes/notes de tous les élèves.
+ * 
+ * Données en sortie : Un tableau de recherche ultra-rapide permettant de croiser les notes par élève, par branche ou par classe.
+ * 
+ * Objectif principal : Offrir un moteur de recherche global (un explorateur) pour retrouver la note d'un élève précis ou filtrer les résultats d'une classe.
+ * 
+ * Ce que ça affiche : Une barre d'outils avec un champ de recherche texte et des menus déroulants (Groupe, Matière, Période), suivie d'un grand tableau listant chaque note individuelle.
+ */
+
 import React, { useState, useMemo } from 'react';
 import { 
     Users, 
@@ -30,11 +42,12 @@ const ResultsExplorer: React.FC<ResultsExplorerProps> = ({ results, onSelectEval
         direction: 'desc'
     });
 
-    // Unique values for filters
+    // Le système fouille dans la grande mémoire des notes pour lister intelligemment quels filtres il peut proposer (ex: lister toutes les matières existantes sans créer de doublon).
     const groups = useMemo(() => Array.from(new Set(results.map(r => r.Evaluation?.Groupe?.nom))).filter(Boolean).sort() as string[], [results]);
     const availableBranches = useMemo(() => Array.from(new Set(results.map(r => r.Evaluation?.Branche?.nom))).filter(Boolean).sort() as string[], [results]);
     const periods = useMemo(() => Array.from(new Set(results.map(r => r.Evaluation?.periode))).filter(Boolean).sort() as string[], [results]);
 
+    // C'est le cœur du réacteur : cette fonction prend toute la liste des notes, et ne garde de façon invisible que celles qui correspondent à ce que le professeur recherche.
     const filteredResults = useMemo(() => {
         return results.filter(r => {
             const matchesSearch = 
@@ -65,6 +78,7 @@ const ResultsExplorer: React.FC<ResultsExplorerProps> = ({ results, onSelectEval
         });
     }, [results, searchTerm, filters, sortConfig]);
 
+    // Inverse le sens de la liste affichée (de A à Z ou de Z à A) quand le professeur clique sur le titre d'une colonne (ex: "Élève").
     const handleSort = (key: string) => {
         setSortConfig(prev => ({
             key,
@@ -267,4 +281,12 @@ const ResultsExplorer: React.FC<ResultsExplorerProps> = ({ results, onSelectEval
     );
 };
 
+/**
+ * 1. L'explorateur s'ouvre, il absorbe l'intégralité des milliers de notes sauvegardées.
+ * 2. Il analyse tout ce volume pour générer les options des menus déroulants en haut (pour que l'enseignant ne puisse filtrer que par des classes ou branches qui existent et ont des cotes).
+ * 3. L'enseignant tape "Jean" dans la barre de recherche.
+ * 4. La fonction intelligente "filteredResults" réagit instantanément, traverse toute la base et ne conserve pour l'affichage que les lignes contenant le nom de Jean.
+ * 5. Le tableau se réduit immédiatement. L'enseignant trouve la note qu'il cherchait.
+ * 6. S'il le souhaite, il peut cliquer sur le bouton "Flèche" situé tout au bout de la ligne pour être téléporté à travers le site directement vers la grille de correction du devoir concerné.
+ */
 export default ResultsExplorer;

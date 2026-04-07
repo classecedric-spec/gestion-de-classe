@@ -1,3 +1,15 @@
+/**
+ * Nom du module/fichier : StudentGradeEntryModal.tsx
+ * 
+ * Données en entrée : Le nom et la photo d'un élève spécifique, l'évaluation concernée et les notes qu'il a déjà obtenues si on les a déjà tapées avant.
+ * 
+ * Données en sortie : L'enregistrement sécurisé et définitif d'une cote (soit une note globale, soit la somme calculée de plusieurs petites questions), ainsi qu'une remarque éventuelle.
+ * 
+ * Objectif principal : Offrir une grande fenêtre pop-up de type "Focus" ou "Cartouche d'examen" pour corriger le devoir d'un élève spécifique confortablement.
+ * 
+ * Ce que ça affiche : Une fenêtre superposée contenant à gauche la calculette des notes (questions par questions si besoin), et à droite l'état de l'élève (Présent, Absent, etc.) et une large case de commentaires.
+ */
+
 import React, { useState, useEffect, useRef } from 'react';
 import { Modal, Input, Button, Badge } from '../../../core';
 import { 
@@ -82,6 +94,7 @@ const StudentGradeEntryModal: React.FC<StudentGradeEntryModalProps> = ({
         }
     }, [isOpen, student, currentResult, questions, questionResults]);
 
+    // Capture le clic sur le bouton "Valider" : compresse les notes de toutes les petites questions (si elles existent) plus la note finale, et envoie le tout au coffre-fort web.
     const handleSave = async () => {
         if (!userId || !student) return;
         setIsSaving(true);
@@ -122,31 +135,43 @@ const StudentGradeEntryModal: React.FC<StudentGradeEntryModalProps> = ({
         }
     };
 
+    // Lorsqu'on tape au clavier la note d'une question spécifique (ex: Question 1 = 4/5), cette fonction met à jour cette case ET recalcule instantanément le total global en bas.
     const handleQuestionChange = (qid: string, val: string) => {
         const newQuestions = { ...localQuestions, [qid]: val };
         setLocalQuestions(newQuestions);
 
         // Validation & Auto-calculate total
-        let total = 0;
         let hasError = false;
-        
-        // Check all questions for validity
+        let weightedTotal = 0;
+        let maxWeightedTotal = 0;
+        let hasAnyAnswer = false;
+
         for (const q of questions) {
+            const ratio = q.ratio != null ? parseFloat(q.ratio.toString()) : 1;
+            const qMax = parseFloat(q.note_max.toString());
+            maxWeightedTotal += qMax * ratio;
+
             const qVal = newQuestions[q.id];
             if (qVal && qVal !== '') {
                 const numVal = parseFloat(qVal);
-                if (isNaN(numVal) || numVal < 0 || numVal > q.note_max) {
+                if (isNaN(numVal) || numVal < 0 || numVal > qMax) {
                     hasError = true;
-                    // Don't break, keep checking others to mark them as invalid in UI
                 } else {
-                    total += numVal;
+                    weightedTotal += numVal * ratio;
+                    hasAnyAnswer = true;
                 }
             }
         }
 
-        // Only update total if no errors in questions
+        // Only update total if no errors in questions and maxWeightedTotal > 0
         if (!hasError) {
-            setLocalTotal(total.toString());
+            if (hasAnyAnswer && maxWeightedTotal > 0) {
+                const evalMax = parseFloat(evaluation.note_max?.toString() || '20');
+                const finalNote = (weightedTotal / maxWeightedTotal) * evalMax;
+                setLocalTotal(parseFloat(finalNote.toFixed(2)).toString());
+            } else {
+                setLocalTotal('');
+            }
         }
     };
 
@@ -164,6 +189,7 @@ const StudentGradeEntryModal: React.FC<StudentGradeEntryModalProps> = ({
         return isNaN(numVal) || numVal < 0 || numVal > evaluation.note_max;
     };
 
+    // Une sécurité mathématique invisible : si une note dépasse son maximum imparti ou n'est pas un nombre, le programme rend invalide l'opération pour bloquer le bouton Valider.
     const hasAnyError = isTotalInvalid() || Object.keys(localQuestions).some(qid => isQuestionInvalid(qid));
 
     if (!student) return null;
@@ -401,4 +427,12 @@ const StudentGradeEntryModal: React.FC<StudentGradeEntryModalProps> = ({
     );
 };
 
+/**
+ * 1. M. le professeur clique sur la ligne d'un élève, la grande "Modal" recouvre l'écran. L'ordinateur affiche instantanément son visage et son nom en gros pour éviter les erreurs.
+ * 2. Si le professeur a paramétré des questions intermédiaires : la case finale est verrouillée (grisée). Le programme invite l'enseignant à remplir ligne par ligne les résultats de chaque exercice. La calculatrice interne additionne le tout en direct.
+ * 3. S'il n'y a pas de sous-questions, le curseur se place tout seul dans la case "Note finale totale" pour taper directement le résultat.
+ * 4. Pendant la frappe, des sécurités de couleur préviennent l'enseignant s'il dépasse le seuil autorisé (la note s'encadre en rouge).
+ * 5. À tout moment, s'il clique sur "Absent" dans la colonne de droite, le statut prend le pas.
+ * 6. Au clic sur "Valider", les données traversent la fibre optique jusqu'aux serveurs ; un signal visuel vert s'affiche "Notes de Jean enregistrées" et la fenêtre se dissout.
+ */
 export default StudentGradeEntryModal;

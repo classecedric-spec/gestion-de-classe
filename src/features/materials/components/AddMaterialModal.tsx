@@ -1,3 +1,21 @@
+/**
+ * Nom du module/fichier : AddMaterialModal.tsx
+ * 
+ * Données en entrée : 
+ *   - `isOpen` : Indique si la fenêtre doit être affichée.
+ *   - `materielToEdit` : (Optionnel) Les données d'un matériel existant si on est en mode "Modification".
+ * 
+ * Données en sortie : 
+ *   - `onSubmit` : Envoie le nom et l'acronyme saisis vers le service de sauvegarde.
+ * 
+ * Objectif principal : Offrir une interface simple et claire pour ajouter un nouvel outil à la classe (ex: 'Tablette') ou modifier un outil existant. La fenêtre s'occupe de valider que le nom est bien rempli avant de permettre l'enregistrement.
+ * 
+ * Ce que ça affiche : 
+ *   - Un champ de texte pour le nom du matériel (obligatoire).
+ *   - Un champ optionnel pour un acronyme court (max 5 lettres).
+ *   - Un bouton de sauvegarde avec un indicateur de chargement.
+ */
+
 import React, { useState, useEffect } from 'react';
 import { FormModal } from '../../../core';
 import { Save } from 'lucide-react';
@@ -10,11 +28,17 @@ interface AddMaterialModalProps {
     materielToEdit?: TypeMateriel | null;
 }
 
+/**
+ * Fenêtre surgissante (Modal) pour la création ou l'édition de matériel.
+ */
 const AddMaterialModal: React.FC<AddMaterialModalProps> = ({ isOpen, onClose, onSubmit, materielToEdit }) => {
     const [nom, setNom] = useState('');
     const [acronyme, setAcronyme] = useState('');
     const [loading, setLoading] = useState(false);
 
+    /**
+     * INITIALISATION : Remplit les champs si on est en mode modification.
+     */
     useEffect(() => {
         if (isOpen) {
             if (materielToEdit) {
@@ -27,8 +51,11 @@ const AddMaterialModal: React.FC<AddMaterialModalProps> = ({ isOpen, onClose, on
         }
     }, [isOpen, materielToEdit]);
 
+    /**
+     * ENVOI : Valide et transmet les données.
+     */
     const handleSubmit = async () => {
-        if (!nom.trim()) return;
+        if (!nom.trim()) return; // Bloque si le nom est vide
 
         setLoading(true);
         try {
@@ -36,7 +63,7 @@ const AddMaterialModal: React.FC<AddMaterialModalProps> = ({ isOpen, onClose, on
                 nom: nom.trim(),
                 acronyme: acronyme.trim() || null
             });
-            onClose();
+            onClose(); // Ferme la fenêtre après succès
         } catch (error) {
             console.error(error);
         } finally {
@@ -55,6 +82,7 @@ const AddMaterialModal: React.FC<AddMaterialModalProps> = ({ isOpen, onClose, on
             size="sm"
         >
             <div className="space-y-4">
+                {/* Champ : Nom du matériel */}
                 <div className="space-y-2">
                     <label htmlFor="nom" className="text-sm font-medium text-gray-300">
                         Nom du matériel <span className="text-danger">*</span>
@@ -70,6 +98,8 @@ const AddMaterialModal: React.FC<AddMaterialModalProps> = ({ isOpen, onClose, on
                         required
                     />
                 </div>
+
+                {/* Champ : Acronyme (Optionnel) */}
                 <div className="space-y-2">
                     <label htmlFor="acronyme" className="text-sm font-medium text-gray-300">
                         Acronyme (Optionnel)
@@ -91,3 +121,14 @@ const AddMaterialModal: React.FC<AddMaterialModalProps> = ({ isOpen, onClose, on
 };
 
 export default AddMaterialModal;
+
+/**
+ * LOGIGRAMME DE FORMULAIRE :
+ * 
+ * 1. OUVERTURE -> La fenêtre apparaît, vide (nouveau) ou pré-remplie (édition).
+ * 2. SAISIE -> L'utilisateur tape le nom de l'objet.
+ * 3. VALIDATION -> Si l'utilisateur clique sur "Enregistrer" :
+ *    - SI NOM VIDE : Rien ne se passe (sécurité).
+ *    - SI NOM OK : Le bouton affiche un sablier et envoie les données.
+ * 4. FERMETURE -> Une fois que le serveur a répondu "OK", la fenêtre se ferme d'elle-même.
+ */
