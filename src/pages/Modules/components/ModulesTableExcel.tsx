@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { ArrowLeft, Table, ChevronRight, X, Layers, Filter, ArrowUp, ArrowDown, Search, Users } from 'lucide-react';
+import { ArrowLeft, Table, ChevronRight, X, Layers, Filter, ArrowUp, ArrowDown, Search, Users, Plus } from 'lucide-react';
 import { CardInfo, Modal, Badge } from '../../../core';
 import { ModuleWithRelations } from '../utils/moduleHelpers';
 import clsx from 'clsx';
@@ -21,11 +21,12 @@ const DEFAULT_COLUMNS: ColumnConfig[] = [
 interface ModulesTableExcelProps {
     modules: ModuleWithRelations[];
     onClose: () => void;
+    onAddModule?: () => void;
     updateModule?: (id: string, moduleData: any) => Promise<any>;
     onSelectModule?: (module: ModuleWithRelations) => void;
 }
 
-export const ModulesTableExcel: React.FC<ModulesTableExcelProps> = ({ modules, onClose, updateModule, onSelectModule }) => {
+export const ModulesTableExcel: React.FC<ModulesTableExcelProps> = ({ modules, onClose, onAddModule, updateModule, onSelectModule }) => {
     // We already have filtered & sorted modules passed from moduleHook
     const [selectedModuleForModal, setSelectedModuleForModal] = useState<ModuleWithRelations | null>(null);
 
@@ -863,6 +864,16 @@ export const ModulesTableExcel: React.FC<ModulesTableExcelProps> = ({ modules, o
                         </div>
                     </div>
                 </div>
+
+                {onAddModule && (
+                    <button
+                        onClick={onAddModule}
+                        className="flex items-center gap-2 px-4 py-2.5 bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/20 text-white/90 rounded-xl font-bold text-sm shadow-sm transition-all hover:scale-105 active:scale-95 group"
+                    >
+                        <Plus size={18} className="group-hover:rotate-90 transition-transform duration-300" />
+                        Ajouter un nouveau module
+                    </button>
+                )}
             </div>
 
             {/* Table Container */}

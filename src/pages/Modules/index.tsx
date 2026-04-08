@@ -31,18 +31,20 @@ const Modules: React.FC = () => {
     const [viewMode, setViewMode] = useState<'list' | 'table'>('table');
     const location = useLocation();
 
-    // Reset viewMode to table when navigating to this page (e.g. sidebar click)
-    useEffect(() => {
-        if (location.pathname === '/dashboard/activities/modules') {
-            setViewMode('table');
-        }
-    }, [location.key, location.pathname]);
-
     // Notifications
     const { notification, showNotification, dismissNotification } = useNotifications();
 
     // Module Management
     const moduleHook = useModuleManagement();
+
+    // Reset viewMode to table when navigating to this page (e.g. sidebar click)
+    // Also re-fetch modules so the table always shows fresh data on each visit
+    useEffect(() => {
+        if (location.pathname === '/dashboard/activities/modules') {
+            setViewMode('table');
+            moduleHook.actions.fetchModules();
+        }
+    }, [location.key, location.pathname]);
 
     // Tabs & Modals
     const [detailTab, setDetailTab] = useState<'activities' | 'groups' | 'progression'>('activities');
@@ -126,8 +128,14 @@ const Modules: React.FC = () => {
         setIsAddActivityModalOpen(true);
     };
 
-    const handleActivityAdded = async () => {
-        await moduleHook.actions.refreshCurrentModule();
+    const handleActivityAdded = async (optimisticActivity?: any) => {
+        if (optimisticActivity && !activityHook.states.activityToEdit) {
+            // Création : on injecte directement l'activité dans le state local (0 latence)
+            moduleHook.actions.addActivitiesToCurrentModule([optimisticActivity]);
+        } else {
+            // Édition : on re-fetch pour avoir les données fraîches
+            await moduleHook.actions.refreshCurrentModule();
+        }
     };
 
     return (
@@ -136,6 +144,7 @@ const Modules: React.FC = () => {
                 <ModulesTableExcel
                     modules={moduleHook.states.filteredModules}
                     onClose={() => setViewMode('list')}
+                    onAddModule={() => setIsAddModalOpen(true)}
                     updateModule={moduleHook.actions.updateModule}
                     onSelectModule={handleModuleSelect}
                 />
@@ -195,7 +204,9 @@ const Modules: React.FC = () => {
             <CreateActivitySeriesModal
                 isOpen={isCreateSeriesModalOpen}
                 onClose={() => setIsCreateSeriesModalOpen(false)}
-                onAdded={moduleHook.actions.refreshCurrentModule}
+                onAdded={(newActivities) => {
+                    moduleHook.actions.addActivitiesToCurrentModule(newActivities);
+                }}
                 moduleId={moduleHook.states.selectedModule?.id || ''}
             />
 

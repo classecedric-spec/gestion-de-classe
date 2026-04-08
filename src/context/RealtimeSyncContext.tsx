@@ -51,7 +51,7 @@ export const RealtimeSyncProvider: React.FC<{ children: React.ReactNode }> = ({ 
                         'Eleve': ['students', 'students-in-class', 'attendance', 'dashboard-stats', 'evaluation_results'],
                         'Groupe': ['groups', 'students', 'dashboard-stats', 'evaluations'],
                         'EleveGroupe': ['students', 'groups', 'students-in-class', 'dashboard-stats'],
-                        'Progression': ['progressions', 'students', 'dashboard-stats'],
+                        'Progression': ['progressions', 'students', 'dashboard-stats', 'vue-retard-progressions', 'all-incomplete-progressions-strict-v2'],
                         'Classe': ['classes', 'students', 'groups', 'students-in-class', 'dashboard-stats'],
                         'Module': ['modules', 'dashboard-stats', 'activities'],
                         'Activite': ['activities', 'modules', 'dashboard-stats'],
@@ -59,18 +59,29 @@ export const RealtimeSyncProvider: React.FC<{ children: React.ReactNode }> = ({ 
                         'Branche': ['branches', 'dashboard-stats', 'evaluations'],
                         'SousBranche': ['branches', 'dashboard-stats'],
                         'Niveau': ['niveaux', 'students', 'activities', 'dashboard-stats'],
-                        'Presence': ['attendance', 'dashboard-stats'],
-                        'PresenceSetup': ['attendance-setup', 'dashboard-stats'],
+                        // Corrections des noms de table
+                        'Attendance': ['attendance', 'dashboard-stats'],
+                        'SetupPresence': ['attendance-setup', 'dashboard-stats'],
                         'CategoriePresence': ['attendance-categories', 'dashboard-stats'],
                         'Responsabilite': ['responsibilities'],
                         'ResponsabiliteEleve': ['responsibilities'],
-                        'Evaluation': ['evaluations', 'evaluation_results', 'dashboard-stats'],
+                        'Evaluation': ['evaluations', 'evaluation_results', 'dashboard-stats', 'all_evaluations_detailed'],
                         'EvaluationQuestion': ['evaluation_questions'],
                         'Resultat': ['evaluation_results', 'dashboard-stats'],
                         'ResultatQuestion': ['question_results', 'evaluation_results'],
                         'TypeNote': ['note_types'],
                         'weekly_planning': ['weekly_planning', 'dashboard-stats'],
-                        'Devoirs': ['devoirs', 'dashboard-stats']
+                        'Devoirs': ['devoirs', 'dashboard-stats'],
+                        // Ajout des tables potentiellement manquantes pour la planification ou autres
+                        'PlanificationHebdo': ['weekly_planning', 'dashboard-stats'],
+                        'custom_activities': ['weekly_planning', 'dashboard-stats'],
+                        'CompteUtilisateur': ['user', 'user-preferences'],
+                        'UserPreference': ['user-preferences'],
+                        'ActiviteMateriel': ['activities', 'modules'],
+                        'Adulte': ['classes'],
+                        'ClasseAdulte': ['classes'],
+                        'SousDomaine': ['branches', 'dashboard-stats'],
+                        'TypeMateriel': ['activities', 'modules']
                     };
 
                     const keysToInvalidate = tableToQueryKey[payload.table as string] || [];

@@ -37,6 +37,11 @@ export interface IGradeRepository {
     findQuestionResultsByEvaluation(evaluationId: string): Promise<Tables<'ResultatQuestion'>[]>;
     upsertQuestionResults(results: TablesInsert<'ResultatQuestion'>[]): Promise<Tables<'ResultatQuestion'>[]>;
 
+    // Regroupement CRUD
+    findRegroupementsByEvaluation(evaluationId: string): Promise<any[]>;
+    upsertRegroupements(regroupements: any[]): Promise<any[]>;
+    deleteRegroupement(id: string): Promise<void>;
+
     // TypeNote CRUD
     findAllNoteTypes(): Promise<Tables<'TypeNote'>[]>;
     createNoteType(typeNote: TablesInsert<'TypeNote'>): Promise<Tables<'TypeNote'>>;

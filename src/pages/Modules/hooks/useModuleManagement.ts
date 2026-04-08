@@ -208,14 +208,31 @@ export function useModuleManagement() {
             handleCreated,
             updateModule: handleUpdateModule,
             refreshCurrentModule: async () => {
-                if (selectedModuleId) {
+                const idToRefresh = selectedModuleId || selectedModule?.id;
+                if (idToRefresh) {
                     try {
-                        const updated = await moduleService.getModuleDetails(selectedModuleId);
-                        setModules(prev => prev.map(m => m.id === selectedModuleId ? updated : m));
+                        const updated = await moduleService.getModuleDetails(idToRefresh);
+                        setModules(prev => prev.map(m => m.id === idToRefresh ? updated : m));
                     } catch (err) {
                         console.error("Error refreshing module", err);
                     }
                 }
+            },
+            // Inject newly created activities directly into local state
+            // (avoids a DB re-fetch that may race with cascade inserts)
+            addActivitiesToCurrentModule: (newActivities: any[]) => {
+                if (!newActivities || newActivities.length === 0) return;
+                const idToUpdate = selectedModuleId || selectedModule?.id;
+                if (!idToUpdate) return;
+
+                setModules(prev => prev.map(m => {
+                    if (m.id !== idToUpdate) return m;
+                    const existingActivities = m.Activite || [];
+                    return {
+                        ...m,
+                        Activite: [...existingActivities, ...newActivities]
+                    };
+                }));
             }
         }
     };

@@ -37,39 +37,70 @@ export class GradeService {
     }
 
     // Processus de création d'un devoir : on crée d'abord la coquille vide (l'évaluation physique en DB), puis s'il y a des petites questions dictées par le prof, le service les greffe automatiquement à la nouvelle coquille.
-    async createEvaluation(evaluation: TablesInsert<'Evaluation'>, questions?: { titre: string, note_max: number, ratio: number, ordre: number }[]) {
+    async createEvaluation(evaluation: TablesInsert<'Evaluation'>, questions?: { id?: string, titre: string, note_max: number, ratio: number, ordre: number }[], regroupements?: any[]) {
         const ev = await this.repository.createEvaluation(evaluation);
+        
         if (questions && questions.length > 0) {
             await this.repository.createQuestions(questions.map(q => ({
                 ...q,
                 evaluation_id: ev.id
+            })) as any);
+        }
+
+        if (regroupements && regroupements.length > 0) {
+            await this.repository.upsertRegroupements(regroupements.map((r, idx) => ({
+                ...r,
+                evaluation_id: ev.id,
+                ordre: r.ordre ?? idx
             })));
         }
+        
         return ev;
     }
 
-    async updateEvaluation(id: string, evaluation: TablesUpdate<'Evaluation'>, questions?: { id?: string, titre: string, note_max: number, ratio: number, ordre: number }[]) {
+    async updateEvaluation(id: string, evaluation: TablesUpdate<'Evaluation'>, questions?: { id?: string, titre: string, note_max: number, ratio: number, ordre: number }[], regroupements?: any[]) {
         const ev = await this.repository.updateEvaluation(id, evaluation);
         
+        // Questions handling
         if (questions) {
-            // Find existing questions to know what to delete
             const existingQuestions = await this.repository.findQuestionsByEvaluation(id);
-            const newQuestionIds = questions.map(q => q.id).filter(qid => qid !== undefined);
+            const newQuestionIds = questions.map(q => q.id).filter(qid => !!qid);
             const toDelete = existingQuestions.filter(eq => !newQuestionIds.includes(eq.id));
             
-            // Delete removed questions
             for (const q of toDelete) {
                 await this.repository.deleteQuestion(q.id);
             }
             
-            // Upsert remaining/new questions
             if (questions.length > 0) {
                 await this.repository.upsertQuestions(questions.map(q => ({
                     ...q,
                     evaluation_id: ev.id
-                })));
+                })) as any);
             }
         }
+
+        // Regroupements handling
+        if (regroupements) {
+            const existingRegroups = await this.repository.findRegroupementsByEvaluation(id);
+            const newRegroupIds = regroupements.map(r => r.id).filter(rid => !!rid);
+            const toDelete = existingRegroups.filter(er => !newRegroupIds.includes(er.id));
+
+            for (const r of toDelete) {
+                await this.repository.deleteRegroupement(r.id);
+            }
+
+            if (regroupements.length > 0) {
+                await this.repository.upsertRegroupements(regroupements.map((r, idx) => {
+                    const { isSuggested, ...cleanR } = r; // Remove UI-only properties
+                    return {
+                        ...cleanR,
+                        evaluation_id: ev.id,
+                        ordre: r.ordre ?? idx
+                    };
+                }));
+            }
+        }
+
         return ev;
     }
 
@@ -79,6 +110,10 @@ export class GradeService {
 
     async getQuestions(evaluationId: string) {
         return this.repository.findQuestionsByEvaluation(evaluationId);
+    }
+
+    async getRegroupements(evaluationId: string) {
+        return this.repository.findRegroupementsByEvaluation(evaluationId);
     }
 
     async getResults(evaluationId: string) {
@@ -131,6 +166,39 @@ export class GradeService {
         return this.repository.deleteNoteType(id);
     }
 
+    // Calcule la note finale d'un élève pour une évaluation donnée, soit à partir de sa note globale, soit en sommant ses critères (questions).
+    calculateStudentTotal(studentId: string, evaluation: any, questions: any[], studentResults: any[], studentQuestionResults: any[]): number | null {
+        const studentResult = studentResults.find(r => r.eleve_id === studentId);
+        if (!studentResult || studentResult.statut !== 'present') return null;
+
+        // Si l'évaluation possède des critères (questions), on recalcule systématiquement le total dynamiquement.
+        if (questions.length > 0) {
+            let weightedSum = 0;
+            let maxWeightedSum = 0;
+            let hasAnyNote = false;
+
+            const relevantQuestions = questions.filter(q => q.evaluation_id === evaluation.id);
+            for (const q of relevantQuestions) {
+                const ratio = q.ratio != null ? parseFloat(q.ratio.toString()) : 1;
+                const qMax = parseFloat(q.note_max.toString());
+                maxWeightedSum += qMax * ratio;
+
+                const qr = studentQuestionResults.find(r => r.question_id === q.id && r.eleve_id === studentId);
+                if (qr && qr.note !== null) {
+                    weightedSum += parseFloat(qr.note.toString()) * ratio;
+                    hasAnyNote = true;
+                }
+            }
+
+            if (!hasAnyNote || maxWeightedSum === 0) return null;
+            const evalMax = parseFloat(evaluation.note_max?.toString() || '20');
+            return parseFloat(((weightedSum / maxWeightedSum) * evalMax).toFixed(2));
+        }
+
+        // Sinon, on utilise la note globale enregistrée.
+        return studentResult.note !== null ? parseFloat(studentResult.note.toString()) : null;
+    }
+
     // La calculette interne : elle prend toutes les notes d'un devoir, enlève intelligemment les absents ou les cases vides, puis sort la moyenne, la meilleure et la pire performance.
     calculateStats(results: Tables<'Resultat'>[], noteMax: number): GradeStats {
         const validGrades = results
@@ -162,8 +230,9 @@ export class GradeService {
     formatStatut(statut: string): string {
         switch (statut) {
             case 'absent': return 'Absent';
-            case 'malade': return 'Malade';
-            case 'non_rendu': return 'Non rendu';
+            case 'malade': return 'Non évaluable';
+            case 'non_remis': 
+            case 'non_rendu': return 'Non remis';
             default: return 'Présent';
         }
     }

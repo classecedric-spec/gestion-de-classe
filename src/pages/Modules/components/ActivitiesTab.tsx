@@ -64,7 +64,7 @@ const SortableActivityItem: React.FC<SortableItemProps> = ({ activity, index, on
                     {/* Requirements Badges */}
                     <div className="flex flex-wrap gap-1.5">
                         {activity.ActiviteNiveau?.map((req: any) => (
-                            <div key={req.id} className="flex items-center gap-1 px-1.5 py-0.5 bg-primary/5 rounded text-[10px] font-bold text-primary border border-primary/10 whitespace-nowrap">
+                            <div key={req.id ?? req.niveau_id} className="flex items-center gap-1 px-1.5 py-0.5 bg-primary/5 rounded text-[10px] font-bold text-primary border border-primary/10 whitespace-nowrap">
                                 <span className="opacity-70 uppercase tracking-tighter">{req.Niveau?.nom}</span>
                                 <span>{req.nombre_exercices || 0}</span>
                                 <span className="opacity-30">/</span>

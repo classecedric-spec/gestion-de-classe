@@ -18,7 +18,7 @@ import { useGradeMutations } from '../hooks/useGrades';
 import { useUserPreferences } from '../../../hooks/useUserPreferences';
 import clsx from 'clsx';
 
-type ColumnId = 'titre' | 'branche' | 'groupe' | 'periode' | 'date' | 'note_max' | 'type_note' | 'nbResultats' | 'moyenne' | 'actions';
+type ColumnId = 'titre' | 'branche' | 'groupe' | 'periode' | 'date' | 'note_max' | 'type_note' | 'nbQuestions' | 'nbResultats' | 'moyenne' | 'actions';
 type ColumnConfig = { id: ColumnId; width: number };
 
 const DEFAULT_COLUMNS: ColumnConfig[] = [
@@ -29,6 +29,7 @@ const DEFAULT_COLUMNS: ColumnConfig[] = [
     { id: 'date', width: 130 },
     { id: 'note_max', width: 100 },
     { id: 'type_note', width: 150 },
+    { id: 'nbQuestions', width: 90 },
     { id: 'nbResultats', width: 120 },
     { id: 'moyenne', width: 120 },
     { id: 'actions', width: 80 }
@@ -42,6 +43,7 @@ const COLUMN_LABELS: Record<ColumnId, string> = {
     date: 'Date',
     note_max: 'Note Max',
     type_note: 'Type',
+    nbQuestions: 'Questions',
     nbResultats: 'Résultats',
     moyenne: 'Moyenne',
     actions: ''
@@ -265,14 +267,15 @@ const EvaluationsTableExcel: React.FC<EvaluationsTableExcelProps> = ({ onSelectE
             {/* Table */}
             <CardInfo className="flex-1 overflow-hidden flex flex-col p-0">
                 <div className="flex-1 overflow-auto custom-scrollbar">
+                    <style>{columns.map(c => `.col-${c.id} { width: ${c.width}px; max-width: ${c.width}px; }`).join('\n')}</style>
                     <table className="w-full text-left border-collapse text-sm whitespace-nowrap table-fixed">
                         <thead className="sticky top-0 z-10 bg-[#1e2e3a] select-none">
                             <tr>
                                 {columns.map((col, index) => (
                                     <th
                                         key={col.id}
-                                        style={{ width: col.width }}
                                         className={clsx(
+                                            `col-${col.id}`,
                                             "p-4 font-bold text-grey-light uppercase tracking-wider text-xs border-b border-white/10 relative transition-colors duration-200",
                                             draggedColumnIndex === index && "opacity-50 bg-white/5",
                                         )}
@@ -313,10 +316,10 @@ const EvaluationsTableExcel: React.FC<EvaluationsTableExcelProps> = ({ onSelectE
                                             <td
                                                 key={col.id}
                                                 className={clsx(
+                                                    `col-${col.id}`,
                                                     "p-4 relative whitespace-nowrap overflow-hidden text-ellipsis",
                                                     col.id === 'titre' && "cursor-pointer"
                                                 )}
-                                                style={{ width: col.width, maxWidth: col.width }}
                                                 onClick={() => {
                                                     if (col.id === 'titre') onSelectEvaluation(ev.id);
                                                 }}
@@ -360,6 +363,7 @@ function getCellSortValue(ev: any, colId: ColumnId): string | number | null {
         case 'date': return ev.date ? new Date(ev.date).getTime() : null;
         case 'note_max': return ev.note_max ?? 0;
         case 'type_note': return ev._typeNoteName || '';
+        case 'nbQuestions': return ev._nbQuestions ?? 0;
         case 'nbResultats': return ev._nbResultats ?? 0;
         case 'moyenne': return ev._moyenne ?? null;
         default: return null;
@@ -557,6 +561,12 @@ function renderCellContent(
             return (
                 <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-white/5 text-grey-medium border border-white/10 truncate inline-block">
                     {ev._typeNoteName}
+                </span>
+            );
+        case 'nbQuestions':
+            return (
+                <span className={clsx("font-semibold", ev._nbQuestions > 0 ? "text-text-main" : "text-white/20")}>
+                    {ev._nbQuestions}
                 </span>
             );
         case 'nbResultats':

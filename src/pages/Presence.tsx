@@ -116,6 +116,44 @@ const Presence: React.FC = () => {
     // Calcul des élèves qui n'ont pas encore été pointés aujourd'hui
     const trulyUnassigned = students.filter(s => !attendances.some(a => a.eleve_id === s.id));
 
+    /**
+     * Tri les élèves par ordre du niveau (Niveau.ordre ou Niveau.nom) puis par prénom.
+     */
+    const sortStudents = (list: typeof students) => {
+        return [...list].sort((a, b) => {
+            const niveauA = a.Niveau;
+            const niveauB = b.Niveau;
+            // Tri par ordre du niveau, puis par nom du niveau, puis par prénom
+            const ordreA = niveauA?.ordre ?? 9999;
+            const ordreB = niveauB?.ordre ?? 9999;
+            if (ordreA !== ordreB) return ordreA - ordreB;
+            const nomNiveauA = niveauA?.nom ?? '';
+            const nomNiveauB = niveauB?.nom ?? '';
+            if (nomNiveauA !== nomNiveauB) return nomNiveauA.localeCompare(nomNiveauB, 'fr');
+            return a.prenom.localeCompare(b.prenom, 'fr');
+        });
+    };
+
+    /**
+     * Groupe les élèves par niveau et retourne un tableau de { levelName, students }.
+     */
+    const groupByLevel = (list: typeof students) => {
+        const sorted = sortStudents(list);
+        const groups: { levelName: string; students: typeof students }[] = [];
+        for (const student of sorted) {
+            const levelName = student.Niveau?.nom ?? 'Sans niveau';
+            const last = groups[groups.length - 1];
+            if (last && last.levelName === levelName) {
+                last.students.push(student);
+            } else {
+                groups.push({ levelName, students: [student] });
+            }
+        }
+        return groups;
+    };
+
+    const unassignedGroups = groupByLevel(trulyUnassigned);
+
     // --- CONSTRUCTION DES ÉLÉMENTS DE L'EN-TÊTE ---
     
     // Le sélecteur "Matin / Après-midi"
@@ -217,12 +255,24 @@ const Presence: React.FC = () => {
                                     color="#9CA3AF"
                                     isUnassigned={true}
                                 >
-                                    {trulyUnassigned.map(student => (
-                                        <AttendanceStudentCard
-                                            key={student.id}
-                                            student={student}
-                                            disabled={isSetupLocked}
-                                        />
+                                    {unassignedGroups.map((group, groupIndex) => (
+                                        <React.Fragment key={group.levelName}>
+                                            {/* Ligne de séparation entre les niveaux (sauf avant le premier) */}
+                                            {groupIndex > 0 && (
+                                                <div className="col-span-full my-1 flex items-center gap-2">
+                                                    <div className="flex-1 h-px bg-white/8" />
+                                                    <span className="text-[10px] font-semibold text-grey-dark/50 uppercase tracking-widest whitespace-nowrap">{group.levelName}</span>
+                                                    <div className="flex-1 h-px bg-white/8" />
+                                                </div>
+                                            )}
+                                            {group.students.map(student => (
+                                                <AttendanceStudentCard
+                                                    key={student.id}
+                                                    student={student}
+                                                    disabled={isSetupLocked}
+                                                />
+                                            ))}
+                                        </React.Fragment>
                                     ))}
                                 </AttendanceColumn>
                             </div>
@@ -255,6 +305,7 @@ const Presence: React.FC = () => {
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 gap-4 pb-20">
                                 {categories.map(cat => {
                                     const catStudents = getStudentsForCategory(cat.id);
+                                    const catGroups = groupByLevel(catStudents);
 
                                     return (
                                         <div key={cat.id} className="h-[300px] min-h-[300px]">
@@ -264,13 +315,24 @@ const Presence: React.FC = () => {
                                                 color={cat.couleur ?? undefined}
                                                 count={catStudents.length}
                                             >
-                                                {catStudents.map(student => (
-                                                    <AttendanceStudentCard
-                                                        key={student.id}
-                                                        student={student}
-                                                        currentStatus={{ status: 'present' }}
-                                                        disabled={isSetupLocked}
-                                                    />
+                                                {catGroups.map((group, groupIndex) => (
+                                                    <React.Fragment key={group.levelName}>
+                                                        {groupIndex > 0 && (
+                                                            <div className="col-span-full my-1 flex items-center gap-2">
+                                                                <div className="flex-1 h-px bg-white/8" />
+                                                                <span className="text-[10px] font-semibold text-grey-dark/50 uppercase tracking-widest whitespace-nowrap">{group.levelName}</span>
+                                                                <div className="flex-1 h-px bg-white/8" />
+                                                            </div>
+                                                        )}
+                                                        {group.students.map(student => (
+                                                            <AttendanceStudentCard
+                                                                key={student.id}
+                                                                student={student}
+                                                                currentStatus={{ status: 'present' }}
+                                                                disabled={isSetupLocked}
+                                                            />
+                                                        ))}
+                                                    </React.Fragment>
                                                 ))}
                                             </AttendanceColumn>
                                         </div>

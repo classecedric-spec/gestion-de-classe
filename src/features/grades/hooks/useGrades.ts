@@ -37,22 +37,26 @@ export const useGradeMutations = (selectedEvaluationId?: string | null) => {
     const queryClient = useQueryClient();
 
     const createEvaluationMutation = useMutation({
-        mutationFn: ({ evaluation, questions }: { evaluation: TablesInsert<'Evaluation'>, questions?: any[] }) => 
-            gradeService.createEvaluation(evaluation, questions),
+        mutationFn: ({ evaluation, questions, regroupements }: { evaluation: TablesInsert<'Evaluation'>, questions?: any[], regroupements?: any[] }) => 
+            gradeService.createEvaluation(evaluation, questions, regroupements),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['evaluations'] });
             queryClient.invalidateQueries({ queryKey: ['all_evaluations_detailed'] });
+            queryClient.invalidateQueries({ queryKey: ['context_results'] });
             toast.success("Évaluation créée avec succès");
         }
     });
 
     const updateEvaluationMutation = useMutation({
-        mutationFn: ({ id, evaluation, questions }: { id: string, evaluation: any, questions?: any[] }) => 
-            gradeService.updateEvaluation(id, evaluation, questions),
-        onSuccess: () => {
+        mutationFn: ({ id, evaluation, questions, regroupements }: { id: string, evaluation: any, questions?: any[], regroupements?: any[] }) => 
+            gradeService.updateEvaluation(id, evaluation, questions, regroupements),
+        onSuccess: (_data, variables) => {
             queryClient.invalidateQueries({ queryKey: ['evaluations'] });
             queryClient.invalidateQueries({ queryKey: ['all_evaluations_detailed'] });
-            queryClient.invalidateQueries({ queryKey: ['evaluation_questions'] });
+            queryClient.invalidateQueries({ queryKey: ['evaluation_questions', variables.id] });
+            queryClient.invalidateQueries({ queryKey: ['evaluation_regroupements', variables.id] });
+            queryClient.invalidateQueries({ queryKey: ['evaluation_detail', variables.id] });
+            queryClient.invalidateQueries({ queryKey: ['evaluation_meta', variables.id] });
             toast.success("Évaluation mise à jour avec succès");
         }
     });
@@ -60,23 +64,46 @@ export const useGradeMutations = (selectedEvaluationId?: string | null) => {
     const deleteEvaluationMutation = useMutation({
         mutationFn: (id: string) => gradeService.deleteEvaluation(id),
         onMutate: async (id) => {
+            // On annule les chargements en cours pour éviter les télescopages de données.
             await queryClient.cancelQueries({ queryKey: ['all_evaluations_detailed'] });
             await queryClient.cancelQueries({ queryKey: ['evaluations'] });
 
             const previousDetailed = queryClient.getQueryData<any[]>(['all_evaluations_detailed']);
+            const previousEvaluations = queryClient.getQueriesData<any[]>({ queryKey: ['evaluations'] });
+
+            // Mise à jour optimiste du cache global (Excel-like view)
             queryClient.setQueryData(['all_evaluations_detailed'], (old: any[] | undefined) =>
                 old?.filter((e: any) => e.id !== id) ?? []
             );
 
-            return { previousDetailed };
+            // Mise à jour optimiste de toutes les vues filtrées (Branche/Trimestre)
+            queryClient.setQueriesData<{pages?: any[], data?: any[]} | any[]>(
+                { queryKey: ['evaluations'] }, 
+                (old: any) => {
+                    if (Array.isArray(old)) return old.filter((e: any) => e.id !== id);
+                    return old;
+                }
+            );
+
+            return { previousDetailed, previousEvaluations };
         },
         onError: (_err, _id, context) => {
+            // Oh mince, erreur serveur ? On remet discrètement l'ancienne liste.
             if (context?.previousDetailed) {
                 queryClient.setQueryData(['all_evaluations_detailed'], context.previousDetailed);
             }
+            if (context?.previousEvaluations) {
+                context.previousEvaluations.forEach(([queryKey, queryData]) => {
+                    queryClient.setQueryData(queryKey, queryData);
+                });
+            }
             toast.error("Erreur lors de la suppression");
         },
-        onSuccess: () => {
+        onSuccess: (_data, deletedId) => {
+            // On force un rafraîchissement final pour certifier les totaux et moyennes.
+            queryClient.invalidateQueries({ queryKey: ['evaluations'] });
+            queryClient.invalidateQueries({ queryKey: ['all_evaluations_detailed'] });
+            queryClient.invalidateQueries({ queryKey: ['context_results'] });
             toast.success("Évaluation supprimée");
         }
     });
@@ -103,9 +130,13 @@ export const useGradeMutations = (selectedEvaluationId?: string | null) => {
         onError: (_err, _variables, context) => {
             if (context?.previous) queryClient.setQueryData(context.queryKey, context.previous);
         },
-        onSuccess: () => {
-            if (selectedEvaluationId) {
-                queryClient.invalidateQueries({ queryKey: ['evaluation_results', selectedEvaluationId] });
+        onSuccess: (_data, variables) => {
+            const evId = variables.evaluation_id || selectedEvaluationId;
+            if (evId) {
+                queryClient.invalidateQueries({ queryKey: ['evaluation_results', evId] });
+                queryClient.invalidateQueries({ queryKey: ['context_results'] });
+                // Important: invalidate global stats since a grade change affects averages
+                queryClient.invalidateQueries({ queryKey: ['all_evaluations_detailed'] });
             }
         }
     });
@@ -134,9 +165,12 @@ export const useGradeMutations = (selectedEvaluationId?: string | null) => {
             if (context?.previous) queryClient.setQueryData(context.queryKey, context.previous);
         },
         onSuccess: () => {
-            if (selectedEvaluationId) {
-                queryClient.invalidateQueries({ queryKey: ['question_results', selectedEvaluationId] });
-                queryClient.invalidateQueries({ queryKey: ['evaluation_results', selectedEvaluationId] });
+            const evId = selectedEvaluationId;
+            if (evId) {
+                queryClient.invalidateQueries({ queryKey: ['question_results', evId] });
+                queryClient.invalidateQueries({ queryKey: ['evaluation_results', evId] });
+                queryClient.invalidateQueries({ queryKey: ['all_evaluations_detailed'] });
+                queryClient.invalidateQueries({ queryKey: ['context_results'] });
             }
         }
     });

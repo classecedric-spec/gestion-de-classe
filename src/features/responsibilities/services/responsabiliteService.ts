@@ -147,6 +147,18 @@ export const responsabiliteService = {
             .eq('id', assignmentId);
 
         if (error) throw error;
+    },
+
+    /**
+     * MISE À JOUR : Modifie le titre d'un métier.
+     */
+    async updateResponsibility(id: string, titre: string): Promise<void> {
+        const { error } = await supabase
+            .from('Responsabilite')
+            .update({ titre })
+            .eq('id', id);
+
+        if (error) throw error;
     }
 };
 

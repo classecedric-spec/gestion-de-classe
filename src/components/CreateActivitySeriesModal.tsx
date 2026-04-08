@@ -5,10 +5,25 @@ import { Modal, Button } from '../core';
 import { Tables } from '../types/supabase';
 import { SupabaseActivityRepository } from '../features/activities/repositories/SupabaseActivityRepository';
 
+interface CreatedActivityData {
+    id: string;
+    titre: string;
+    module_id: string | null;
+    user_id: string;
+    ordre: number | null;
+    statut_exigence: string | null;
+    nombre_exercices: number | null;
+    nombre_erreurs: number | null;
+    ActiviteNiveau?: any[];
+    ActiviteMateriel?: any[];
+    Progression?: any[];
+    [key: string]: any;
+}
+
 interface CreateActivitySeriesModalProps {
     isOpen: boolean;
     onClose: () => void;
-    onAdded: () => void;
+    onAdded: (newActivities: CreatedActivityData[]) => void;
     moduleId: string;
 }
 
@@ -189,9 +204,30 @@ const CreateActivitySeriesModal: React.FC<CreateActivitySeriesModalProps> = ({ i
 
                     await activityRepository.addActivityMaterials(materialLinks);
                 }
+
+                // 5. Build enriched activity objects for immediate local state update
+                //    (avoids a roundtrip fetch that may race with cascade inserts)
+                const enrichedActivities: CreatedActivityData[] = insertedActivities.map(act => ({
+                    ...act,
+                    ActiviteNiveau: selectedLevels.map(sl => ({
+                        activite_id: act.id,
+                        niveau_id: sl.id,
+                        nombre_exercices: sl.nombre_exercices,
+                        nombre_erreurs: sl.nombre_erreurs,
+                        statut_exigence: 'obligatoire',
+                        Niveau: { nom: sl.nom }
+                    })),
+                    ActiviteMateriel: materialTypeId
+                        ? [{ activite_id: act.id, type_materiel_id: materialTypeId }]
+                        : [],
+                    Progression: []
+                }));
+
+                onAdded(enrichedActivities);
+            } else {
+                onAdded([]);
             }
 
-            onAdded();
             onClose();
         } catch (err: any) {
             setError(err.message || "Une erreur est survenue lors de la création.");

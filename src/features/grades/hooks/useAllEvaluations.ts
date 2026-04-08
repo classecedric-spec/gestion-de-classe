@@ -28,17 +28,39 @@ export const useAllEvaluations = () => {
         queryFn: async () => {
             const evs = await gradeService.getAllEvaluationsDetailed();
             
-            const { data: questions } = await supabase
-                .from('EvaluationQuestion')
-                .select('evaluation_id, note_max, ratio');
+            const { data: allQuestions } = await supabase.from('EvaluationQuestion').select('*');
+            const { data: allResults } = await supabase.from('Resultat').select('*');
+            const { data: allQuestionResults } = await supabase.from('ResultatQuestion').select('*');
                 
             return evs.map((ev: any) => {
-                const evQs = questions?.filter((q: any) => q.evaluation_id === ev.id) || [];
+                const evQs = allQuestions?.filter((q: any) => q.evaluation_id === ev.id) || [];
+                const evResults = allResults?.filter((r: any) => r.evaluation_id === ev.id) || [];
+                
+                const effectiveNotes = evResults
+                    .map(r => {
+                        const studentQR = allQuestionResults?.filter(qr => 
+                            evQs.some(q => q.id === qr.question_id) && qr.eleve_id === r.eleve_id
+                        ) || [];
+                        return gradeService.calculateStudentTotal(r.eleve_id, ev, evQs, evResults, studentQR);
+                    })
+                    .filter(n => n !== null) as number[];
+
                 let realNoteMax = ev.note_max;
                 if (evQs.length > 0) {
                     realNoteMax = evQs.reduce((acc: number, q: any) => acc + (Number(q.note_max) * (q.ratio != null ? Number(q.ratio) : 1)), 0);
                 }
-                return { ...ev, _real_note_max: realNoteMax };
+
+                const avg = effectiveNotes.length > 0 
+                    ? effectiveNotes.reduce((a, b) => a + b, 0) / effectiveNotes.length 
+                    : null;
+
+                return { 
+                    ...ev, 
+                    _real_note_max: realNoteMax,
+                    _nbQuestions: evQs.length,
+                    _nbResultats: effectiveNotes.length,
+                    _moyenne: avg
+                };
             });
         },
         staleTime: 1000 * 60 * 2, // 2 minutes
@@ -50,11 +72,12 @@ export const useAllEvaluations = () => {
         _brancheName: ev.Branche?.nom || '-',
         _groupeName: ev.Groupe?.nom || '-',
         _typeNoteName: ev.TypeNote?.nom || '-',
-        _nbResultats: ev.nb_resultats || 0,
-        _moyenne: ev.moyenne,
+        _nbResultats: ev._nbResultats,
+        _moyenne: ev._moyenne,
         _noteMaxResult: ev.note_max_result,
         _noteMinResult: ev.note_min_result,
         _real_note_max: ev._real_note_max,
+        _nbQuestions: ev._nbQuestions,
     }));
 
     return {

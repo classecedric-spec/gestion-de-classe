@@ -40,6 +40,10 @@ const Responsabilites: React.FC = () => {
     // État pour savoir quelle tâche on est en train de modifier (pour l'assignation)
     const [selectedTask, setSelectedTask] = useState<ResponsabiliteWithEleves | null>(null);
 
+    // État pour l'édition en ligne du titre
+    const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
+    const [editingTaskTitleValue, setEditingTaskTitleValue] = useState('');
+
     // 1. RÉCUPÉRATION DES DONNÉES : Charge la liste au démarrage
     const { data: tasks = [], isLoading } = useQuery({
         queryKey: ['responsibilities', session?.user.id],
@@ -135,11 +139,59 @@ const Responsabilites: React.FC = () => {
         }
     });
 
+    // ACTION : Modifier le titre d'une responsabilité
+    const updateTaskMutation = useMutation({
+        mutationFn: ({ id, titre }: { id: string, titre: string }) => responsabiliteService.updateResponsibility(id, titre),
+        onMutate: async ({ id, titre }) => {
+            const queryKey = ['responsibilities', session?.user.id];
+            await queryClient.cancelQueries({ queryKey });
+            const previous = queryClient.getQueryData<ResponsabiliteWithEleves[]>(queryKey) || [];
+
+            queryClient.setQueryData(queryKey, previous.map(t => t.id === id ? { ...t, titre } : t));
+            return { previous, queryKey };
+        },
+        onError: (_err, _variables, context) => {
+            if (context?.previous) queryClient.setQueryData(context.queryKey, context.previous);
+            toast.error("Erreur lors de la modification");
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['responsibilities', session?.user.id] });
+            setEditingTaskId(null);
+            toast.success("Responsabilité modifiée");
+        }
+    });
+
     // GESTIONNAIRES DE FORMULAIRE
     const handleAddTask = (e: React.FormEvent) => {
         e.preventDefault();
         if (!newTaskTitle.trim()) return;
         createTaskMutation.mutate(newTaskTitle.trim());
+    };
+
+    const handleDoubleClick = (task: ResponsabiliteWithEleves) => {
+        setEditingTaskId(task.id);
+        setEditingTaskTitleValue(task.titre);
+    };
+
+    const handleSaveEdit = () => {
+        if (!editingTaskId) return;
+        if (!editingTaskTitleValue.trim()) {
+            setEditingTaskId(null);
+            return;
+        }
+
+        const task = tasks.find(t => t.id === editingTaskId);
+        if (task && task.titre === editingTaskTitleValue.trim()) {
+            setEditingTaskId(null);
+            return;
+        }
+
+        updateTaskMutation.mutate({ id: editingTaskId, titre: editingTaskTitleValue.trim() });
+    };
+
+    const handleKeyDown = (e: React.KeyboardEvent) => {
+        if (e.key === 'Enter') handleSaveEdit();
+        if (e.key === 'Escape') setEditingTaskId(null);
     };
 
     // Filtrage visuel de la table
@@ -226,9 +278,25 @@ const Responsabilites: React.FC = () => {
                                     <tr key={task.id} className="group hover:bg-white/5 transition-colors">
                                         <td className="px-6 py-6 align-top">
                                             <div className="flex flex-col gap-1">
-                                                <span className="text-lg font-bold text-white group-hover:text-primary transition-colors">
-                                                    {task.titre}
-                                                </span>
+                                                {editingTaskId === task.id ? (
+                                                    <input
+                                                        autoFocus
+                                                        type="text"
+                                                        value={editingTaskTitleValue}
+                                                        onChange={(e) => setEditingTaskTitleValue(e.target.value)}
+                                                        onBlur={handleSaveEdit}
+                                                        onKeyDown={handleKeyDown}
+                                                        className="bg-white/10 border border-primary/50 text-white text-lg font-bold rounded px-2 py-0.5 focus:ring-1 focus:ring-primary outline-none"
+                                                    />
+                                                ) : (
+                                                    <span
+                                                        onDoubleClick={() => handleDoubleClick(task)}
+                                                        className="text-lg font-bold text-white group-hover:text-primary transition-colors cursor-pointer"
+                                                        title="Double-cliquez pour modifier"
+                                                    >
+                                                        {task.titre}
+                                                    </span>
+                                                )}
                                                 <span className="text-[10px] text-grey-dark font-medium uppercase tracking-tighter">
                                                     Créé le {new Date(task.created_at).toLocaleDateString()}
                                                 </span>

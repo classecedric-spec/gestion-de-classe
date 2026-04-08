@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef, useEffect } from 'react';
 import { Folder, SlidersHorizontal, Clock, Plus, Table, Users } from 'lucide-react';
 import { CardInfo, SearchBar, FilterSelect, CardList, ListItem, EmptyState, Badge, Avatar } from '../../../core';
 import clsx from 'clsx';
@@ -26,6 +26,19 @@ export const ModulesListSidebar: React.FC<ModulesListSidebarProps> = ({
     headerHeight,
     onTableModeClick
 }) => {
+    const selectedItemRef = useRef<HTMLDivElement | null>(null);
+    const selectedModuleId = moduleHook.states.selectedModule?.id;
+
+    // Auto-scroll to the selected module whenever selection changes
+    // (e.g. when coming from the Excel table view)
+    useEffect(() => {
+        if (!selectedItemRef.current) return;
+        const t = setTimeout(() => {
+            selectedItemRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }, 80); // small delay to let the list render after viewMode switch
+        return () => clearTimeout(t);
+    }, [selectedModuleId]);
+
     return (
         <div className="w-1/4 flex flex-col gap-6 overflow-hidden">
             <CardInfo
@@ -142,8 +155,13 @@ export const ModulesListSidebar: React.FC<ModulesListSidebarProps> = ({
                 ) : (
                     <div className="space-y-1">
                         {moduleHook.states.filteredModules.map((module: any) => {
+                            const isSelected = moduleHook.states.selectedModule?.id === module.id;
                             const isExpired = module.date_fin && new Date(module.date_fin) < new Date();
                             return (
+                                <div
+                                    key={module.id}
+                                    ref={isSelected ? selectedItemRef : null}
+                                >
                                 <ListItem
                                     key={module.id}
                                     id={module.id}
@@ -214,6 +232,7 @@ export const ModulesListSidebar: React.FC<ModulesListSidebarProps> = ({
                                         </div>
                                     ].filter(Boolean)}
                                 />
+                                </div>
                             );
                         })}
                     </div>

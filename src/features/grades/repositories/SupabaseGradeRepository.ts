@@ -93,9 +93,14 @@ export class SupabaseGradeRepository implements IGradeRepository {
     }
 
     async createQuestions(questions: TablesInsert<'EvaluationQuestion'>[]): Promise<Tables<'EvaluationQuestion'>[]> {
+        const sanitized = questions.map(q => {
+            const { id, ...rest } = q as any;
+            return id ? q : rest;
+        });
+
         const { data, error } = await supabase
             .from('EvaluationQuestion')
-            .insert(questions)
+            .insert(sanitized)
             .select();
             
         if (error) throw error;
@@ -103,13 +108,39 @@ export class SupabaseGradeRepository implements IGradeRepository {
     }
 
     async upsertQuestions(questions: TablesInsert<'EvaluationQuestion'>[]): Promise<Tables<'EvaluationQuestion'>[]> {
-        const { data, error } = await supabase
-            .from('EvaluationQuestion')
-            .upsert(questions, { onConflict: 'id' })
-            .select();
-            
-        if (error) throw error;
-        return data || [];
+        const toInsert: any[] = [];
+        const toUpdate: any[] = [];
+
+        for (const q of questions) {
+            const { id, ...rest } = q as any;
+            if (id) {
+                toUpdate.push(q);
+            } else {
+                toInsert.push(rest);
+            }
+        }
+
+        const results: Tables<'EvaluationQuestion'>[] = [];
+
+        if (toUpdate.length > 0) {
+            const { data, error } = await supabase
+                .from('EvaluationQuestion')
+                .upsert(toUpdate, { onConflict: 'id' })
+                .select();
+            if (error) throw error;
+            if (data) results.push(...data);
+        }
+
+        if (toInsert.length > 0) {
+            const { data, error } = await supabase
+                .from('EvaluationQuestion')
+                .insert(toInsert)
+                .select();
+            if (error) throw error;
+            if (data) results.push(...data);
+        }
+
+        return results;
     }
 
     async deleteQuestion(id: string): Promise<void> {
@@ -168,9 +199,11 @@ export class SupabaseGradeRepository implements IGradeRepository {
 
     // "Upsert" est la contraction de 'Update' (Mettre à jour) et 'Insert' (Insérer). C'est un ordre intelligent : "Si cet élève a déjà une note pour ce devoir précis, alors écrase-la. Sinon, crée-lui une nouvelle case".
     async upsertResult(result: TablesInsert<'Resultat'>): Promise<Tables<'Resultat'>> {
+        // Sanitize to remove relationship fields that aren't columns
+        const { Eleve, Evaluation, ...sanitized } = result as any;
         const { data, error } = await supabase
             .from('Resultat')
-            .upsert(result, { onConflict: 'evaluation_id,eleve_id' })
+            .upsert(sanitized, { onConflict: 'evaluation_id,eleve_id' })
             .select()
             .single();
             
@@ -199,13 +232,55 @@ export class SupabaseGradeRepository implements IGradeRepository {
     }
 
     async upsertQuestionResults(results: TablesInsert<'ResultatQuestion'>[]): Promise<Tables<'ResultatQuestion'>[]> {
+        // Sanitize to remove relationship fields that aren't columns
+        const sanitized = results.map(r => {
+            const { EvaluationQuestion, ...rest } = r as any;
+            return rest;
+        });
+        
         const { data, error } = await supabase
             .from('ResultatQuestion')
-            .upsert(results, { onConflict: 'eleve_id,question_id' })
+            .upsert(sanitized, { onConflict: 'eleve_id,question_id' })
             .select();
             
         if (error) throw error;
         return data || [];
+    }
+
+    // Regroupement CRUD
+    async findRegroupementsByEvaluation(evaluationId: string): Promise<any[]> {
+        const { data, error } = await supabase
+            .from('EvaluationRegroupement')
+            .select('*')
+            .eq('evaluation_id', evaluationId)
+            .order('ordre', { ascending: true });
+            
+        if (error) throw error;
+        return data || [];
+    }
+
+    async upsertRegroupements(regroupements: any[]): Promise<any[]> {
+        const sanitized = regroupements.map(r => {
+            const { id, ...rest } = r;
+            return id ? r : rest;
+        });
+
+        const { data, error } = await supabase
+            .from('EvaluationRegroupement')
+            .upsert(sanitized, { onConflict: 'id' })
+            .select();
+            
+        if (error) throw error;
+        return data || [];
+    }
+
+    async deleteRegroupement(id: string): Promise<void> {
+        const { error } = await supabase
+            .from('EvaluationRegroupement')
+            .delete()
+            .eq('id', id);
+            
+        if (error) throw error;
     }
 
     // TypeNote CRUD

@@ -22,6 +22,7 @@ const Grades: React.FC = () => {
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
     const [editingEvaluationData, setEditingEvaluationData] = useState<any>(null);
     const [editingQuestions, setEditingQuestions] = useState<any[]>([]);
+    const [editingRegroupements, setEditingRegroupements] = useState<any[]>([]);
     const location = useLocation();
 
     // Reset view to evaluations table when navigating to this page (e.g. sidebar click)
@@ -39,17 +40,18 @@ const Grades: React.FC = () => {
     } = useGradeMutations();
 
     // Handlers
-    const handleCreateEvaluation = async (data: TablesInsert<'Evaluation'>, questions: any[]) => {
+    const handleCreateEvaluation = async (data: TablesInsert<'Evaluation'>, questions: any[], regroupements?: any[]) => {
         try {
             if (editingEvaluationData) {
-                await updateEvaluation({ id: editingEvaluationData.id, evaluation: data, questions });
+                await updateEvaluation({ id: editingEvaluationData.id, evaluation: data, questions, regroupements });
             } else {
-                const newEval = await createEvaluation({ evaluation: data, questions });
+                const newEval = await createEvaluation({ evaluation: data, questions, regroupements });
                 if (newEval) setSelectedEvaluationId(newEval.id);
             }
             setIsAddModalOpen(false);
             setEditingEvaluationData(null);
             setEditingQuestions([]);
+            setEditingRegroupements([]);
         } catch (error) {
             console.error(error);
         }
@@ -58,7 +60,9 @@ const Grades: React.FC = () => {
     const handleEditClick = async (evaluation: any) => {
         setEditingEvaluationData(evaluation);
         const fetchedQuestions = await gradeService.getQuestions(evaluation.id);
+        const fetchedRegroupements = await gradeService.getRegroupements(evaluation.id);
         setEditingQuestions(fetchedQuestions);
+        setEditingRegroupements(fetchedRegroupements);
         setIsAddModalOpen(true);
     };
 
@@ -158,6 +162,7 @@ const Grades: React.FC = () => {
                     setIsAddModalOpen(false);
                     setEditingEvaluationData(null);
                     setEditingQuestions([]);
+                    setEditingRegroupements([]);
                 }}
                 onSubmit={handleCreateEvaluation}
                 brancheId={''}
@@ -165,6 +170,7 @@ const Grades: React.FC = () => {
                 periode={''}
                 initialData={editingEvaluationData}
                 initialQuestions={editingQuestions}
+                initialRegroupements={editingRegroupements}
             />
         </div>
     );

@@ -21,7 +21,7 @@ import {
     X, 
     CheckCircle2, 
     XCircle, 
-    HeartPulse, 
+    MinusCircle, 
     Octagon, 
     MessageSquare, 
     Trash2 
@@ -49,6 +49,7 @@ const EvaluationDetailTable: React.FC<EvaluationDetailTableProps> = ({ evaluatio
     const [isEntryModalOpen, setIsEntryModalOpen] = useState(false);
     const [isBulkEdit, setIsBulkEdit] = useState(false);
     const [evalToDelete, setEvalToDelete] = useState<string | null>(null);
+    const [pendingAbsences, setPendingAbsences] = useState<Record<string, { timeoutId: any, startTime: number }>>({});
     const { session } = useAuth();
     const userId = session?.user?.id;
 
@@ -71,13 +72,67 @@ const EvaluationDetailTable: React.FC<EvaluationDetailTableProps> = ({ evaluatio
     // Prépare une action pour modifier l'état de l'élève (ex: marquer "absent" ou "malade") et le sauvegarder immédiatement.
     const handleStatutChange = async (studentId: string, newStatut: string) => {
         if (!userId) return;
+
+        // Si une suppression était programmée pour ce même élève, on l'annule systématiquement 
+        // dès qu'on clique sur N'IMPORTE QUEL bouton de statut (y compris recliquer sur Absent pour annuler).
+        if (pendingAbsences[studentId]) {
+            clearTimeout(pendingAbsences[studentId].timeoutId);
+            setPendingAbsences(prev => {
+                const updated = { ...prev };
+                delete updated[studentId];
+                return updated;
+            });
+            
+            // Si on a recliqué sur "Absent", on considère que c'était une demande d'annulation
+            if (newStatut === 'absent') return;
+        }
+
+        if (newStatut === 'absent') {
+            const timeoutId = setTimeout(async () => {
+                const currentResult = currentResults.find((r: any) => r.eleve_id === studentId);
+                
+                // 1. Enregistrer le statut absent et effacer la note principale
+                await saveResult({
+                    id: currentResult?.id,
+                    eleve_id: studentId,
+                    evaluation_id: evaluationId,
+                    statut: 'absent',
+                    note: null, // On efface la note
+                    commentaire: currentResult?.commentaire,
+                    user_id: userId
+                });
+
+                // 2. Effacer les résultats détaillés par question si présents
+                if (hasQuestions) {
+                    const studentQs = questions.filter(q => q.evaluation_id === evaluationId);
+                    const resultsToDelete = questionResults.filter(qr => qr.eleve_id === studentId && studentQs.some(q => q.id === qr.question_id));
+                    
+                    if (resultsToDelete.length > 0) {
+                         await saveQuestionResults(resultsToDelete.map(r => ({ ...r, note: null })));
+                    }
+                }
+
+                setPendingAbsences(prev => {
+                    const updated = { ...prev };
+                    delete updated[studentId];
+                    return updated;
+                });
+            }, 3000);
+
+            setPendingAbsences(prev => ({
+                ...prev,
+                [studentId]: { timeoutId, startTime: Date.now() }
+            }));
+            return;
+        }
+
         const currentResult = currentResults.find((r: any) => r.eleve_id === studentId);
         await saveResult({
             id: currentResult?.id,
             eleve_id: studentId,
             evaluation_id: evaluationId,
             statut: newStatut,
-            note: currentResult?.note,
+            note: hasQuestions ? undefined : currentResult?.note,
             commentaire: currentResult?.commentaire,
             user_id: userId
         });
@@ -101,60 +156,60 @@ const EvaluationDetailTable: React.FC<EvaluationDetailTableProps> = ({ evaluatio
         });
     };
 
+    const calculateScore = (studentId: string) => {
+        if (!evaluation || !questions.length) return { total: null, formula: null };
+        
+        const studentQuestionResults = questionResults.filter(qr => qr.eleve_id === studentId);
+        if (studentQuestionResults.length === 0) return { total: null, formula: null };
+
+        let weightedSum = 0;
+        let maxWeightedSum = 0;
+        let hasAnyNote = false;
+        let notesList: string[] = [];
+
+        for (const q of questions) {
+            const ratio = q.ratio != null ? parseFloat(q.ratio.toString()) : 1;
+            const qMax = parseFloat(q.note_max.toString());
+            maxWeightedSum += qMax * ratio;
+
+            const qr = studentQuestionResults.find(r => r.question_id === q.id);
+            if (qr && qr.note !== null) {
+                const noteVal = parseFloat(qr.note.toString());
+                weightedSum += noteVal * ratio;
+                hasAnyNote = true;
+                notesList.push(ratio === 1 ? noteVal.toString() : `${noteVal}×${ratio}`);
+            }
+        }
+
+        if (!hasAnyNote) return { total: null, formula: null };
+
+        const evalMax = parseFloat(evaluation.note_max?.toString() || '20');
+        const finalTotal = (weightedSum / maxWeightedSum) * evalMax;
+        
+        let formulaPart = notesList.length > 1 ? `(${notesList.join(' + ')})` : notesList[0];
+        let fullFormula = formulaPart;
+        
+        if (Math.abs(maxWeightedSum - evalMax) > 0.01) {
+            fullFormula = `${formulaPart} / ${maxWeightedSum} × ${evalMax}`;
+        }
+        
+        return { 
+            total: parseFloat(finalTotal.toFixed(2)), 
+            formula: `${fullFormula} = ${finalTotal.toFixed(2)}` 
+        };
+    };
+
     const handleQuestionNoteChange = async (studentId: string, questionId: string, note: string) => {
         if (!userId) return;
         const q = questions.find(q => q.id === questionId);
         const val = note === '' ? null : parseFloat(note);
         if (q && val !== null && (val < 0 || val > q.note_max)) return;
 
-        let maxWeightedTotal = 0;
-        let weightedTotal = 0;
-        let hasAnyAnswer = false;
-        
-        const otherQuestionsResults = questionResults.filter(qr => qr.eleve_id === studentId && qr.question_id !== questionId);
-
-        for (const currentQ of questions) {
-            const ratio = currentQ.ratio != null ? parseFloat(currentQ.ratio.toString()) : 1;
-            const qMax = parseFloat(currentQ.note_max.toString());
-            maxWeightedTotal += qMax * ratio;
-
-            if (currentQ.id === questionId) {
-                 if (val !== null) {
-                     weightedTotal += val * ratio;
-                     hasAnyAnswer = true;
-                 }
-            } else {
-                 const qr = otherQuestionsResults.find(r => r.question_id === currentQ.id);
-                 if (qr && qr.note !== null) {
-                     weightedTotal += parseFloat(qr.note.toString()) * ratio;
-                     hasAnyAnswer = true;
-                 }
-            }
-        }
-
-        const evalMax = parseFloat(evaluation?.note_max?.toString() || '20');
-        let newTotal: number | null = null;
-        if (hasAnyAnswer && maxWeightedTotal > 0) {
-            const finalNote = (weightedTotal / maxWeightedTotal) * evalMax;
-            newTotal = parseFloat(finalNote.toFixed(2));
-        }
-
         await saveQuestionResults([{
             eleve_id: studentId,
             question_id: questionId,
             note: val
         }]);
-
-        const currentResult = currentResults.find((r: any) => r.eleve_id === studentId);
-        await saveResult({
-            id: currentResult?.id,
-            eleve_id: studentId,
-            evaluation_id: evaluationId,
-            note: newTotal,
-            statut: currentResult?.statut || 'present',
-            commentaire: currentResult?.commentaire,
-            user_id: userId
-        });
     };
 
     // Prépare une action pour sauvegarder de façon permanente un texte d'appréciation libre rédigé par le professeur.
@@ -166,7 +221,7 @@ const EvaluationDetailTable: React.FC<EvaluationDetailTableProps> = ({ evaluatio
             eleve_id: studentId,
             evaluation_id: evaluationId,
             commentaire: comment,
-            note: currentResult?.note,
+            note: hasQuestions ? undefined : currentResult?.note,
             statut: currentResult?.statut || 'present',
             user_id: userId
         });
@@ -176,6 +231,31 @@ const EvaluationDetailTable: React.FC<EvaluationDetailTableProps> = ({ evaluatio
     useEffect(() => {
         setSelectedEvaluationId(evaluationId);
     }, [evaluationId, setSelectedEvaluationId]);
+
+    const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+        if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
+            e.preventDefault();
+            const container = e.currentTarget.closest('table');
+            if (!container) return;
+
+            const inputs = Array.from(container.querySelectorAll('input[type="number"]')) as HTMLInputElement[];
+            const index = inputs.indexOf(e.currentTarget);
+
+            if (e.key === 'ArrowRight') {
+                const next = inputs[index + 1];
+                if (next) {
+                    next.focus();
+                    next.select();
+                }
+            } else {
+                const prev = inputs[index - 1];
+                if (prev) {
+                    prev.focus();
+                    prev.select();
+                }
+            }
+        }
+    };
 
     // Va chercher dans la base de données numérique le "contexte" de l'évaluation (quelle matière, quel groupe d'élèves).
     const { data: evalDetails } = useQuery({
@@ -230,6 +310,7 @@ const EvaluationDetailTable: React.FC<EvaluationDetailTableProps> = ({ evaluatio
     const activeNoteType = noteTypes.find(nt => nt.id === evaluation?.type_note_id);
     const isConversion = activeNoteType?.systeme === 'conversion';
     const hasQuestions = questions.length > 0;
+
 
     const isLoading = hookLoading || loadingStudents;
 
@@ -338,15 +419,15 @@ const EvaluationDetailTable: React.FC<EvaluationDetailTableProps> = ({ evaluatio
                                         lastLevelId = student.Niveau?.id;
                                         
                                         const result = currentResults.find((r: any) => r.eleve_id === student.id);
-                                         const noteMax = Number(evaluation?.note_max) || 20;
+                                        const noteMax = Number(evaluation?.note_max) || 20;
 
                                         const isRowComplete = hasQuestions
                                             ? questions.every(q => questionResults.some(qr => qr.eleve_id === student.id && qr.question_id === q.id && qr.note != null))
-                                            : result?.note != null && result?.note !== '';
+                                            : result?.note != null;
 
                                         const hasAtLeastOneData = hasQuestions
                                             ? questions.some(q => questionResults.some(qr => qr.eleve_id === student.id && qr.question_id === q.id && qr.note != null))
-                                            : false;
+                                            : result?.note != null;
 
                                         const isDataMissing = !isRowComplete && hasAtLeastOneData && (!result?.statut || result.statut === 'present');
 
@@ -406,6 +487,7 @@ const EvaluationDetailTable: React.FC<EvaluationDetailTableProps> = ({ evaluatio
                                                             !hasQuestions ? (
                                                                 <div className="flex justify-center">
                                                                     <Input
+                                                                        key={`${student.id}-total-${result?.note ?? 'null'}`}
                                                                         type="number"
                                                                         defaultValue={result?.note ?? ''}
                                                                         onBlur={(e: any) => {
@@ -413,6 +495,7 @@ const EvaluationDetailTable: React.FC<EvaluationDetailTableProps> = ({ evaluatio
                                                                                 handleNoteChange(student.id, e.target.value);
                                                                             }
                                                                         }}
+                                                                        onKeyDown={handleKeyDown}
                                                                         className={clsx(
                                                                             "w-20 h-10 text-center text-lg font-black bg-grey-dark border-white/20 text-primary",
                                                                             evaluation?.note_max && (Number(result?.note ?? 0) > evaluation.note_max || Number(result?.note ?? 0) < 0) && "border-danger text-danger"
@@ -420,31 +503,44 @@ const EvaluationDetailTable: React.FC<EvaluationDetailTableProps> = ({ evaluatio
                                                                     />
                                                                 </div>
                                                             ) : (
-                                                                <div className="flex flex-col items-center opacity-50">
-                                                                     <span className="text-lg font-black text-white">
-                                                                        {result?.note ?? '--'}
-                                                                    </span>
+                                                                <div className="flex justify-center">
+                                                                    {(() => {
+                                                                        const { total, formula } = calculateScore(student.id);
+                                                                        const palier = (isConversion && total != null) ? getConversionPalier(Number(total), noteMax, activeNoteType) : null;
+                                                                        const palierColor = palier?.color ? colorMap[palier.color] || 'text-white' : 'text-white';
+                                                                        
+                                                                        return (
+                                                                            <div className="flex flex-col items-center" title={formula || undefined}>
+                                                                                <span className={clsx(
+                                                                                    "text-lg font-black transition-colors", 
+                                                                                    total != null ? (isConversion ? palierColor : "text-primary") : "text-white opacity-20"
+                                                                                )}>
+                                                                                    {total ?? '--'}
+                                                                                </span>
+                                                                            </div>
+                                                                        );
+                                                                    })()}
                                                                 </div>
                                                             )
                                                         ) : (
-                                                            result?.note != null ? (
-                                                                <div className="flex flex-col items-center">
-                                                                    <span className="text-2xl font-black text-white">
-                                                                        {result.note}
-                                                                    </span>
-                                                                    {isConversion && (() => {
-                                                                        const palier = getConversionPalier(Number(result.note), noteMax, activeNoteType);
-                                                                        const palierColor = palier?.color ? colorMap[palier.color] || 'text-amber-500' : 'text-amber-500';
-                                                                        return palier ? (
-                                                                            <span className={clsx("text-[11px] font-black uppercase tracking-widest mt-1", palierColor)}>
-                                                                                {palier.letter}
+                                                            <div className="flex flex-col items-center">
+                                                                {(() => {
+                                                                    const { total, formula } = hasQuestions ? calculateScore(student.id) : { total: result?.note, formula: null };
+                                                                    const palier = (isConversion && total != null) ? getConversionPalier(Number(total), noteMax, activeNoteType) : null;
+                                                                    const palierColor = palier?.color ? colorMap[palier.color] || 'text-white' : 'text-white';
+                                                                    
+                                                                    return (
+                                                                        <div className="flex flex-col items-center" title={formula || undefined}>
+                                                                            <span className={clsx(
+                                                                                "text-2xl font-black transition-colors", 
+                                                                                total != null ? (isConversion ? palierColor : "text-white") : "text-white/10"
+                                                                            )}>
+                                                                                {total ?? '—'}
                                                                             </span>
-                                                                        ) : null;
-                                                                    })()}
-                                                                </div>
-                                                            ) : (
-                                                                <span className="text-white/10">—</span>
-                                                            )
+                                                                        </div>
+                                                                    );
+                                                                })()}
+                                                            </div>
                                                         )}
                                                     </td>
 
@@ -458,6 +554,7 @@ const EvaluationDetailTable: React.FC<EvaluationDetailTableProps> = ({ evaluatio
                                                                 {isBulkEdit ? (
                                                                     <div className="flex justify-center">
                                                                         <Input
+                                                                            key={`${student.id}-${q.id}-${qResult?.note ?? 'null'}`}
                                                                             type="number"
                                                                             defaultValue={qResult?.note ?? ''}
                                                                             onBlur={(e: any) => {
@@ -465,6 +562,7 @@ const EvaluationDetailTable: React.FC<EvaluationDetailTableProps> = ({ evaluatio
                                                                                     handleQuestionNoteChange(student.id, q.id, e.target.value);
                                                                                 }
                                                                             }}
+                                                                            onKeyDown={handleKeyDown}
                                                                             className={clsx(
                                                                                 "w-16 h-10 text-center font-black bg-grey-dark/40 border-white/10 focus:border-primary",
                                                                                 (Number(qResult?.note ?? 0) > q.note_max || Number(qResult?.note ?? 0) < 0) && "border-danger text-danger"
@@ -495,7 +593,7 @@ const EvaluationDetailTable: React.FC<EvaluationDetailTableProps> = ({ evaluatio
                                                                 {[
                                                                     { id: 'present', icon: CheckCircle2, color: 'text-emerald-500', bg: 'bg-emerald-500/10' },
                                                                     { id: 'absent', icon: XCircle, color: 'text-danger', bg: 'bg-danger/10' },
-                                                                    { id: 'malade', icon: HeartPulse, color: 'text-amber-500', bg: 'bg-amber-500/10' },
+                                                                    { id: 'malade', icon: MinusCircle, color: 'text-amber-500', bg: 'bg-amber-500/10' },
                                                                     { id: 'non_remis', icon: Octagon, color: 'text-grey-medium', bg: 'bg-grey-medium/10' }
                                                                 ].map((s) => (
                                                                     <button
@@ -504,13 +602,19 @@ const EvaluationDetailTable: React.FC<EvaluationDetailTableProps> = ({ evaluatio
                                                                         tabIndex={-1}
                                                                         className={clsx(
                                                                             "w-8 h-8 rounded-lg flex items-center justify-center transition-all border",
-                                                                            result?.statut === s.id || (s.id === 'present' && !result?.statut)
-                                                                                ? `border-${s.color.split('-')[1]}-500/50 ${s.bg} ${s.color}`
-                                                                                : "border-transparent text-white/20 hover:text-white/40"
+                                                                            pendingAbsences[student.id] && s.id === 'absent' ? "animate-pulse border-danger bg-danger/20 text-danger" : (
+                                                                                result?.statut === s.id || (s.id === 'present' && !result?.statut)
+                                                                                    ? `border-${s.color.split('-')[1]}-500/50 ${s.bg} ${s.color}`
+                                                                                    : "border-transparent text-white/20 hover:text-white/40"
+                                                                            )
                                                                         )}
-                                                                        title={formatStatut(s.id)}
+                                                                        title={pendingAbsences[student.id] && s.id === 'absent' ? "Annuler l'absence..." : formatStatut(s.id)}
                                                                     >
-                                                                        <s.icon size={16} />
+                                                                        {pendingAbsences[student.id] && s.id === 'absent' ? (
+                                                                            <Loader2 size={16} className="animate-spin" />
+                                                                        ) : (
+                                                                            <s.icon size={16} />
+                                                                        )}
                                                                     </button>
                                                                 ))}
                                                             </div>

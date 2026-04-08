@@ -78,6 +78,7 @@ const StudentGradeEntryModal: React.FC<StudentGradeEntryModalProps> = ({
     const isConversion = activeNoteType?.systeme === 'conversion';
     const hasQuestions = questions.length > 0;
 
+
     // Initialize local state
     useEffect(() => {
         if (isOpen && student) {
@@ -135,7 +136,6 @@ const StudentGradeEntryModal: React.FC<StudentGradeEntryModalProps> = ({
         }
     };
 
-    // Lorsqu'on tape au clavier la note d'une question spécifique (ex: Question 1 = 4/5), cette fonction met à jour cette case ET recalcule instantanément le total global en bas.
     const handleQuestionChange = (qid: string, val: string) => {
         const newQuestions = { ...localQuestions, [qid]: val };
         setLocalQuestions(newQuestions);
@@ -189,7 +189,6 @@ const StudentGradeEntryModal: React.FC<StudentGradeEntryModalProps> = ({
         return isNaN(numVal) || numVal < 0 || numVal > evaluation.note_max;
     };
 
-    // Une sécurité mathématique invisible : si une note dépasse son maximum imparti ou n'est pas un nombre, le programme rend invalide l'opération pour bloquer le bouton Valider.
     const hasAnyError = isTotalInvalid() || Object.keys(localQuestions).some(qid => isQuestionInvalid(qid));
 
     if (!student) return null;
@@ -356,8 +355,8 @@ const StudentGradeEntryModal: React.FC<StudentGradeEntryModalProps> = ({
                                 {[
                                     { id: 'present', label: 'Présent', color: 'primary' },
                                     { id: 'absent', label: 'Absent', color: 'danger' },
-                                    { id: 'malade', label: 'Enfant Malade', color: 'amber' },
-                                    { id: 'non_remis', label: 'Non Remis', color: 'rose' }
+                                    { id: 'malade', label: 'Non évaluable', color: 'amber' },
+                                    { id: 'non_remis', label: 'Non remis', color: 'rose' }
                                 ].map((s) => (
                                     <button
                                         key={s.id}
