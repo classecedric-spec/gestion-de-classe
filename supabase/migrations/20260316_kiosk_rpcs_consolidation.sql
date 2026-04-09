@@ -18,7 +18,9 @@ BEGIN
         'nom', nom,
         'prenom', prenom,
         'photo_url', photo_url,
-        'niveau_id', niveau_id
+        'niveau_id', niveau_id,
+        'importance_suivi', importance_suivi,
+        'user_id', titulaire_id
     )
     FROM "Eleve"
     WHERE id = p_student_id AND access_token::TEXT = p_token;

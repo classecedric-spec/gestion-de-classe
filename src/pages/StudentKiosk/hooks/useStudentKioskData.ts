@@ -3,6 +3,7 @@ import { useLocation } from 'react-router-dom';
 import { supabase } from '../../../lib/database';
 import { trackingService } from '../../../features/tracking/services/trackingService';
 import { toast } from 'sonner';
+import { calculateLuckyStatus } from '../../../lib/helpers/mobileEncodingHelpers';
 
 export function useStudentKioskData(studentId: string | undefined) {
     const [student, setStudent] = useState<any>(null);
@@ -11,6 +12,10 @@ export function useStudentKioskData(studentId: string | undefined) {
     const [progressions, setProgressions] = useState<Record<string, string>>({});
     const [loading, setLoading] = useState(true);
     const [kioskOpen, setKioskOpen] = useState(true);
+    
+    // Lucky Check preferences
+    const [manualIndices, setManualIndices] = useState<Record<string, any>>({});
+    const [defaultLuckyIndex, setDefaultLuckyIndex] = useState<number>(50);
 
     const location = useLocation();
     const token = new URLSearchParams(location.search).get('token');
@@ -95,7 +100,11 @@ export function useStudentKioskData(studentId: string | undefined) {
                 }
 
                 const allActivities = fetchedModules.flatMap(m =>
-                    (m.Activite || []).map((a: any) => ({ ...a, Module: { nom: m.nom, id: m.id } }))
+                    (m.Activite || []).map((a: any) => ({ 
+                        ...a, 
+                        Module: { nom: m.nom, id: m.id },
+                        branchId: m.SousBranche?.Branche?.id || null
+                    }))
                 );
                 
                 if (JSON.stringify(allActivities) !== JSON.stringify(activities)) {
@@ -150,14 +159,47 @@ export function useStudentKioskData(studentId: string | undefined) {
 
                 // 3. Flatten activities from modules for easy display
                 const allActivities = fetchedModules.flatMap(m =>
-                    m.Activite.map((a: any) => ({ ...a, Module: { nom: m.nom, id: m.id } }))
+                    m.Activite.map((a: any) => ({ 
+                        ...a, 
+                        Module: { nom: m.nom, id: m.id },
+                        branchId: m.SousBranche?.Branche?.id || null
+                    }))
                 );
                 setActivities(allActivities);
 
                 // 4. Fetch Progressions Map
-                if (studentId) {
-                    const progMap = await trackingService.fetchStudentProgressionsMap(studentId);
+                    const progMap: Record<string, string> = {};
+                    if (progData) {
+                        (progData as any[]).forEach(p => {
+                            progMap[p.activite_id] = p.etat;
+                        });
+                    }
                     setProgressions(progMap);
+                }
+            }
+
+            // 4. Fetch Lucky Check Preferences
+            const targetTeacherId = token 
+                ? (Array.isArray(rpcData) ? rpcData[0]?.student?.user_id : rpcData?.student?.user_id)
+                : studentData?.user_id;
+
+            if (targetTeacherId) {
+                try {
+                    const { data: prefData } = await supabase
+                        .from('UserPreference')
+                        .select('key, value')
+                        .eq('user_id', targetTeacherId)
+                        .in('key', ['eleve_profil_competences', 'default_lucky_check_index']);
+                    
+                    if (prefData) {
+                        const indicesPref = prefData.find(p => p.key === 'eleve_profil_competences');
+                        if (indicesPref) setManualIndices(indicesPref.value as any);
+
+                        const defaultIdxPref = prefData.find(p => p.key === 'default_lucky_check_index');
+                        if (defaultIdxPref) setDefaultLuckyIndex(Number(defaultIdxPref.value));
+                    }
+                } catch (e) {
+                    console.warn('Could not load Lucky Check preferences:', e);
                 }
             }
 
@@ -173,8 +215,23 @@ export function useStudentKioskData(studentId: string | undefined) {
         if (!studentId) return;
 
         // Optimistic UI
+        let statusToSave = newStatus;
+        if (newStatus === 'termine') {
+            const activity = activities.find(a => a.id === activityId);
+            const lucky = calculateLuckyStatus({
+                studentId: studentId!,
+                branchId: activity?.branchId || null,
+                studentName: `${student?.prenom} ${student?.nom}`,
+                activityTitle: activity?.titre || 'Activité',
+                studentGlobalIndex: student?.importance_suivi,
+                manualIndices,
+                defaultLuckyIndex
+            });
+            statusToSave = lucky.status;
+        }
+
         const oldStatus = progressions[activityId];
-        setProgressions(prev => ({ ...prev, [activityId]: newStatus }));
+        setProgressions(prev => ({ ...prev, [activityId]: statusToSave }));
 
         try {
             if (token) {
@@ -183,7 +240,7 @@ export function useStudentKioskData(studentId: string | undefined) {
                     p_student_id: studentId,
                     p_activity_id: activityId,
                     p_token: token,
-                    p_status: newStatus
+                    p_status: statusToSave
                 });
 
                 if (error) throw error;
@@ -221,7 +278,7 @@ export function useStudentKioskData(studentId: string | undefined) {
                     await trackingService.upsertProgression({
                         eleve_id: studentId,
                         activite_id: activityId,
-                        etat: newStatus,
+                        etat: statusToSave,
                         updated_at: new Date().toISOString()
                     });
                 }
@@ -231,16 +288,10 @@ export function useStudentKioskData(studentId: string | undefined) {
                 // Student actions just change status usually.
                 // But if student says "Terminé" -> "a_verifier". 
 
-                if (newStatus === 'termine') {
-                    // If lucky check calls for verification, it might override to 'a_verifier'
-                    // This logic is usually in `useProgressions`.
-                    // For Kiosk, we should probably implement simple logic:
-                    // Student "Done" -> 'a_verifier' (always? or trust based?)
-
-                    // Let's keep it simple: Student marks as "Done" -> 'a_verifier'.
-                    // Teacher validates 'a_verifier' -> 'termine' (green).
-                    // Or maybe Student can mark 'termine' directly?
-                    // Usually "J'ai fini" -> "A vérifier" (Orange/Purple).
+                if (statusToSave === 'a_verifier') {
+                    toast.info("C'est noté ! Ton prof va vérifier ton travail.");
+                } else if (statusToSave === 'termine') {
+                    toast.success("Bravo ! Travail validé.");
                 }
             }
         } catch (err) {

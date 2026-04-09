@@ -68,3 +68,48 @@ export const processModules = (modulesData: any[], levelId: string, progMap: Rec
 
     return processedModules;
 };
+/**
+ * calculateLuckyStatus
+ * Core logic for the "Lucky Check" (auto-verification).
+ * Determines if an activity marked as finished should be automatically validated (Green) 
+ * or flagged for teacher review (Purple) based on trust indices.
+ */
+export const calculateLuckyStatus = (params: {
+    studentId: string;
+    branchId: string | null;
+    studentName: string;
+    activityTitle: string;
+    studentGlobalIndex: number | null;
+    manualIndices: Record<string, any>;
+    defaultLuckyIndex: number;
+}): { status: 'termine' | 'a_verifier'; trustApplied: number; source: string; roll: number } => {
+    const { 
+        studentId, branchId, studentName, activityTitle, 
+        studentGlobalIndex, manualIndices, defaultLuckyIndex 
+    } = params;
+
+    // 1. Resolve Trust Index Priority
+    const specificIdx = branchId ? manualIndices[studentId]?.[branchId] : null;
+    const idx = specificIdx ?? studentGlobalIndex ?? defaultLuckyIndex ?? 50;
+    
+    // 2. Roll the dice
+    const randomRoll = Math.random() * 100;
+    const willVerify = randomRoll < idx;
+    const finalStatus = willVerify ? 'a_verifier' : 'termine';
+
+    // 3. Log details for transparency (matching the user's current pattern)
+    const source = specificIdx !== null && specificIdx !== undefined 
+        ? 'MATIÈRE' 
+        : (studentGlobalIndex !== null && studentGlobalIndex !== undefined ? 'ÉLÈVE' : 'DÉFAUT');
+
+    console.log(`[LuckyCheck] ${studentName} | Activité: ${activityTitle}`);
+    console.log(`- Indice appliqué: ${idx}% (Source: ${source}) | Tirage: ${randomRoll.toFixed(2)}%`);
+    console.log(`- Décision: ${willVerify ? 'À VÉRIFIER 🟣' : 'TERMINÉ 🟢'}`);
+
+    return { 
+        status: finalStatus, 
+        trustApplied: idx, 
+        source, 
+        roll: randomRoll 
+    };
+};
