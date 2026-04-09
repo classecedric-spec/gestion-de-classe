@@ -22,6 +22,7 @@ export const ROUTES = {
     DASHBOARD_HOMEWORK: '/dashboard/travaux-domicile',
     DASHBOARD_CLASSWORK: '/dashboard/travaux-classe',
     DASHBOARD_NOTES: '/dashboard/notes',
+    DASHBOARD_DAILY_LOG: '/dashboard/journal',
 
     // Sub‑pages under user management
     USER_GROUPS: '/dashboard/user/groups',

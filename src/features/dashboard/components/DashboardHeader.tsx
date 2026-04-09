@@ -16,7 +16,7 @@
  */
 
 import React from 'react';
-import { Search, LayoutList, Users, Mail, Home as HomeIcon, School } from 'lucide-react';
+import { Search, LayoutList, Users, Mail, Home as HomeIcon, School, History } from 'lucide-react';
 import { Tabs, Input } from '../../../core';
 
 interface DashboardHeaderProps {
@@ -51,7 +51,8 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({
         { id: 'avant-mail', label: 'Avant Mail', icon: Mail },
         { id: 'vue-retard', label: 'Vue Retard', icon: Mail },
         { id: 'travaux-domicile', label: 'Travaux à Doc', icon: HomeIcon },
-        { id: 'travaux-classe', label: 'Travaux Classe', icon: School }
+        { id: 'travaux-classe', label: 'Travaux Classe', icon: School },
+        { id: 'journal', label: 'Journal', icon: History }
     ];
 
     return (

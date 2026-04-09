@@ -101,7 +101,7 @@ const Badge: React.FC<BadgeProps> = ({
         <span
             className={clsx(
                 'inline-flex items-center justify-center font-bold uppercase tracking-wider rounded-md border transition-colors',
-                variantStyles[variant][style],
+                (variantStyles[variant] || variantStyles.default)[style],
                 sizeStyles[size],
                 className
             )}
