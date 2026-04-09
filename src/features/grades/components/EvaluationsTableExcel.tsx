@@ -11,7 +11,7 @@
  */
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Table, Filter, ArrowUp, ArrowDown, Search, X, ChevronRight, Loader2, BarChart3, Trash2, Edit2, Download } from 'lucide-react';
+import { Table, Filter, ArrowUp, ArrowDown, Search, X, ChevronRight, Loader2, BarChart3, Trash2, Edit2, Download, Info as InfoIcon } from 'lucide-react';
 import { CardInfo, ConfirmModal } from '../../../core';
 import { useAllEvaluations } from '../hooks/useAllEvaluations';
 import { useGradeMutations } from '../hooks/useGrades';
@@ -585,23 +585,39 @@ function renderCellContent(
                     displayAvg = (ev._moyenne / ev.note_max) * ev._real_note_max;
                 }
             }
-            return ev._moyenne !== null ? (
-                <div className="flex flex-col items-start justify-center gap-0.5">
-                    <span className={clsx(
-                        "font-black text-base tabular-nums leading-none",
-                        percentage >= 80 ? "text-emerald-500" :
-                        percentage >= 50 ? "text-blue-500" : "text-rose-500"
-                    )}>
-                        {Math.round(percentage)}%
-                    </span>
-                    <div className="flex items-baseline gap-1">
-                        <span className="font-bold text-[10px] text-grey-light leading-none">
-                            {displayAvg.toFixed(1)}
-                        </span>
-                        <span className="text-[9px] text-grey-medium leading-none">/ {realAvgMax}</span>
+            return (
+                <div className="flex items-center gap-2 group">
+                    {ev._moyenne !== null ? (
+                        <div className="flex flex-col items-start justify-center gap-0.5">
+                            <span className={clsx(
+                                "font-black text-base tabular-nums leading-none",
+                                percentage >= 80 ? "text-emerald-500" :
+                                percentage >= 50 ? "text-blue-500" : "text-rose-500"
+                            )}>
+                                {Math.round(percentage)}%
+                            </span>
+                            <div className="flex items-baseline gap-1">
+                                <span className="font-bold text-[10px] text-grey-light leading-none">
+                                    {displayAvg.toFixed(1)}
+                                </span>
+                                <span className="text-[9px] text-grey-medium leading-none">/ {realAvgMax}</span>
+                            </div>
+                        </div>
+                    ) : (
+                        <span className="text-white/20 italic text-xs">—</span>
+                    )}
+                    
+                    <div 
+                        className="opacity-0 group-hover:opacity-100 transition-opacity cursor-help"
+                        title={ev._moyenne !== null 
+                            ? "Moyenne calculée sur l'ensemble des élèves présents ayant une note." 
+                            : "La moyenne n'apparaît que si au moins un élève présent a une note enregistrée."
+                        }
+                    >
+                        <InfoIcon size={12} className="text-grey-medium hover:text-primary transition-colors" />
                     </div>
                 </div>
-            ) : <span className="text-white/20 italic text-xs">—</span>;
+            );
         case 'actions':
             return (
                 <div className="flex justify-center opacity-0 group-hover:opacity-100 transition-opacity">

@@ -28,22 +28,52 @@ export const useAllEvaluations = () => {
         queryFn: async () => {
             const evs = await gradeService.getAllEvaluationsDetailed();
             
-            const { data: allQuestions } = await supabase.from('EvaluationQuestion').select('*');
-            const { data: allResults } = await supabase.from('Resultat').select('*');
-            const { data: allQuestionResults } = await supabase.from('ResultatQuestion').select('*');
+            if (!evs || evs.length === 0) return [];
+            const evIds = evs.map((e: any) => e.id);
+
+            // Fetch only necessary data for the current evaluations to avoid 1000-row limit
+            const { data: allQuestions } = await supabase
+                .from('EvaluationQuestion')
+                .select('*')
+                .in('evaluation_id', evIds);
+
+            const { data: allResults } = await supabase
+                .from('Resultat')
+                .select('*')
+                .in('evaluation_id', evIds)
+                .limit(5000);
+
+            const { data: allQuestionResults } = await supabase
+                .from('ResultatQuestion')
+                .select('*, EvaluationQuestion!inner(evaluation_id)')
+                .in('EvaluationQuestion.evaluation_id', evIds)
+                .limit(10000);
                 
             return evs.map((ev: any) => {
                 const evQs = allQuestions?.filter((q: any) => q.evaluation_id === ev.id) || [];
                 const evResults = allResults?.filter((r: any) => r.evaluation_id === ev.id) || [];
                 
-                const effectiveNotes = evResults
-                    .map(r => {
-                        const studentQR = allQuestionResults?.filter(qr => 
-                            evQs.some(q => q.id === qr.question_id) && qr.eleve_id === r.eleve_id
-                        ) || [];
-                        return gradeService.calculateStudentTotal(r.eleve_id, ev, evQs, evResults, studentQR);
+                // On identifie tous les élèves qui ont "participé" (soit une note globale, soit une note par question)
+                const studentIdsFromResults = evResults.map(r => r.eleve_id);
+                const evQuestionResults = (allQuestionResults as any[])?.filter(qr => 
+                    qr.EvaluationQuestion?.evaluation_id === ev.id
+                ) || [];
+                const studentIdsFromDetails = evQuestionResults.map(qr => qr.eleve_id);
+                
+                const uniqueParticipatingStudentIds = Array.from(new Set([...studentIdsFromResults, ...studentIdsFromDetails]));
+
+                const effectiveNotes = uniqueParticipatingStudentIds
+                    .map(studentId => {
+                        const studentQR = evQuestionResults.filter(qr => qr.eleve_id === studentId);
+                        const total = gradeService.calculateStudentTotal(studentId, ev, evQs, evResults, studentQR);
+                        return total;
                     })
                     .filter(n => n !== null) as number[];
+
+                // Debug log to pinpoint calculation issues
+                if (effectiveNotes.length === 0 && evResults.length > 0) {
+                    console.warn(`[DIAGNOSTIC] Moyenne absente pour "${ev.titre}" : ${evResults.length} résultats trouvés, mais 0 notes valides calculées. Statuts :`, evResults.map(r => r.statut));
+                }
 
                 let realNoteMax = ev.note_max;
                 if (evQs.length > 0) {

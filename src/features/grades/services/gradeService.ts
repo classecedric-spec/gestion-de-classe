@@ -169,13 +169,19 @@ export class GradeService {
     // Calcule la note finale d'un élève pour une évaluation donnée, soit à partir de sa note globale, soit en sommant ses critères (questions).
     calculateStudentTotal(studentId: string, evaluation: any, questions: any[], studentResults: any[], studentQuestionResults: any[]): number | null {
         const studentResult = studentResults.find(r => r.eleve_id === studentId);
-        if (!studentResult || studentResult.statut !== 'present') return null;
-
+        
         // Si l'évaluation possède des critères (questions), on recalcule systématiquement le total dynamiquement.
         if (questions.length > 0) {
+            // Un élève est considéré comme participant s'il a au moins une note par question OU s'il est explicitement marqué présent
+            const hasAnyNote = studentQuestionResults.some(qr => qr.note !== null);
+            const isExplicitlyPresent = studentResult?.statut === 'present';
+            const isExplicitlyAbsent = studentResult && studentResult.statut !== 'present';
+
+            if (isExplicitlyAbsent || (!hasAnyNote && !isExplicitlyPresent)) return null;
+
             let weightedSum = 0;
             let maxWeightedSum = 0;
-            let hasAnyNote = false;
+            let noteFound = false;
 
             const relevantQuestions = questions.filter(q => q.evaluation_id === evaluation.id);
             for (const q of relevantQuestions) {
@@ -186,16 +192,17 @@ export class GradeService {
                 const qr = studentQuestionResults.find(r => r.question_id === q.id && r.eleve_id === studentId);
                 if (qr && qr.note !== null) {
                     weightedSum += parseFloat(qr.note.toString()) * ratio;
-                    hasAnyNote = true;
+                    noteFound = true;
                 }
             }
 
-            if (!hasAnyNote || maxWeightedSum === 0) return null;
+            if (!noteFound || maxWeightedSum === 0) return null;
             const evalMax = parseFloat(evaluation.note_max?.toString() || '20');
             return parseFloat(((weightedSum / maxWeightedSum) * evalMax).toFixed(2));
         }
 
-        // Sinon, on utilise la note globale enregistrée.
+        // Sinon, on utilise la note globale enregistrée (si présente et si présent).
+        if (!studentResult || studentResult.statut !== 'present') return null;
         return studentResult.note !== null ? parseFloat(studentResult.note.toString()) : null;
     }
 

@@ -205,11 +205,57 @@ const EvaluationDetailTable: React.FC<EvaluationDetailTableProps> = ({ evaluatio
         const val = note === '' ? null : parseFloat(note);
         if (q && val !== null && (val < 0 || val > q.note_max)) return;
 
+        // 1. Sauvegarder la note de la question
         await saveQuestionResults([{
             eleve_id: studentId,
             question_id: questionId,
             note: val
         }]);
+
+        // 2. Recalculer le score total pour mettre à jour la table Resultat (statistiques globales)
+        if (evaluation) {
+            let weightedSum = 0;
+            let maxWeightedSum = 0;
+            let hasAnyNote = false;
+
+            for (const quest of questions) {
+                const ratio = quest.ratio != null ? parseFloat(quest.ratio.toString()) : 1;
+                const qMax = parseFloat(quest.note_max.toString());
+                maxWeightedSum += qMax * ratio;
+
+                // On utilise la nouvelle valeur si c'est la question en cours, sinon celle du cache
+                let currentVal: number | null = null;
+                if (quest.id === questionId) {
+                    currentVal = val;
+                } else {
+                    const qr = questionResults.find(r => r.eleve_id === studentId && r.question_id === quest.id);
+                    currentVal = (qr && qr.note !== null) ? parseFloat(qr.note.toString()) : null;
+                }
+
+                if (currentVal !== null) {
+                    weightedSum += currentVal * ratio;
+                    hasAnyNote = true;
+                }
+            }
+
+            if (hasAnyNote && maxWeightedSum > 0) {
+                const evalMax = parseFloat(evaluation.note_max?.toString() || '20');
+                const finalTotal = (weightedSum / maxWeightedSum) * evalMax;
+                
+                const currentResult = currentResults.find((r: any) => r.eleve_id === studentId);
+                
+                // 3. Sauvegarder le résultat global
+                await saveResult({
+                    id: currentResult?.id,
+                    eleve_id: studentId,
+                    evaluation_id: evaluationId,
+                    note: parseFloat(finalTotal.toFixed(2)),
+                    statut: currentResult?.statut || 'present',
+                    commentaire: currentResult?.commentaire,
+                    user_id: userId
+                });
+            }
+        }
     };
 
     // Prépare une action pour sauvegarder de façon permanente un texte d'appréciation libre rédigé par le professeur.

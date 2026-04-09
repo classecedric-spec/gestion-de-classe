@@ -206,8 +206,8 @@ export const useGradeMutations = (selectedEvaluationId?: string | null) => {
         createEvaluation: createEvaluationMutation.mutateAsync,
         updateEvaluation: updateEvaluationMutation.mutateAsync,
         deleteEvaluation: deleteEvaluationMutation.mutate,
-        saveResult: saveResultMutation.mutate,
-        saveQuestionResults: saveQuestionResultsMutation.mutate,
+        saveResult: saveResultMutation.mutateAsync,
+        saveQuestionResults: saveQuestionResultsMutation.mutateAsync,
         saveNoteType: saveNoteTypeMutation.mutateAsync,
         deleteNoteType: deleteNoteTypeMutation.mutateAsync,
     };
