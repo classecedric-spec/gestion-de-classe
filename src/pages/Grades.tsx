@@ -3,13 +3,15 @@ import {
     ChevronLeft,
     Plus,
     ClipboardList,
-    Settings2
+    Settings2,
+    Users
 } from 'lucide-react';
 import { useLocation } from 'react-router-dom';
 import { Button, Tabs } from '../core';
 import EvaluationsTableExcel from '../features/grades/components/EvaluationsTableExcel';
 import EvaluationDetailTable from '../features/grades/components/EvaluationDetailTable';
 import AddEvaluationModal from '../features/grades/components/AddEvaluationModal';
+import GradesByStudentTable from '../features/grades/components/GradesByStudentTable';
 import GradeSettings from '../features/grades/components/GradeSettings';
 import { useGradeMutations } from '../features/grades/hooks/useGrades';
 import { gradeService } from '../features/grades/services';
@@ -25,11 +27,11 @@ const Grades: React.FC = () => {
     const [editingRegroupements, setEditingRegroupements] = useState<any[]>([]);
     const location = useLocation();
 
-    // Reset view to evaluations table when navigating to this page (e.g. sidebar click)
+    // Reset view to encodage table when navigating to this page (e.g. sidebar click)
     useEffect(() => {
         if (location.pathname === '/dashboard/notes') {
             setSelectedEvaluationId(null);
-            setActiveTab('evaluations');
+            setActiveTab('encodage');
         }
     }, [location.key, location.pathname]);
 
@@ -67,7 +69,8 @@ const Grades: React.FC = () => {
     };
 
     const tabs = [
-        { id: 'evaluations', label: 'Évaluations', icon: ClipboardList },
+        { id: 'encodage', label: 'Encodage', icon: ClipboardList },
+        { id: 'par_enfant', label: 'Par enfant', icon: Users },
         { id: 'settings', label: 'Paramètres', icon: Settings2 }
     ];
 
@@ -121,7 +124,7 @@ const Grades: React.FC = () => {
                             variant="capsule"
                             level={3}
                         />
-                        {activeTab === 'evaluations' && (
+                        {activeTab === 'encodage' && (
                             <Button
                                 onClick={() => {
                                     setEditingEvaluationData(null);
@@ -142,6 +145,10 @@ const Grades: React.FC = () => {
             {activeTab === 'settings' ? (
                 <div className="animate-in fade-in slide-in-from-right-4 duration-300">
                     <GradeSettings />
+                </div>
+            ) : activeTab === 'par_enfant' ? (
+                <div className="animate-in fade-in slide-in-from-right-4 duration-300">
+                    <GradesByStudentTable />
                 </div>
             ) : selectedEvaluationId ? (
                 <EvaluationDetailTable

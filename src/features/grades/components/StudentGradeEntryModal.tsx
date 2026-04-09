@@ -183,6 +183,24 @@ const StudentGradeEntryModal: React.FC<StudentGradeEntryModalProps> = ({
         return isNaN(numVal) || numVal < 0 || (q ? numVal > q.note_max : false);
     };
 
+    const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            // Search within the nearest modal container
+            const container = e.currentTarget.closest('.space-y-8');
+            if (!container) return;
+
+            const inputs = Array.from(container.querySelectorAll('input[type="number"]')) as HTMLInputElement[];
+            const index = inputs.indexOf(e.currentTarget);
+
+            const next = inputs[index + 1];
+            if (next) {
+                next.focus();
+                next.select();
+            }
+        }
+    };
+
     const isTotalInvalid = () => {
         if (localTotal === '') return false;
         const numVal = parseFloat(localTotal);
@@ -280,6 +298,7 @@ const StudentGradeEntryModal: React.FC<StudentGradeEntryModalProps> = ({
                                                         type="number"
                                                         value={val}
                                                         onChange={(e) => handleQuestionChange(q.id, e.target.value)}
+                                                        onKeyDown={handleKeyDown}
                                                         placeholder="--"
                                                         className={clsx(
                                                             "text-center font-black text-lg h-12 bg-grey-dark/50 border-white/10 focus:border-primary focus:ring-0",
@@ -321,6 +340,7 @@ const StudentGradeEntryModal: React.FC<StudentGradeEntryModalProps> = ({
                                             type="number"
                                             value={localTotal}
                                             onChange={(e) => setLocalTotal(e.target.value)}
+                                            onKeyDown={handleKeyDown}
                                             readOnly={hasQuestions}
                                             placeholder="--"
                                             className={clsx(

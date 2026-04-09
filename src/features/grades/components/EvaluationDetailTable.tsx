@@ -279,7 +279,7 @@ const EvaluationDetailTable: React.FC<EvaluationDetailTableProps> = ({ evaluatio
     }, [evaluationId, setSelectedEvaluationId]);
 
     const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-        if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
+        if (e.key === 'ArrowRight' || e.key === 'ArrowLeft' || e.key === 'Enter') {
             e.preventDefault();
             const container = e.currentTarget.closest('table');
             if (!container) return;
@@ -287,13 +287,13 @@ const EvaluationDetailTable: React.FC<EvaluationDetailTableProps> = ({ evaluatio
             const inputs = Array.from(container.querySelectorAll('input[type="number"]')) as HTMLInputElement[];
             const index = inputs.indexOf(e.currentTarget);
 
-            if (e.key === 'ArrowRight') {
+            if (e.key === 'ArrowRight' || e.key === 'Enter') {
                 const next = inputs[index + 1];
                 if (next) {
                     next.focus();
                     next.select();
                 }
-            } else {
+            } else if (e.key === 'ArrowLeft') {
                 const prev = inputs[index - 1];
                 if (prev) {
                     prev.focus();
@@ -561,7 +561,14 @@ const EvaluationDetailTable: React.FC<EvaluationDetailTableProps> = ({ evaluatio
                                                                                     "text-lg font-black transition-colors", 
                                                                                     total != null ? (isConversion ? palierColor : "text-primary") : "text-white opacity-20"
                                                                                 )}>
-                                                                                    {total ?? '--'}
+                                                                                    <span>
+                                                                                        {total ?? '--'}
+                                                                                        {total !== null && (
+                                                                                            <span className="ml-1.5 text-[10px] text-primary/50 font-black uppercase tracking-widest">
+                                                                                                ({Math.round((Number(total) / noteMax) * 100)})
+                                                                                            </span>
+                                                                                        )}
+                                                                                    </span>
                                                                                 </span>
                                                                             </div>
                                                                         );
@@ -581,7 +588,14 @@ const EvaluationDetailTable: React.FC<EvaluationDetailTableProps> = ({ evaluatio
                                                                                 "text-2xl font-black transition-colors", 
                                                                                 total != null ? (isConversion ? palierColor : "text-white") : "text-white/10"
                                                                             )}>
-                                                                                {total ?? '—'}
+                                                                                <span>
+                                                                                    {total ?? '—'}
+                                                                                    {total !== null && (
+                                                                                        <span className="ml-2 text-xs text-white/40 font-black">
+                                                                                            ({Math.round((Number(total) / noteMax) * 100)})
+                                                                                        </span>
+                                                                                    )}
+                                                                                </span>
                                                                             </span>
                                                                         </div>
                                                                     );
