@@ -45,6 +45,11 @@ export default defineConfig({
       }
     }
   },
+  esbuild: {
+    // Drop console.log and debugger in production to keep the bundle clean
+    // and prevent Tailwind from scanning log strings as CSS class names
+    drop: ['console', 'debugger'],
+  },
   test: {
     globals: true,
     environment: 'jsdom',

@@ -53,6 +53,8 @@ export function useStudentKioskData(studentId: string | undefined) {
     const fetchData = async () => {
         setLoading(true);
         try {
+            let targetTeacherId: string | null = null;
+
             if (token) {
                 // --- TOKEN MODE (No Login) ---
 
@@ -66,6 +68,8 @@ export function useStudentKioskData(studentId: string | undefined) {
                 
                 const studentData = Array.isArray(rpcData) ? rpcData[0]?.student : rpcData?.student;
                 if (!studentData) throw new Error("Accès refusé");
+
+                targetTeacherId = studentData?.user_id ?? null;
 
                 setStudent(studentData);
 
@@ -149,12 +153,10 @@ export function useStudentKioskData(studentId: string | undefined) {
 
                 if (error) throw error;
                 setStudent(studentData);
+                targetTeacherId = studentData?.user_id ?? null;
 
-                // 2. Fetch Active Modules (Mobile/Kiosk view usually shows all active or filtered)
-                // leveraging existing repo method
-                const fetchedModules = await trackingService.getMobileModules(); // This gets en_cours modules
-
-                // Filter modules relevant to student's level if necessary, or just show all active
+                // 2. Fetch Active Modules
+                const fetchedModules = await trackingService.getMobileModules();
                 setModules(fetchedModules);
 
                 // 3. Flatten activities from modules for easy display
@@ -167,21 +169,24 @@ export function useStudentKioskData(studentId: string | undefined) {
                 );
                 setActivities(allActivities);
 
-                // 4. Fetch Progressions Map
-                    const progMap: Record<string, string> = {};
-                    if (progData) {
-                        (progData as any[]).forEach(p => {
-                            progMap[p.activite_id] = p.etat;
-                        });
-                    }
-                    setProgressions(progMap);
+                // 4. Fetch Progressions Map directly from the Progression table
+                const { data: progData, error: progError } = await supabase
+                    .from('Progression')
+                    .select('activite_id, etat')
+                    .eq('eleve_id', studentId);
+
+                if (progError) throw progError;
+
+                const progMap: Record<string, string> = {};
+                if (progData) {
+                    (progData as any[]).forEach(p => {
+                        progMap[p.activite_id] = p.etat;
+                    });
                 }
+                setProgressions(progMap);
             }
 
             // 4. Fetch Lucky Check Preferences
-            const targetTeacherId = token 
-                ? (Array.isArray(rpcData) ? rpcData[0]?.student?.user_id : rpcData?.student?.user_id)
-                : studentData?.user_id;
 
             if (targetTeacherId) {
                 try {
