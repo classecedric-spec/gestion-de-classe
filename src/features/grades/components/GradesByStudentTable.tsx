@@ -421,7 +421,7 @@ const GradesByStudentTable: React.FC = () => {
                                     <th className={clsx(
                                         "sticky right-[198px] z-30 p-2 w-[80px] bg-surface border-b border-white/10 border-l border-white/10 text-center align-middle",
                                         isDetailedView ? 'top-[64px]' : 'top-0'
-                                    )} style={{boxShadow: '-4px 0 12px rgba(0,0,0,0.4)'}}>
+                                    )}>
                                         <div className="flex flex-col items-center justify-center">
                                             <span className="text-[9px] font-black uppercase text-rose-400 leading-tight">Tests</span>
                                             <span className="text-[9px] font-black uppercase text-rose-400 leading-tight">Manquants</span>
@@ -430,13 +430,13 @@ const GradesByStudentTable: React.FC = () => {
                                     <th className={clsx(
                                         "sticky right-[99px] z-30 p-2 w-[100px] bg-surface border-b border-white/10 text-center align-middle",
                                         isDetailedView ? 'top-[64px]' : 'top-0'
-                                    )} style={{boxShadow: '-4px 0 12px rgba(0,0,0,0.4)'}}>
+                                    )}>
                                         <span className="text-[10px] font-black uppercase text-primary tracking-widest leading-tight">RESULTATS SELON<br />PONDERATION</span>
                                     </th>
                                     <th className={clsx(
                                         "sticky right-0 z-30 p-2 w-[100px] bg-surface border-b border-white/10 text-center align-middle",
                                         isDetailedView ? 'top-[64px]' : 'top-0'
-                                    )} style={{boxShadow: '-4px 0 12px rgba(0,0,0,0.4)'}}>
+                                    )}>
                                         <span className="text-[10px] font-black uppercase text-emerald-400 tracking-widest leading-tight">RESULTATS<br />SELON %</span>
                                     </th>
                                 </tr>
@@ -479,17 +479,17 @@ const GradesByStudentTable: React.FC = () => {
                                     <th className={clsx(
                                         "sticky right-[198px] z-30 p-2 w-[80px] bg-surface border-b border-white/10 border-l border-white/10 text-center align-middle h-8",
                                         isDetailedView ? 'top-[204px]' : 'top-[40px]'
-                                    )} style={{boxShadow: '-4px 0 12px rgba(0,0,0,0.4)'}} />
+                                    )} />
                                     <th className={clsx(
                                         "sticky right-[99px] z-30 p-2 w-[100px] bg-surface border-b border-white/10 text-center align-middle h-8 uppercase text-[10px] font-black text-grey-medium/60",
                                         isDetailedView ? 'top-[204px]' : 'top-[40px]'
-                                    )} style={{boxShadow: '-4px 0 12px rgba(0,0,0,0.4)'}}>
+                                    )}>
                                         100%
                                     </th>
                                     <th className={clsx(
                                         "sticky right-0 z-30 p-2 w-[100px] bg-surface border-b border-white/10 text-center align-middle h-8 uppercase text-[10px] font-black text-grey-medium/60",
                                         isDetailedView ? 'top-[204px]' : 'top-[40px]'
-                                    )} style={{boxShadow: '-4px 0 12px rgba(0,0,0,0.4)'}}>
+                                    )}>
                                         100%
                                     </th>
                                 </tr>
@@ -650,7 +650,7 @@ const GradesByStudentTable: React.FC = () => {
                                             return (
                                                 <>
                                                     {/* Summary: Missing count */}
-                                                    <td className="sticky right-[198px] z-10 bg-surface border-t border-white/5 border-l border-white/10 text-center font-black text-sm transition-colors w-[80px]" style={{boxShadow: '-4px 0 12px rgba(0,0,0,0.4)'}}>
+                                                    <td className="sticky right-[198px] z-10 bg-surface border-t border-white/5 border-l border-white/10 text-center font-black text-sm transition-colors w-[80px]">
                                                         {missingCount > 0 ? (
                                                             <span className="text-rose-500">{missingCount}</span>
                                                         ) : (
@@ -659,18 +659,13 @@ const GradesByStudentTable: React.FC = () => {
                                                     </td>
 
                                                     {/* Summary: Weighted Result */}
-                                                    <td className="sticky right-[99px] z-10 bg-surface border-t border-white/5 text-center p-2 transition-colors w-[100px]" style={{boxShadow: '-4px 0 12px rgba(0,0,0,0.4)'}}>
+                                                    <td className="sticky right-[99px] z-10 bg-surface border-t border-white/5 text-center p-2 transition-colors w-[100px]">
                                                         {weightedPercentage !== null ? (
                                                             <div className="flex flex-col items-center">
                                                                 <span className={clsx("text-base font-black leading-none", weightedStyle?.colorClass)}>
                                                                     {weightedPercentage}%
                                                                 </span>
-                                                                <div className="w-10 h-1 mt-1 bg-white/10 rounded-full overflow-hidden">
-                                                                    <div 
-                                                                        className={clsx("h-full transition-all duration-500", weightedStyle?.colorClass.replace('text-', 'bg-'))}
-                                                                        style={{ width: `${weightedPercentage}%` }}
-                                                                    />
-                                                                </div>
+
                                                             </div>
                                                         ) : (
                                                             <span className="text-grey-medium opacity-20">—</span>
@@ -678,18 +673,13 @@ const GradesByStudentTable: React.FC = () => {
                                                     </td>
 
                                                     {/* Summary: Simple Average Result (%) */}
-                                                    <td className="sticky right-0 z-10 bg-surface border-t border-white/5 text-center p-2 transition-colors w-[100px]" style={{boxShadow: '-4px 0 12px rgba(0,0,0,0.4)'}}>
+                                                    <td className="sticky right-0 z-10 bg-surface border-t border-white/5 text-center p-2 transition-colors w-[100px]">
                                                         {simplePercentage !== null ? (
                                                             <div className="flex flex-col items-center">
                                                                 <span className={clsx("text-base font-black leading-none", simpleStyle?.colorClass)}>
                                                                     {simplePercentage}%
                                                                 </span>
-                                                                <div className="w-10 h-1 mt-1 bg-white/10 rounded-full overflow-hidden">
-                                                                    <div 
-                                                                        className={clsx("h-full transition-all duration-500", simpleStyle?.colorClass.replace('text-', 'bg-'))}
-                                                                        style={{ width: `${simplePercentage}%` }}
-                                                                    />
-                                                                </div>
+
                                                             </div>
                                                         ) : (
                                                             <span className="text-grey-medium opacity-20">—</span>
