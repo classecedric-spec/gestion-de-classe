@@ -2,7 +2,7 @@ import React, { useState, useMemo, useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { gradeService } from '../services';
 import { trackingService } from '../../tracking/services/trackingService';
-import { Loader2, Users, X, Info } from 'lucide-react';
+import { Loader2, Users, X, Info, ArrowUp, ArrowDown } from 'lucide-react';
 import { Avatar, CardInfo } from '../../../core';
 import { useAllEvaluations } from '../hooks/useAllEvaluations';
 import { useGroupsData } from '../../groups/hooks/useGroupsData';
@@ -16,6 +16,7 @@ const GradesByStudentTable: React.FC = () => {
     const [branchFilter, setBranchFilter] = useState<string>('all');
     const [periodeFilter, setPeriodeFilter] = useState<string>('all');
     const [searchQuery, setSearchQuery] = useState('');
+    const [sortConfig, setSortConfig] = useState<{ key: 'name' | 'missing' | 'weighted' | 'simple'; direction: 'asc' | 'desc' } | null>(null);
 
     // 1. Fetch all evaluations
     const { evaluations, loading: loadingEvals } = useAllEvaluations();
@@ -189,6 +190,98 @@ const GradesByStudentTable: React.FC = () => {
         );
     }, [students, searchQuery]);
 
+    const studentsWithStats = useMemo(() => {
+        return searchedStudents.map(student => {
+            const scores = filteredEvaluations.map(ev => {
+                const obtained = scoreMap[student.id]?.[ev.id];
+                const max = ev.note_max || 20;
+                const pct = (obtained !== null && obtained !== undefined) ? (obtained / max) * 100 : null;
+                return { obtained, max, pct };
+            });
+
+            const completed = scores.filter(s => s.obtained !== null && s.obtained !== undefined);
+            const missingCount = scores.length - completed.length;
+
+            let weightedPercentage = 0;
+            if (completed.length > 0) {
+                const totalObtained = completed.reduce((sum, s) => sum + (s.obtained as number), 0);
+                const totalMax = completed.reduce((sum, s) => sum + s.max, 0);
+                weightedPercentage = (totalObtained / totalMax) * 100;
+            }
+
+            let simplePercentage = 0;
+            if (completed.length > 0) {
+                const sumPcts = completed.reduce((sum, s) => sum + (s.pct as number), 0);
+                simplePercentage = sumPcts / completed.length;
+            }
+
+            return {
+                ...student,
+                _stats: {
+                    missingCount,
+                    weightedPercentage,
+                    simplePercentage,
+                    hasData: completed.length > 0
+                }
+            };
+        });
+    }, [searchedStudents, filteredEvaluations, scoreMap]);
+
+    const sortedStudents = useMemo(() => {
+        if (!sortConfig) return studentsWithStats;
+
+        const { key, direction } = sortConfig;
+        const dir = direction === 'asc' ? 1 : -1;
+
+        return [...studentsWithStats].sort((a, b) => {
+            let valA: any;
+            let valB: any;
+
+            switch (key) {
+                case 'name':
+                    valA = `${a.prenom} ${a.nom}`.toLowerCase();
+                    valB = `${b.prenom} ${b.nom}`.toLowerCase();
+                    return valA.localeCompare(valB) * dir;
+                case 'missing':
+                    valA = a._stats.missingCount;
+                    valB = b._stats.missingCount;
+                    break;
+                case 'weighted':
+                    valA = a._stats.hasData ? a._stats.weightedPercentage : -1;
+                    valB = b._stats.hasData ? b._stats.weightedPercentage : -1;
+                    break;
+                case 'simple':
+                    valA = a._stats.hasData ? a._stats.simplePercentage : -1;
+                    valB = b._stats.hasData ? b._stats.simplePercentage : -1;
+                    break;
+                default:
+                    return 0;
+            }
+
+            if (valA === valB) return 0;
+            return (valA > valB ? 1 : -1) * dir;
+        });
+    }, [studentsWithStats, sortConfig]);
+
+    const handleSort = (key: 'name' | 'missing' | 'weighted' | 'simple') => {
+        setSortConfig(current => {
+            if (current?.key === key) {
+                return { key, direction: current.direction === 'asc' ? 'desc' : 'asc' };
+            }
+            // Defaults based on user request
+            if (key === 'missing') return { key, direction: 'desc' };
+            if (key === 'name') return { key, direction: 'asc' };
+            return { key, direction: 'asc' };
+        });
+    };
+
+    const SortIndicator = ({ column }: { column: 'name' | 'missing' | 'weighted' | 'simple' }) => {
+        if (sortConfig?.key !== column) return null;
+        return sortConfig.direction === 'asc' 
+            ? <ArrowUp size={12} className="ml-1 text-primary" /> 
+            : <ArrowDown size={12} className="ml-1 text-primary" />;
+    };
+
     const getScoreStyle = (score: number | null, max: number, typeNoteId?: string | null) => {
         if (score === null) return { colorClass: 'text-grey-dark', letter: null };
 
@@ -198,7 +291,7 @@ const GradesByStudentTable: React.FC = () => {
         const colorMap: Record<string, string> = {
             emerald: 'text-emerald-500',
             blue: 'text-blue-500',
-            amber: 'text-amber-500',
+            amber: 'text-primary',
             rose: 'text-rose-500',
             purple: 'text-purple-500',
             grey: 'text-grey-medium'
@@ -341,7 +434,7 @@ const GradesByStudentTable: React.FC = () => {
                             <thead className="sticky top-0 z-20 bg-surface shadow-sm">
                                 {/* Row 1: Evaluation group titles (detailed view only) */}
                                 <tr className="border-b border-white/10">
-                                    <th className="sticky left-0 top-0 z-40 bg-surface border-r border-white/10 h-16 min-w-[220px]" />
+                                    <th className="sticky left-0 top-0 z-40 bg-background border-t border-l border-r border-white/10 h-16 min-w-[220px]" />
                                     {filteredEvaluations.length > 0 ? filteredEvaluations.map(ev => {
                                         const evColumns = getEvaluationColumns(ev.id);
                                         const colSpan = isDetailedView ? evColumns.length + 1 : 1;
@@ -352,11 +445,11 @@ const GradesByStudentTable: React.FC = () => {
                                             : 120;
                                             
                                         return (
-                                            <th
-                                                key={`header-group-${ev.id}`}
-                                                colSpan={colSpan}
-                                                className="p-2 border-r border-white/5 align-middle"
-                                            >
+                                                <th
+                                                    key={`header-group-${ev.id}`}
+                                                    colSpan={colSpan}
+                                                    className="p-2 border-t border-r border-white/10 align-middle"
+                                                >
                                                 <div
                                                     className="bg-white/5 border border-white/10 rounded-lg py-1.5 px-3 text-[10px] font-black text-primary uppercase tracking-widest whitespace-normal leading-tight mx-auto text-center break-words"
                                                     style={{ width: `${titleMaxWidth}px`, minWidth: 'min-content' }}
@@ -370,24 +463,30 @@ const GradesByStudentTable: React.FC = () => {
                                         <th className="p-2 h-12" />
                                     )}
                                     {/* Spacer for summary columns */}
-                                    <th className="sticky right-[198px] top-0 z-30 bg-surface border-b border-white/10 w-[80px]" />
-                                    <th className="sticky right-[99px] top-0 z-30 bg-surface border-b border-white/10 w-[100px]" />
-                                    <th className="sticky right-0 top-0 z-30 bg-surface border-b border-white/10 w-[100px]" />
+                                    <th className="sticky right-[198px] top-0 z-30 bg-background border-t border-b border-white/10 w-[80px]" />
+                                    <th className="sticky right-[99px] top-0 z-30 bg-background border-t border-b border-white/10 w-[100px]" />
+                                    <th className="sticky right-0 top-0 z-30 bg-background border-t border-b border-white/10 w-[100px]" />
                                 </tr>
 
                                 {/* Row 2: Column headers */}
                                 <tr className="border-b border-white/10">
-                                    <th className={clsx(
-                                        'sticky left-0 z-40 bg-surface p-4 text-left min-w-[220px] border-r border-white/10 border-b border-white/10 h-10',
-                                        isDetailedView ? 'top-[64px]' : 'top-0'
-                                    )}>
-                                        <span className="text-xs font-bold uppercase tracking-wider text-primary">Élève</span>
+                                    <th 
+                                        className={clsx(
+                                            'sticky left-0 z-40 bg-background p-4 text-left min-w-[220px] border-t border-l border-r border-white/10 border-b border-white/10 h-10 cursor-pointer hover:bg-white/5 transition-colors group/sort',
+                                            isDetailedView ? 'top-[64px]' : 'top-0'
+                                        )}
+                                        onClick={() => handleSort('name')}
+                                    >
+                                        <div className="flex items-center">
+                                            <span className="text-xs font-bold uppercase tracking-wider text-primary">Élève</span>
+                                            <SortIndicator column="name" />
+                                        </div>
                                     </th>
 
                                     {filteredEvaluations.length > 0 ? filteredEvaluations.map(ev => {
                                         if (!isDetailedView) {
                                             return (
-                                                <th key={ev.id} className="p-0 text-[10px] font-black text-primary uppercase tracking-widest border-b border-white/10 min-w-[120px] text-center border-r border-white/10 align-middle px-2 h-10">
+                                                <th key={ev.id} className="p-0 text-[10px] font-black text-primary uppercase tracking-widest border-b border-white/10 border-t border-primary/50 border-l border-primary/50 border-r border-primary/50 min-w-[120px] text-center align-middle px-2 h-10 bg-primary/5">
                                                     Résultat
                                                 </th>
                                             );
@@ -395,19 +494,31 @@ const GradesByStudentTable: React.FC = () => {
                                         const evColumns = getEvaluationColumns(ev.id);
                                         return (
                                             <React.Fragment key={`questions-${ev.id}`}>
-                                                {evColumns.map(col => (
-                                                    <th key={col.id} className="p-0 min-w-[65px] align-bottom pb-2 border-b border-white/10 border-r border-white/5 relative bg-surface group/col">
-                                                        <div className="flex flex-col items-center justify-end h-[140px] w-full px-1">
-                                                            <span
-                                                                className="text-[10px] font-medium text-grey-medium uppercase tracking-wide leading-tight [writing-mode:vertical-rl] rotate-180 whitespace-normal mb-2 break-words text-left"
-                                                                title={col.titre}
-                                                            >
-                                                                {col.titre}
-                                                            </span>
-                                                        </div>
-                                                    </th>
-                                                ))}
-                                                <th className="p-0 text-[10px] font-black text-primary uppercase tracking-widest border-b border-white/10 min-w-[85px] text-center border-r border-white/10 align-middle px-2">
+                                                {evColumns.map(col => {
+                                                    const isGold = col.titre.toUpperCase() === 'TOTAL';
+                                                    return (
+                                                        <th 
+                                                            key={col.id} 
+                                                            className={clsx(
+                                                                "p-0 min-w-[65px] align-bottom pb-2 border-b border-white/10 border-r border-white/10 relative bg-surface group/col",
+                                                                isGold && "border-t border-primary/50 border-l border-primary/50 border-r border-primary/50"
+                                                            )}
+                                                        >
+                                                            <div className="flex flex-col items-center justify-end h-[140px] w-full px-1">
+                                                                <span
+                                                                    className={clsx(
+                                                                        "text-[10px] font-medium uppercase tracking-wide leading-tight [writing-mode:vertical-rl] rotate-180 whitespace-normal mb-2 break-words text-left",
+                                                                        isGold ? "text-primary" : "text-grey-medium"
+                                                                    )}
+                                                                    title={col.titre}
+                                                                >
+                                                                    {col.titre}
+                                                                </span>
+                                                            </div>
+                                                        </th>
+                                                    );
+                                                })}
+                                                <th className="p-0 text-[10px] font-black text-primary uppercase tracking-widest border-b border-white/10 min-w-[85px] text-center border-t border-primary/50 border-l border-primary/50 border-r border-primary/50 align-middle px-2 bg-primary/5">
                                                     Total
                                                 </th>
                                             </React.Fragment>
@@ -419,32 +530,41 @@ const GradesByStudentTable: React.FC = () => {
                                     )}
 
                                     <th className={clsx(
-                                        "sticky right-[198px] z-30 p-2 w-[80px] bg-surface border-b border-white/10 border-l border-white/10 text-center align-middle",
+                                        "sticky right-[198px] z-30 p-2 w-[80px] bg-background border-t border-b border-white/10 border-l border-white/10 text-center align-middle cursor-pointer hover:bg-white/5 transition-colors group/sort",
                                         isDetailedView ? 'top-[64px]' : 'top-0'
-                                    )}>
-                                        <div className="flex flex-col items-center justify-center">
+                                    )} onClick={() => handleSort('missing')}>
+                                        <div className="flex flex-col items-center justify-center relative">
                                             <span className="text-[9px] font-black uppercase text-rose-400 leading-tight">Tests</span>
                                             <span className="text-[9px] font-black uppercase text-rose-400 leading-tight">Manquants</span>
+                                            <div className="absolute -right-1 top-1/2 -translate-y-1/2">
+                                                <SortIndicator column="missing" />
+                                            </div>
                                         </div>
                                     </th>
                                     <th className={clsx(
-                                        "sticky right-[99px] z-30 p-2 w-[100px] bg-surface border-b border-white/10 text-center align-middle",
+                                        "sticky right-[99px] z-30 p-2 w-[100px] bg-background border-t border-b border-white/10 text-center align-middle cursor-pointer hover:bg-white/5 transition-colors",
                                         isDetailedView ? 'top-[64px]' : 'top-0'
-                                    )}>
-                                        <span className="text-[10px] font-black uppercase text-primary tracking-widest leading-tight">RESULTATS SELON<br />PONDERATION</span>
+                                    )} onClick={() => handleSort('weighted')}>
+                                        <div className="flex items-center justify-center">
+                                            <span className="text-[10px] font-black uppercase text-primary tracking-widest leading-tight">RESULTATS SELON<br />PONDERATION</span>
+                                            <SortIndicator column="weighted" />
+                                        </div>
                                     </th>
                                     <th className={clsx(
-                                        "sticky right-0 z-30 p-2 w-[100px] bg-surface border-b border-white/10 text-center align-middle",
+                                        "sticky right-0 z-30 p-2 w-[100px] bg-background border-t border-b border-white/10 border-r border-white/10 text-center align-middle cursor-pointer hover:bg-white/5 transition-colors",
                                         isDetailedView ? 'top-[64px]' : 'top-0'
-                                    )}>
-                                        <span className="text-[10px] font-black uppercase text-emerald-400 tracking-widest leading-tight">RESULTATS<br />SELON %</span>
+                                    )} onClick={() => handleSort('simple')}>
+                                        <div className="flex items-center justify-center">
+                                            <span className="text-[10px] font-black uppercase text-primary tracking-widest leading-tight">RESULTATS<br />SELON %</span>
+                                            <SortIndicator column="simple" />
+                                        </div>
                                     </th>
                                 </tr>
 
                                 {/* Row 3: Max Points */}
                                 <tr className="border-b border-white/10 bg-surface/80">
                                     <th className={clsx(
-                                        "sticky left-0 z-40 bg-surface px-4 py-2 text-left min-w-[220px] border-r border-white/10 border-b border-white/10 h-8",
+                                        "sticky left-0 z-40 bg-background px-4 py-2 text-left min-w-[220px] border-r border-white/10 border-b border-white/10 h-8",
                                         isDetailedView ? 'top-[204px]' : 'top-[40px]'
                                     )}>
                                         <span className="text-[9px] font-black uppercase text-grey-medium tracking-widest">Points Max</span>
@@ -453,7 +573,7 @@ const GradesByStudentTable: React.FC = () => {
                                     {filteredEvaluations.length > 0 ? filteredEvaluations.map(ev => {
                                         if (!isDetailedView) {
                                             return (
-                                                <th key={`max-ev-${ev.id}`} className="p-0 text-[10px] font-black text-grey-medium/60 uppercase border-b border-white/10 min-w-[120px] text-center border-r border-white/10 align-middle px-2 h-8">
+                                                <th key={`max-ev-${ev.id}`} className="p-0 text-[10px] font-black text-grey-medium/60 uppercase border-b border-white/10 min-w-[120px] text-center border-r border-primary/50 border-l border-primary/50 align-middle px-2 h-8 bg-primary/5">
                                                     / {ev.note_max}
                                                 </th>
                                             );
@@ -462,13 +582,13 @@ const GradesByStudentTable: React.FC = () => {
                                         return (
                                             <React.Fragment key={`max-cols-${ev.id}`}>
                                                 {evColumns.map(col => (
-                                                    <th key={`max-${col.id}`} className="p-0 min-w-[65px] h-8 text-center border-b border-white/10 border-r border-white/5 relative bg-surface/50">
+                                                    <th key={`max-${col.id}`} className="p-0 min-w-[65px] h-8 text-center border-b border-white/10 border-r border-white/10 relative bg-surface/50">
                                                         <span className="text-[10px] font-black text-grey-medium/60 uppercase">
                                                             / {Number.isInteger(col.maxPoints) ? col.maxPoints : col.maxPoints.toFixed(1)}
                                                         </span>
                                                     </th>
                                                 ))}
-                                                <th className="p-0 text-[10px] font-black text-grey-medium uppercase border-b border-white/10 min-w-[85px] text-center border-r border-white/10 align-middle px-2 h-8">
+                                                <th className="p-0 text-[10px] font-black text-grey-medium uppercase border-b border-white/10 min-w-[85px] text-center border-r border-primary/50 border-l border-primary/50 align-middle px-2 h-8 bg-primary/5">
                                                     / {ev.note_max}
                                                 </th>
                                             </React.Fragment>
@@ -477,17 +597,17 @@ const GradesByStudentTable: React.FC = () => {
 
                                     {/* Summary Maxes */}
                                     <th className={clsx(
-                                        "sticky right-[198px] z-30 p-2 w-[80px] bg-surface border-b border-white/10 border-l border-white/10 text-center align-middle h-8",
+                                        "sticky right-[198px] z-30 p-2 w-[80px] bg-background border-b border-white/10 border-l border-white/10 text-center align-middle h-8",
                                         isDetailedView ? 'top-[204px]' : 'top-[40px]'
                                     )} />
                                     <th className={clsx(
-                                        "sticky right-[99px] z-30 p-2 w-[100px] bg-surface border-b border-white/10 text-center align-middle h-8 uppercase text-[10px] font-black text-grey-medium/60",
+                                        "sticky right-[99px] z-30 p-2 w-[100px] bg-background border-b border-white/10 text-center align-middle h-8 uppercase text-[10px] font-black text-grey-medium/60",
                                         isDetailedView ? 'top-[204px]' : 'top-[40px]'
                                     )}>
                                         100%
                                     </th>
                                     <th className={clsx(
-                                        "sticky right-0 z-30 p-2 w-[100px] bg-surface border-b border-white/10 text-center align-middle h-8 uppercase text-[10px] font-black text-grey-medium/60",
+                                        "sticky right-0 z-30 p-2 w-[100px] bg-background border-b border-white/10 text-center align-middle h-8 uppercase text-[10px] font-black text-grey-medium/60",
                                         isDetailedView ? 'top-[204px]' : 'top-[40px]'
                                     )}>
                                         100%
@@ -495,29 +615,15 @@ const GradesByStudentTable: React.FC = () => {
                                 </tr>
                             </thead>
 
-                            <tbody className="divide-y divide-white/5 transition-all">
-                                {searchedStudents.map(student => {
-                                    // --- Summary calculations ---
-                                    const scores = filteredEvaluations.map(ev => ({
-                                        obtained: scoreMap[student.id]?.[ev.id],
-                                        max: ev.note_max || 20,
-                                        type_note_id: ev.type_note_id
-                                    }));
-                                    const completedScores = scores.filter(s => s.obtained !== null && s.obtained !== undefined);
-                                    const missingCount = scores.length - completedScores.length;
-
-                                    let globalPercentage: number | null = null;
-                                    if (completedScores.length > 0) {
-                                        const totalObtained = completedScores.reduce((sum, s) => sum + (s.obtained as number), 0);
-                                        const totalMax = completedScores.reduce((sum, s) => sum + s.max, 0);
-                                        globalPercentage = Math.round((totalObtained / totalMax) * 100);
-                                    }
-                                    const globalStyle = globalPercentage !== null ? getScoreStyle(globalPercentage, 100, null) : null;
+                            <tbody className="divide-y divide-white/10 transition-all">
+                                {sortedStudents.map((student, idx) => {
+                                    const { missingCount, weightedPercentage, simplePercentage, hasData } = student._stats;
+                                    const isLast = idx === sortedStudents.length - 1;
 
                                     return (
-                                        <tr key={student.id} className="hover:bg-white/[0.02] transition-colors group">
+                                        <tr key={student.id} className="hover:bg-white/[0.05] transition-colors group">
                                             {/* Student Info (Sticky) */}
-                                            <td className="sticky left-0 z-10 bg-surface p-3 border-r border-white/10 group-hover:bg-surface-light transition-colors min-w-[220px]">
+                                            <td className="sticky left-0 z-10 bg-background p-3 border-l border-r border-white/10 group-hover:shadow-[inset_0_0_0_2000px_rgba(255,255,255,0.05)] transition-all min-w-[220px]">
                                                 <div className="flex items-center gap-3">
                                                     <Avatar
                                                         src={student.photo_url}
@@ -542,7 +648,13 @@ const GradesByStudentTable: React.FC = () => {
                                                 if (!isDetailedView) {
                                                     const scoreStyle = getScoreStyle(total ?? null, ev.note_max, ev.type_note_id);
                                                     return (
-                                                        <td key={ev.id} className="p-2 text-center border-t border-white/5 border-r border-white/10 relative min-w-[120px]">
+                                                        <td 
+                                                            key={ev.id} 
+                                                            className={clsx(
+                                                                "p-2 text-center border-t border-white/10 relative min-w-[120px] border-l border-primary/50 border-r border-primary/50 bg-primary/5",
+                                                                isLast && "border-b border-white/10"
+                                                            )}
+                                                        >
                                                             {(total !== null && total !== undefined) ? (
                                                                 <div className="flex flex-col items-center">
                                                                     <span className={clsx('text-sm font-black', scoreStyle.colorClass)}>
@@ -581,9 +693,17 @@ const GradesByStudentTable: React.FC = () => {
                                                                 });
 
                                                                 const colStyle = getScoreStyle(hasAnyMark ? totalCol : null, col.maxPoints, ev.type_note_id);
+                                                                const isColGold = col.titre.toUpperCase() === 'TOTAL';
                                                                 
                                                                 return (
-                                                                    <td key={col.id} className="p-2 text-center border-t border-white/5 border-r border-white/5 min-w-[65px]">
+                                                                    <td 
+                                                                        key={col.id} 
+                                                                        className={clsx(
+                                                                            "p-2 text-center border-t border-white/10 min-w-[65px]",
+                                                                            isColGold ? "border-l border-primary/50 border-r border-primary/50 bg-primary/5" : "border-r border-white/10",
+                                                                            isColGold && isLast && "border-b border-white/10"
+                                                                        )}
+                                                                    >
                                                                         {hasAnyMark ? (
                                                                             <span className={clsx('text-xs font-bold', colStyle.colorClass)}>
                                                                                 {Number.isInteger(totalCol) ? totalCol : totalCol.toFixed(1)}
@@ -595,7 +715,10 @@ const GradesByStudentTable: React.FC = () => {
                                                                 );
                                                             })}
                                                             {/* Total cell for this evaluation */}
-                                                            <td className="p-2 text-center border-t border-white/5 border-r border-white/10 min-w-[85px]">
+                                                            <td className={clsx(
+                                                                "p-2 text-center border-t border-white/10 border-l border-primary/50 border-r border-primary/50 min-w-[85px] bg-primary/5",
+                                                                isLast && "border-b border-white/10"
+                                                            )}>
                                                             {(total !== null && total !== undefined) ? (() => {
                                                                 const totalStyle = getScoreStyle(total, ev.note_max, ev.type_note_id);
                                                                 return (
@@ -619,78 +742,60 @@ const GradesByStudentTable: React.FC = () => {
                                         })}
 
                                             {(() => {
-                                            const scoresInfo = filteredEvaluations.map(ev => {
-                                                const obtained = scoreMap[student.id]?.[ev.id];
-                                                const max = ev.note_max || 20;
-                                                const pct = (obtained !== null && obtained !== undefined) ? (obtained / max) * 100 : null;
-                                                return { obtained, max, pct, type_note_id: ev.type_note_id };
-                                            });
+                                                const weightedStyle = hasData ? getScoreStyle(Math.round(weightedPercentage), 100, null) : null;
+                                                const simpleStyle = hasData ? getScoreStyle(Math.round(simplePercentage), 100, null) : null;
 
-                                            const completed = scoresInfo.filter(s => s.obtained !== null && s.obtained !== undefined);
-                                            const missingCount = scoresInfo.length - completed.length;
+                                                return (
+                                                    <>
+                                                        {/* Summary: Missing count */}
+                                                        <td className={clsx(
+                                                            "sticky right-[198px] z-10 bg-background border-t border-white/10 border-l border-white/10 text-center font-black text-sm transition-all w-[80px] group-hover:shadow-[inset_0_0_0_2000px_rgba(255,255,255,0.05)]",
+                                                            isLast && "border-b border-white/10"
+                                                        )}>
+                                                            {missingCount > 0 ? (
+                                                                <span className="text-rose-500">{missingCount}</span>
+                                                            ) : (
+                                                                <span className="text-grey-medium opacity-20 text-xs">0</span>
+                                                            )}
+                                                        </td>
 
-                                            // 1. Weighted Average (Selon Pondération)
-                                            let weightedPercentage: number | null = null;
-                                            if (completed.length > 0) {
-                                                const totalObtained = completed.reduce((sum, s) => sum + (s.obtained as number), 0);
-                                                const totalMax = completed.reduce((sum, s) => sum + s.max, 0);
-                                                weightedPercentage = Math.round((totalObtained / totalMax) * 100);
-                                            }
+                                                        {/* Summary: Weighted Result */}
+                                                        <td className={clsx(
+                                                            "sticky right-[99px] z-10 bg-background border-t border-white/10 text-center p-2 transition-all w-[100px] group-hover:shadow-[inset_0_0_0_2000px_rgba(255,255,255,0.05)]",
+                                                            isLast && "border-b border-white/10"
+                                                        )}>
+                                                            {hasData ? (
+                                                                <div className="flex flex-col items-center">
+                                                                    <span className={clsx("text-base font-black leading-none", weightedStyle?.colorClass)}>
+                                                                        {Math.round(weightedPercentage)}%
+                                                                    </span>
+                                                                </div>
+                                                            ) : (
+                                                                <span className="text-grey-medium opacity-20">—</span>
+                                                            )}
+                                                        </td>
 
-                                            // 2. Simple Average (Selon %)
-                                            let simplePercentage: number | null = null;
-                                            if (completed.length > 0) {
-                                                const sumPcts = completed.reduce((sum, s) => sum + (s.pct as number), 0);
-                                                simplePercentage = Math.round(sumPcts / completed.length);
-                                            }
-
-                                            const weightedStyle = weightedPercentage !== null ? getScoreStyle(weightedPercentage, 100, null) : null;
-                                            const simpleStyle = simplePercentage !== null ? getScoreStyle(simplePercentage, 100, null) : null;
-
-                                            return (
-                                                <>
-                                                    {/* Summary: Missing count */}
-                                                    <td className="sticky right-[198px] z-10 bg-surface border-t border-white/5 border-l border-white/10 text-center font-black text-sm transition-colors w-[80px]">
-                                                        {missingCount > 0 ? (
-                                                            <span className="text-rose-500">{missingCount}</span>
-                                                        ) : (
-                                                            <span className="text-grey-medium opacity-20 text-xs">0</span>
-                                                        )}
-                                                    </td>
-
-                                                    {/* Summary: Weighted Result */}
-                                                    <td className="sticky right-[99px] z-10 bg-surface border-t border-white/5 text-center p-2 transition-colors w-[100px]">
-                                                        {weightedPercentage !== null ? (
-                                                            <div className="flex flex-col items-center">
-                                                                <span className={clsx("text-base font-black leading-none", weightedStyle?.colorClass)}>
-                                                                    {weightedPercentage}%
-                                                                </span>
-
-                                                            </div>
-                                                        ) : (
-                                                            <span className="text-grey-medium opacity-20">—</span>
-                                                        )}
-                                                    </td>
-
-                                                    {/* Summary: Simple Average Result (%) */}
-                                                    <td className="sticky right-0 z-10 bg-surface border-t border-white/5 text-center p-2 transition-colors w-[100px]">
-                                                        {simplePercentage !== null ? (
-                                                            <div className="flex flex-col items-center">
-                                                                <span className={clsx("text-base font-black leading-none", simpleStyle?.colorClass)}>
-                                                                    {simplePercentage}%
-                                                                </span>
-
-                                                            </div>
-                                                        ) : (
-                                                            <span className="text-grey-medium opacity-20">—</span>
-                                                        )}
-                                                    </td>
-                                                </>
-                                            );
+                                                        {/* Summary: Simple Average Result (%) */}
+                                                        <td className={clsx(
+                                                            "sticky right-0 z-10 bg-background border-t border-white/10 border-r border-white/10 text-center p-2 transition-all w-[100px] group-hover:shadow-[inset_0_0_0_2000px_rgba(255,255,255,0.05)]",
+                                                            isLast && "border-b border-white/10"
+                                                        )}>
+                                                            {hasData ? (
+                                                                <div className="flex flex-col items-center">
+                                                                    <span className={clsx("text-base font-black leading-none", simpleStyle?.colorClass)}>
+                                                                        {Math.round(simplePercentage)}%
+                                                                    </span>
+                                                                </div>
+                                                            ) : (
+                                                                <span className="text-grey-medium opacity-20">—</span>
+                                                            )}
+                                                        </td>
+                                                    </>
+                                                );
                                             })()}
-                                        </tr>
-                                    );
-                                })}
+                                    </tr>
+                                );
+                            })}
                             </tbody>
                         </table>
                     </div>

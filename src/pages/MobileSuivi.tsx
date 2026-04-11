@@ -52,7 +52,7 @@ const MobileSuivi: React.FC = () => {
                     <button
                         onClick={() => actions.setSelectedStatusFilter('besoin_d_aide')}
                         className={`flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-[10px] font-bold uppercase tracking-wide transition-all ${states.selectedStatusFilter === 'besoin_d_aide'
-                            ? 'bg-[#A0A8AD] text-white border-[#A0A8AD]'
+                            ? 'bg-grey-medium text-white border-grey-medium'
                             : 'bg-surface border border-white/10 text-grey-medium'
                             }`}
                     >
@@ -61,7 +61,7 @@ const MobileSuivi: React.FC = () => {
                     <button
                         onClick={() => actions.setSelectedStatusFilter('a_verifier')}
                         className={`flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-[10px] font-bold uppercase tracking-wide transition-all ${states.selectedStatusFilter === 'a_verifier'
-                            ? 'bg-[#8B5CF6] text-white border-[#8B5CF6]'
+                            ? 'bg-purple-accent text-white border-purple-accent'
                             : 'bg-surface border border-white/10 text-grey-medium'
                             }`}
                     >
@@ -70,7 +70,7 @@ const MobileSuivi: React.FC = () => {
                     <button
                         onClick={() => actions.setSelectedStatusFilter('ajustement')}
                         className={`flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-[10px] font-bold uppercase tracking-wide transition-all ${states.selectedStatusFilter === 'ajustement'
-                            ? 'bg-orange-500 text-white border-orange-500'
+                            ? 'bg-amber-accent text-black border-amber-accent'
                             : 'bg-surface border border-white/10 text-grey-medium'
                             }`}
                     >
@@ -182,7 +182,7 @@ const MobileSuivi: React.FC = () => {
 
                                         return (
                                             <div key={modId} className="bg-surface/60 border border-white/10 rounded-xl overflow-hidden shadow-sm">
-                                                <div className="p-3 bg-[#1D2125]">
+                                                <div className="p-3 bg-panel-elevated">
                                                     <div className="flex items-center gap-2 mb-3 mt-1">
                                                         <div className="w-1.5 h-4 bg-primary rounded-full"></div>
                                                         <span className="text-sm font-bold text-white tracking-wide">{modName}</span>

@@ -1,5 +1,7 @@
-
-// PDF Theme Token definition
+/**
+ * Couleurs dédiées aux PDF (@react-pdf / impression).
+ * L’interface vitée utilise les variables dans `src/index.css` ; aligner les hex ici si tu changes l’identité.
+ */
 export const PDF_THEME = {
     colors: {
         primary: '#E0E0E0', // Was hardcoded in Modern PDF

@@ -145,7 +145,7 @@ const ProgressionKanban: React.FC<ProgressionKanbanProps> = ({
     const columns = [
         { id: 'a_commencer', label: 'À commencer', icon: null, color: 'text-grey-medium', bg: 'bg-white/5' },
         { id: 'besoin_d_aide', label: 'Besoin d\'aide', icon: AlertCircle, color: 'text-danger', bg: 'bg-danger/10' },
-        { id: 'a_verifier', label: 'À Vérifier', icon: ShieldCheck, color: 'text-[#8B5CF6]', bg: 'bg-[#8B5CF6]/10' },
+        { id: 'a_verifier', label: 'À Vérifier', icon: ShieldCheck, color: 'text-purple-accent', bg: 'bg-purple-accent/10' },
         { id: 'a_domicile', label: 'À domicile', icon: Home, color: 'text-danger', bg: 'bg-danger/10' },
         { id: 'termine', label: 'Terminé', icon: Trophy, color: 'text-success', bg: 'bg-success/10' }
     ];

@@ -90,7 +90,7 @@ const InlineEditCell: React.FC<{
                     onKeyDown={handleKeyDown}
                     placeholder={placeholder}
                     className={clsx(
-                        "absolute -top-1 -left-1 min-w-[140%] bg-[#0F172A] border-4 border-primary shadow-[0_20px_50px_rgba(0,0,0,0.8)] text-white rounded-xl px-4 py-3 text-lg font-bold outline-none animate-in zoom-in-95 duration-150 opacity-100",
+                        "absolute -top-1 -left-1 min-w-[140%] bg-popover-surface border-4 border-primary shadow-[0_20px_50px_rgba(0,0,0,0.8)] text-white rounded-xl px-4 py-3 text-lg font-bold outline-none animate-in zoom-in-95 duration-150 opacity-100",
                         className
                     )}
                 />
@@ -250,7 +250,7 @@ export const GroupsDetailView: React.FC<GroupsDetailViewProps> = ({
                         size="xl"
                         src={selectedGroup.photo_url}
                         initials={selectedGroup.acronyme || (selectedGroup.nom ? selectedGroup.nom[0] : '?')}
-                        className={selectedGroup.photo_url ? "bg-[#D9B981]" : "bg-surface"}
+                        className={selectedGroup.photo_url ? "bg-primary" : "bg-surface"}
                     />
                     <div className="min-w-0">
                         <h1 className="text-cq-xl font-black text-text-main mb-1 tracking-tight truncate">{selectedGroup.nom}</h1>
@@ -316,7 +316,7 @@ export const GroupsDetailView: React.FC<GroupsDetailViewProps> = ({
                                             avatar={{
                                                 src: student.photo_url,
                                                 initials: `${student.prenom[0]}${student.nom[0]}`,
-                                                className: student.photo_url ? "bg-[#D9B981]" : "bg-background"
+                                                className: student.photo_url ? "bg-primary" : "bg-background"
                                             }}
                                         />
                                     ))}
@@ -346,7 +346,7 @@ export const GroupsDetailView: React.FC<GroupsDetailViewProps> = ({
                             {showColumnMenu && (
                                 <>
                                     <div className="fixed inset-0 z-40" onClick={() => setShowColumnMenu(false)} />
-                                    <div className="absolute top-full right-0 mt-2 w-72 bg-[#0F172A] border border-white/10 rounded-xl shadow-[0_30px_60px_rgba(0,0,0,0.9)] z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+                                    <div className="absolute top-full right-0 mt-2 w-72 bg-popover-surface border border-white/10 rounded-xl shadow-[0_30px_60px_rgba(0,0,0,0.9)] z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
                                         <div className="px-4 py-3 border-b border-white/5 bg-white/5">
                                             <h4 className="text-[10px] font-black uppercase tracking-widest text-grey-medium">Informations à afficher</h4>
                                         </div>
@@ -409,7 +409,7 @@ export const GroupsDetailView: React.FC<GroupsDetailViewProps> = ({
                                                             size="xs"
                                                             src={student.photo_url}
                                                             initials={`${student.prenom[0]}${student.nom[0]}`}
-                                                            className={student.photo_url ? "bg-[#D9B981]" : "bg-surface-dark"}
+                                                            className={student.photo_url ? "bg-primary" : "bg-surface-dark"}
                                                         />
                                                     </td>
                                                     <td className="px-6 py-3 sticky left-12 z-10 bg-background/50 group-hover/row:bg-surface/30">

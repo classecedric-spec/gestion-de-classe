@@ -252,7 +252,6 @@ const Presence: React.FC = () => {
                                     id="unassigned"
                                     title="Non assignés"
                                     count={trulyUnassigned.length}
-                                    color="#9CA3AF"
                                     isUnassigned={true}
                                 >
                                     {unassignedGroups.map((group, groupIndex) => (

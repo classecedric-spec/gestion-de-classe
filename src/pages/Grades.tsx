@@ -8,12 +8,12 @@ import {
 } from 'lucide-react';
 import { useLocation } from 'react-router-dom';
 import { Button, Tabs } from '../core';
+import { useGradeMutations, useAllEvaluations } from '../features/grades/hooks';
 import EvaluationsTableExcel from '../features/grades/components/EvaluationsTableExcel';
 import EvaluationDetailTable from '../features/grades/components/EvaluationDetailTable';
 import AddEvaluationModal from '../features/grades/components/AddEvaluationModal';
 import GradesByStudentTable from '../features/grades/components/GradesByStudentTable';
 import GradeSettings from '../features/grades/components/GradeSettings';
-import { useGradeMutations } from '../features/grades/hooks/useGrades';
 import { gradeService } from '../features/grades/services';
 import { TablesInsert } from '../types/supabase';
 
@@ -26,6 +26,15 @@ const Grades: React.FC = () => {
     const [editingQuestions, setEditingQuestions] = useState<any[]>([]);
     const [editingRegroupements, setEditingRegroupements] = useState<any[]>([]);
     const location = useLocation();
+    
+    // Filters State (lifted from EvaluationsTableExcel for context-awareness)
+    const [branchFilter, setBranchFilter] = useState<string>('all');
+    const [groupFilter, setGroupFilter] = useState<string>('all');
+    const [periodeFilter, setPeriodeFilter] = useState<string>('all');
+
+    // Data Fetching
+    const { evaluations } = useAllEvaluations();
+    const selectedEvaluation = evaluations.find(ev => ev.id === selectedEvaluationId);
 
     // Reset view to encodage table when navigating to this page (e.g. sidebar click)
     useEffect(() => {
@@ -76,8 +85,8 @@ const Grades: React.FC = () => {
 
     return (
         <div className="p-6 w-full space-y-6 min-h-screen animate-in fade-in slide-in-from-bottom-2 duration-500">
-            {/* Header section */}
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            {/* Page Header Area */}
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 pb-2">
                 <div className="flex items-center gap-4">
                     {(selectedEvaluationId || activeTab === 'settings') && (
                         <Button
@@ -85,38 +94,35 @@ const Grades: React.FC = () => {
                             size="sm"
                             onClick={() => {
                                 if (selectedEvaluationId) setSelectedEvaluationId(null);
-                                else setActiveTab('evaluations');
+                                else setActiveTab('encodage');
                             }}
-                            className="rounded-full w-10 h-10 p-0 flex items-center justify-center hover:bg-grey-light/20"
+                            className="rounded-xl w-10 h-10 p-0 flex items-center justify-center hover:bg-white/5 border border-white/5 shadow-sm"
                         >
-                            <ChevronLeft size={24} />
+                            <ChevronLeft size={20} />
                         </Button>
                     )}
-                    <div>
-                        <h1 className="text-3xl font-black text-text-main flex items-center gap-3 tracking-tight">
+                    <div className="space-y-1">
+                        <div className="flex items-center gap-3">
                             {activeTab === 'settings' ? (
-                                <>
-                                    <Settings2 className="text-primary" size={32} />
-                                    Configuration
-                                </>
+                                <Settings2 className="text-primary" size={28} />
                             ) : (
-                                <>
-                                    <ClipboardList className="text-primary" size={32} />
-                                    Notes & Évaluations
-                                </>
+                                <ClipboardList className="text-primary" size={28} />
                             )}
-                        </h1>
-                        <p className="text-grey-medium font-medium mt-1">
-                            {activeTab === 'settings'
-                                ? 'Personnalisez vos barèmes et types de notes'
-                                : 'Gérez et encodez les résultats de vos élèves'
-                            }
-                        </p>
+                            <h1 className="text-2xl font-black text-text-main uppercase tracking-tight">
+                                {selectedEvaluationId ? (
+                                    <div className="flex items-center gap-2">
+                                        <span className="opacity-40">Notes</span>
+                                        <span className="opacity-20 text-xs">/</span>
+                                        <span className="text-primary">{selectedEvaluation?.titre || 'Évaluation'}</span>
+                                    </div>
+                                ) : (activeTab === 'settings' ? 'Configuration' : 'Notes & Évaluations')}
+                            </h1>
+                        </div>
                     </div>
                 </div>
 
                 {!selectedEvaluationId && (
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-4 bg-surface/50 p-1 rounded-2xl border border-white/5 shadow-inner">
                         <Tabs
                             tabs={tabs}
                             activeTab={activeTab}
@@ -125,16 +131,20 @@ const Grades: React.FC = () => {
                             level={3}
                         />
                         {activeTab === 'encodage' && (
+                            <div className="h-8 w-px bg-white/10 mx-1" />
+                        )}
+                        {activeTab === 'encodage' && (
                             <Button
                                 onClick={() => {
                                     setEditingEvaluationData(null);
                                     setEditingQuestions([]);
                                     setIsAddModalOpen(true);
                                 }}
-                                className="border border-primary/30"
+                                className="bg-primary/10 border border-primary/20 text-primary hover:bg-primary hover:text-text-dark"
+                                size="sm"
                             >
-                                <Plus size={20} className="mr-2" />
-                                Nouvelle Évaluation
+                                <Plus size={18} className="mr-1.5" />
+                                Nouveau
                             </Button>
                         )}
                     </div>
@@ -159,6 +169,12 @@ const Grades: React.FC = () => {
                 <EvaluationsTableExcel
                     onSelectEvaluation={setSelectedEvaluationId}
                     onEditEvaluation={handleEditClick}
+                    branchFilter={branchFilter}
+                    setBranchFilter={setBranchFilter}
+                    groupFilter={groupFilter}
+                    setGroupFilter={setGroupFilter}
+                    periodeFilter={periodeFilter}
+                    setPeriodeFilter={setPeriodeFilter}
                 />
             )}
 
@@ -172,9 +188,9 @@ const Grades: React.FC = () => {
                     setEditingRegroupements([]);
                 }}
                 onSubmit={handleCreateEvaluation}
-                brancheId={''}
-                groupId={''}
-                periode={''}
+                brancheId={branchFilter !== 'all' ? branchFilter : ''}
+                groupId={groupFilter !== 'all' ? groupFilter : ''}
+                periode={periodeFilter !== 'all' ? periodeFilter : ''}
                 initialData={editingEvaluationData}
                 initialQuestions={editingQuestions}
                 initialRegroupements={editingRegroupements}

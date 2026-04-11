@@ -83,7 +83,7 @@ export function SortableGroupItem({ group, index, selectedGroup, onClick, onEdit
                 avatar={{
                     src: group.photo_url,
                     initials: group.acronyme || (group.nom && group.nom[0]),
-                    className: group.photo_url ? "bg-[#D9B981]" : "bg-background"
+                    className: group.photo_url ? "bg-primary" : "bg-background"
                 }}
                 // On injecte à gauche de la carte : le numéro de position ET la poignée
                 // de glissement. La poignée (GripVertical) est la zone "draggable" :

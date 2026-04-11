@@ -13,11 +13,11 @@ export const getStatusInfo = (status: string) => {
         case 'termine':
             return { color: 'bg-success', text: 'Terminé', icon: Check };
         case 'a_verifier':
-            return { color: 'bg-[#8B5CF6]', text: 'À vérifier', icon: ShieldCheck };
+            return { color: 'bg-purple-accent', text: 'À vérifier', icon: ShieldCheck };
         case 'en_cours':
             return { color: 'bg-primary', text: 'En cours', icon: Play };
         case 'besoin_d_aide':
-            return { color: 'bg-[#A0A8AD]', text: 'Aide', icon: AlertCircle };
+            return { color: 'bg-grey-medium', text: 'Aide', icon: AlertCircle };
         default:
             return { color: 'bg-white/10', text: 'À faire', icon: null };
     }

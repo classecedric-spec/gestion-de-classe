@@ -266,7 +266,7 @@ const Responsabilites: React.FC = () => {
                 ) : (
                     <div className="overflow-x-auto">
                         <table className="w-full text-left">
-                            <thead className="bg-[#1a1a1a]/50 text-xs font-bold text-grey-medium uppercase tracking-wider">
+                            <thead className="bg-card-bg/50 text-xs font-bold text-grey-medium uppercase tracking-wider">
                                 <tr>
                                     <th className="px-6 py-4 w-1/3">Tâche / Responsabilité</th>
                                     <th className="px-6 py-4">Élèves Assignés</th>

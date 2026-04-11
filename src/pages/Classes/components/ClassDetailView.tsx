@@ -51,7 +51,7 @@ export const ClassDetailView: React.FC<ClassDetailViewProps> = ({
                         size="xl"
                         src={(selectedClass as any).photo_base64 || selectedClass.logo_url}
                         initials={selectedClass.acronyme || (selectedClass.nom ? selectedClass.nom[0] : '?')}
-                        className={((selectedClass as any).photo_base64 || selectedClass.logo_url) ? "bg-[#D9B981]" : "bg-input"}
+                        className={((selectedClass as any).photo_base64 || selectedClass.logo_url) ? "bg-primary" : "bg-input"}
                     />
                     <div>
                         <h1 className="text-cq-xl font-black text-text-main mb-2 tracking-tight">{selectedClass.nom}</h1>

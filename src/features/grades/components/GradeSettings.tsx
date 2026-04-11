@@ -152,20 +152,20 @@ const GradeSettings: React.FC = () => {
             </div>
 
             {isAdding && (
-                <Card className="p-6 border-primary/20 bg-primary/5 animate-in fade-in slide-in-from-top-2 duration-300">
-                    <div className="flex justify-between items-center mb-6">
-                        <h3 className="font-bold text-text-main flex items-center gap-2">
-                            <div className="p-1.5 rounded-lg bg-primary/20 text-primary">
-                                <Settings size={16} />
+                <Card variant="gradient" className="animate-in fade-in slide-in-from-top-2 duration-300">
+                    <Card.Header className="flex justify-between items-center bg-primary/5">
+                        <h3 className="font-black text-text-main uppercase tracking-tighter flex items-center gap-3">
+                            <div className="p-2 rounded-xl bg-primary/20 text-primary shadow-inner">
+                                <Settings size={18} />
                             </div>
                             {editingId ? 'Modifier le système' : 'Nouveau système de notation'}
                         </h3>
-                        <button onClick={resetForm} className="text-grey-medium hover:text-text-main transition-colors" title="Fermer">
+                        <button onClick={resetForm} className="p-2 rounded-lg text-grey-medium hover:text-white hover:bg-white/5 transition-all" title="Fermer">
                             <X size={20} />
                         </button>
-                    </div>
+                    </Card.Header>
 
-                    <div className="space-y-6">
+                    <Card.Body className="space-y-8">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             <Input 
                                 label="Nom du barème" 
@@ -175,16 +175,16 @@ const GradeSettings: React.FC = () => {
                             />
                             <div className="space-y-2">
                                 <label className="text-xs font-bold text-grey-medium uppercase tracking-wider">Type de système</label>
-                                <div className="flex bg-input rounded-xl p-1 gap-1 border border-white/5">
+                                <div className="flex bg-black/20 rounded-2xl p-1.5 gap-1.5 border border-white/5">
                                     <button
                                         onClick={() => setFormData({...formData, systeme: 'numerique'})}
-                                        className={`flex-1 py-2 px-4 rounded-lg text-sm font-bold transition-all ${formData.systeme === 'numerique' ? 'bg-primary text-white shadow-lg' : 'text-grey-medium hover:text-grey-dark'}`}
+                                        className={`flex-1 py-2.5 px-4 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${formData.systeme === 'numerique' ? 'bg-primary text-text-dark shadow-lg' : 'text-grey-medium hover:text-white hover:bg-white/5'}`}
                                     >
                                         Numérique
                                     </button>
                                     <button
                                         onClick={() => setFormData({...formData, systeme: 'conversion'})}
-                                        className={`flex-1 py-2 px-4 rounded-lg text-sm font-bold transition-all ${formData.systeme === 'conversion' ? 'bg-primary text-white shadow-lg' : 'text-grey-medium hover:text-grey-dark'}`}
+                                        className={`flex-1 py-2.5 px-4 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${formData.systeme === 'conversion' ? 'bg-primary text-text-dark shadow-lg' : 'text-grey-medium hover:text-white hover:bg-white/5'}`}
                                     >
                                         Conversion
                                     </button>
@@ -211,10 +211,13 @@ const GradeSettings: React.FC = () => {
                         )}
 
                         {formData.systeme === 'conversion' && (
-                            <div className="space-y-4 animate-in fade-in slide-in-from-left-2 duration-300">
-                                <div className="flex justify-between items-center">
-                                    <h4 className="text-sm font-bold text-text-main uppercase tracking-widest">Grille de Conversion</h4>
-                                    <Button size="sm" variant="ghost" icon={Plus} onClick={addPalier} className="text-primary hover:bg-primary/10">
+                            <div className="space-y-6 animate-in fade-in slide-in-from-left-2 duration-300">
+                                <div className="flex justify-between items-center border-b border-white/5 pb-2">
+                                    <h4 className="text-xs font-black text-text-main uppercase tracking-widest flex items-center gap-2">
+                                        <div className="w-1.5 h-4 bg-primary rounded-full" />
+                                        Grille de Conversion
+                                    </h4>
+                                    <Button size="sm" variant="ghost" icon={Plus} onClick={addPalier} className="text-primary hover:bg-primary/10 rounded-xl">
                                         Ajouter un palier
                                     </Button>
                                 </div>
@@ -319,14 +322,15 @@ const GradeSettings: React.FC = () => {
                                 </div>
                             </div>
                         )}
-                    </div>
+                    </Card.Body>
                     
-                    <div className="flex justify-end gap-3 pt-6 mt-6 border-t border-white/5">
+                    <Card.Footer className="flex justify-end gap-3 bg-black/20">
                         <Button variant="ghost" onClick={resetForm}>Annuler</Button>
                         <Button 
                             variant="primary" 
                             icon={Save} 
                             onClick={handleSave} 
+                            className="shadow-xl shadow-primary/20"
                             disabled={
                                 !formData.nom || 
                                 (formData.systeme === 'numerique' && !formData.config.max) ||
@@ -342,61 +346,62 @@ const GradeSettings: React.FC = () => {
                         >
                             Enregistrer le barème
                         </Button>
-                    </div>
+                    </Card.Footer>
                 </Card>
             )}
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                 {noteTypes.map((type) => (
-                    <Card key={type.id} className="p-4 flex justify-between items-center group hover:border-primary/40 transition-all duration-300 hover:shadow-lg hover:shadow-primary/5">
-                        <div className="flex items-center gap-4">
-                            <div className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-transform duration-300 shadow-inner
-                                ${type.systeme === 'conversion' ? 'bg-amber-500/10 text-amber-500' : 'bg-primary/10 text-primary'}
-                            `}>
-                                <Settings size={22} />
-                            </div>
-                            <div className="space-y-1">
-                                <h4 className="font-bold text-text-main leading-none">{type.nom}</h4>
-                                <div className="flex items-center gap-2">
-                                    <span className="text-[10px] px-2 py-0.5 rounded-md bg-white/5 text-grey-medium border border-white/10 uppercase font-black tracking-wider">
-                                        {type.systeme === 'conversion' ? 'Conversion en Lettres' : 'Numérique'}
-                                    </span>
-                                    {type.systeme === 'numerique' && (
-                                        <span className="text-[10px] px-2 py-0.5 rounded-md bg-white/5 text-primary border border-primary/20 uppercase font-black tracking-wider">
-                                            Sur {(type.config as any)?.max || '?'}
+                    <Card 
+                        key={type.id} 
+                        hover
+                        className="group transition-all duration-300"
+                    >
+                        <Card.Body className="flex justify-between items-center p-4">
+                            <div className="flex items-center gap-4">
+                                <div className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-transform duration-300 shadow-inner
+                                    ${type.systeme === 'conversion' ? 'bg-amber-500/10 text-amber-500' : 'bg-primary/10 text-primary'}
+                                `}>
+                                    <Settings size={22} />
+                                </div>
+                                <div className="space-y-1">
+                                    <h4 className="font-black text-text-main leading-none uppercase tracking-tight">{type.nom}</h4>
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-[10px] px-2 py-0.5 rounded-md bg-white/5 text-grey-medium border border-white/10 uppercase font-black tracking-wider">
+                                            {type.systeme === 'conversion' ? 'Conversion' : 'Numérique'}
                                         </span>
-                                    )}
-                                    {type.systeme === 'conversion' && (
-                                        <span className="text-[10px] px-2 py-0.5 rounded-md bg-amber-500/10 text-amber-500 border border-amber-500/20 uppercase font-black tracking-wider">
-                                            Points libres
-                                        </span>
-                                    )}
-                                    {type.systeme === 'conversion' && (
-                                        <span className="text-[10px] px-2 py-0.5 rounded-md bg-amber-500/10 text-amber-500 border border-amber-500/20 uppercase font-black tracking-wider">
-                                            {(type.config as any)?.paliers?.length || 0} paliers
-                                        </span>
-                                    )}
+                                        {type.systeme === 'numerique' && (
+                                            <span className="text-[10px] px-2 py-0.5 rounded-md bg-primary/10 text-primary border border-primary/20 uppercase font-black tracking-wider">
+                                                Sur {(type.config as any)?.max || '?'}
+                                            </span>
+                                        )}
+                                        {type.systeme === 'conversion' && (
+                                            <span className="text-[10px] px-2 py-0.5 rounded-md bg-amber-500/10 text-amber-500 border border-amber-500/20 uppercase font-black tracking-wider">
+                                                {(type.config as any)?.paliers?.length || 0} paliers
+                                            </span>
+                                        )}
+                                    </div>
                                 </div>
                             </div>
-                        </div>
-                        <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                            <Button 
-                                variant="ghost" 
-                                icon={Edit2} 
-                                onClick={() => startEdit(type)} 
-                                size="sm" 
-                                className="hover:bg-primary/10 hover:text-primary" 
-                                title="Modifier"
-                            />
-                            <Button 
-                                variant="ghost" 
-                                icon={Trash2} 
-                                onClick={() => deleteNoteType(type.id)} 
-                                size="sm" 
-                                className="text-danger/60 hover:text-danger hover:bg-danger/10"
-                                title="Supprimer"
-                            />
-                        </div>
+                            <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                                <Button 
+                                    variant="ghost" 
+                                    icon={Edit2} 
+                                    onClick={() => startEdit(type)} 
+                                    size="sm" 
+                                    className="hover:bg-primary/10 hover:text-primary rounded-xl" 
+                                    title="Modifier"
+                                />
+                                <Button 
+                                    variant="ghost" 
+                                    icon={Trash2} 
+                                    onClick={() => deleteNoteType(type.id)} 
+                                    size="sm" 
+                                    className="text-danger/60 hover:text-danger hover:bg-danger/10 rounded-xl"
+                                    title="Supprimer"
+                                />
+                            </div>
+                        </Card.Body>
                     </Card>
                 ))}
             </div>

@@ -424,23 +424,23 @@ const EvaluationDetailTable: React.FC<EvaluationDetailTableProps> = ({ evaluatio
             <div className="flex-1 overflow-hidden bg-surface rounded-2xl border border-white/10 flex flex-col">
                 <div className="flex-1 overflow-auto custom-scrollbar">
                     <table className="w-full text-left border-separate border-spacing-0 text-sm">
-                        <thead className="sticky top-0 z-30 bg-[#1e2e3a]">
+                        <thead className="sticky top-0 z-30 bg-table-header">
                             <tr>
                                 <th className="p-5 font-black text-white uppercase tracking-tighter text-xs border-b border-r border-white/10 sticky left-0 bg-surface z-40">
                                     Élève
                                 </th>
-                                <th className="p-5 font-black text-primary uppercase tracking-tighter text-xs border-b border-white/10 text-center min-w-[120px] bg-primary/10">
+                                <th className="p-5 font-black text-primary uppercase tracking-tighter text-xs border-b border-l border-r border-primary/50 text-center min-w-[120px] bg-primary/10">
                                     Total / {evaluation?.note_max}
                                 </th>
                                 {hasQuestions && questions.map(q => (
-                                    <th key={q.id} className="p-5 font-black text-grey-light uppercase tracking-tighter text-[10px] border-b border-white/10 text-center min-w-[100px]">
+                                    <th key={q.id} className="p-5 font-black text-grey-light uppercase tracking-tighter text-[10px] border-b border-r border-white/10 text-center min-w-[100px]">
                                         <div className="flex flex-col items-center gap-1">
                                             <span className="truncate max-w-[120px] text-primary">{q.titre}</span>
                                             <Badge variant="secondary" className="text-[9px] opacity-80 px-2 py-0">/ {q.note_max}</Badge>
                                         </div>
                                     </th>
                                 ))}
-                                <th className="p-5 font-black text-white uppercase tracking-tighter text-xs border-b border-white/10 text-center min-w-[120px]">
+                                <th className="p-5 font-black text-white uppercase tracking-tighter text-xs border-b border-r border-white/10 text-center min-w-[120px]">
                                     Statut
                                 </th>
                                 <th className="p-5 font-black text-white uppercase tracking-tighter text-xs border-b border-white/10 min-w-[250px]">
@@ -448,7 +448,7 @@ const EvaluationDetailTable: React.FC<EvaluationDetailTableProps> = ({ evaluatio
                                 </th>
                             </tr>
                         </thead>
-                        <tbody className="divide-y divide-white/5">
+                        <tbody className="divide-y divide-white/10">
                             {students.length === 0 ? (
                                 <tr>
                                     <td colSpan={4 + (hasQuestions ? questions.length : 0)} className="p-20 text-center">
@@ -480,7 +480,7 @@ const EvaluationDetailTable: React.FC<EvaluationDetailTableProps> = ({ evaluatio
                                         const colorMap: Record<string, string> = {
                                             emerald: 'text-emerald-400',
                                             blue: 'text-blue-400',
-                                            amber: 'text-amber-400',
+                                            amber: 'text-primary',
                                             rose: 'text-rose-400',
                                             purple: 'text-purple-400',
                                             grey: 'text-grey-medium'
@@ -489,7 +489,7 @@ const EvaluationDetailTable: React.FC<EvaluationDetailTableProps> = ({ evaluatio
                                         return (
                                             <React.Fragment key={student.id}>
                                                 {showLevelHeader && (
-                                                    <tr className="bg-[#1a2632]">
+                                                    <tr className="bg-table-row-group">
                                                         <td colSpan={4 + (hasQuestions ? questions.length : 0)} className="px-5 py-3 border-b border-white/10 border-l-4 border-primary">
                                                             <div className="flex items-center gap-2">
                                                                 <span className="text-[11px] font-black text-white/70 uppercase tracking-[0.2em] select-none">
@@ -507,13 +507,13 @@ const EvaluationDetailTable: React.FC<EvaluationDetailTableProps> = ({ evaluatio
                                                         }
                                                     }}
                                                     className={clsx(
-                                                        "group transition-all border-b border-white/5",
+                                                        "group transition-all border-b border-white/10",
                                                         !isBulkEdit && "cursor-pointer hover:bg-white/[0.05]",
                                                         isRowComplete && !isBulkEdit && "bg-emerald-500/[0.02]",
                                                         isDataMissing && "bg-danger/[0.15]"
                                                     )}
                                                 >
-                                                    <td className="p-4 sticky left-0 bg-surface z-20 border-r border-white/5 transition-colors group-hover:bg-white/10">
+                                                    <td className="p-4 sticky left-0 bg-surface z-20 border-r border-white/10 transition-all group-hover:shadow-[inset_0_0_0_2000px_rgba(255,255,255,0.05)]">
                                                         <div className="flex items-center gap-4">
                                                             <div className="w-10 h-10 rounded-full bg-grey-dark/50 p-0.5 border-2 border-white/10 overflow-hidden shrink-0 group-hover:border-primary/50 transition-colors">
                                                                 {student.photo_url ? (
@@ -528,7 +528,7 @@ const EvaluationDetailTable: React.FC<EvaluationDetailTableProps> = ({ evaluatio
                                                         </div>
                                                     </td>
 
-                                                    <td className="p-2 text-center bg-primary/5 border-r border-white/10">
+                                                    <td className="p-2 text-center bg-primary/5 border-l border-r border-primary/40">
                                                         {isBulkEdit ? (
                                                             !hasQuestions ? (
                                                                 <div className="flex justify-center">
@@ -586,7 +586,7 @@ const EvaluationDetailTable: React.FC<EvaluationDetailTableProps> = ({ evaluatio
                                                                         <div className="flex flex-col items-center" title={formula || undefined}>
                                                                             <span className={clsx(
                                                                                 "text-2xl font-black transition-colors", 
-                                                                                total != null ? (isConversion ? palierColor : "text-white") : "text-white/10"
+                                                                                total != null ? (isConversion ? palierColor : "text-primary") : "text-white/10"
                                                                             )}>
                                                                                 <span>
                                                                                     {total ?? '—'}
@@ -610,7 +610,7 @@ const EvaluationDetailTable: React.FC<EvaluationDetailTableProps> = ({ evaluatio
                                                         const palierColor = palier?.color ? colorMap[palier.color] || '' : '';
 
                                                         return (
-                                                            <td key={q.id} className="p-2 text-center border-r border-white/5">
+                                                            <td key={q.id} className="p-2 text-center border-r border-white/10">
                                                                 {isBulkEdit ? (
                                                                     <div className="flex justify-center">
                                                                         <Input
@@ -647,13 +647,13 @@ const EvaluationDetailTable: React.FC<EvaluationDetailTableProps> = ({ evaluatio
                                                         );
                                                     })}
 
-                                                    <td className="p-2 text-center">
+                                                    <td className="p-2 text-center border-r border-white/10">
                                                         {isBulkEdit ? (
                                                             <div className="flex items-center justify-center gap-1">
                                                                 {[
                                                                     { id: 'present', icon: CheckCircle2, color: 'text-emerald-500', bg: 'bg-emerald-500/10' },
                                                                     { id: 'absent', icon: XCircle, color: 'text-danger', bg: 'bg-danger/10' },
-                                                                    { id: 'malade', icon: MinusCircle, color: 'text-amber-500', bg: 'bg-amber-500/10' },
+                                                                    { id: 'malade', icon: MinusCircle, color: 'text-primary', bg: 'bg-primary/10' },
                                                                     { id: 'non_remis', icon: Octagon, color: 'text-grey-medium', bg: 'bg-grey-medium/10' }
                                                                 ].map((s) => (
                                                                     <button

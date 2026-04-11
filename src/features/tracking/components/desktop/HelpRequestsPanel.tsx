@@ -131,10 +131,10 @@ const HelpRequestsPanel: React.FC<HelpRequestsPanelProps> = ({
                                                 req.is_suivi
                                                     ? "bg-primary text-black border border-primary"
                                                     : req.etat === 'a_verifier'
-                                                        ? "bg-[#8B5CF6] text-white border border-[#8B5CF6]"
+                                                        ? "bg-purple-accent text-white border border-purple-accent"
                                                         : req.etat === 'ajustement'
-                                                            ? "bg-[#F59E0B] text-black border border-[#F59E0B]"
-                                                            : "bg-[#A0A8AD] text-white border border-[#A0A8AD]"
+                                                            ? "bg-amber-accent text-black border border-amber-accent"
+                                                            : "bg-grey-medium text-white border border-grey-medium"
                                             )}
                                         >
                                             {req.is_suivi ? 'Suivi' : getStatusShortLabel(req.etat)}

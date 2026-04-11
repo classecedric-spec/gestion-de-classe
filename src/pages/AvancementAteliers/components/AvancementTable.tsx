@@ -42,9 +42,9 @@ export const AvancementTable: React.FC<AvancementTableProps> = ({
         const baseStyle = getStatusStyle(status);
         switch (status) {
             case 'termine': return `${baseStyle} border-success text-white`;
-            case 'besoin_d_aide': return `${baseStyle} border-[#A0A8AD] text-white`;
-            case 'ajustement': return `${baseStyle} border-[#F59E0B] text-black`;
-            case 'a_verifier': return `${baseStyle} border-[#8B5CF6] text-white`;
+            case 'besoin_d_aide': return `${baseStyle} border-grey-medium text-white`;
+            case 'ajustement': return `${baseStyle} border-amber-accent text-black`;
+            case 'a_verifier': return `${baseStyle} border-purple-accent text-white`;
             case 'a_domicile': return `${baseStyle} border-danger text-white`;
             case 'a_commencer': return "bg-white/5 border-white/10 text-grey-medium hover:bg-white/10";
             default: return "bg-transparent border-transparent text-transparent";
@@ -182,13 +182,13 @@ export const AvancementTable: React.FC<AvancementTableProps> = ({
                     <span className="text-xs font-medium text-grey-light">Terminé</span>
                 </div>
                 <div className="flex items-center gap-2">
-                    <div className="w-4 h-4 rounded bg-[#A0A8AD] flex items-center justify-center text-white">
+                    <div className="w-4 h-4 rounded bg-grey-medium flex items-center justify-center text-white">
                         <AlertCircle size={10} />
                     </div>
                     <span className="text-xs font-medium text-grey-light">Besoin d'aide</span>
                 </div>
                 <div className="flex items-center gap-2">
-                    <div className="w-4 h-4 rounded bg-[#F59E0B] flex items-center justify-center text-black">
+                    <div className="w-4 h-4 rounded bg-amber-accent flex items-center justify-center text-black">
                         <Settings2 size={10} />
                     </div>
                     <span className="text-xs font-medium text-grey-light">Ajustement</span>

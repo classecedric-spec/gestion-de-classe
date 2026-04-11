@@ -10,7 +10,13 @@ function App() {
     return (
         <QueryClientProvider client={queryClient}>
             <RealtimeSyncProvider>
-                <Toaster position="top-right" toastOptions={{ duration: 3000, style: { background: '#333', color: '#fff' } }} />
+                <Toaster
+                    position="top-right"
+                    toastOptions={{
+                        duration: 3000,
+                        style: { background: 'var(--surface)', color: 'var(--text-main)' },
+                    }}
+                />
                 <AppRoutes />
                 <SpeedInsights />
             </RealtimeSyncProvider>

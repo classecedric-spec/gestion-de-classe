@@ -52,9 +52,24 @@ const COLUMN_LABELS: Record<ColumnId, string> = {
 interface EvaluationsTableExcelProps {
     onSelectEvaluation: (evalId: string) => void;
     onEditEvaluation: (ev: any) => void;
+    branchFilter: string;
+    setBranchFilter: (v: string) => void;
+    groupFilter: string;
+    setGroupFilter: (v: string) => void;
+    periodeFilter: string;
+    setPeriodeFilter: (v: string) => void;
 }
 
-const EvaluationsTableExcel: React.FC<EvaluationsTableExcelProps> = ({ onSelectEvaluation, onEditEvaluation }) => {
+const EvaluationsTableExcel: React.FC<EvaluationsTableExcelProps> = ({ 
+    onSelectEvaluation, 
+    onEditEvaluation,
+    branchFilter,
+    setBranchFilter,
+    groupFilter,
+    setGroupFilter,
+    periodeFilter,
+    setPeriodeFilter
+}) => {
     const { evaluations, loading } = useAllEvaluations();
     const { deleteEvaluation } = useGradeMutations();
     const [evalToDelete, setEvalToDelete] = useState<string | null>(null);
@@ -171,15 +186,12 @@ const EvaluationsTableExcel: React.FC<EvaluationsTableExcelProps> = ({ onSelectE
     const [isSearchOpen, setIsSearchOpen] = useState(false);
     const searchMenuRef = useRef<HTMLDivElement>(null);
 
-    const [branchFilter, setBranchFilter] = useState<string>('all');
     const [isBranchMenuOpen, setIsBranchMenuOpen] = useState(false);
     const branchMenuRef = useRef<HTMLDivElement>(null);
 
-    const [groupFilter, setGroupFilter] = useState<string>('all');
     const [isGroupMenuOpen, setIsGroupMenuOpen] = useState(false);
     const groupMenuRef = useRef<HTMLDivElement>(null);
 
-    const [periodeFilter, setPeriodeFilter] = useState<string>('all');
     const [isPeriodeMenuOpen, setIsPeriodeMenuOpen] = useState(false);
     const periodeMenuRef = useRef<HTMLDivElement>(null);
 
@@ -233,14 +245,16 @@ const EvaluationsTableExcel: React.FC<EvaluationsTableExcelProps> = ({ onSelectE
 
     if (evaluations.length === 0) {
         return (
-            <div className="flex flex-col items-center justify-center py-20 text-center space-y-4 bg-surface rounded-3xl border border-dashed border-border/20">
-                <div className="p-6 rounded-full bg-grey-light/10 text-grey-light mb-4">
-                    <BarChart3 size={64} strokeWidth={1} />
+            <div className="flex flex-col items-center justify-center py-20 text-center space-y-6 bg-surface rounded-3xl border-2 border-dashed border-white/5 animate-in fade-in duration-500">
+                <div className="p-8 rounded-3xl bg-primary/5 text-primary/20 shadow-inner">
+                    <BarChart3 size={80} strokeWidth={1} />
                 </div>
-                <h3 className="text-xl font-black text-white uppercase tracking-tight">Aucune évaluation</h3>
-                <p className="max-w-xs text-grey-medium">
-                    Créez votre première évaluation pour la voir apparaître ici.
-                </p>
+                <div className="space-y-2">
+                    <h3 className="text-2xl font-black text-white uppercase tracking-tighter">Aucune évaluation</h3>
+                    <p className="max-w-xs text-grey-medium font-medium">
+                        Votre carnet de cotes est vide. Commencez par créer une évaluation pour vos élèves.
+                    </p>
+                </div>
             </div>
         );
     }
@@ -269,7 +283,7 @@ const EvaluationsTableExcel: React.FC<EvaluationsTableExcelProps> = ({ onSelectE
                 <div className="flex-1 overflow-auto custom-scrollbar">
                     <style>{columns.map(c => `.col-${c.id} { width: ${c.width}px; max-width: ${c.width}px; }`).join('\n')}</style>
                     <table className="w-full text-left border-collapse text-sm whitespace-nowrap table-fixed">
-                        <thead className="sticky top-0 z-10 bg-[#1e2e3a] select-none">
+                        <thead className="sticky top-0 z-10 bg-table-header select-none">
                             <tr>
                                 {columns.map((col, index) => (
                                     <th

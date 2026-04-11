@@ -454,7 +454,7 @@ export const ModulesTableExcel: React.FC<ModulesTableExcelProps> = ({ modules, o
                                                             if (e.key === 'Enter') handleStatusSubmit(module.id, editingStatusValue);
                                                             if (e.key === 'Escape') setEditingStatusId(null);
                                                         }}
-                                                        className="bg-surface-light border border-primary/50 shadow-[0_0_10px_rgba(var(--color-primary),0.2)] rounded px-2 py-1 text-xs font-semibold tracking-wider text-text-main focus:outline-none transition-all cursor-pointer"
+                                                        className="bg-surface-light border border-primary/50 shadow-[0_0_10px_color-mix(in_srgb,var(--primary)_22%,transparent)] rounded px-2 py-1 text-xs font-semibold tracking-wider text-text-main focus:outline-none transition-all cursor-pointer"
                                                     >
                                                         <option value="en_preparation">En prép.</option>
                                                         <option value="en_cours">En cours</option>
@@ -510,7 +510,7 @@ export const ModulesTableExcel: React.FC<ModulesTableExcelProps> = ({ modules, o
                                                             if (e.key === 'Enter') handleDateSubmit(module.id);
                                                             if (e.key === 'Escape') setEditingDateId(null);
                                                         }}
-                                                        className="w-full bg-surface-light border border-primary/50 shadow-[0_0_10px_rgba(var(--color-primary),0.2)] rounded px-2 py-1 text-xs font-semibold uppercase tracking-wider text-text-main focus:outline-none transition-all"
+                                                        className="w-full bg-surface-light border border-primary/50 shadow-[0_0_10px_color-mix(in_srgb,var(--primary)_22%,transparent)] rounded px-2 py-1 text-xs font-semibold uppercase tracking-wider text-text-main focus:outline-none transition-all"
                                                     />
                                                 ) : module.date_fin ? (
                                                     <span className={clsx(

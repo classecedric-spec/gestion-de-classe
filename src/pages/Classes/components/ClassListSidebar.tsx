@@ -93,7 +93,7 @@ export const ClassListSidebar: React.FC<ClassListSidebarProps> = ({
                                 avatar={{
                                     src: (classe as any).photo_base64 || classe.logo_url,
                                     initials: classe.acronyme || (classe.nom ? classe.nom[0] : '?'),
-                                    className: ((classe as any).photo_base64 || classe.logo_url) ? "bg-[#D9B981]" : "bg-background"
+                                    className: ((classe as any).photo_base64 || classe.logo_url) ? "bg-primary" : "bg-background"
                                 }}
                             />
                         );

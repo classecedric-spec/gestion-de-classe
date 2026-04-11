@@ -105,7 +105,7 @@ const MobileRequestCard: React.FC<MobileRequestCardProps> = ({
                 {/* ZONE STATUT ET DATE : Le badge de couleur */}
                 <div className="shrink-0 flex flex-col items-end justify-center gap-1.5">
                     {req.updated_at && (
-                        <span className="text-[9px] text-[#FFD700] font-bold whitespace-nowrap drop-shadow-sm">
+                        <span className="text-[9px] text-primary font-bold whitespace-nowrap drop-shadow-sm">
                             {new Intl.DateTimeFormat('fr-FR', {
                                 weekday: 'long',
                                 day: 'numeric',
@@ -120,10 +120,10 @@ const MobileRequestCard: React.FC<MobileRequestCardProps> = ({
                         req.is_suivi
                             ? "bg-primary text-black border border-primary"
                             : req.etat === 'a_verifier'
-                                ? "bg-[#8B5CF6] text-white border border-[#8B5CF6]"
+                                ? "bg-purple-accent text-white border border-purple-accent"
                                 : req.etat === 'ajustement'
-                                    ? "bg-orange-500 text-white border border-orange-500"
-                                    : "bg-[#A0A8AD] text-white border border-[#A0A8AD]"
+                                    ? "bg-amber-accent text-black border border-amber-accent"
+                                    : "bg-grey-medium text-white border border-grey-medium"
                     )}>
                         {req.is_suivi ? 'Suivi' : getStatusShortLabel(normalizeStatus(req.etat))}
                     </div>
@@ -149,7 +149,7 @@ const MobileRequestCard: React.FC<MobileRequestCardProps> = ({
                         </button>
                         <button
                             onClick={(e) => { e.stopPropagation(); onStatusUpdate(req, 'valide'); }}
-                            className="py-2.5 bg-success hover:bg-emerald-600 text-white rounded-xl shadow-lg shadow-success/20 text-[10px] font-black uppercase tracking-tighter transition-all"
+                            className="py-2.5 bg-success hover:brightness-110 text-white rounded-xl shadow-lg shadow-success/20 text-[10px] font-black uppercase tracking-tighter transition-all"
                         >
                             Validé
                         </button>

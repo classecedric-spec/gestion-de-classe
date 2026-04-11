@@ -134,7 +134,7 @@ const AddStudentToTaskModal: React.FC<AddStudentToTaskModalProps> = ({
                                             isAlreadyAssigned
                                                 ? "bg-grey-light/5 opacity-40 cursor-not-allowed border-transparent"
                                                 : isSelected
-                                                    ? "bg-primary/20 border-primary shadow-[0_0_15px_rgba(var(--color-primary-rgb),0.2)]"
+                                                    ? "bg-primary/20 border-primary shadow-[0_0_15px_color-mix(in_srgb,var(--primary)_22%,transparent)]"
                                                     : "bg-white/5 border-white/5 hover:bg-primary/10 hover:border-primary/30 active:scale-[0.98]"
                                         )}
                                     >

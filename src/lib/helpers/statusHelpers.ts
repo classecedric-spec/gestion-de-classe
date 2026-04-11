@@ -57,7 +57,7 @@ export const STATUS_CONFIG: Record<StatusKey, StatusDetail> = {
         shortLabel: 'Maison'
     },
     ajustement: {
-        color: 'bg-[#F59E0B]',
+        color: 'bg-amber-accent',
         textColor: 'text-black',
         icon: AlertCircle,
         label: '⚠️ Erreur > 1',

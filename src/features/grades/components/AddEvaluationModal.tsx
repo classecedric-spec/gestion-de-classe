@@ -423,8 +423,9 @@ const AddEvaluationModal: React.FC<AddEvaluationModalProps> = ({
                             ]}
                         />
                         {isConversion && (
-                            <p className="mt-2 text-[10px] text-amber-500 font-bold uppercase tracking-wider animate-in fade-in slide-in-from-top-1">
-                                Info: Le maximum ci-dessus servira de base pour la conversion en lettres (%)
+                            <p className="mt-3 text-[10px] text-primary font-black uppercase tracking-widest animate-in fade-in slide-in-from-top-1 flex items-center gap-1.5 px-1">
+                                <InfoIcon size={12} />
+                                Info: Le maximum ci-dessus servira de base pour la conversion (%)
                             </p>
                         )}
                     </div>
@@ -434,17 +435,17 @@ const AddEvaluationModal: React.FC<AddEvaluationModalProps> = ({
                     <div className="flex items-center mb-4">
                         <div className="flex items-center gap-2">
                             <ListChecks size={20} className="text-primary" />
-                            <span className="font-bold text-grey-dark">Détails par question</span>
+                            <span className="font-black text-text-main uppercase tracking-tight text-sm">Détails par question</span>
                         </div>
-                        <label className="flex items-center gap-2 cursor-pointer group ml-[50px]">
-                            <span className="text-[10px] font-bold text-grey-medium uppercase tracking-wider group-hover:text-primary transition-colors">
+                        <label className="flex items-center gap-3 cursor-pointer group ml-10">
+                            <span className="text-[10px] font-black text-grey-medium uppercase tracking-widest group-hover:text-primary transition-colors">
                                 Activer
                             </span>
                             <input 
                                 type="checkbox" 
                                 checked={withQuestions}
                                 onChange={(e) => setWithQuestions(e.target.checked)}
-                                className="w-4 h-4 rounded border-border text-primary focus:ring-primary"
+                                className="w-5 h-5 rounded-lg border-white/10 bg-black/20 text-primary focus:ring-primary/50 transition-all"
                             />
                         </label>
                         {withQuestions && (
@@ -465,16 +466,16 @@ const AddEvaluationModal: React.FC<AddEvaluationModalProps> = ({
                     {withQuestions && (
                         <div className="space-y-3 animate-in slide-in-from-top-2 duration-300">
                             {/* Brouillon temporaire */}
-                            <div className="mb-6 p-4 bg-amber-500/5 rounded-xl border border-dashed border-amber-500/20">
-                                <div className="flex items-center gap-2 mb-2">
-                                    <FileText size={16} className="text-amber-500" />
-                                    <span className="text-[10px] font-bold text-amber-500 uppercase tracking-widest">
+                            <div className="mb-6 p-5 bg-primary/5 rounded-2xl border border-dashed border-primary/20 shadow-inner">
+                                <div className="flex items-center gap-2 mb-3">
+                                    <FileText size={16} className="text-primary" />
+                                    <span className="text-[10px] font-black text-primary uppercase tracking-widest">
                                         Brouillon temporaire (Zone de copier-coller)
                                     </span>
                                 </div>
                                 <textarea
-                                    placeholder="Collez ici vos textes à copier-coller dans les questions. Ce contenu sera effacé à la fermeture de la fenêtre."
-                                    className="w-full h-24 bg-black/20 border border-white/5 rounded-lg p-3 text-sm text-grey-light focus:outline-none focus:border-amber-500/30 transition-all resize-none placeholder:text-grey-medium/30 focus:bg-black/40"
+                                    placeholder="Collez ici vos textes à copier-coller dans les questions..."
+                                    className="w-full h-24 bg-black/30 border border-white/5 rounded-xl p-4 text-sm text-grey-light focus:outline-none focus:border-primary/30 transition-all resize-none placeholder:text-grey-medium/20 focus:bg-black/50"
                                     value={scratchpad}
                                     onChange={(e) => setScratchpad(e.target.value)}
                                 />
@@ -608,20 +609,16 @@ const AddEvaluationModal: React.FC<AddEvaluationModalProps> = ({
                                 Ajouter une question
                             </Button>
                         {questions.length >= 2 && (
-                                <div className="mt-4 p-3 bg-primary/5 border border-primary/20 rounded-lg flex items-center gap-2 animate-in slide-in-from-bottom-2">
-                                    <div className="w-5 flex-none"></div>
-                                    <div className="w-6 flex-none"></div>
-                                    <div className="flex-1 flex justify-end">
-                                        <span className="text-sm font-medium text-grey-dark">Total maximum pondéré :</span>
+                                <div className="mt-6 p-4 bg-primary/5 border border-primary/10 rounded-2xl flex items-center justify-between animate-in slide-in-from-bottom-2">
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-8 h-8 rounded-lg bg-primary/20 flex items-center justify-center text-primary">
+                                            <Calculator size={16} />
+                                        </div>
+                                        <span className="text-[10px] font-black text-grey-medium uppercase tracking-widest">Total maximum pondéré</span>
                                     </div>
-                                    <div className="flex-none w-20 text-center">
-                                        <span className="text-lg font-bold text-primary whitespace-nowrap">
-                        {questions.reduce((acc, q) => acc + (Number(q.note_max) * Number(q.ratio) || 0), 0)} pts
-                                        </span>
+                                    <div className="text-xl font-black text-primary drop-shadow-sm">
+                                        {questions.reduce((acc, q) => acc + (Number(q.note_max) * Number(q.ratio) || 0), 0)} <span className="text-xs">pts</span>
                                     </div>
-                                    <div className="w-4"></div>
-                                    <div className="w-24"></div>
-                                    <div className="w-10"></div>
                                 </div>
                             )}
                             

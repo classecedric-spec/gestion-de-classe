@@ -74,9 +74,9 @@ const Badge: React.FC<BadgeProps> = ({
             ghost: 'bg-transparent text-amber-accent'
         },
         info: {
-            solid: 'bg-blue-500/20 text-blue-400 border-blue-500/20',
-            outline: 'bg-transparent text-blue-400 border-blue-500/50',
-            ghost: 'bg-transparent text-blue-400'
+            solid: 'bg-info/20 text-info border-info/20',
+            outline: 'bg-transparent text-info border-info/50',
+            ghost: 'bg-transparent text-info'
         },
         purple: {
             solid: 'bg-purple-accent/20 text-purple-accent border-purple-accent/20',
@@ -114,7 +114,7 @@ const Badge: React.FC<BadgeProps> = ({
                         variant === 'success' && 'bg-success',
                         variant === 'danger' && 'bg-danger',
                         variant === 'warning' && 'bg-amber-accent',
-                        variant === 'info' && 'bg-blue-400',
+                        variant === 'info' && 'bg-info',
                         variant === 'purple' && 'bg-purple-accent',
                         variant === 'default' && 'bg-grey-light'
                     )}

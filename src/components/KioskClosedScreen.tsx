@@ -31,7 +31,7 @@ const KioskClosedScreen: React.FC<KioskClosedScreenProps> = ({ timeNow }) => {
             </div>
 
             {/* Icône cadenas */}
-            <div className="w-24 h-24 bg-primary/10 rounded-[2rem] flex items-center justify-center border-2 border-primary/20 mb-8 shadow-[0_0_80px_rgba(var(--color-primary-rgb),0.15)] animate-pulse">
+            <div className="w-24 h-24 bg-primary/10 rounded-[2rem] flex items-center justify-center border-2 border-primary/20 mb-8 shadow-[0_0_80px_color-mix(in_srgb,var(--primary)_18%,transparent)] animate-pulse">
                 <Lock size={48} className="text-primary" />
             </div>
 

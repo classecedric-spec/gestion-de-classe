@@ -9,7 +9,7 @@ interface StatusSelectProps {
 const STATUS_OPTIONS = [
     { value: 'en_cours', label: 'En cours', activeClass: 'bg-success border-success text-white' },
     { value: 'archive', label: 'Archive', activeClass: 'bg-danger border-danger text-white' },
-    { value: 'en_preparation', label: 'En préparation', activeClass: 'bg-primary border-primary text-[#1e1e1e]' }
+    { value: 'en_preparation', label: 'En préparation', activeClass: 'bg-primary border-primary text-text-dark' }
 ];
 
 /**

@@ -78,12 +78,12 @@ export const ClassTableView: React.FC<TableViewProps> = ({ students, sortConfig,
                                     title="Sexe de l'élève"
                                     className={clsx(
                                         "w-full bg-transparent border-transparent focus:border-primary/50 focus:bg-black/20 rounded px-2 py-1 outline-none transition-all font-medium cursor-pointer appearance-none",
-                                        student.sex === 'M' ? "text-blue-400" : student.sex === 'F' ? "text-pink-400" : "text-grey-medium"
+                                        student.sex === 'M' ? "text-info" : student.sex === 'F' ? "text-pink-accent" : "text-grey-medium"
                                     )}
                                 >
                                     <option value="" className="bg-surface text-grey-medium">-</option>
-                                    <option value="M" className="bg-surface text-blue-400">G</option>
-                                    <option value="F" className="bg-surface text-pink-400">F</option>
+                                    <option value="M" className="bg-surface text-info">G</option>
+                                    <option value="F" className="bg-surface text-pink-accent">F</option>
                                 </select>
                             </td>
                             <td className="px-2 py-2">

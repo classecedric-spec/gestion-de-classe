@@ -138,9 +138,9 @@ export const PlannerSlot: React.FC<PlannerSlotProps & React.HTMLAttributes<HTMLD
             {...props}
             className={`
                 relative rounded-xl border transition-all flex flex-col items-start justify-start text-left p-2.5 group
-                ${isOver ? 'border-primary bg-primary/10 scale-[1.02] shadow-[0_0_15px_rgba(var(--primary),0.3)] z-10' : ''}
+                ${isOver ? 'border-primary bg-primary/10 scale-[1.02] shadow-[0_0_15px_color-mix(in_srgb,var(--primary)_35%,transparent)] z-10' : ''}
                 ${isDisabled ? 'bg-black/80 border-white/5 opacity-50 cursor-not-allowed' : (currentItem ? `${currentItem.color_code || ''} border-white/10` : 'border-border bg-surface/50 h-full min-h-0')}
-                ${items && items.length > 1 ? '!border-purple-500 !border-[3px] shadow-[0_0_10px_rgba(168,85,247,0.5)]' : ''}
+                ${items && items.length > 1 ? '!border-purple-accent !border-[3px] shadow-[0_0_10px_color-mix(in_srgb,var(--purple-accent)_45%,transparent)]' : ''}
             `}
         >
             {/* Cas d'une cellule désactivée (ex: vacances ou mercredi PM) */}

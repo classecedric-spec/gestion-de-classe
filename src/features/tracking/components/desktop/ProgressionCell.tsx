@@ -94,17 +94,17 @@ const ProgressionCell: React.FC<ProgressionCellProps> = ({
         <div className={clsx(
             "p-2.5 rounded-xl border transition-all flex flex-col gap-2.5 h-full",
             isLocked
-                ? "bg-purple-900/10 border-purple-500/30 ring-1 ring-purple-500/10"
+                ? "bg-purple-accent/10 border-purple-accent/30 ring-1 ring-purple-accent/10"
                 : "bg-white/[0.03] border-white/5"
         )}>
             {/* ZONE TITRE : Nom de l'exercice et codes de matériel (ex: [ORP] pour ordinateur) */}
             <div className="w-full min-w-0">
                 <span className={clsx(
                     "text-xs leading-tight transition-all text-left block",
-                    isLocked ? "font-bold text-[#8B5CF6]" : (isNotStarted ? "font-bold underline text-white" : "font-semibold text-gray-400 opacity-80"),
+                    isLocked ? "font-bold text-purple-accent" : (isNotStarted ? "font-bold underline text-white" : "font-semibold text-grey-medium opacity-80"),
                     currentStatus === 'termine' && "text-success opacity-100",
                     currentStatus === 'besoin_d_aide' && "text-grey-medium opacity-100",
-                    currentStatus === 'ajustement' && "text-[#F59E0B] opacity-100"
+                    currentStatus === 'ajustement' && "text-amber-accent opacity-100"
                 )}>
                     {activity.titre}
                     {activity.ActiviteMateriel && activity.ActiviteMateriel.length > 0 && (
@@ -125,7 +125,7 @@ const ProgressionCell: React.FC<ProgressionCellProps> = ({
                         "py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all border truncate px-1",
                         isLocked && "opacity-20 grayscale cursor-not-allowed",
                         currentStatus === 'besoin_d_aide'
-                            ? "bg-[#A0A8AD] text-white border-[#A0A8AD] shadow-sm"
+                            ? "bg-grey-medium text-white border-grey-medium shadow-sm"
                             : "bg-black/20 border-white/5 text-grey-medium hover:border-grey-medium/40"
                     )}
                     title="Besoin d'aide"
@@ -141,8 +141,8 @@ const ProgressionCell: React.FC<ProgressionCellProps> = ({
                         "py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all border truncate px-1",
                         isLocked && "opacity-20 grayscale cursor-not-allowed",
                         currentStatus === 'ajustement'
-                            ? "bg-[#F59E0B] text-black border-[#F59E0B] shadow-sm"
-                            : "bg-black/20 border-white/5 text-grey-medium hover:border-[#F59E0B]/40"
+                            ? "bg-amber-accent text-black border-amber-accent shadow-sm"
+                            : "bg-black/20 border-white/5 text-grey-medium hover:border-amber-accent/40"
                     )}
                     title={getStatusLabel('ajustement')}
                 >
@@ -156,10 +156,10 @@ const ProgressionCell: React.FC<ProgressionCellProps> = ({
                     className={clsx(
                         "py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all border flex items-center justify-center gap-1 shrink-0 truncate px-1",
                         isLocked
-                            ? "bg-[#8B5CF6] text-white border-[#8B5CF6] shadow-sm ring-2 ring-purple-500/50 scale-100 opacity-90 cursor-not-allowed"
+                            ? "bg-purple-accent text-white border-purple-accent shadow-sm ring-2 ring-purple-accent/50 scale-100 opacity-90 cursor-not-allowed"
                             : ((currentStatus === 'termine' || currentStatus === 'a_verifier')
                                 ? (currentStatus === 'a_verifier'
-                                    ? "bg-[#8B5CF6] text-white border-[#8B5CF6] shadow-sm"
+                                    ? "bg-purple-accent text-white border-purple-accent shadow-sm"
                                     : "bg-success text-white border-success shadow-sm")
                                 : "bg-black/20 border-white/5 text-grey-medium hover:border-success/40")
                     )}

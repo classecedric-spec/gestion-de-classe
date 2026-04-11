@@ -64,7 +64,7 @@ export const AdultColumnWrapper: React.FC<AdultColumnWrapperProps> = ({
             <div className="p-4 border-b border-white/5 shrink-0">
                 <button
                     onClick={onOpenRandomPicker}
-                    className="w-full py-4 bg-purple-600 hover:bg-purple-700 text-white rounded-xl font-black text-xs uppercase tracking-widest hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-2 shadow-lg shadow-purple-500/20"
+                    className="w-full py-4 bg-purple-accent hover:brightness-90 text-white rounded-xl font-black text-xs uppercase tracking-widest hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-2 shadow-lg shadow-purple-accent/20"
                 >
                     <Zap size={18} />
                     <span>La Main Innocente</span>

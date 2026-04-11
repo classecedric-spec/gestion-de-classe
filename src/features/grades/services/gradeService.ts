@@ -227,11 +227,11 @@ export class GradeService {
     }
 
     getGradeColor(note: number | null, noteMax: number): string {
-        if (note === null) return 'text-gray-400';
+        if (note === null) return 'text-grey-medium';
         const percentage = (note / noteMax) * 100;
-        if (percentage >= 80) return 'text-green-600';
-        if (percentage >= 50) return 'text-blue-600';
-        return 'text-red-600';
+        if (percentage >= 80) return 'text-success';
+        if (percentage >= 50) return 'text-info';
+        return 'text-danger';
     }
 
     formatStatut(statut: string): string {

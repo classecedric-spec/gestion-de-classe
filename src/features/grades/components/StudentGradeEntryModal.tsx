@@ -366,7 +366,7 @@ const StudentGradeEntryModal: React.FC<StudentGradeEntryModalProps> = ({
                         {/* Status Selection */}
                         <div className="space-y-4">
                             <div className="flex items-center gap-3">
-                                <div className="p-2 rounded-lg bg-amber-500/10 text-amber-500">
+                                <div className="p-2 rounded-lg bg-primary/10 text-primary">
                                     <AlertCircle size={20} />
                                 </div>
                                 <h4 className="font-black text-white uppercase text-sm tracking-widest">Statut</h4>

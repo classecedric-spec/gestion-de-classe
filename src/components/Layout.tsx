@@ -75,7 +75,7 @@ const Layout: React.FC = () => {
                 <button
                     onClick={() => setIsOpen(true)}
                     className={clsx(
-                        "fixed z-[100] h-[46px] w-[46px] rounded-xl shadow-xl flex items-center justify-center transition-all active:scale-95 bg-[#D9B981] text-black hover:bg-[#cdaf76]",
+                        "fixed z-[100] h-[46px] w-[46px] rounded-xl shadow-xl flex items-center justify-center transition-all active:scale-95 bg-primary text-black hover:bg-primary-hover",
                         isFullPage ? "top-[11px] left-4" : "top-[33px] left-6"
                     )}
                     title="Afficher le menu"

@@ -55,8 +55,8 @@ const ValidationDebugModal: React.FC<ValidationDebugModalProps> = ({
     const getActionLabel = () => {
         switch (action) {
             case 'valide': return { label: 'Validation', color: 'text-success', bg: 'bg-success/20' };
-            case 'non_valide': return { label: 'Besoin d\'aide', color: 'text-purple-400', bg: 'bg-purple-500/20' };
-            case 'status_quo': return { label: 'Status Quo', color: 'text-orange-400', bg: 'bg-orange-500/20' };
+            case 'non_valide': return { label: 'Besoin d\'aide', color: 'text-purple-accent', bg: 'bg-purple-accent/20' };
+            case 'status_quo': return { label: 'Status Quo', color: 'text-amber-accent', bg: 'bg-amber-accent/20' };
             default: return { label: action, color: 'text-white', bg: 'bg-white/10' };
         }
     };
@@ -106,7 +106,7 @@ const ValidationDebugModal: React.FC<ValidationDebugModalProps> = ({
 
                         <div className="flex justify-between items-center text-sm">
                             <span className="text-grey-medium">Ajustement algorithmique</span>
-                            <div className={`font-mono font-bold flex items-center gap-1 ${adjustment > 0 ? 'text-red-400' : adjustment < 0 ? 'text-success' : 'text-grey-medium'}`}>
+                            <div className={`font-mono font-bold flex items-center gap-1 ${adjustment > 0 ? 'text-danger' : adjustment < 0 ? 'text-success' : 'text-grey-medium'}`}>
                                 {adjustment > 0 ? <TrendingUp size={14} /> : adjustment < 0 ? <TrendingDown size={14} /> : <Minus size={14} />}
                                 {adjustment > 0 ? '+' : ''}{adjustment}%
                             </div>
@@ -116,7 +116,7 @@ const ValidationDebugModal: React.FC<ValidationDebugModalProps> = ({
 
                         <div className="flex justify-between items-center">
                             <span className="font-bold text-white">Nouvelle Probabilité</span>
-                            <span className={`font-mono text-xl font-bold ${adjustment > 0 ? 'text-orange-400' : 'text-success'}`}>
+                            <span className={`font-mono text-xl font-bold ${adjustment > 0 ? 'text-danger' : 'text-success'}`}>
                                 {finalScore.toFixed(0)}%
                             </span>
                         </div>

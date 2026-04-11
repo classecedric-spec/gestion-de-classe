@@ -83,7 +83,7 @@ const ImageUpload: React.FC<ImageUploadProps> = ({
                 className={clsx(
                     "w-20 h-20 rounded-2xl border-2 border-dashed flex items-center justify-center relative group overflow-hidden shadow-inner transition-all",
                     isDragging ? "border-primary bg-primary/20 scale-105" : "bg-white/5 border-white/20",
-                    value && "bg-[#D9B981]"
+                    value && "bg-primary"
                 )}
                 onDragOver={handleDragOver}
                 onDragLeave={handleDragLeave}

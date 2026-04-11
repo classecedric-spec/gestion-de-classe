@@ -26,7 +26,7 @@ export const ClassGridView: React.FC<GridViewProps> = ({ students, onEditStudent
                     avatar={{
                         src: student.photo_base64,
                         initials: (student.prenom || '?')[0] + (student.nom || '?')[0],
-                        className: student.photo_base64 ? "bg-[#D9B981]" : "bg-input"
+                        className: student.photo_base64 ? "bg-primary" : "bg-input"
                     }}
                 />
             ))}

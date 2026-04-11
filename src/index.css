@@ -7,6 +7,8 @@
     --primary: #D9B981;
     --background: #0a0a0a;
     --surface: #1e1e1e;
+    --surface-light: #2a2a2a;
+    --surface-dark: #161616;
     --text-main: #ffffff;
     --text-dark: #000000;
     --success: #007B66;
@@ -30,6 +32,20 @@
     /* Purple accent color */
     --amber-accent: #F59E0B;
     /* Amber/orange accent */
+    --primary-hover: #cdaf76;
+    /* Interactive gold (between primary and primary-dark) */
+    --table-header: #1e2e3a;
+    /* Spreadsheet / dense table header */
+    --table-row-group: #1a2632;
+    /* Grouped row band in tables */
+    --popover-surface: #0f172a;
+    /* Floating panels, dropdowns (contrasts with app background) */
+    --panel-elevated: #1d2125;
+    /* Nested panels, mobile drawers */
+    --info: #3b82f6;
+    /* Secondary semantic (links, info badges) */
+    --pink-accent: #f472b6;
+    /* e.g. genre F, decorative */
 
     --font-sans: "Inter", "system-ui", "Avenir", "Helvetica", "Arial", sans-serif;
   }
@@ -40,6 +56,8 @@
     --background: #F4EFE6;
     /* Warmer, more saturated cream background (less aggressive than white) */
     --surface: #FFFFFF;
+    --surface-light: #f7f5f0;
+    --surface-dark: #ebe6de;
     --text-main: #3A352F;
     /* Warm charcoal text */
     --text-dark: #1A1814;
@@ -51,6 +69,17 @@
     --input: #FFFFFF;
     --border: #E2DAD1;
     /* Warmer, distinct border */
+    --modal-bg: #fffcf7;
+    --card-bg: #ebe6de;
+    --primary-hover: #9a7238;
+    --table-header: #dcd6cc;
+    --table-row-group: #ebe6de;
+    --popover-surface: #ffffff;
+    --panel-elevated: #f0ebe3;
+    --purple-accent: #7c3aed;
+    --amber-accent: #d97706;
+    --info: #2563eb;
+    --pink-accent: #db2777;
   }
 
   [data-theme="default"] {
@@ -60,6 +89,8 @@
     /* Neumo 2 Blue-Grey */
     --surface: #254154;
     /* Same as BG (Flat look, defined by borders) */
+    --surface-light: #2f4554;
+    --surface-dark: #19303d;
     --text-main: #F2F2F2;
     --text-dark: #00131E;
     --success: #10b981;
@@ -71,6 +102,12 @@
     --input: #19303D;
     --border: rgba(217, 185, 129, 0.2);
     /* Goldish border */
+    --primary-hover: #cdaf76;
+    --table-header: #1e2e3a;
+    --table-row-group: #1a2632;
+    --popover-surface: #0f172a;
+    --panel-elevated: #1d2125;
+    --info: #60a5fa;
   }
 
   /* NEUMORPHISME - Refined style (was neumo-2) */
@@ -79,6 +116,8 @@
     --background: #254154;
     /* Slightly lighter background to let shadows breathe */
     --surface: #254154;
+    --surface-light: #2f4554;
+    --surface-dark: #19303d;
     --text-main: #F2F2F2;
     --text-dark: #00131E;
     --success: #10b981;
@@ -95,6 +134,12 @@
     --neu-shadow-dark: rgba(0, 0, 0, 0.4);
     /* Stronger depth shadow */
     --neu-blur: 16px;
+    --primary-hover: #cdaf76;
+    --table-header: #1e2e3a;
+    --table-row-group: #1a2632;
+    --popover-surface: #0f172a;
+    --panel-elevated: #1d2125;
+    --info: #60a5fa;
   }
 
   /* VISION OS STYLE - Immersive Glass & Vibrancy */
@@ -104,10 +149,23 @@
     --background: #0f172a;
     /* Deep night background */
     --surface: rgba(255, 255, 255, 0.12);
+    --surface-light: rgba(255, 255, 255, 0.16);
+    --surface-dark: rgba(0, 0, 0, 0.35);
     --text-main: #ffffff;
     --text-dark: #000000;
     --input: rgba(0, 0, 0, 0.2);
     --border: rgba(255, 255, 255, 0.15);
+    --modal-bg: rgba(15, 23, 42, 0.85);
+    --card-bg: rgba(255, 255, 255, 0.08);
+    --primary-hover: rgba(255, 255, 255, 0.88);
+    --table-header: #1e293b;
+    --table-row-group: #0f172a;
+    --popover-surface: #020617;
+    --panel-elevated: rgba(15, 23, 42, 0.92);
+    --purple-accent: #a78bfa;
+    --amber-accent: #fbbf24;
+    --info: #93c5fd;
+    --pink-accent: #f9a8d4;
   }
 
 
@@ -119,6 +177,8 @@
   --color-primary-light: var(--primary-light);
   --color-background: var(--background);
   --color-surface: var(--surface);
+  --color-surface-light: var(--surface-light);
+  --color-surface-dark: var(--surface-dark);
   --color-input: var(--input);
   --color-text-main: var(--text-main);
   --color-text-dark: var(--text-dark);
@@ -132,6 +192,13 @@
   --color-card-bg: var(--card-bg);
   --color-purple-accent: var(--purple-accent);
   --color-amber-accent: var(--amber-accent);
+  --color-primary-hover: var(--primary-hover);
+  --color-table-header: var(--table-header);
+  --color-table-row-group: var(--table-row-group);
+  --color-popover-surface: var(--popover-surface);
+  --color-panel-elevated: var(--panel-elevated);
+  --color-info: var(--info);
+  --color-pink-accent: var(--pink-accent);
 
   --font-sans: "Inter", "system-ui", "Avenir", "Helvetica", "Arial", sans-serif;
 }

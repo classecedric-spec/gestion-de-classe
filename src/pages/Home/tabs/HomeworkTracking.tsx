@@ -60,7 +60,7 @@ export default function HomeworkTracking() {
         const totalActivities = student.modules.reduce((acc: number, mod: any) => acc + mod.activities.length, 0);
 
         return (
-            <div key={student.id} className={`bg-background/50 border ${isExpanded ? 'border-primary' : 'border-white/5'} ${isRandom ? 'shadow-[0_0_15px_rgba(var(--color-primary-rgb),0.1)]' : ''} rounded-xl overflow-hidden transition-all mb-2`}>
+            <div key={student.id} className={`bg-background/50 border ${isExpanded ? 'border-primary' : 'border-white/5'} ${isRandom ? 'shadow-[0_0_15px_color-mix(in_srgb,var(--primary)_12%,transparent)]' : ''} rounded-xl overflow-hidden transition-all mb-2`}>
                 <div
                     onClick={() => toggleStudent(student.id)}
                     className="flex items-center justify-between p-3 cursor-pointer hover:bg-white/5"

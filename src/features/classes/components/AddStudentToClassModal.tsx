@@ -247,7 +247,7 @@ export const AddStudentToClassModal: React.FC<AddStudentToClassModalProps> = ({
                                             initials={`${(student.prenom || '')[0]}${(student.nom || '')[0]}`}
                                             className={clsx(
                                                 "shrink-0",
-                                                isSelected ? "bg-background" : student.photo_url ? "bg-[#D9B981]" : "bg-white/10"
+                                                isSelected ? "bg-background" : student.photo_url ? "bg-primary" : "bg-white/10"
                                             )}
                                         />
                                         <div className="flex-1 min-w-0">

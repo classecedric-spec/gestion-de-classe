@@ -65,9 +65,9 @@ export const getStatusColorClasses = (status: string | null | undefined): string
         case 'termine':
             return 'bg-success text-white border-success';
         case 'besoin_d_aide':
-            return 'bg-[#A0A8AD] text-white border-[#A0A8AD]';
+            return 'bg-grey-medium text-white border-grey-medium';
         case 'ajustement':
-            return 'bg-[#F59E0B] text-black border-[#F59E0B]';
+            return 'bg-amber-accent text-black border-amber-accent';
         case 'en_cours':
             return 'bg-primary/20 text-primary border-primary';
         case 'a_domicile':
