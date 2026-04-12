@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 
 interface DailyLogContext {
+    user: any;
     selectedGroup: any;
     setSelectedGroup: (group: any) => void;
     groups: any[];
@@ -28,7 +29,7 @@ interface DailyLogContext {
 }
 
 const DailyLog: React.FC = () => {
-    const { selectedGroup, setSelectedGroup, groups, students } = useOutletContext<DailyLogContext>();
+    const { user, selectedGroup, setSelectedGroup, groups, students } = useOutletContext<DailyLogContext>();
     const [selectedDate, setSelectedDate] = useState(format(new Date(), 'yyyy-MM-dd'));
     const [view, setView] = useState<'table' | 'pills'>('table');
     const [searchQuery, setSearchQuery] = useState('');
@@ -61,6 +62,7 @@ const DailyLog: React.FC = () => {
                         Module:module_id (id, nom)
                     )
                 `)
+                .eq('user_id', user.id)
                 .in('eleve_id', studentIds)
                 .in('etat', ['termine', 'a_verifier'])
                 .gte('updated_at', start)

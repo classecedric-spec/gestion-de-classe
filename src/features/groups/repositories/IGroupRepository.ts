@@ -23,9 +23,9 @@ import { Tables, TablesInsert, TablesUpdate } from '../../../types/supabase';
 export interface IGroupRepository {
     /** 
      * LISTER TOUS LES GROUPES : 
-     * Récupère la liste intégrale des groupes de l'enseignant actuel.
+     * Récupère la liste intégrale des groupes d'un enseignant spécifique.
      */
-    getGroups(): Promise<Tables<'Groupe'>[]>;
+    getGroups(userId: string): Promise<Tables<'Groupe'>[]>;
 
     /** 
      * FILTRER PAR UTILISATEUR : 
@@ -37,31 +37,31 @@ export interface IGroupRepository {
      * TROUVER UN GROUPE : 
      * Recherche une fiche groupe précise par son code ID unique.
      */
-    getGroup(id: string): Promise<Tables<'Groupe'> | null>;
+    getGroup(id: string, userId: string): Promise<Tables<'Groupe'> | null>;
 
     /** 
      * CRÉER UN GROUPE : 
      * Enregistre un nouveau groupe et retourne la fiche créée avec son identifiant définitif.
      */
-    createGroup(group: TablesInsert<'Groupe'>): Promise<Tables<'Groupe'>>;
+    createGroup(group: TablesInsert<'Groupe'>, userId: string): Promise<Tables<'Groupe'>>;
 
     /** 
      * METTRE À JOUR : 
      * Modifie les informations d'un groupe (nom, couleur, etc.) sans changer son identifiant.
      */
-    updateGroup(id: string, updates: TablesUpdate<'Groupe'>): Promise<Tables<'Groupe'>>;
+    updateGroup(id: string, updates: TablesUpdate<'Groupe'>, userId: string): Promise<Tables<'Groupe'>>;
 
     /** 
      * SUPPRIMER : 
      * Efface définitivement un groupe du système.
      */
-    deleteGroup(id: string): Promise<void>;
+    deleteGroup(id: string, userId: string): Promise<void>;
 
     /** 
      * RÉORDONNER : 
      * Mémorise la nouvelle position d'un groupe dans une liste triée (Drag & Drop).
      */
-    updateOrder(id: string, order: number): Promise<void>;
+    updateOrder(id: string, order: number, userId: string): Promise<void>;
 }
 
 /**

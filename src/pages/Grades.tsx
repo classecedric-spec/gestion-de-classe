@@ -16,6 +16,8 @@ import GradesByStudentTable from '../features/grades/components/GradesByStudentT
 import GradeSettings from '../features/grades/components/GradeSettings';
 import { gradeService } from '../features/grades/services';
 import { TablesInsert } from '../types/supabase';
+import { getCurrentUser } from '../lib/database';
+import { useQuery } from '@tanstack/react-query';
 
 const Grades: React.FC = () => {
     // UI State
@@ -31,6 +33,13 @@ const Grades: React.FC = () => {
     const [branchFilter, setBranchFilter] = useState<string>('all');
     const [groupFilter, setGroupFilter] = useState<string>('all');
     const [periodeFilter, setPeriodeFilter] = useState<string>('all');
+
+    // User State
+    const { data: user } = useQuery({
+        queryKey: ['user'],
+        queryFn: getCurrentUser,
+        staleTime: Infinity,
+    });
 
     // Data Fetching
     const { evaluations } = useAllEvaluations();
@@ -69,9 +78,10 @@ const Grades: React.FC = () => {
     };
 
     const handleEditClick = async (evaluation: any) => {
+        if (!user) return;
         setEditingEvaluationData(evaluation);
-        const fetchedQuestions = await gradeService.getQuestions(evaluation.id);
-        const fetchedRegroupements = await gradeService.getRegroupements(evaluation.id);
+        const fetchedQuestions = await gradeService.getQuestions(evaluation.id, user.id);
+        const fetchedRegroupements = await gradeService.getRegroupements(evaluation.id, user.id);
         setEditingQuestions(fetchedQuestions);
         setEditingRegroupements(fetchedRegroupements);
         setIsAddModalOpen(true);

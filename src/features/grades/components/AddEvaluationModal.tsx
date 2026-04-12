@@ -10,16 +10,16 @@
  * Ce que ça affiche : Une boîte de dialogue flottante contenant des champs de texte, des menus déroulants (pour choisir la date, la branche, etc.) et une section optionnelle pour détailler les points par question.
  */
 
-import React, { useState, useEffect } from 'react';
-import { Modal, Input, Button } from '../../../core';
-import { Trash2, Plus, Settings2, ListChecks, FileText, ArrowRightLeft, GripVertical, Check, X } from 'lucide-react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { Modal, Input, Button, Select } from '../../../core';
+import { Trash2, Plus, Settings2, ListChecks, FileText, ClipboardList, ArrowRightLeft, GripVertical, Check, X, Info as InfoIcon, Calculator } from 'lucide-react';
 import { useAuth } from '../../../hooks/useAuth';
 import { useNoteTypes } from '../hooks/useGrades';
 import { useBranches } from '../../branches/hooks/useBranches';
 import { useGroupsData } from '../../groups/hooks/useGroupsData';
-import Select from '../../../core/Select';
 import { usePeriods } from '../hooks/usePeriods';
-import { clsx } from 'clsx';
+import clsx from 'clsx';
+import { toast } from 'sonner';
 
 // Définit les éléments extérieurs dont cette fenêtre a besoin pour s'ouvrir et fonctionner correctement de l'extérieur.
 interface AddEvaluationModalProps {
@@ -48,7 +48,7 @@ const AddEvaluationModal: React.FC<AddEvaluationModalProps> = ({
 }) => {
     // Collecte les informations de connexion de l'utilisateur et les réglages de l'application (barèmes, branches, groupes, périodes).
     const { session } = useAuth();
-    const { data: noteTypes = [] } = useNoteTypes();
+    const { data: noteTypes = [] } = useNoteTypes(session?.user?.id);
     const { branches } = useBranches();
     const { periodOptions, loading: loadingPeriods } = usePeriods();
     const { groups } = useGroupsData();
@@ -80,6 +80,22 @@ const AddEvaluationModal: React.FC<AddEvaluationModalProps> = ({
     const [associations, setAssociations] = useState<any[]>([
         { id: `temp_${Math.random().toString(36).substr(2, 9)}`, label: '', slots: [null, null, null, null], isSuggested: false }
     ]);
+    const [attemptedSubmit, setAttemptedSubmit] = useState(false);
+
+    // Fonction pour déterminer si un champ doit afficher une erreur visuelle.
+    // Elle ne s'active que si l'utilisateur a déjà cliqué une fois sur "Envoyer" (attemptedSubmit).
+    const isInvalid = useCallback((value: any) => {
+        if (!attemptedSubmit) return false;
+        
+        // Pour du texte, on vérifie s'il est vide.
+        if (typeof value === 'string') return value.trim() === '';
+        
+        // Pour des nombres (Note Max, etc.) on vérifie s'ils sont valides et positifs.
+        if (typeof value === 'number') return isNaN(value) || value <= 0;
+        
+        // Pour tout le reste, une valeur "fausy" est considérée invalide.
+        return !value;
+    }, [attemptedSubmit]);
 
     // Utilise une référence pour savoir si on vient d'ouvrir la fenêtre ou si l'ID du contrôle a changé.
     // Cela évite d'effacer ce que le prof est en train de taper si le parent (Grades.tsx) se rafraîchit.
@@ -137,6 +153,7 @@ const AddEvaluationModal: React.FC<AddEvaluationModalProps> = ({
                 }
 
                 setScratchpad('');
+                setAttemptedSubmit(false);
                 lastInitializedIdRef.current = currentId;
             }
         } else {
@@ -159,63 +176,116 @@ const AddEvaluationModal: React.FC<AddEvaluationModalProps> = ({
     }, [loadingPeriods, periodOptions, localPeriode, initialData, periode]);
 
     // Fonction utilitaire pour recalculer le total des points (Note Max) à partir de la liste des questions
-    const updateNoteMax = (currentQuestions: any[]) => {
+    const updateNoteMax = useCallback((currentQuestions: any[]) => {
         const total = currentQuestions.reduce((acc, q) => acc + (Number(q.note_max) * Number(q.ratio) || 0), 0);
         setNoteMax(total);
-    };
+    }, []);
 
     // Prépare une action pour ajouter une ligne de question supplémentaire si l'enseignant veut détailler son contrôle.
-    const handleAddQuestion = () => {
-        const newQuestions = [...questions, { titre: '', note_max: 5, ratio: 1, ordre: questions.length }];
-        setQuestions(newQuestions);
-        updateNoteMax(newQuestions);
-    };
+    const handleAddQuestion = useCallback(() => {
+        setQuestions(prev => {
+            const newQuestions = [...prev, { titre: '', note_max: 5, ratio: 1, ordre: prev.length }];
+            updateNoteMax(newQuestions);
+            return newQuestions;
+        });
+    }, [updateNoteMax]);
 
     // Prépare une action pour effacer une ligne de question si l'enseignant s'est trompé.
-    const handleRemoveQuestion = (index: number) => {
-        const newQuestions = questions.filter((_, i) => i !== index);
-        setQuestions(newQuestions);
-        updateNoteMax(newQuestions);
-    };
+    const handleRemoveQuestion = useCallback((index: number) => {
+        setQuestions(prev => {
+            const newQuestions = prev.filter((_, i) => i !== index);
+            updateNoteMax(newQuestions);
+            return newQuestions;
+        });
+    }, [updateNoteMax]);
 
     // Prépare une action pour mettre à jour les informations (texte ou points) à chaque fois que l'enseignant tape au clavier dans une case de question.
-    const handleQuestionChange = (index: number, field: string, value: any) => {
-        const newQuestions = [...questions];
-        (newQuestions[index] as any)[field] = value;
-        
-        // Calcule automatiquement et additionne le total des points dès qu'on modifie la valeur d'une question.
-        if (field === 'note_max' || field === 'ratio') {
-            updateNoteMax(newQuestions);
-        }
-        
-        // Sauvegarde la liste mise à jour.
-        setQuestions(newQuestions);
-    };
+    const handleQuestionChange = useCallback((index: number, field: string, value: any) => {
+        setQuestions(prev => {
+            const newQuestions = [...prev];
+            (newQuestions[index] as any)[field] = value;
+            
+            // Calcule automatiquement et additionne le total des points dès qu'on modifie la valeur d'une question.
+            if (field === 'note_max' || field === 'ratio') {
+                updateNoteMax(newQuestions);
+            }
+            return newQuestions;
+        });
+    }, [updateNoteMax]);
 
-    const handleAddAssociation = () => {
-        setAssociations([
-            ...associations,
+    const handleAddAssociation = useCallback(() => {
+        setAssociations(prev => [
+            ...prev,
             { id: `temp_${Math.random().toString(36).substr(2, 9)}`, label: '', slots: [null, null, null, null], isSuggested: false }
         ]);
-    };
+    }, []);
 
-    const handleRemoveAssociation = (id: string) => {
-        if (associations.length > 1) {
-            setAssociations(associations.filter(a => a.id !== id));
-        } else {
-            // Just clear the first one instead of deleting if it's the last one
-            setAssociations([{ id: `temp_${Math.random().toString(36).substr(2, 9)}`, label: '', slots: [null, null, null, null], isSuggested: false }]);
+    const handleRemoveAssociation = useCallback((id: string) => {
+        setAssociations(prev => {
+            if (prev.length > 1) {
+                return prev.filter(a => a.id !== id);
+            }
+            return [{ id: `temp_${Math.random().toString(36).substr(2, 9)}`, label: '', slots: [null, null, null, null], isSuggested: false }];
+        });
+    }, []);
+
+    const handleImportCriteria = useCallback(() => {
+        if (!scratchpad.trim()) {
+            toast.error("Le brouillon est vide.");
+            return;
         }
-    };
 
+        // Split by newlines or tabs, trim and filter empty
+        const lines = scratchpad.split(/[\n\t]/).map(line => line.trim()).filter(line => line !== '');
+        
+        if (lines.length === 0) {
+            toast.error("Aucun critère valide trouvé dans le brouillon.");
+            return;
+        }
+
+        setQuestions(prev => {
+            // On vérifie si la seule question actuelle est vide (état par défaut)
+            // Si oui, on la remplace. Sinon, on ajoute à la suite.
+            const isDefault = prev.length === 1 && prev[0].titre === '' && prev[0].note_max === 5;
+            const existingQuestions = isDefault ? [] : [...prev];
+            
+            const newQuestionsList = lines.map((name, i) => ({
+                titre: name,
+                note_max: 5,
+                ratio: 1,
+                ordre: existingQuestions.length + i
+            }));
+
+            const updated = [...existingQuestions, ...newQuestionsList];
+            updateNoteMax(updated);
+            return updated;
+        });
+
+        toast.success(`${lines.length} critères importés avec succès.`);
+        // setScratchpad(''); // On garde le texte au cas où l'utilisateur veut corriger ? Non, l'image montre un bouton "Traiter". 
+    }, [scratchpad, updateNoteMax]);
+
+    const handleClearScratchpad = () => {
+        setScratchpad('');
+    };
     // Prépare l'action finale de validation lorsque l'enseignant clique sur "Créer l'évaluation".
     const handleFormSubmit = (e: React.FormEvent) => {
         // Empêche la page web de se recharger brusquement comme elle le ferait par défaut avec un formulaire.
         e.preventDefault();
+        setAttemptedSubmit(true);
         
         // Vérifie qu'on sait bien qui est connecté et pour quelle classe/branche l'évaluation est faite avant de continuer.
         const userId = session?.user?.id;
-        if (!userId || !effectiveBrancheId || !effectiveGroupId || !effectivePeriode) return;
+
+        // Validation simple des champs obligatoires
+        const isHeaderValid = titre.trim() !== '' && date !== '' && !isNaN(noteMax);
+        const isContextValid = effectiveBrancheId !== '' && effectiveGroupId !== '' && effectivePeriode !== '';
+        const areQuestionsValid = !withQuestions || questions.every(q => q.titre.trim() !== '' && !isNaN(q.note_max));
+
+        if (!userId || !isHeaderValid || !isContextValid || !areQuestionsValid) {
+            toast.error("Veuillez remplir tous les champs obligatoires marqués en rouge.");
+            return;
+        }
 
         // Regroupe proprement toutes les informations tapées dans un colis final.
         const evaluationData = {
@@ -251,6 +321,7 @@ const AddEvaluationModal: React.FC<AddEvaluationModalProps> = ({
         setAssociations([
             { id: `temp_${Math.random().toString(36).substr(2, 9)}`, label: '', slots: [null, null, null, null], isSuggested: false }
         ]);
+        setAttemptedSubmit(false);
         onClose();
     };
 
@@ -306,14 +377,14 @@ const AddEvaluationModal: React.FC<AddEvaluationModalProps> = ({
         setAssociations(newAssocs);
     };
 
-    const calculateAssociationTotal = (slots: (number | null)[]) => {
+    const calculateAssociationTotal = useCallback((slots: (number | null)[]) => {
         return slots.reduce((acc: number, qIdx: number | null) => {
             if (qIdx === null) return acc;
             const q = questions[qIdx - 1];
             if (!q) return acc;
             return acc + (Number(q.note_max) * Number(q.ratio) || 0);
         }, 0);
-    };
+    }, [questions]);
 
     // Prépare une action pour adapter automatiquement la "Note Max" si l'enseignant choisit un barème de notation pré-existant (ex: sur 20, ou acquis/non acquis).
     const handleTypeNoteChange = (id: string) => {
@@ -328,10 +399,29 @@ const AddEvaluationModal: React.FC<AddEvaluationModalProps> = ({
     };
     
     // Obscerve si le barème actuellement choisi par l'enseignant est un système de conversion spécifique (ex: lettres) pour afficher des instructions.
-    const activeNoteType = noteTypes.find(nt => nt.id === typeNoteId);
-    const isConversion = activeNoteType?.systeme === 'conversion';
+    const activeNoteType = useMemo(() => noteTypes.find(nt => nt.id === typeNoteId), [noteTypes, typeNoteId]);
+    const isConversion = useMemo(() => activeNoteType?.systeme === 'conversion', [activeNoteType]);
 
-    // Construit visuellement toute la boîte de dialogue étape par étape en y plaçant les boutons et champs de texte préparés.
+    // Memoize options for Select components
+    const branchOptions = useMemo(() => [
+        { value: '', label: 'Sélectionner...' },
+        ...branches.map(b => ({ value: b.id, label: b.nom }))
+    ], [branches]);
+
+    const groupOptions = useMemo(() => [
+        { value: '', label: 'Sélectionner...' },
+        ...groups.map(g => ({ value: g.id, label: g.nom }))
+    ], [groups]);
+
+    const periodOptionsMemo = useMemo(() => [
+        { value: '', label: 'Sélectionner...' },
+        ...periodOptions
+    ], [periodOptions]);
+
+    const noteTypeOptions = useMemo(() => [
+        { value: '', label: 'Standard' },
+        ...noteTypes.map(nt => ({ value: nt.id, label: nt.nom }))
+    ], [noteTypes]);
     return (
         <Modal
             isOpen={isOpen}
@@ -355,31 +445,22 @@ const AddEvaluationModal: React.FC<AddEvaluationModalProps> = ({
                             label="Branche"
                             value={localBrancheId}
                             onChange={(e) => setLocalBrancheId(e.target.value)}
-                            options={[
-                                { value: '', label: 'Sélectionner...' },
-                                ...branches.map(b => ({ value: b.id, label: b.nom }))
-                            ]}
+                            options={branchOptions}
+                            error={isInvalid(localBrancheId) ? 'Requis' : undefined}
                         />
                         <Select
                             label="Groupe"
                             value={localGroupId}
                             onChange={(e) => setLocalGroupId(e.target.value)}
-                            options={[
-                                { value: '', label: 'Sélectionner...' },
-                                ...groups.map(g => ({ value: g.id, label: g.nom }))
-                            ]}
+                            options={groupOptions}
+                            error={isInvalid(localGroupId) ? 'Requis' : undefined}
                         />
                         <Select
                             label="Période"
                             value={localPeriode}
                             onChange={(e) => setLocalPeriode(e.target.value)}
-                            options={
-                                loadingPeriods
-                                    ? [{ value: '', label: 'Chargement...' }]
-                                    : periodOptions.length > 0
-                                        ? periodOptions
-                                        : [{ value: 'Trimestre 1', label: 'Trimestre 1' }]
-                            }
+                            options={periodOptionsMemo}
+                            error={isInvalid(localPeriode) ? 'Requis' : undefined}
                         />
                     </div>
                 )}
@@ -391,6 +472,7 @@ const AddEvaluationModal: React.FC<AddEvaluationModalProps> = ({
                             value={titre}
                             onChange={(e) => setTitre(e.target.value)}
                             required
+                            error={isInvalid(titre) ? 'Un titre est requis' : undefined}
                         />
                     </div>
                     <Input
@@ -399,6 +481,7 @@ const AddEvaluationModal: React.FC<AddEvaluationModalProps> = ({
                         value={date}
                         onChange={(e) => setDate(e.target.value)}
                         required
+                        error={isInvalid(date) ? 'Sélectionnez une date' : undefined}
                     />
                     <div className="grid grid-cols-1 gap-3">
                         <Input
@@ -409,6 +492,7 @@ const AddEvaluationModal: React.FC<AddEvaluationModalProps> = ({
                             onChange={(e) => setNoteMax(parseFloat(e.target.value))}
                             disabled={withQuestions}
                             required
+                            error={isInvalid(noteMax) ? 'Note max requise' : undefined}
                         />
                     </div>
                     <div className="md:col-span-2">
@@ -417,10 +501,7 @@ const AddEvaluationModal: React.FC<AddEvaluationModalProps> = ({
                             value={typeNoteId}
                             onChange={(e) => handleTypeNoteChange(e.target.value)}
                             icon={Settings2}
-                            options={[
-                                { value: '', label: 'Points personnalisés' },
-                                ...noteTypes.map(nt => ({ value: nt.id, label: nt.nom }))
-                            ]}
+                            options={noteTypeOptions}
                         />
                         {isConversion && (
                             <p className="mt-3 text-[10px] text-primary font-black uppercase tracking-widest animate-in fade-in slide-in-from-top-1 flex items-center gap-1.5 px-1">
@@ -466,19 +547,49 @@ const AddEvaluationModal: React.FC<AddEvaluationModalProps> = ({
                     {withQuestions && (
                         <div className="space-y-3 animate-in slide-in-from-top-2 duration-300">
                             {/* Brouillon temporaire */}
-                            <div className="mb-6 p-5 bg-primary/5 rounded-2xl border border-dashed border-primary/20 shadow-inner">
-                                <div className="flex items-center gap-2 mb-3">
-                                    <FileText size={16} className="text-primary" />
-                                    <span className="text-[10px] font-black text-primary uppercase tracking-widest">
-                                        Brouillon temporaire (Zone de copier-coller)
-                                    </span>
+                            <div className="mb-6 p-5 bg-primary/5 rounded-2xl border border-dashed border-primary/20 shadow-inner group/scratch">
+                                <div className="flex items-center justify-between mb-3">
+                                    <div className="flex items-center gap-2">
+                                        <FileText size={16} className="text-primary" />
+                                        <span className="text-[10px] font-black text-primary uppercase tracking-widest">
+                                            Brouillon temporaire (Zone de copier-coller)
+                                        </span>
+                                    </div>
+                                    <div className="flex items-center gap-2 opacity-0 group-hover/scratch:opacity-100 transition-opacity">
+                                        <Button 
+                                            type="button"
+                                            size="sm" 
+                                            variant="ghost" 
+                                            onClick={handleClearScratchpad}
+                                            className="h-7 px-2 text-[9px] font-black uppercase tracking-tighter text-grey-medium hover:text-red-400"
+                                        >
+                                            <Trash2 size={12} className="mr-1" />
+                                            Vider
+                                        </Button>
+                                        <Button 
+                                            type="button"
+                                            size="sm" 
+                                            variant="primary" 
+                                            onClick={handleImportCriteria}
+                                            className="h-7 px-3 text-[9px] font-black uppercase tracking-tighter"
+                                        >
+                                            <ClipboardList size={12} className="mr-1" />
+                                            Traiter et Importer
+                                        </Button>
+                                    </div>
                                 </div>
                                 <textarea
-                                    placeholder="Collez ici vos textes à copier-coller dans les questions..."
+                                    placeholder="Collez ici votre liste de critères (issue d'Excel ou texte)..."
                                     className="w-full h-24 bg-black/30 border border-white/5 rounded-xl p-4 text-sm text-grey-light focus:outline-none focus:border-primary/30 transition-all resize-none placeholder:text-grey-medium/20 focus:bg-black/50"
                                     value={scratchpad}
                                     onChange={(e) => setScratchpad(e.target.value)}
                                 />
+                                <div className="mt-2 flex items-center gap-1.5 px-1">
+                                    <InfoIcon size={10} className="text-primary/40" />
+                                    <span className="text-[9px] text-grey-medium font-bold uppercase tracking-wider italic">
+                                        Séparez vos titres par des retours à la ligne ou des tabulations
+                                    </span>
+                                </div>
                             </div>
 
                             {questions.length > 0 && (
@@ -533,7 +644,10 @@ const AddEvaluationModal: React.FC<AddEvaluationModalProps> = ({
                                         </div>
                                         
                                         {/* Styled Question Input */}
-                                        <div className="flex-1 bg-input/40 rounded-xl px-4 py-2 border border-white/5 focus-within:border-primary/50 transition-all">
+                                        <div className={clsx(
+                                            "flex-1 bg-input/40 rounded-xl px-4 py-2 border border-white/5 focus-within:border-primary/50 transition-all",
+                                            isInvalid(q.titre) && "bg-danger/20 border-danger/50"
+                                        )}>
 
                                             <input
                                                 type="text"
@@ -552,6 +666,7 @@ const AddEvaluationModal: React.FC<AddEvaluationModalProps> = ({
                                                 value={q.note_max}
                                                 onChange={(e) => handleQuestionChange(index, 'note_max', parseFloat(e.target.value))}
                                                 required
+                                                error={isInvalid(q.note_max) ? 'Err' : undefined}
                                             />
                                         </div>
                                         
@@ -567,6 +682,7 @@ const AddEvaluationModal: React.FC<AddEvaluationModalProps> = ({
                                                     step="0.1"
                                                     min="0"
                                                     required
+                                                    error={isInvalid(q.ratio) ? 'Err' : undefined}
                                                 />
                                             ) : (
                                                 <Input
@@ -581,6 +697,7 @@ const AddEvaluationModal: React.FC<AddEvaluationModalProps> = ({
                                                     step="0.5"
                                                     min="0"
                                                     required
+                                                    error={isInvalid(q.ratio) ? 'Err' : undefined}
                                                 />
                                             )}
                                         </div>

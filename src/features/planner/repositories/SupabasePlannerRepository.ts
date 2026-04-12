@@ -21,14 +21,24 @@ import { TablesInsert } from '../../../types/supabase';
  * Implémentation concrète du répertoire pour Supabase.
  */
 export class SupabasePlannerRepository implements IPlannerRepository {
+    private validateUserId(userId: string): boolean {
+        if (!userId || userId === 'undefined' || userId === 'null') {
+            console.warn('[SupabasePlannerRepository] Attempted query with invalid userId');
+            return false;
+        }
+        return true;
+    }
+
     /**
      * LECTURE : Va chercher tous les créneaux d'une semaine précise.
      */
-    async getPlanningForWeek(weekStartDate: string): Promise<WeeklyPlanningItem[]> {
+    async getPlanningForWeek(weekStartDate: string, userId: string): Promise<WeeklyPlanningItem[]> {
+        if (!this.validateUserId(userId)) return [];
         const { data } = await supabase
             .from('weekly_planning')
             .select('*')
-            .eq('week_start_date', weekStartDate);
+            .eq('week_start_date', weekStartDate)
+            .eq('user_id', userId);
         
         // On renvoie la liste trouvée, ou un tableau vide s'il n'y a rien
         return (data as WeeklyPlanningItem[]) || [];

@@ -30,47 +30,47 @@ export class GroupService {
     constructor(private repository: IGroupRepository) { }
 
     /**
-     * Récupère la liste intégrale de tous les groupes d'élèves (souvent triés par ordre alphabétique).
+     * Récupère la liste intégrale de tous les groupes d'élèves d'un enseignant.
      */
-    getGroups = async (): Promise<Tables<'Groupe'>[]> => {
-        return await this.repository.getGroups();
+    getGroups = async (userId: string): Promise<Tables<'Groupe'>[]> => {
+        return await this.repository.getGroups(userId);
     }
 
     /**
      * Recherche la fiche détaillée d'un seul groupe grâce à son identifiant unique.
      */
-    getGroup = async (id: string): Promise<Tables<'Groupe'> | null> => {
-        return await this.repository.getGroup(id);
+    getGroup = async (id: string, userId: string): Promise<Tables<'Groupe'> | null> => {
+        return await this.repository.getGroup(id, userId);
     }
 
     /**
      * Enregistre officiellement un tout nouveau groupe (ex: "Soutien Lecture").
      */
-    createGroup = async (group: TablesInsert<'Groupe'>): Promise<Tables<'Groupe'>> => {
+    createGroup = async (group: TablesInsert<'Groupe'>, userId: string): Promise<Tables<'Groupe'>> => {
         // On demande au dépôt de créer la ligne correspondante en base de données.
-        return await this.repository.createGroup(group);
+        return await this.repository.createGroup(group, userId);
     }
 
     /**
      * Met à jour les informations d'un groupe existant (ex: changer son nom ou sa couleur).
      */
-    updateGroup = async (id: string, updates: TablesUpdate<'Groupe'>): Promise<Tables<'Groupe'>> => {
-        return await this.repository.updateGroup(id, updates);
+    updateGroup = async (id: string, updates: TablesUpdate<'Groupe'>, userId: string): Promise<Tables<'Groupe'>> => {
+        return await this.repository.updateGroup(id, updates, userId);
     }
 
     /**
      * Supprime définitivement un groupe. Attention : les liens avec les élèves seront également coupés.
      */
-    deleteGroup = async (id: string): Promise<void> => {
-        return await this.repository.deleteGroup(id);
+    deleteGroup = async (id: string, userId: string): Promise<void> => {
+        return await this.repository.deleteGroup(id, userId);
     }
 
     /**
      * Change la position numérique d'un groupe dans une liste ordonnée.
      * Utile pour réorganiser l'affichage manuellement par l'enseignant.
      */
-    updateGroupOrder = async (id: string, order: number): Promise<void> => {
-        return await this.repository.updateOrder(id, order);
+    updateGroupOrder = async (id: string, order: number, userId: string): Promise<void> => {
+        return await this.repository.updateOrder(id, order, userId);
     }
 }
 

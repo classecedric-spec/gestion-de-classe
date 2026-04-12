@@ -21,8 +21,6 @@ import { GraduationCap, LayoutList, Plus, FileText, QrCode, Table, Settings, Che
 import { useNavigate } from 'react-router-dom';
 import { Avatar, Badge, CardInfo, CardTabs, EmptyState, ListItem, ActionItem, Button } from '../../../core';
 import PdfProgress from '../../../core/PdfProgress';
-import { Tables } from '../../../types/supabase';
-import { StudentWithClass } from '../hooks/useGroupStudents';
 import {
     DndContext,
     closestCenter,
@@ -48,14 +46,20 @@ import clsx from 'clsx';
  * Ce petit composant transforme n'importe quel texte en champ de saisie par un double-clic.
  * Idéal pour modifier une note ou une information sans ouvrir de formulaire complexe.
  */
-const InlineEditCell: React.FC<{
+/**
+ * MODIFICATION MAGIQUE (InlineEditCell) : 
+ * Ce petit composant transforme n'importe quel texte en champ de saisie par un double-clic.
+ * Idéal pour modifier une note ou une information sans ouvrir de formulaire complexe.
+ * MÉMOÏSÉ : Pour éviter de recharger des centaines de cellules si les données n'ont pas bougé.
+ */
+const InlineEditCell = React.memo<{
     value: any;
     type?: 'text' | 'number' | 'date';
     placeholder?: string;
     onSave: (value: any) => void;
     className?: string;
     fallbackValue?: any;
-}> = ({ value, type = 'text', placeholder = '-', onSave, className, fallbackValue }) => {
+}>(({ value, type = 'text', placeholder = '-', onSave, className, fallbackValue }) => {
     const [isEditing, setIsEditing] = useState(false);
     const [tempValue, setTempValue] = useState(value || '');
 
@@ -116,7 +120,8 @@ const InlineEditCell: React.FC<{
             {isFallback && <span className="ml-1 text-[8px] uppercase tracking-tighter">(défaut)</span>}
         </div>
     );
-};
+});
+InlineEditCell.displayName = 'InlineEditCell';
 
 /**
  * PERSONNALISATION DU TABLEAU (SortableHeader) : 
@@ -152,7 +157,135 @@ const SortableHeader: React.FC<{ id: string; label: string; className?: string }
             </div>
         </th>
     );
-};
+};/**
+ * LIGNE D'ÉLÈVE (StudentTableRow) : 
+ * Composant mémoïsé pour éviter de recalculer toute la ligne si une seule note change 
+ * ou si le parent subit un rendu à cause du layout.
+ */
+const StudentTableRow = React.memo<{
+    student: any;
+    studentProfile: any;
+    visibleColumns: string[];
+    branches: { id: string; nom: string }[];
+    onUpdateStudentField: (studentId: string, field: string, value: unknown) => void;
+    onEditStudent: (student: any) => void;
+    allPossibleColumns: { id: string; label: string; alwaysVisible: boolean }[];
+}>(({ student, studentProfile, visibleColumns, branches, onUpdateStudentField, onEditStudent, allPossibleColumns }) => {
+    return (
+        <tr className="hover:bg-white/5 transition-colors group/row">
+            <td className="px-6 py-3 sticky left-0 z-10 bg-background/50 group-hover/row:bg-surface/30">
+                <Avatar
+                    size="xs"
+                    src={student.photo_url}
+                    initials={`${student.prenom[0]}${student.nom[0]}`}
+                    className={student.photo_url ? "bg-primary" : "bg-surface-dark"}
+                />
+            </td>
+            <td className="px-6 py-3 sticky left-12 z-10 bg-background/50 group-hover/row:bg-surface/30">
+                <InlineEditCell
+                    value={student.prenom}
+                    onSave={(val) => onUpdateStudentField(student.id, 'prenom', val)}
+                    className="font-bold text-text-main"
+                />
+            </td>
+            <td className="px-6 py-3 sticky left-32 z-10 bg-background/50 group-hover/row:bg-surface/30">
+                <InlineEditCell
+                    value={student.nom}
+                    onSave={(val) => onUpdateStudentField(student.id, 'nom', val)}
+                    className="font-bold text-text-main"
+                />
+            </td>
+
+            {/* DONNÉES ÉDITABLES À LA VOLÉE */}
+            {visibleColumns.map(columnId => {
+                if (columnId === 'date_naissance') {
+                    return (
+                        <td key={columnId} className="px-6 py-3 text-grey-medium">
+                            <InlineEditCell
+                                value={student.date_naissance}
+                                onSave={(val) => onUpdateStudentField(student.id, 'date_naissance', val)}
+                                placeholder="JJ/MM/AAAA"
+                            />
+                        </td>
+                    );
+                }
+                if (columnId === 'classe') return <td key={columnId} className="px-6 py-3 text-grey-dark italic text-xs">{student.Classe?.nom || '-'}</td>;
+                
+                // SUIVI PAR MATIÈRE
+                if (columnId.startsWith('branch_')) {
+                    const branchId = columnId.replace('branch_', '');
+                    return (
+                        <td key={columnId} className="px-6 py-3 text-center">
+                            <InlineEditCell
+                                type="number"
+                                value={studentProfile[branchId]}
+                                fallbackValue={student.importance_suivi || 50}
+                                onSave={(val) => onUpdateStudentField(student.id, columnId, parseInt(val))}
+                                className="text-center font-black !w-16"
+                            />
+                        </td>
+                    );
+                }
+
+                // MOYENNE AUTOMATIQUE
+                if (columnId === 'indice_moyen') {
+                    let sum = 0, count = 0;
+                    branches.forEach(b => {
+                        const val = studentProfile[b.id] || student.importance_suivi || 50;
+                        sum += parseInt(val, 10);
+                        count++;
+                    });
+                    const average = count > 0 ? Math.round(sum / count) : '-';
+                    return (
+                        <td key={columnId} className="px-6 py-3 text-center">
+                            <div className="font-black text-primary px-2 py-1 bg-primary/10 rounded">{average}%</div>
+                        </td>
+                    );
+                }
+
+                // CHAMPS DIVERS (Email, Telephone, etc.)
+                return (
+                    <td key={columnId} className="px-6 py-3 text-grey-medium text-xs">
+                        <InlineEditCell
+                            value={(student as any)[columnId]}
+                            onSave={(val) => onUpdateStudentField(student.id, columnId, val)}
+                            placeholder="-"
+                        />
+                    </td>
+                );
+            })}
+
+            <td className="px-6 py-3 text-right">
+                <Button variant="ghost" size="sm" className="opacity-0 group-hover/row:opacity-100" onClick={() => onEditStudent(student)}>Détails</Button>
+            </td>
+        </tr>
+    );
+});
+StudentTableRow.displayName = 'StudentTableRow';
+
+export interface GroupsDetailViewProps {
+    selectedGroup: { id: string; nom: string; acronyme?: string | null; photo_url?: string | null };
+    studentsInGroup: any[];
+    loadingStudents: boolean;
+    activeTab: string;
+    setActiveTab: (id: string) => void;
+    headerHeight: number | string;
+    headerRef: React.Ref<HTMLDivElement>;
+    onAddStudents: () => void;
+    onEditStudent: (student: any) => void;
+    onRemoveStudent: (student: any) => void;
+    isGeneratingPDF: boolean;
+    progressText: string;
+    pdfProgress: number;
+    onGeneratePDF: () => void;
+    onShowQRModal: (tab?: 'encodage' | 'planification' | 'both') => void;
+    visibleColumns: string[];
+    onToggleColumn: (columnId: string) => void;
+    onReorderColumns: (columns: string[]) => void;
+    onUpdateStudentField: (studentId: string, field: string, value: unknown) => void;
+    eleveProfilCompetences: Record<string, unknown>;
+    branches: { id: string; nom: string }[];
+}
 
 /**
  * Vue principale affichant le contenu détaillé d'un groupe.
@@ -399,99 +532,18 @@ export const GroupsDetailView: React.FC<GroupsDetailViewProps> = ({
                                         </SortableContext>
                                     </thead>
                                     <tbody className="divide-y divide-white/5">
-                                        {studentsInGroup.map(student => {
-                                            const studentProfile = eleveProfilCompetences[student.id] || {};
-
-                                            return (
-                                                <tr key={student.id} className="hover:bg-white/5 transition-colors group/row">
-                                                    <td className="px-6 py-3 sticky left-0 z-10 bg-background/50 group-hover/row:bg-surface/30">
-                                                        <Avatar
-                                                            size="xs"
-                                                            src={student.photo_url}
-                                                            initials={`${student.prenom[0]}${student.nom[0]}`}
-                                                            className={student.photo_url ? "bg-primary" : "bg-surface-dark"}
-                                                        />
-                                                    </td>
-                                                    <td className="px-6 py-3 sticky left-12 z-10 bg-background/50 group-hover/row:bg-surface/30">
-                                                        <InlineEditCell
-                                                            value={student.prenom}
-                                                            onSave={(val) => onUpdateStudentField(student.id, 'prenom', val)}
-                                                            className="font-bold text-text-main"
-                                                        />
-                                                    </td>
-                                                    <td className="px-6 py-3 sticky left-32 z-10 bg-background/50 group-hover/row:bg-surface/30">
-                                                        <InlineEditCell
-                                                            value={student.nom}
-                                                            onSave={(val) => onUpdateStudentField(student.id, 'nom', val)}
-                                                            className="font-bold text-text-main"
-                                                        />
-                                                    </td>
-
-                                                    {/* DONNÉES ÉDITABLES À LA VOLÉE */}
-                                                    {visibleColumns.map(columnId => {
-                                                        if (columnId === 'date_naissance') {
-                                                            return (
-                                                                <td key={columnId} className="px-6 py-3 text-grey-medium">
-                                                                    <InlineEditCell
-                                                                        value={student.date_naissance}
-                                                                        onSave={(val) => onUpdateStudentField(student.id, 'date_naissance', val)}
-                                                                        placeholder="JJ/MM/AAAA"
-                                                                    />
-                                                                </td>
-                                                            );
-                                                        }
-                                                        if (columnId === 'classe') return <td key={columnId} className="px-6 py-3 text-grey-dark italic text-xs">{student.Classe?.nom || '-'}</td>;
-                                                        
-                                                        // SUIVI PAR MATIÈRE
-                                                        if (columnId.startsWith('branch_')) {
-                                                            const branchId = columnId.replace('branch_', '');
-                                                            return (
-                                                                <td key={columnId} className="px-6 py-3 text-center">
-                                                                    <InlineEditCell
-                                                                        type="number"
-                                                                        value={studentProfile[branchId]}
-                                                                        fallbackValue={student.importance_suivi || 50}
-                                                                        onSave={(val) => onUpdateStudentField(student.id, columnId, parseInt(val))}
-                                                                        className="text-center font-black !w-16"
-                                                                    />
-                                                                </td>
-                                                            );
-                                                        }
-
-                                                        // MOYENNE AUTOMATIQUE
-                                                        if (columnId === 'indice_moyen') {
-                                                            let sum = 0, count = 0;
-                                                            branches.forEach(b => {
-                                                                const val = studentProfile[b.id] || student.importance_suivi || 50;
-                                                                sum += parseInt(val, 10);
-                                                                count++;
-                                                            });
-                                                            const average = count > 0 ? Math.round(sum / count) : '-';
-                                                            return (
-                                                                <td key={columnId} className="px-6 py-3 text-center">
-                                                                    <div className="font-black text-primary px-2 py-1 bg-primary/10 rounded">{average}%</div>
-                                                                </td>
-                                                            );
-                                                        }
-
-                                                        // CHAMPS DIVERS (Email, Telephone, etc.)
-                                                        return (
-                                                            <td key={columnId} className="px-6 py-3 text-grey-medium text-xs">
-                                                                <InlineEditCell
-                                                                    value={(student as any)[columnId]}
-                                                                    onSave={(val) => onUpdateStudentField(student.id, columnId, val)}
-                                                                    placeholder="-"
-                                                                />
-                                                            </td>
-                                                        );
-                                                    })}
-
-                                                    <td className="px-6 py-3 text-right">
-                                                        <Button variant="ghost" size="sm" className="opacity-0 group-hover/row:opacity-100" onClick={() => onEditStudent(student)}>Détails</Button>
-                                                    </td>
-                                                </tr>
-                                            );
-                                        })}
+                                        {studentsInGroup.map(student => (
+                                            <StudentTableRow
+                                                key={student.id}
+                                                student={student}
+                                                studentProfile={eleveProfilCompetences[student.id] || {}}
+                                                visibleColumns={visibleColumns}
+                                                branches={branches}
+                                                onUpdateStudentField={onUpdateStudentField}
+                                                onEditStudent={onEditStudent}
+                                                allPossibleColumns={allPossibleColumns}
+                                            />
+                                        ))}
                                     </tbody>
                                 </table>
                             </DndContext>

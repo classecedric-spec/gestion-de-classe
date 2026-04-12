@@ -93,7 +93,7 @@ export const useClasses = () => {
         queryKey: ['classes', user?.id],
         queryFn: async () => {
             if (!user) return [];
-            return await classService.getClasses();
+            return await classService.getClasses(user.id);
         },
         enabled: !!user,
         staleTime: 1000 * 60 * 5, // Cache valide 5 minutes
@@ -116,7 +116,7 @@ export const useClasses = () => {
         queryKey: ['students-in-class', user?.id, selectedClass?.id],
         queryFn: async () => {
             if (!selectedClass || !user) return [];
-            const data = await classService.getStudentsByClass(selectedClass.id);
+            const data = await classService.getStudentsByClass(selectedClass.id, user.id);
 
             // Optimisation : on charge les photos depuis le cache local du navigateur si possible
             if (isCacheEnabled() && data) {

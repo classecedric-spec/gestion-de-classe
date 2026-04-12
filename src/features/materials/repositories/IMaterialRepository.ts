@@ -26,7 +26,7 @@ export interface IMaterialRepository {
     /**
      * Récupère la liste complète du matériel, classée par nom.
      */
-    getAll(): Promise<TypeMateriel[]>;
+    getAll(userId: string): Promise<TypeMateriel[]>;
 
     /**
      * Trouve toutes les activités pédagogiques qui ont besoin d'un matériel précis.

@@ -23,16 +23,25 @@ import { ILevelRepository } from './ILevelRepository';
  * Implémente le contrat `ILevelRepository` en utilisant les outils de Supabase.
  */
 export class SupabaseLevelRepository implements ILevelRepository {
+    private validateUserId(userId: string): boolean {
+        if (!userId || userId === 'undefined' || userId === 'null') {
+            console.warn('[SupabaseLevelRepository] Attempted query with invalid userId');
+            return false;
+        }
+        return true;
+    }
     
     /**
      * LECTURE DES NIVEAUX :
      * Récupère la liste triée et demande à l'ordinateur de compter simultanément 
      * combien d'élèves sont inscrits dans chaque niveau.
      */
-    async getLevels(): Promise<LevelWithStudentCount[]> {
+    async getLevels(userId: string): Promise<LevelWithStudentCount[]> {
+        if (!this.validateUserId(userId)) return [];
         const { data, error } = await supabase
             .from('Niveau')
             .select('*, Eleve(count)')
+            .eq('user_id', userId)
             .order('ordre', { ascending: true });
 
         if (error) throw error;
@@ -43,11 +52,13 @@ export class SupabaseLevelRepository implements ILevelRepository {
      * LECTURE DES ÉLÈVES :
      * Filtre l'annuaire de l'école pour ne garder que les enfants d'un niveau précis.
      */
-    async getStudentsByLevel(levelId: string): Promise<Tables<'Eleve'>[]> {
+    async getStudentsByLevel(levelId: string, userId: string): Promise<Tables<'Eleve'>[]> {
+        if (!this.validateUserId(userId)) return [];
         const { data, error } = await supabase
             .from('Eleve')
             .select('*')
             .eq('niveau_id', levelId)
+            .eq('titulaire_id', userId)
             .order('nom', { ascending: true });
 
         if (error) throw error;
@@ -59,10 +70,11 @@ export class SupabaseLevelRepository implements ILevelRepository {
      * Insère une nouvelle ligne dans la table 'Niveau'. 
      * Récupère immédiatement l'objet créé pour confirmer le succès.
      */
-    async createLevel(level: TablesInsert<'Niveau'>): Promise<LevelWithStudentCount> {
+    async createLevel(level: TablesInsert<'Niveau'>, userId: string): Promise<LevelWithStudentCount> {
+        if (!this.validateUserId(userId)) throw new Error("userId required");
         const { data, error } = await supabase
             .from('Niveau')
-            .insert([level])
+            .insert([{ ...level, user_id: userId }])
             .select('*, Eleve(count)')
             .single();
 
@@ -74,11 +86,12 @@ export class SupabaseLevelRepository implements ILevelRepository {
      * MISE À JOUR :
      * Modifie les champs d'un niveau existant identifié par son ID.
      */
-    async updateLevel(id: string, updates: TablesUpdate<'Niveau'>): Promise<LevelWithStudentCount> {
+    async updateLevel(id: string, updates: TablesUpdate<'Niveau'>, userId: string): Promise<LevelWithStudentCount> {
         const { data, error } = await supabase
             .from('Niveau')
             .update(updates)
             .eq('id', id)
+            .eq('user_id', userId)
             .select('*, Eleve(count)')
             .single();
 
@@ -90,11 +103,12 @@ export class SupabaseLevelRepository implements ILevelRepository {
      * SUPPRESSION :
      * Efface définitivement le niveau du système.
      */
-    async deleteLevel(id: string): Promise<void> {
+    async deleteLevel(id: string, userId: string): Promise<void> {
         const { error } = await supabase
             .from('Niveau')
             .delete()
-            .eq('id', id);
+            .eq('id', id)
+            .eq('user_id', userId);
         if (error) throw error;
     }
 
@@ -103,10 +117,13 @@ export class SupabaseLevelRepository implements ILevelRepository {
      * Utilise la fonction "Upsert" (Mettre à jour si existe, sinon créer) pour 
      * enregistrer le nouvel ordre de tous les niveaux d'un coup.
      */
-    async updateOrders(updates: TablesUpdate<'Niveau'>[]): Promise<void> {
+    async updateOrders(updates: TablesUpdate<'Niveau'>[], userId: string): Promise<void> {
+        // Pour garantir la sécurité, on s'assure que chaque mise à jour appartient à l'utilisateur
+        const secureUpdates = updates.map(update => ({ ...update, user_id: userId }));
+        
         const { error } = await supabase
             .from('Niveau')
-            .upsert(updates as TablesInsert<'Niveau'>[], { onConflict: 'id' });
+            .upsert(secureUpdates as TablesInsert<'Niveau'>[], { onConflict: 'id' });
         if (error) throw error;
     }
 
@@ -115,10 +132,12 @@ export class SupabaseLevelRepository implements ILevelRepository {
      * Trouve la position la plus élevée (ex: 5) pour savoir que le prochain niveau 
      * devra porter le numéro 6.
      */
-    async getMaxOrder(): Promise<number> {
+    async getMaxOrder(userId: string): Promise<number> {
+        if (!this.validateUserId(userId)) return 0;
         const { data } = await supabase
             .from('Niveau')
             .select('ordre')
+            .eq('user_id', userId)
             .order('ordre', { ascending: false })
             .limit(1);
 

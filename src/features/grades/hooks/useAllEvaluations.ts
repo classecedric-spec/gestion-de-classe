@@ -12,42 +12,62 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { gradeService } from '../services';
-import { supabase } from '../../../lib/database';
+import { supabase, getCurrentUser } from '../../../lib/database';
 
 /**
  * Ce "Hook" est indépendant du contexte de classe actuel. Il va tout chercher volontairement pour construire la vue d'ensemble (Excel-like).
  */
 export const useAllEvaluations = () => {
     // Délégué (useQuery) qui récupère les données et les garde en mémoire vive pendant 2 minutes (staleTime). Si le prof change d'onglet, le programme ne re-télécharge pas tout inutilement.
+    const { data: user } = useQuery({
+        queryKey: ['user'],
+        queryFn: getCurrentUser,
+        staleTime: Infinity,
+    });
+
     const {
         data: evaluations = [],
         isLoading: loading,
         refetch
     } = useQuery({
-        queryKey: ['all_evaluations_detailed'],
+        queryKey: ['all_evaluations_detailed', user?.id],
         queryFn: async () => {
-            const evs = await gradeService.getAllEvaluationsDetailed();
+            if (!user) return [];
+            const evs = await gradeService.getAllEvaluationsDetailed(user.id);
             
             if (!evs || evs.length === 0) return [];
             const evIds = evs.map((e: any) => e.id);
 
-            // Fetch only necessary data for the current evaluations to avoid 1000-row limit
-            const { data: allQuestions } = await supabase
-                .from('EvaluationQuestion')
-                .select('*')
-                .in('evaluation_id', evIds);
+            // Fetch data in chunks to avoid URL length limits with the .in() filter
+            const fetchInChunks = async (table: string, idField: string, ids: string[], selectString: string = '*') => {
+                const CHUNK_SIZE = 20; // Réduit à 20 pour éviter les erreurs 400 "Bad Request" (limite de longueur d'URL)
+                let results: any[] = [];
+                for (let i = 0; i < ids.length; i += CHUNK_SIZE) {
+                    const chunk = ids.slice(i, i + CHUNK_SIZE);
+                    let query = supabase.from(table).select(selectString).in(idField, chunk);
+                    // Filter by user_id only for tables that actually have it.
+                    // EvaluationQuestion and ResultatQuestion are linked via evaluation_id (already in 'chunk').
+                    if (['Resultat'].includes(table)) {
+                        query = query.eq('user_id', user.id);
+                    }
+                    const { data, error } = await query.limit(5000); // Respect limit per chunk
+                    if (error) throw error;
+                    if (data) results = [...results, ...data];
+                }
+                return { data: results };
+            };
 
-            const { data: allResults } = await supabase
-                .from('Resultat')
-                .select('*')
-                .in('evaluation_id', evIds)
-                .limit(5000);
-
-            const { data: allQuestionResults } = await supabase
-                .from('ResultatQuestion')
-                .select('*, EvaluationQuestion!inner(evaluation_id)')
-                .in('EvaluationQuestion.evaluation_id', evIds)
-                .limit(10000);
+            const { data: allQuestions } = await fetchInChunks('EvaluationQuestion', 'evaluation_id', evIds);
+            const { data: allResults } = await fetchInChunks('Resultat', 'evaluation_id', evIds);
+            
+            // Get all unique question IDs to fetch their results directly without complex joins in the filter
+            const questionIds = Array.from(new Set(allQuestions?.map((q: any) => q.id) || []));
+            const { data: allQuestionResults } = await fetchInChunks(
+                'ResultatQuestion', 
+                'question_id', 
+                questionIds, 
+                '*, EvaluationQuestion(evaluation_id)'
+            );
                 
             return evs.map((ev: any) => {
                 const evQs = allQuestions?.filter((q: any) => q.evaluation_id === ev.id) || [];
@@ -93,6 +113,7 @@ export const useAllEvaluations = () => {
                 };
             });
         },
+        enabled: !!user,
         staleTime: 1000 * 60 * 2, // 2 minutes
     });
 

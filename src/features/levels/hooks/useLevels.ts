@@ -17,6 +17,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { levelService } from '../services/levelService';
+import { supabase } from '../../../lib/database';
 import { LevelWithStudentCount } from '../../../types';
 import { toast } from 'sonner';
 import { Tables, TablesInsert, TablesUpdate } from '../../../types/supabase';
@@ -38,7 +39,10 @@ export const useLevels = () => {
     const fetchLevels = useCallback(async () => {
         setLoading(true);
         try {
-            const data = await levelService.fetchLevels();
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) return;
+
+            const data = await levelService.fetchLevels(user.id);
             setLevels(data);
 
             setSelectedLevel(current => {
@@ -67,7 +71,10 @@ export const useLevels = () => {
             const loadStudents = async () => {
                 setLoadingStudents(true);
                 try {
-                    const data = await levelService.fetchStudents(selectedLevel.id);
+                    const { data: { user } } = await supabase.auth.getUser();
+                    if (!user) return;
+
+                    const data = await levelService.fetchStudents(selectedLevel.id, user.id);
                     setStudents(data);
                 } catch (error) {
                     console.error("Error fetching students:", error);
@@ -97,7 +104,9 @@ export const useLevels = () => {
      */
     const createLevel = async (levelData: TablesInsert<'Niveau'>): Promise<boolean> => {
         try {
-            const newLevel = await levelService.createLevel(levelData);
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) throw new Error("Utilisateur non authentifié.");
+            const newLevel = await levelService.createLevel(levelData, user.id);
             setLevels(prev => [...prev, newLevel]);
             setSelectedLevel(newLevel);
             toast.success("Niveau créé avec succès");
@@ -120,7 +129,9 @@ export const useLevels = () => {
         }
 
         try {
-            const updated = await levelService.updateLevel(id, levelData);
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) throw new Error("Utilisateur non authentifié.");
+            const updated = await levelService.updateLevel(id, levelData, user.id);
             setLevels(prev => prev.map(l => l.id === id ? updated : l));
             if (selectedLevel && selectedLevel.id === id) {
                 setSelectedLevel(updated);
@@ -149,7 +160,9 @@ export const useLevels = () => {
         }
 
         try {
-            await levelService.deleteLevel(id);
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) throw new Error("Utilisateur non authentifié.");
+            await levelService.deleteLevel(id, user.id);
             toast.success("Niveau supprimé");
             return true;
         } catch (error) {
@@ -168,13 +181,17 @@ export const useLevels = () => {
     const reorderLevels = async (newLevels: LevelWithStudentCount[]) => {
         setLevels(newLevels);
         try {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) throw new Error("Utilisateur non authentifié.");
+
             const updates = newLevels.map((item, index) => ({
                 id: item.id,
                 nom: item.nom,
-                user_id: item.user_id,
+                user_id: user.id, // On s'assure que le user_id est le bon
                 ordre: index + 1
             }));
-            await levelService.updateOrder(updates);
+            
+            await levelService.updateOrder(updates, user.id);
         } catch (error) {
             console.error("Error reordering levels:", error);
             toast.error("Erreur lors de la réorganisation");

@@ -29,7 +29,7 @@ export const CardInfo = forwardRef<HTMLDivElement, CardInfoProps>(({
     return (
         <div
             className={clsx(
-                "card-flat transition-all duration-300 ease-in-out overflow-hidden container-card", // Removed shrink-0
+                "card-flat transition-all duration-300 ease-in-out overflow-visible container-card", // Removed shrink-0
                 className,
                 // Ensure we are a flex container if flex-1 or flex-col is passed
                 (className?.includes('flex-1') || className?.includes('flex-col')) && "flex flex-col"

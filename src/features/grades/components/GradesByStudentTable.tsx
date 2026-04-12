@@ -7,16 +7,185 @@ import { Avatar, CardInfo } from '../../../core';
 import { useAllEvaluations } from '../hooks/useAllEvaluations';
 import { useGroupsData } from '../../groups/hooks/useGroupsData';
 import { useNoteTypes } from '../hooks/useGrades';
-import { supabase } from '../../../lib/database';
+import { supabase, getCurrentUser } from '../../../lib/database';
 import clsx from 'clsx';
+
+const GradeCell = React.memo(({ 
+    studentId, 
+    evaluation, 
+    col,
+    resultsDataIndexed,
+    getScoreStyle
+}: { 
+    studentId: string, 
+    evaluation: any, 
+    col: any,
+    resultsDataIndexed: any,
+    getScoreStyle: (score: number | null, max: number, typeNoteId?: string | null) => { colorClass: string, letter: string | null }
+}) => {
+    const score = useMemo(() => {
+        if (!resultsDataIndexed) return null;
+        
+        if (col.questions.length === 1 && !col.id.includes('regroupement')) {
+            const qr = resultsDataIndexed.questionResultsMap.get(`${studentId}_${col.questions[0].id}`);
+            return qr?.note != null ? parseFloat(qr.note.toString()) : null;
+        }
+
+        // Regroupement
+        let sum = 0;
+        let found = false;
+        col.questions.forEach((q: any) => {
+            const qr = resultsDataIndexed.questionResultsMap.get(`${studentId}_${q.id}`);
+            if (qr?.note != null) {
+                sum += parseFloat(qr.note.toString()) * (q.ratio || 1);
+                found = true;
+            }
+        });
+        return found ? sum : null;
+    }, [studentId, col, resultsDataIndexed]);
+
+    const { colorClass, letter } = getScoreStyle(score, col.maxPoints, evaluation.type_note_id);
+
+    return (
+        <td className="p-0 min-w-[65px] h-10 text-center border-b border-white/10 border-r border-white/10 relative bg-surface/30">
+            <div className="flex flex-col items-center justify-center">
+                <span className={clsx("text-sm font-black tabular-nums", colorClass)}>
+                    {score !== null ? (Number.isInteger(score) ? score : score.toFixed(1)) : '—'}
+                </span>
+                {letter && <span className={clsx("text-[9px] font-black uppercase tracking-tighter opacity-70", colorClass)}>{letter}</span>}
+            </div>
+        </td>
+    );
+});
+
+const StudentGradeRow = React.memo(({ 
+    student, 
+    evaluations, 
+    evaluationColumnsMap, 
+    scoreMap, 
+    resultsDataIndexed, 
+    isDetailedView, 
+    isLast,
+    getScoreStyle
+}: {
+    student: any,
+    evaluations: any[],
+    evaluationColumnsMap: Map<string, any[]>,
+    scoreMap: Record<string, Record<string, number | null>>,
+    resultsDataIndexed: any,
+    isDetailedView: boolean,
+    isLast: boolean,
+    getScoreStyle: any
+}) => {
+    return (
+        <tr className={clsx("hover:bg-white/[0.02] transition-colors group", isLast ? "" : "border-b border-white/10")}>
+            <td className="sticky left-0 z-20 bg-background p-4 min-w-[220px] border-r border-white/10 group-hover:bg-white/[0.05] transition-colors">
+                <div className="flex items-center gap-3">
+                    <Avatar 
+                        src={student.photo_url} 
+                        alt={`${student.prenom} ${student.nom}`}
+                        className="w-8 h-8 rounded-full border border-white/10 ring-2 ring-transparent group-hover:ring-primary/30 transition-all shrink-0"
+                    />
+                    <div className="flex flex-col min-w-0">
+                        <span className="text-sm font-black text-white truncate leading-tight group-hover:text-primary transition-colors">
+                            {student.prenom} {student.nom}
+                        </span>
+                        {student.Niveau && (
+                            <span className="text-[10px] font-bold text-grey-medium uppercase tracking-widest mt-0.5">
+                                {student.Niveau.nom}
+                            </span>
+                        )}
+                    </div>
+                </div>
+            </td>
+
+            {evaluations.map(ev => {
+                const total = scoreMap[student.id]?.[ev.id] ?? null;
+                const { colorClass, letter } = getScoreStyle(total, ev.note_max, ev.type_note_id);
+                
+                if (!isDetailedView) {
+                    return (
+                        <td key={ev.id} className="p-0 min-w-[120px] h-10 text-center border-b border-white/10 border-r border-primary/50 border-l border-primary/50 bg-primary/5 relative">
+                            <div className="flex flex-col items-center justify-center">
+                                <span className={clsx("text-base font-black tabular-nums transition-transform group-hover:scale-110", colorClass)}>
+                                    {total !== null ? total : '—'}
+                                </span>
+                                {letter && <span className={clsx("text-[10px] font-black uppercase", colorClass)}>{letter}</span>}
+                            </div>
+                        </td>
+                    );
+                }
+
+                const evColumns = evaluationColumnsMap.get(ev.id) || [];
+                return (
+                    <React.Fragment key={ev.id}>
+                        {evColumns.map(col => (
+                            <GradeCell 
+                                key={col.id}
+                                studentId={student.id}
+                                evaluation={ev}
+                                col={col}
+                                resultsDataIndexed={resultsDataIndexed}
+                                getScoreStyle={getScoreStyle}
+                            />
+                        ))}
+                        <td className="p-0 min-w-[85px] h-10 text-center border-b border-white/10 border-r border-primary/50 border-l border-primary/50 bg-primary/10 relative">
+                            <div className="flex flex-col items-center justify-center">
+                                <span className={clsx("text-base font-black tabular-nums", colorClass)}>
+                                    {total !== null ? total : '—'}
+                                </span>
+                                {letter && <span className={clsx("text-[10px] font-black uppercase", colorClass)}>{letter}</span>}
+                            </div>
+                        </td>
+                    </React.Fragment>
+                );
+            })}
+
+            {/* Summary Columns */}
+            <td className="sticky right-[198px] z-20 bg-background/95 w-[80px] text-center border-l border-white/10 align-middle">
+                <span className={clsx(
+                    "px-2 py-0.5 rounded-full text-[11px] font-black",
+                    student._stats.missingCount > 0 ? "bg-rose-500/10 text-rose-500" : "bg-emerald-500/10 text-emerald-500"
+                )}>
+                    {student._stats.missingCount}
+                </span>
+            </td>
+            <td className="sticky right-[99px] z-20 bg-background/95 w-[100px] text-center align-middle">
+                <span className={clsx(
+                    "text-sm font-black tabular-nums",
+                    student._stats.weightedPercentage >= 80 ? "text-emerald-500" :
+                    student._stats.weightedPercentage >= 50 ? "text-primary" : "text-rose-500"
+                )}>
+                    {student._stats.hasData ? `${Math.round(student._stats.weightedPercentage)}%` : '—'}
+                </span>
+            </td>
+            <td className="sticky right-0 z-20 bg-background/95 w-[100px] text-center border-r border-white/10 align-middle shadow-[-4px_0_8px_rgba(0,0,0,0.2)]">
+                <span className={clsx(
+                    "text-sm font-black tabular-nums",
+                    student._stats.simplePercentage >= 80 ? "text-emerald-500" :
+                    student._stats.simplePercentage >= 50 ? "text-primary" : "text-rose-500"
+                )}>
+                    {student._stats.hasData ? `${Math.round(student._stats.simplePercentage)}%` : '—'}
+                </span>
+            </td>
+        </tr>
+    );
+});
 
 const GradesByStudentTable: React.FC = () => {
     const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
+
     const [isDetailedView, setIsDetailedView] = useState(false);
     const [branchFilter, setBranchFilter] = useState<string>('all');
     const [periodeFilter, setPeriodeFilter] = useState<string>('all');
     const [searchQuery, setSearchQuery] = useState('');
     const [sortConfig, setSortConfig] = useState<{ key: 'name' | 'missing' | 'weighted' | 'simple'; direction: 'asc' | 'desc' } | null>(null);
+
+    const { data: user } = useQuery({
+        queryKey: ['user'],
+        queryFn: getCurrentUser,
+        staleTime: Infinity,
+    });
 
     // 1. Fetch all evaluations
     const { evaluations, loading: loadingEvals } = useAllEvaluations();
@@ -25,18 +194,18 @@ const GradesByStudentTable: React.FC = () => {
     const { groups: availableGroups, loading: loadingGroups } = useGroupsData();
 
     // 2.5 Fetch note types (for color conversion)
-    const { data: noteTypes = [] } = useNoteTypes();
+    const { data: noteTypes = [] } = useNoteTypes(user?.id);
 
     // 3. Fetch students of selected group
     const { data: studentData, isLoading: loadingStudents } = useQuery({
-        queryKey: ['group_students', selectedGroupId],
+        queryKey: ['group_students', selectedGroupId, user?.id],
         queryFn: async () => {
-            if (!selectedGroupId) return { ids: [], full: [] };
-            const results = await trackingService.fetchStudentsInGroup(selectedGroupId);
+            if (!selectedGroupId || !user?.id) return { ids: [], full: [] };
+            const results = await trackingService.fetchStudentsInGroup(selectedGroupId, user.id);
             results.full.sort((a, b) => (a.prenom || '').localeCompare(b.prenom || '') || (a.nom || '').localeCompare(b.nom || ''));
             return results;
         },
-        enabled: !!selectedGroupId
+        enabled: !!selectedGroupId && !!user?.id
     });
 
     const students = studentData?.full || [];
@@ -46,14 +215,15 @@ const GradesByStudentTable: React.FC = () => {
     const { data: relevantGroupIds = [] } = useQuery({
         queryKey: ['relevant_groups_for_students', studentIds],
         queryFn: async () => {
-            if (studentIds.length === 0) return [];
+            if (studentIds.length === 0 || !user) return [];
             const { data } = await supabase
                 .from('EleveGroupe')
                 .select('groupe_id')
+                .eq('user_id', user.id)
                 .in('eleve_id', studentIds);
             return Array.from(new Set(data?.map(d => d.groupe_id).filter(Boolean) as string[] || []));
         },
-        enabled: studentIds.length > 0
+        enabled: studentIds.length > 0 && !!user
     });
 
     const availableBranches = useMemo(() => {
@@ -90,98 +260,54 @@ const GradesByStudentTable: React.FC = () => {
     const evalIds = useMemo(() => filteredEvaluations.map(e => e.id), [filteredEvaluations]);
 
     const { data: resultsData, isLoading: loadingResults } = useQuery({
-        queryKey: ['cross_table_results', evalIds, selectedGroupId],
+        queryKey: ['cross_table_results', evalIds, selectedGroupId, user?.id],
         queryFn: async () => {
+            if (!user?.id || evalIds.length === 0) return { results: [], questionResults: [], questions: [], regroupements: [] };
+            
             const [results, questionResults, questions, regroupements] = await Promise.all([
-                gradeService.getResultsForEvaluations(evalIds),
-                supabase.from('ResultatQuestion').select('*, EvaluationQuestion!inner(evaluation_id)').in('EvaluationQuestion.evaluation_id', evalIds),
-                supabase.from('EvaluationQuestion').select('*').in('evaluation_id', evalIds),
-                supabase.from('EvaluationRegroupement').select('*').in('evaluation_id', evalIds)
+                gradeService.getResultsForEvaluations(evalIds, user.id),
+                gradeService.getQuestionResultsForEvaluations(evalIds, user.id),
+                gradeService.getQuestionsForEvaluations(evalIds, user.id),
+                gradeService.getRegroupementsForEvaluations(evalIds, user.id)
             ]);
+
             return {
                 results,
-                questionResults: (questionResults.data as any[]) || [],
-                questions: (questions.data as any[]) || [],
-                regroupements: (regroupements.data as any[]) || []
+                questionResults,
+                questions,
+                regroupements
             };
         },
-        enabled: !!selectedGroupId && evalIds.length > 0
+        enabled: !!selectedGroupId && evalIds.length > 0 && !!user?.id
     });
 
-    const scoreMap = useMemo(() => {
-        if (!resultsData) return {};
-        const map: Record<string, Record<string, number | null>> = {};
-        students.forEach(student => {
-            map[student.id] = {};
-            filteredEvaluations.forEach(ev => {
-                const evQs = resultsData.questions.filter(q => q.evaluation_id === ev.id);
-                const evResults = resultsData.results.filter(r => r.evaluation_id === ev.id);
-                const evQR = resultsData.questionResults.filter(qr => qr.EvaluationQuestion?.evaluation_id === ev.id);
-                const total = gradeService.calculateStudentTotal(student.id, ev, evQs, evResults, evQR);
-                map[student.id][ev.id] = total;
-            });
-        });
-        return map;
-    }, [students, filteredEvaluations, resultsData]);
-
-    const getEvaluationColumns = useCallback((evaluationId: string) => {
-        if (!resultsData) return [];
+    // --- OPTIMIZATION: Indexing results for O(1) lookup ---
+    const resultsDataIndexed = useMemo(() => {
+        if (!resultsData) return null;
         
-        const evQuestions = resultsData.questions
-            .filter(q => q.evaluation_id === evaluationId)
-            .sort((a, b) => (a.ordre ?? 0) - (b.ordre ?? 0));
-            
-        const evRegroupements = resultsData.regroupements
-            ? resultsData.regroupements
-                .filter(r => r.evaluation_id === evaluationId)
-                .sort((a, b) => (a.ordre ?? 0) - (b.ordre ?? 0))
-            : [];
-
-        if (evRegroupements.length === 0) {
-            return evQuestions.map(q => ({
-                id: q.id,
-                titre: q.titre,
-                questions: [q],
-                maxPoints: (q.note_max || 0) * (q.ratio || 1)
-            }));
-        }
-
-        const questionsByNumber = new Map<number, any>();
-        evQuestions.forEach((q, idx) => questionsByNumber.set(idx + 1, q));
-
-        const assignedQuestionIds = new Set<string>();
-        const columns: any[] = [];
-
-        evRegroupements.forEach(r => {
-            const groupingQuestions = (r.elements || [])
-                .map((num: number) => questionsByNumber.get(num))
-                .filter(Boolean);
-                
-            groupingQuestions.forEach((q: any) => assignedQuestionIds.add(q.id));
-            
-            columns.push({
-                id: r.id,
-                titre: r.titre,
-                questions: groupingQuestions,
-                maxPoints: groupingQuestions.reduce((acc: number, q: any) => acc + (q.note_max || 0) * (q.ratio || 1), 0)
-            });
+        const resultsMap = new Map<string, any>();
+        resultsData.results.forEach(r => {
+            resultsMap.set(`${r.eleve_id}_${r.evaluation_id}`, r);
         });
 
-        evQuestions.forEach(q => {
-            if (!assignedQuestionIds.has(q.id)) {
-                columns.push({
-                    id: q.id,
-                    titre: q.titre,
-                    questions: [q],
-                    maxPoints: (q.note_max || 0) * (q.ratio || 1)
-                });
-            }
+        const questionResultsMap = new Map<string, any>();
+        resultsData.questionResults.forEach(qr => {
+            questionResultsMap.set(`${qr.eleve_id}_${qr.question_id}`, qr);
         });
 
-        return columns;
+        const questionsByEval = new Map<string, any[]>();
+        resultsData.questions.forEach(q => {
+            if (!questionsByEval.has(q.evaluation_id)) questionsByEval.set(q.evaluation_id, []);
+            questionsByEval.get(q.evaluation_id)!.push(q);
+        });
+
+        return {
+            ...resultsData,
+            resultsMap,
+            questionResultsMap,
+            questionsByEval
+        };
     }, [resultsData]);
-
-
 
     const searchedStudents = useMemo(() => {
         if (!searchQuery) return students;
@@ -190,13 +316,123 @@ const GradesByStudentTable: React.FC = () => {
         );
     }, [students, searchQuery]);
 
-    const studentsWithStats = useMemo(() => {
-        return searchedStudents.map(student => {
+    const evaluationColumnsMap = useMemo(() => {
+        if (!resultsData) return new Map<string, any[]>();
+        
+        const map = new Map<string, any[]>();
+        filteredEvaluations.forEach(ev => {
+            const evQuestions = resultsData.questions
+                .filter(q => q.evaluation_id === ev.id)
+                .sort((a, b) => (a.ordre ?? 0) - (b.ordre ?? 0));
+                
+            const evRegroupements = resultsData.regroupements
+                ? resultsData.regroupements
+                    .filter(r => r.evaluation_id === ev.id)
+                    .sort((a, b) => (a.ordre ?? 0) - (b.ordre ?? 0))
+                : [];
+
+            let cols: any[] = [];
+            if (evRegroupements.length === 0) {
+                cols = evQuestions.map(q => ({
+                    id: q.id,
+                    titre: q.titre,
+                    questions: [q],
+                    maxPoints: (q.note_max || 0) * (q.ratio || 1)
+                }));
+            } else {
+                const questionsByNumber = new Map<number, any>();
+                evQuestions.forEach((q, idx) => questionsByNumber.set(idx + 1, q));
+
+                const assignedQuestionIds = new Set<string>();
+                
+                evRegroupements.forEach(r => {
+                    const groupingQuestions = (r.elements || [])
+                        .map((num: number) => questionsByNumber.get(num))
+                        .filter(Boolean);
+                        
+                    groupingQuestions.forEach((q: any) => assignedQuestionIds.add(q.id));
+                    
+                    cols.push({
+                        id: r.id,
+                        titre: r.titre,
+                        questions: groupingQuestions,
+                        maxPoints: groupingQuestions.reduce((acc: number, q: any) => acc + (q.note_max || 0) * (q.ratio || 1), 0)
+                    });
+                });
+
+                evQuestions.forEach(q => {
+                    if (!assignedQuestionIds.has(q.id)) {
+                        cols.push({
+                            id: q.id,
+                            titre: q.titre,
+                            questions: [q],
+                            maxPoints: (q.note_max || 0) * (q.ratio || 1)
+                        });
+                    }
+                });
+            }
+            map.set(ev.id, cols);
+        });
+        return map;
+    }, [resultsData, filteredEvaluations]);
+
+    const getEvaluationColumns = useCallback((evId: string) => {
+        return evaluationColumnsMap.get(evId) || [];
+    }, [evaluationColumnsMap]);
+
+    const calculateTotalOptimized = useCallback((studentId: string, evaluation: any, evalQuestions: any[], resultsMap: Map<string, any>, qResultsMap: Map<string, any>) => {
+        const studentResult = resultsMap.get(`${studentId}_${evaluation.id}`);
+        
+        if (evalQuestions.length > 0) {
+            const isExplicitlyAbsent = studentResult && studentResult.statut !== 'present';
+            if (isExplicitlyAbsent) return null;
+
+            let weightedSum = 0;
+            let maxWeightedSum = 0;
+            let noteFound = false;
+
+            for (const q of evalQuestions) {
+                const ratio = q.ratio != null ? parseFloat(q.ratio.toString()) : 1;
+                const qMax = parseFloat(q.note_max.toString());
+                maxWeightedSum += qMax * ratio;
+
+                const qr = qResultsMap.get(`${studentId}_${q.id}`);
+                if (qr && qr.note !== null) {
+                    weightedSum += parseFloat(qr.note.toString()) * ratio;
+                    noteFound = true;
+                }
+            }
+
+            if (!noteFound || maxWeightedSum === 0) {
+                // Check if explicitly present even without notes
+                if (studentResult?.statut === 'present') return 0;
+                return null;
+            }
+            
+            const evalMax = parseFloat(evaluation.note_max?.toString() || '20');
+            return parseFloat(((weightedSum / maxWeightedSum) * evalMax).toFixed(2));
+        }
+
+        if (!studentResult || studentResult.statut !== 'present') return null;
+        return studentResult.note !== null ? parseFloat(studentResult.note.toString()) : null;
+    }, []);
+
+    const processedData = useMemo(() => {
+        if (!resultsDataIndexed) return { students: [], scoreMap: {} };
+
+        const scoreMap: Record<string, Record<string, number | null>> = {};
+        
+        const studentsProcessed = searchedStudents.map(student => {
+            scoreMap[student.id] = {};
+            
             const scores = filteredEvaluations.map(ev => {
-                const obtained = scoreMap[student.id]?.[ev.id];
+                const evQs = resultsDataIndexed.questionsByEval.get(ev.id) || [];
+                const total = calculateTotalOptimized(student.id, ev, evQs, resultsDataIndexed.resultsMap, resultsDataIndexed.questionResultsMap);
+                
+                scoreMap[student.id][ev.id] = total;
                 const max = ev.note_max || 20;
-                const pct = (obtained !== null && obtained !== undefined) ? (obtained / max) * 100 : null;
-                return { obtained, max, pct };
+                const pct = (total !== null && total !== undefined) ? (total / max) * 100 : null;
+                return { obtained: total, max, pct };
             });
 
             const completed = scores.filter(s => s.obtained !== null && s.obtained !== undefined);
@@ -225,15 +461,18 @@ const GradesByStudentTable: React.FC = () => {
                 }
             };
         });
-    }, [searchedStudents, filteredEvaluations, scoreMap]);
 
-    const sortedStudents = useMemo(() => {
-        if (!sortConfig) return studentsWithStats;
+        return { students: studentsProcessed, scoreMap };
+    }, [searchedStudents, filteredEvaluations, resultsDataIndexed, calculateTotalOptimized]);
+
+    const { sortedStudents, scoreMap } = useMemo(() => {
+        const { students: pStudents, scoreMap: pScoreMap } = processedData;
+        if (!sortConfig) return { sortedStudents: pStudents, scoreMap: pScoreMap };
 
         const { key, direction } = sortConfig;
         const dir = direction === 'asc' ? 1 : -1;
 
-        return [...studentsWithStats].sort((a, b) => {
+        const sorted = [...pStudents].sort((a, b) => {
             let valA: any;
             let valB: any;
 
@@ -261,7 +500,9 @@ const GradesByStudentTable: React.FC = () => {
             if (valA === valB) return 0;
             return (valA > valB ? 1 : -1) * dir;
         });
-    }, [studentsWithStats, sortConfig]);
+
+        return { sortedStudents: sorted, scoreMap: pScoreMap };
+    }, [processedData, sortConfig]);
 
     const handleSort = (key: 'name' | 'missing' | 'weighted' | 'simple') => {
         setSortConfig(current => {
@@ -282,7 +523,7 @@ const GradesByStudentTable: React.FC = () => {
             : <ArrowDown size={12} className="ml-1 text-primary" />;
     };
 
-    const getScoreStyle = (score: number | null, max: number, typeNoteId?: string | null) => {
+    const getScoreStyle = useCallback((score: number | null, max: number, typeNoteId?: string | null) => {
         if (score === null) return { colorClass: 'text-grey-dark', letter: null };
 
         const noteType = noteTypes.find(nt => nt.id === typeNoteId);
@@ -309,7 +550,7 @@ const GradesByStudentTable: React.FC = () => {
         if (pct >= 80) return { colorClass: 'text-emerald-500', letter: null };
         if (pct >= 50) return { colorClass: 'text-primary', letter: null };
         return { colorClass: 'text-rose-500', letter: null };
-    };
+    }, [noteTypes]);
 
     if (loadingEvals || loadingGroups) {
         return (
@@ -616,186 +857,19 @@ const GradesByStudentTable: React.FC = () => {
                             </thead>
 
                             <tbody className="divide-y divide-white/10 transition-all">
-                                {sortedStudents.map((student, idx) => {
-                                    const { missingCount, weightedPercentage, simplePercentage, hasData } = student._stats;
-                                    const isLast = idx === sortedStudents.length - 1;
-
-                                    return (
-                                        <tr key={student.id} className="hover:bg-white/[0.05] transition-colors group">
-                                            {/* Student Info (Sticky) */}
-                                            <td className="sticky left-0 z-10 bg-background p-3 border-l border-r border-white/10 group-hover:shadow-[inset_0_0_0_2000px_rgba(255,255,255,0.05)] transition-all min-w-[220px]">
-                                                <div className="flex items-center gap-3">
-                                                    <Avatar
-                                                        src={student.photo_url}
-                                                        text={`${student.prenom?.charAt(0)}${student.nom?.charAt(0)}`}
-                                                        size="sm"
-                                                        className="border-2 border-primary/20 group-hover:border-primary transition-colors"
-                                                    />
-                                                    <div className="min-w-0 flex flex-col">
-                                                        <span className="font-bold text-text-main truncate text-xs">{student.prenom} {student.nom}</span>
-                                                        <span className="text-[9px] text-grey-medium font-bold uppercase tracking-widest">
-                                                            {student.Niveau?.nom || 'P6'}
-                                                        </span>
-                                                    </div>
-                                                </div>
-                                            </td>
-
-                                            {/* Cells for each evaluation */}
-                                            {filteredEvaluations.map(ev => {
-                                                const total = scoreMap[student.id]?.[ev.id];
-                                                const percentage = (total !== null && total !== undefined) ? Math.round((total / (ev.note_max || 20)) * 100) : null;
-
-                                                if (!isDetailedView) {
-                                                    const scoreStyle = getScoreStyle(total ?? null, ev.note_max, ev.type_note_id);
-                                                    return (
-                                                        <td 
-                                                            key={ev.id} 
-                                                            className={clsx(
-                                                                "p-2 text-center border-t border-white/10 relative min-w-[120px] border-l border-primary/50 border-r border-primary/50 bg-primary/5",
-                                                                isLast && "border-b border-white/10"
-                                                            )}
-                                                        >
-                                                            {(total !== null && total !== undefined) ? (
-                                                                <div className="flex flex-col items-center">
-                                                                    <span className={clsx('text-sm font-black', scoreStyle.colorClass)}>
-                                                                        {total}
-                                                                    </span>
-                                                                    <span className={clsx('text-[10px] font-black opacity-80', scoreStyle.colorClass)}>
-                                                                        {percentage}%
-                                                                    </span>
-                                                                </div>
-                                                            ) : (
-                                                                <div className="flex items-center justify-center py-1">
-                                                                    <div className="w-5 h-5 rounded-full bg-rose-500 flex items-center justify-center shadow-sm border border-rose-400/20" title="Aucun point encodé">
-                                                                        <X className="w-3 h-3 text-white" strokeWidth={3} />
-                                                                    </div>
-                                                                </div>
-                                                            )}
-                                                        </td>
-                                                    );
-                                                }
-
-                                                // Detailed view cells
-                                                if (isDetailedView) {
-                                                    const evColumns = getEvaluationColumns(ev.id);
-                                                    return (
-                                                        <React.Fragment key={`row-${student.id}-${ev.id}`}>
-                                                            {evColumns.map(col => {
-                                                                let totalCol = 0;
-                                                                let hasAnyMark = false;
-                                                                
-                                                                col.questions.forEach((q: any) => {
-                                                                    const qr = resultsData?.questionResults.find(r => r.question_id === q.id && r.eleve_id === student.id);
-                                                                    if (qr && qr.note !== null) {
-                                                                        totalCol += (qr.note * (q.ratio || 1));
-                                                                        hasAnyMark = true;
-                                                                    }
-                                                                });
-
-                                                                const colStyle = getScoreStyle(hasAnyMark ? totalCol : null, col.maxPoints, ev.type_note_id);
-                                                                const isColGold = col.titre.toUpperCase() === 'TOTAL';
-                                                                
-                                                                return (
-                                                                    <td 
-                                                                        key={col.id} 
-                                                                        className={clsx(
-                                                                            "p-2 text-center border-t border-white/10 min-w-[65px]",
-                                                                            isColGold ? "border-l border-primary/50 border-r border-primary/50 bg-primary/5" : "border-r border-white/10",
-                                                                            isColGold && isLast && "border-b border-white/10"
-                                                                        )}
-                                                                    >
-                                                                        {hasAnyMark ? (
-                                                                            <span className={clsx('text-xs font-bold', colStyle.colorClass)}>
-                                                                                {Number.isInteger(totalCol) ? totalCol : totalCol.toFixed(1)}
-                                                                            </span>
-                                                                        ) : (
-                                                                            <span className="text-grey-dark text-[10px]">—</span>
-                                                                        )}
-                                                                    </td>
-                                                                );
-                                                            })}
-                                                            {/* Total cell for this evaluation */}
-                                                            <td className={clsx(
-                                                                "p-2 text-center border-t border-white/10 border-l border-primary/50 border-r border-primary/50 min-w-[85px] bg-primary/5",
-                                                                isLast && "border-b border-white/10"
-                                                            )}>
-                                                            {(total !== null && total !== undefined) ? (() => {
-                                                                const totalStyle = getScoreStyle(total, ev.note_max, ev.type_note_id);
-                                                                return (
-                                                                    <div className="flex flex-col items-center">
-                                                                        <span className={clsx('text-xs font-black', totalStyle.colorClass)}>{total}</span>
-                                                                        <span className={clsx('text-[9px] font-black opacity-80', totalStyle.colorClass)}>{percentage}%</span>
-                                                                    </div>
-                                                                );
-                                                            })() : (
-                                                                <div className="flex items-center justify-center py-1">
-                                                                    <div className="w-5 h-5 rounded-full bg-rose-500 flex items-center justify-center shadow-sm border border-rose-400/20" title="Aucun point encodé">
-                                                                        <X className="w-3 h-3 text-white" strokeWidth={3} />
-                                                                    </div>
-                                                                </div>
-                                                            )}
-                                                        </td>
-                                                    </React.Fragment>
-                                                );
-                                            }
-                                            return null;
-                                        })}
-
-                                            {(() => {
-                                                const weightedStyle = hasData ? getScoreStyle(Math.round(weightedPercentage), 100, null) : null;
-                                                const simpleStyle = hasData ? getScoreStyle(Math.round(simplePercentage), 100, null) : null;
-
-                                                return (
-                                                    <>
-                                                        {/* Summary: Missing count */}
-                                                        <td className={clsx(
-                                                            "sticky right-[198px] z-10 bg-background border-t border-white/10 border-l border-white/10 text-center font-black text-sm transition-all w-[80px] group-hover:shadow-[inset_0_0_0_2000px_rgba(255,255,255,0.05)]",
-                                                            isLast && "border-b border-white/10"
-                                                        )}>
-                                                            {missingCount > 0 ? (
-                                                                <span className="text-rose-500">{missingCount}</span>
-                                                            ) : (
-                                                                <span className="text-grey-medium opacity-20 text-xs">0</span>
-                                                            )}
-                                                        </td>
-
-                                                        {/* Summary: Weighted Result */}
-                                                        <td className={clsx(
-                                                            "sticky right-[99px] z-10 bg-background border-t border-white/10 text-center p-2 transition-all w-[100px] group-hover:shadow-[inset_0_0_0_2000px_rgba(255,255,255,0.05)]",
-                                                            isLast && "border-b border-white/10"
-                                                        )}>
-                                                            {hasData ? (
-                                                                <div className="flex flex-col items-center">
-                                                                    <span className={clsx("text-base font-black leading-none", weightedStyle?.colorClass)}>
-                                                                        {Math.round(weightedPercentage)}%
-                                                                    </span>
-                                                                </div>
-                                                            ) : (
-                                                                <span className="text-grey-medium opacity-20">—</span>
-                                                            )}
-                                                        </td>
-
-                                                        {/* Summary: Simple Average Result (%) */}
-                                                        <td className={clsx(
-                                                            "sticky right-0 z-10 bg-background border-t border-white/10 border-r border-white/10 text-center p-2 transition-all w-[100px] group-hover:shadow-[inset_0_0_0_2000px_rgba(255,255,255,0.05)]",
-                                                            isLast && "border-b border-white/10"
-                                                        )}>
-                                                            {hasData ? (
-                                                                <div className="flex flex-col items-center">
-                                                                    <span className={clsx("text-base font-black leading-none", simpleStyle?.colorClass)}>
-                                                                        {Math.round(simplePercentage)}%
-                                                                    </span>
-                                                                </div>
-                                                            ) : (
-                                                                <span className="text-grey-medium opacity-20">—</span>
-                                                            )}
-                                                        </td>
-                                                    </>
-                                                );
-                                            })()}
-                                    </tr>
-                                );
-                            })}
+                                {sortedStudents.map((student, idx) => (
+                                    <StudentGradeRow
+                                        key={student.id}
+                                        student={student}
+                                        evaluations={filteredEvaluations}
+                                        evaluationColumnsMap={evaluationColumnsMap}
+                                        scoreMap={scoreMap}
+                                        resultsDataIndexed={resultsDataIndexed}
+                                        isDetailedView={isDetailedView}
+                                        isLast={idx === sortedStudents.length - 1}
+                                        getScoreStyle={getScoreStyle}
+                                    />
+                                ))}
                             </tbody>
                         </table>
                     </div>

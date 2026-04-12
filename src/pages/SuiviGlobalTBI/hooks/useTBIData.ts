@@ -53,10 +53,13 @@ export const useTBIData = () => {
 
     // --- Fetch Functions ---
     const fetchGroups = useCallback(async () => {
+        const user = await getCurrentUser();
+        if (!user) return;
+
         await fetchWithCache(
             'groups',
             async () => {
-                return await groupService.getGroups();
+                return await groupService.getGroups(user.id);
             },
             (data: Group[]) => {
                 setGroups(data);
@@ -99,9 +102,11 @@ export const useTBIData = () => {
         await fetchWithCache(
             `modules_active_${studentId}`,
             async () => {
+                const user = await getCurrentUser();
+                if (!user) return [];
                 const student = students.find(s => s.id === studentId);
                 const studentLevelId = student?.niveau_id || undefined;
-                return await trackingService.getModulesWithProgressions(studentId, studentLevelId);
+                return await trackingService.getModulesWithProgressions(studentId, user.id, studentLevelId);
             },
             (data: any[]) => {
                 const student = students.find(s => s.id === studentId);
@@ -146,7 +151,9 @@ export const useTBIData = () => {
         await fetchWithCache(
             `activities_${moduleId}_${studentId}`,
             async () => {
-                return await trackingService.getModuleActivitiesAndProgressions(moduleId, studentId);
+                const user = await getCurrentUser();
+                if (!user) return { activities: [], progressions: [] };
+                return await trackingService.getModuleActivitiesAndProgressions(moduleId, studentId, user.id);
             },
             (data: any) => {
                 const { activities: acts, progressions: progs } = data;
@@ -170,8 +177,11 @@ export const useTBIData = () => {
         if (students.length === 0) return;
         const studentIds = students.map(s => s.id);
 
+        const user = await getCurrentUser();
+        if (!user) return;
+
         // trackingService.getHelpRequests handles fetch and filtering
-        const validRequests = await trackingService.getHelpRequests(studentIds);
+        const validRequests = await trackingService.getHelpRequests(studentIds, user.id);
         setHelpRequests(validRequests);
     }, [students]);
 
@@ -208,7 +218,9 @@ export const useTBIData = () => {
     }, []);
 
     const handleHelpStatusClick = useCallback(async (requestId: string) => {
-        const success = await trackingService.updateProgressionStatus(requestId, 'termine');
+        const user = await getCurrentUser();
+        if (!user) return;
+        const success = await trackingService.updateProgressionStatus(requestId, 'termine', user.id);
         if (success) fetchHelpRequests();
     }, [fetchHelpRequests]);
 

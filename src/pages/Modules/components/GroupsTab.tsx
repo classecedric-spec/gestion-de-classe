@@ -1,7 +1,7 @@
 import React from 'react';
 import { Users, CheckSquare, Check } from 'lucide-react';
 import clsx from 'clsx';
-import { Tables } from '../../../../types/supabase';
+import type { Tables } from '../../../types/supabase';
 
 interface GroupsTabProps {
     groups: Tables<'Groupe'>[];

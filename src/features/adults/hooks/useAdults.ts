@@ -14,6 +14,7 @@
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { adultService } from '../services/adultService';
+import { useAuth } from '../../../hooks/useAuth';
 import { toast } from 'sonner';
 import type { Database } from '../../../types/supabase';
 
@@ -22,6 +23,9 @@ type AdultInsert = Database['public']['Tables']['Adulte']['Insert'];
 type AdultUpdate = Database['public']['Tables']['Adulte']['Update'];
 
 export const useAdults = () => {
+    const { session } = useAuth();
+    const userId = session?.user.id;
+
     // ÉTATS DE BASE
     const [adults, setAdults] = useState<AdultRow[]>([]);
     const [loading, setLoading] = useState<boolean>(true);
@@ -29,9 +33,10 @@ export const useAdults = () => {
 
     // CHARGEMENT INITIAL : Récupération de la liste complète
     const fetchAdults = useCallback(async () => {
+        if (!userId) return;
         setLoading(true);
         try {
-            const data = await adultService.fetchAdults();
+            const data = await adultService.fetchAdults(userId);
             setAdults(data);
         } catch (error) {
             console.error("Error fetching adults:", error);
@@ -39,7 +44,7 @@ export const useAdults = () => {
         } finally {
             setLoading(false);
         }
-    }, []);
+    }, [userId]);
 
     useEffect(() => {
         fetchAdults();

@@ -25,14 +25,23 @@ import { IMaterialRepository, TypeMateriel, MaterialActivity } from './IMaterial
  * Implémentation réelle du dépôt de matériel utilisant la technologie Supabase.
  */
 export class SupabaseMaterialRepository implements IMaterialRepository {
+    private validateUserId(userId: string): boolean {
+        if (!userId || userId === 'undefined' || userId === 'null') {
+            console.warn('[SupabaseMaterialRepository] Attempted query with invalid userId');
+            return false;
+        }
+        return true;
+    }
 
     /**
      * Récupère tout le matériel de l'école.
      */
-    async getAll(): Promise<TypeMateriel[]> {
+    async getAll(userId: string): Promise<TypeMateriel[]> {
+        if (!this.validateUserId(userId)) return [];
         const { data, error } = await supabase
             .from('TypeMateriel')
             .select('*')
+            .eq('user_id', userId)
             .order('nom');
 
         if (error) throw error;

@@ -1,6 +1,7 @@
 import { useState, useEffect, Dispatch, SetStateAction } from 'react';
 import { activityService } from '../../../features/activities/services/activityService';
 import { trackingService } from '../../../features/tracking/services/trackingService';
+import { supabase } from '../../../lib/database';
 import { arrayMove } from '@dnd-kit/sortable';
 import { toast } from 'react-hot-toast';
 import { ModuleWithRelations, Activite } from '../utils/moduleHelpers';
@@ -59,7 +60,9 @@ export function useActivityManagement(
             if (activityIds.length === 0) return;
 
             try {
-                const data = await trackingService.getProgressionStatsForActivities(activityIds);
+                const { data: { user } } = await supabase.auth.getUser();
+                if (!user) return;
+                const data = await trackingService.getProgressionStatsForActivities(activityIds, user.id);
 
                 const newStats: Record<string, ActivityStats> = {};
                 activityIds.forEach(id => {
@@ -125,7 +128,9 @@ export function useActivityManagement(
     // Delete activity
     const deleteActivity = async (id: string) => {
         try {
-            await activityService.deleteActivity(id);
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) throw new Error("Utilisateur non authentifié.");
+            await activityService.deleteActivity(id, user.id);
 
             // Update local state
             setModuleActivities(prev => prev.filter(a => a.id !== id));
@@ -148,7 +153,9 @@ export function useActivityManagement(
     // Update activities order in database
     const updateActivitiesOrder = async (updates: any[]) => {
         try {
-            await activityService.upsertActivities(updates as TablesInsert<'Activite'>[]);
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) throw new Error("Utilisateur non authentifié.");
+            await activityService.upsertActivities(updates as TablesInsert<'Activite'>[], user.id);
         } catch (err) {
             console.error('Error updating activities order:', err);
             toast.error("Erreur lors de la mise à jour de l'ordre");

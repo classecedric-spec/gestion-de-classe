@@ -33,7 +33,7 @@ export interface IAttendanceRepository {
     // ==================== GESTION DES GROUPES ====================
     
     /** Récupère la liste des classes/groupes disponibles. */
-    getGroups(): Promise<Group[]>;
+    getGroups(userId: string): Promise<Group[]>;
     
     /** Récupère les réglages de l'enseignant (ex: groupe favori). */
     getUserPreferences(userId: string, key: string): Promise<any>;
@@ -44,30 +44,30 @@ export interface IAttendanceRepository {
     // ==================== ÉLÈVES ====================
     
     /** Liste les élèves d'une classe pour faire l'appel. */
-    getStudentsByGroup(groupId: string): Promise<Student[]>;
+    getStudentsByGroup(groupId: string, userId: string): Promise<Student[]>;
 
     // ==================== CONFIGURATION DES APPELS (SETUPS) ====================
     
     /** Récupère les différents types d'appels (ex: Matin, Étude, Cantine). */
-    getSetups(): Promise<SetupPresence[]>;
+    getSetups(userId: string): Promise<SetupPresence[]>;
     
     /** Récupère les statuts possibles pour un appel (Présent, Absent, Retard, etc.). */
-    getCategories(setupId: string): Promise<CategoriePresence[]>;
+    getCategories(setupId: string, userId: string): Promise<CategoriePresence[]>;
     
     /** Crée une nouvelle configuration d'appel personnalisée. */
     createSetup(userId: string, name: string, description: string | null): Promise<SetupPresence>;
     
     /** Modifie le nom ou la description d'un type d'appel. */
-    updateSetup(id: string, name: string, description: string | null): Promise<void>;
+    updateSetup(id: string, userId: string, name: string, description: string | null): Promise<void>;
     
     /** Supprime un type d'appel. */
-    deleteSetup(id: string): Promise<void>;
+    deleteSetup(id: string, userId: string): Promise<void>;
     
     /** Enregistre ou met à jour les catégories (statuts) liées à un appel. */
-    upsertCategories(categories: TablesInsert<'CategoriePresence'>[]): Promise<void>;
+    upsertCategories(categories: TablesInsert<'CategoriePresence'>[], userId: string): Promise<void>;
     
     /** Supprime un statut (ex: retirer 'Sortie anticipée'). */
-    deleteCategory(id: string): Promise<void>;
+    deleteCategory(id: string, userId: string): Promise<void>;
     
     /** Sécurité : s'assure qu'un statut 'Absent' existe toujours pour que l'appel soit valide. */
     ensureAbsentCategory(setupId: string, userId: string): Promise<void>;
@@ -75,27 +75,27 @@ export interface IAttendanceRepository {
     // ==================== L'APPEL (ATTENDANCE) ====================
     
     /** Récupère les présences déjà enregistrées pour une date et une période précise. */
-    getAttendances(date: string, period: string, studentIds: string[], setupId: string): Promise<Attendance[]>;
+    getAttendances(date: string, period: string, studentIds: string[], setupId: string, userId: string): Promise<Attendance[]>;
     
     /** Vérifie s'il existe déjà un appel pour ce moment afin d'éviter les doublons. */
-    checkExistingSetup(date: string, period: string, studentIds: string[]): Promise<string | undefined>;
+    checkExistingSetup(date: string, period: string, studentIds: string[], userId: string): Promise<string | undefined>;
     
     /** Enregistre le statut d'un élève (ex: Paul est présent). */
-    upsertAttendance(attendanceRecord: Partial<Attendance> & { id?: string }): Promise<Attendance>;
+    upsertAttendance(attendanceRecord: Partial<Attendance> & { id?: string }, userId: string): Promise<Attendance>;
     
     /** Annule une ligne d'appel. */
-    deleteAttendance(id: string): Promise<void>;
+    deleteAttendance(id: string, userId: string): Promise<void>;
     
     /** Enregistre l'appel pour toute la classe d'un seul coup. */
-    bulkInsertAttendances(records: TablesInsert<'Attendance'>[]): Promise<Attendance[]>;
+    bulkInsertAttendances(records: TablesInsert<'Attendance'>[], userId: string): Promise<Attendance[]>;
 
     // ==================== RAPPORTS ET HISTORIQUE ====================
     
     /** Liste les jours où un appel a été effectué (pour le calendrier). */
-    getDistinctDates(setupId: string): Promise<string[]>;
+    getDistinctDates(setupId: string, userId: string): Promise<string[]>;
     
     /** Récupère toutes les présences sur une période (pour l'export PDF). */
-    getAttendanceRange(start: string, end: string): Promise<AttendanceWithCategory[]>;
+    getAttendanceRange(start: string, end: string, userId: string): Promise<AttendanceWithCategory[]>;
     
     /** Utilitaire : copie l'appel du matin vers l'après-midi pour gagner du temps. */
     copyPeriodData(date: string, setupId: string, fromPeriod: string, toPeriod: string, userId: string): Promise<void>;

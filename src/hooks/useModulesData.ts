@@ -1,4 +1,5 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { supabase } from '../lib/database';
 import { trackingService } from '../features/tracking/services/trackingService';
 import { processModules } from '../lib/helpers/mobileEncodingHelpers';
 
@@ -14,9 +15,12 @@ export const useModulesData = (studentId: string | null, levelId: string | null)
         queryFn: async () => {
             if (!studentId || !levelId) return { modules: [], progressions: {} };
 
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) return { modules: [], progressions: {} };
+
             const [modulesData, progMap] = await Promise.all([
-                trackingService.getMobileModules(),
-                trackingService.fetchStudentProgressionsMap(studentId)
+                trackingService.getMobileModules(user.id),
+                trackingService.fetchStudentProgressionsMap(studentId, user.id)
             ]);
 
             const processedModules = processModules(modulesData || [], levelId, progMap);

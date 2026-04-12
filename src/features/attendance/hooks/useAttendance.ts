@@ -46,7 +46,7 @@ export const useAttendance = () => {
         queryKey: ['groups', user?.id],
         queryFn: async () => {
             if (!user) return [];
-            return await attendanceService.fetchGroups();
+            return await attendanceService.fetchGroups(user.id);
         },
         enabled: !!user,
         staleTime: 1000 * 60 * 5,
@@ -68,8 +68,8 @@ export const useAttendance = () => {
     const { data: students = [] } = useQuery({
         queryKey: ['students', user?.id, selectedGroupId],
         queryFn: async () => {
-            if (!selectedGroupId) return [];
-            return await attendanceService.fetchStudentsByGroup(selectedGroupId);
+            if (!user || !selectedGroupId) return [];
+            return await attendanceService.fetchStudentsByGroup(selectedGroupId, user.id);
         },
         enabled: !!selectedGroupId && !!user,
         staleTime: 1000 * 60 * 5,
@@ -80,7 +80,7 @@ export const useAttendance = () => {
         queryKey: ['attendance-setup', user?.id],
         queryFn: async () => {
             if (!user) return [];
-            return await attendanceService.fetchSetups();
+            return await attendanceService.fetchSetups(user.id);
         },
         enabled: !!user,
         staleTime: 1000 * 60 * 5,
@@ -90,8 +90,8 @@ export const useAttendance = () => {
     const { data: categories = [] } = useQuery({
         queryKey: ['attendance-categories', user?.id, selectedSetupId],
         queryFn: async () => {
-            if (!selectedSetupId) return [];
-            return await attendanceService.fetchCategories(selectedSetupId);
+            if (!selectedSetupId || !user) return [];
+            return await attendanceService.fetchCategories(selectedSetupId, user.id);
         },
         enabled: !!selectedSetupId && !!user,
         staleTime: 1000 * 60 * 5,
@@ -103,8 +103,8 @@ export const useAttendance = () => {
     const { data: existingSetupId } = useQuery({
         queryKey: ['attendance-check-setup', user?.id, currentDate, currentPeriod, selectedGroupId],
         queryFn: async () => {
-            if (!selectedGroupId || students.length === 0) return null;
-            const existingSetup = await attendanceService.checkExistingSetup(currentDate, currentPeriod, students.map(s => s.id));
+            if (!selectedGroupId || students.length === 0 || !user) return null;
+            const existingSetup = await attendanceService.checkExistingSetup(currentDate, currentPeriod, students.map(s => s.id), user.id);
             return existingSetup || null;
         },
         enabled: !!user && !!selectedGroupId && students.length > 0,
@@ -124,8 +124,8 @@ export const useAttendance = () => {
     const { data: attendances = [], isLoading: loading } = useQuery({
         queryKey: ['attendance', user?.id, currentDate, currentPeriod, selectedGroupId, selectedSetupId],
         queryFn: async () => {
-            if (!selectedGroupId || !selectedSetupId || students.length === 0) return [];
-            return await attendanceService.fetchAttendances(currentDate, currentPeriod, students.map(s => s.id), selectedSetupId);
+            if (!user || !selectedGroupId || !selectedSetupId || students.length === 0) return [];
+            return await attendanceService.fetchAttendances(currentDate, currentPeriod, students.map(s => s.id), selectedSetupId, user.id);
         },
         enabled: !!user && !!selectedGroupId && !!selectedSetupId && students.length > 0,
         staleTime: 1000 * 60,
@@ -135,7 +135,10 @@ export const useAttendance = () => {
 
     // Sauvegarde unitaire (quand on déplace UN élève)
     const upsertMutation = useMutation({
-        mutationFn: (rec: Attendance) => attendanceService.upsertAttendance(rec),
+        mutationFn: (rec: Attendance) => {
+            if (!user) throw new Error("User required");
+            return attendanceService.upsertAttendance(rec, user.id);
+        },
         onMutate: async (newRecord) => {
             // Logique optimiste : on met à jour l'écran immédiatement avant confirmation du serveur
             const queryKey = ['attendance', user?.id, currentDate, currentPeriod, selectedGroupId, selectedSetupId];
@@ -159,7 +162,10 @@ export const useAttendance = () => {
 
     // Suppression (quand un élève revient dans la zone "Non assigné")
     const deleteMutation = useMutation({
-        mutationFn: (id: string) => attendanceService.deleteAttendance(id),
+        mutationFn: (id: string) => {
+            if (!user) throw new Error("User required");
+            return attendanceService.deleteAttendance(id, user.id);
+        },
         onMutate: async (id) => {
             const queryKey = ['attendance', user?.id, currentDate, currentPeriod, selectedGroupId, selectedSetupId];
             await queryClient.cancelQueries({ queryKey });
@@ -174,7 +180,10 @@ export const useAttendance = () => {
 
     // Sauvegarde groupée (ex: "Tout le monde présent")
     const bulkMutation = useMutation({
-        mutationFn: (recs: any[]) => attendanceService.bulkInsertAttendances(recs),
+        mutationFn: (recs: any[]) => {
+            if (!user) throw new Error("User required");
+            return attendanceService.bulkInsertAttendances(recs, user.id);
+        },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['attendance', user?.id, currentDate, currentPeriod, selectedGroupId, selectedSetupId] });
         }

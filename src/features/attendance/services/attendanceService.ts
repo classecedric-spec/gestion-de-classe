@@ -39,8 +39,8 @@ export class AttendanceService {
     // ==================== GESTION DES GROUPES (CLASSES) ====================
 
     /** Récupère toutes les classes rangées par nom. */
-    async fetchGroups(): Promise<Group[]> {
-        return await this.repository.getGroups();
+    async fetchGroups(userId: string): Promise<Group[]> {
+        return await this.repository.getGroups(userId);
     }
 
     /** Lit une préférence enregistrée (ex: quelle était la dernière classe ouverte). */
@@ -56,20 +56,20 @@ export class AttendanceService {
     // ==================== GESTION DES ÉLÈVES ====================
 
     /** Récupère la liste des élèves d'une classe précise. */
-    async fetchStudentsByGroup(groupId: string): Promise<Student[]> {
-        return await this.repository.getStudentsByGroup(groupId);
+    async fetchStudentsByGroup(groupId: string, userId: string): Promise<Student[]> {
+        return await this.repository.getStudentsByGroup(groupId, userId);
     }
 
     // ==================== CONFIGURATION (SETS & CATÉGORIES) ====================
 
     /** Récupère les types d'appels (Matin, Cantine, etc.). */
-    async fetchSetups(): Promise<SetupPresence[]> {
-        return await this.repository.getSetups();
+    async fetchSetups(userId: string): Promise<SetupPresence[]> {
+        return await this.repository.getSetups(userId);
     }
 
     /** Récupère les statuts (Présent, Absent, etc.) liés à un type d'appel. */
-    async fetchCategories(setupId: string): Promise<CategoriePresence[]> {
-        return await this.repository.getCategories(setupId);
+    async fetchCategories(setupId: string, userId: string): Promise<CategoriePresence[]> {
+        return await this.repository.getCategories(setupId, userId);
     }
 
     /** Crée un nouveau type d'appel après avoir vérifié que le nom est correct. */
@@ -83,27 +83,27 @@ export class AttendanceService {
     }
 
     /** Modifie un type d'appel existant. */
-    async updateSetup(id: string, name: string, description: string | null): Promise<void> {
+    async updateSetup(id: string, userId: string, name: string, description: string | null): Promise<void> {
         if (!name || name.trim().length === 0) {
             throw new Error('Le nom du setup est requis');
         }
 
-        await this.repository.updateSetup(id, name.trim(), description);
+        await this.repository.updateSetup(id, userId, name.trim(), description);
     }
 
     /** Supprime un type d'appel. */
-    async deleteSetup(id: string): Promise<void> {
-        await this.repository.deleteSetup(id);
+    async deleteSetup(id: string, userId: string): Promise<void> {
+        await this.repository.deleteSetup(id, userId);
     }
 
     /** Enregistre plusieurs catégories de présence d'un coup. */
-    async upsertCategories(categories: TablesInsert<'CategoriePresence'>[]): Promise<void> {
-        await this.repository.upsertCategories(categories);
+    async upsertCategories(categories: TablesInsert<'CategoriePresence'>[], userId: string): Promise<void> {
+        await this.repository.upsertCategories(categories, userId);
     }
 
     /** Supprime un statut de présence spécifique. */
-    async deleteCategory(id: string): Promise<void> {
-        await this.repository.deleteCategory(id);
+    async deleteCategory(id: string, userId: string): Promise<void> {
+        await this.repository.deleteCategory(id, userId);
     }
 
     /** Sécurité : s'assure que le statut 'Absent' est toujours disponible. */
@@ -114,40 +114,40 @@ export class AttendanceService {
     // ==================== SAISIE DES PRÉSENCES ====================
 
     /** Récupère l'état de l'appel pour un jour et une heure donnés. */
-    async fetchAttendances(date: string, period: string, studentIds: string[], setupId: string): Promise<Attendance[]> {
-        return await this.repository.getAttendances(date, period, studentIds, setupId);
+    async fetchAttendances(date: string, period: string, studentIds: string[], setupId: string, userId: string): Promise<Attendance[]> {
+        return await this.repository.getAttendances(date, period, studentIds, setupId, userId);
     }
 
     /** Vérifie si un appel a déjà été commencé pour guider l'enseignant. */
-    async checkExistingSetup(date: string, period: string, studentIds: string[]): Promise<string | undefined> {
-        return await this.repository.checkExistingSetup(date, period, studentIds);
+    async checkExistingSetup(date: string, period: string, studentIds: string[], userId: string): Promise<string | undefined> {
+        return await this.repository.checkExistingSetup(date, period, studentIds, userId);
     }
 
     /** Enregistre la présence d'un élève. */
-    async upsertAttendance(attendanceRecord: Partial<Attendance> & { id?: string }): Promise<Attendance> {
-        return await this.repository.upsertAttendance(attendanceRecord);
+    async upsertAttendance(attendanceRecord: Partial<Attendance> & { id?: string }, userId: string): Promise<Attendance> {
+        return await this.repository.upsertAttendance(attendanceRecord, userId);
     }
 
     /** Annule la saisie de présence pour un élève (le remet en 'Non assigné'). */
-    async deleteAttendance(id: string): Promise<void> {
-        await this.repository.deleteAttendance(id);
+    async deleteAttendance(id: string, userId: string): Promise<void> {
+        await this.repository.deleteAttendance(id, userId);
     }
 
     /** Enregistre les présences de toute une classe d'un coup. */
-    async bulkInsertAttendances(records: TablesInsert<'Attendance'>[]): Promise<Attendance[]> {
-        return await this.repository.bulkInsertAttendances(records);
+    async bulkInsertAttendances(records: TablesInsert<'Attendance'>[], userId: string): Promise<Attendance[]> {
+        return await this.repository.bulkInsertAttendances(records, userId);
     }
 
     // ==================== RAPPORTS ET STATISTIQUES ====================
 
     /** Trouve toutes les dates où un appel a été réalisé. */
-    async fetchDistinctDates(setupId: string): Promise<string[]> {
-        return await this.repository.getDistinctDates(setupId);
+    async fetchDistinctDates(setupId: string, userId: string): Promise<string[]> {
+        return await this.repository.getDistinctDates(setupId, userId);
     }
 
     /** Récupère toutes les données de présences entre deux dates (pour les PDF). */
-    async fetchAttendanceRange(start: string, end: string): Promise<AttendanceWithCategory[]> {
-        return await this.repository.getAttendanceRange(start, end);
+    async fetchAttendanceRange(start: string, end: string, userId: string): Promise<AttendanceWithCategory[]> {
+        return await this.repository.getAttendanceRange(start, end, userId);
     }
 
     /** 

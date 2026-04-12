@@ -14,42 +14,49 @@ import { Tables, TablesInsert, TablesUpdate } from '../../../types/supabase';
 
 export interface IGradeRepository {
     // Evaluation CRUD
-    findEvaluationsByContext(brancheId?: string, periode?: string): Promise<Tables<'Evaluation'>[]>;
-    findAllEvaluationsDetailed(): Promise<any[]>;
-    createEvaluation(evaluation: TablesInsert<'Evaluation'>): Promise<Tables<'Evaluation'>>;
-    updateEvaluation(id: string, evaluation: TablesUpdate<'Evaluation'>): Promise<Tables<'Evaluation'>>;
-    deleteEvaluation(id: string): Promise<void>;
+    findEvaluationsByContext(userId: string, brancheId?: string, periode?: string): Promise<Tables<'Evaluation'>[]>;
+    findAllEvaluationsDetailed(userId: string): Promise<any[]>;
+    createEvaluation(evaluation: TablesInsert<'Evaluation'>, userId: string): Promise<Tables<'Evaluation'>>;
+    updateEvaluation(id: string, evaluation: TablesUpdate<'Evaluation'>, userId: string): Promise<Tables<'Evaluation'>>;
+    deleteEvaluation(id: string, userId: string): Promise<void>;
+    findDeletedEvaluations(userId: string): Promise<Tables<'Evaluation'>[]>;
+    restoreEvaluation(id: string, userId: string): Promise<void>;
+    permanentDeleteEvaluation(id: string, userId: string): Promise<void>;
 
     // Questions CRUD
-    findQuestionsByEvaluation(evaluationId: string): Promise<Tables<'EvaluationQuestion'>[]>;
-    createQuestions(questions: TablesInsert<'EvaluationQuestion'>[]): Promise<Tables<'EvaluationQuestion'>[]>;
-    upsertQuestions(questions: TablesInsert<'EvaluationQuestion'>[]): Promise<Tables<'EvaluationQuestion'>[]>;
-    deleteQuestion(id: string): Promise<void>;
+    findQuestionsByEvaluation(evaluationId: string, userId: string): Promise<Tables<'EvaluationQuestion'>[]>;
+    findQuestionsByEvaluations(evaluationIds: string[], userId: string): Promise<Tables<'EvaluationQuestion'>[]>;
+    createQuestions(questions: TablesInsert<'EvaluationQuestion'>[], userId: string): Promise<Tables<'EvaluationQuestion'>[]>;
+    upsertQuestions(questions: TablesInsert<'EvaluationQuestion'>[], userId: string): Promise<Tables<'EvaluationQuestion'>[]>;
+    deleteQuestion(id: string, userId: string): Promise<void>;
 
     // Resultat CRUD
-    findResultsByEvaluation(evaluationId: string): Promise<Tables<'Resultat'>[]>;
-    findResultsByEvaluations(evaluationIds: string[]): Promise<Tables<'Resultat'>[]>;
-    findAllResultsDetailed(): Promise<any[]>;
-    upsertResult(result: TablesInsert<'Resultat'>): Promise<Tables<'Resultat'>>;
-    deleteResult(id: string): Promise<void>;
+    findResultsByEvaluation(evaluationId: string, userId: string): Promise<Tables<'Resultat'>[]>;
+    findResultsByEvaluations(evaluationIds: string[], userId: string): Promise<Tables<'Resultat'>[]>;
+    findAllResultsDetailed(userId: string): Promise<any[]>;
+    upsertResults(results: TablesInsert<'Resultat'>[], userId: string): Promise<Tables<'Resultat'>[]>;
+    upsertResult(result: TablesInsert<'Resultat'>, userId: string): Promise<Tables<'Resultat'>>;
+    deleteResult(id: string, userId: string): Promise<void>;
 
     // Question Results CRUD
-    findQuestionResultsByEvaluation(evaluationId: string): Promise<Tables<'ResultatQuestion'>[]>;
-    upsertQuestionResults(results: TablesInsert<'ResultatQuestion'>[]): Promise<Tables<'ResultatQuestion'>[]>;
+    findQuestionResultsByEvaluation(evaluationId: string, userId: string): Promise<Tables<'ResultatQuestion'>[]>;
+    findQuestionResultsByEvaluations(evaluationIds: string[], userId: string): Promise<Tables<'ResultatQuestion'>[]>;
+    upsertQuestionResults(results: TablesInsert<'ResultatQuestion'>[], userId: string): Promise<Tables<'ResultatQuestion'>[]>;
 
     // Regroupement CRUD
-    findRegroupementsByEvaluation(evaluationId: string): Promise<any[]>;
-    upsertRegroupements(regroupements: any[]): Promise<any[]>;
-    deleteRegroupement(id: string): Promise<void>;
+    findRegroupementsByEvaluation(evaluationId: string, userId: string): Promise<any[]>;
+    findRegroupementsByEvaluations(evaluationIds: string[], userId: string): Promise<any[]>;
+    upsertRegroupements(regroupements: any[], userId: string): Promise<any[]>;
+    deleteRegroupement(id: string, userId: string): Promise<void>;
 
     // TypeNote CRUD
-    findAllNoteTypes(): Promise<Tables<'TypeNote'>[]>;
-    createNoteType(typeNote: TablesInsert<'TypeNote'>): Promise<Tables<'TypeNote'>>;
-    updateNoteType(id: string, typeNote: TablesUpdate<'TypeNote'>): Promise<Tables<'TypeNote'>>;
-    deleteNoteType(id: string): Promise<void>;
+    findAllNoteTypes(userId: string): Promise<Tables<'TypeNote'>[]>;
+    createNoteType(typeNote: TablesInsert<'TypeNote'>, userId: string): Promise<Tables<'TypeNote'>>;
+    updateNoteType(id: string, typeNote: TablesUpdate<'TypeNote'>, userId: string): Promise<Tables<'TypeNote'>>;
+    deleteNoteType(id: string, userId: string): Promise<void>;
 
     // Helpers
-    getResultsWithStudents(evaluationId: string): Promise<any[]>;
+    getResultsWithStudents(userId: string, evaluationId: string): Promise<any[]>;
 }
 
 /**

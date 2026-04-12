@@ -27,14 +27,23 @@ import {
  * Implémentation concrète de IAttendanceRepository utilisant Supabase (PostgreSQL).
  */
 export class SupabaseAttendanceRepository implements IAttendanceRepository {
+    private validateUserId(userId: string): boolean {
+        if (!userId || userId === 'undefined' || userId === 'null') {
+            console.warn('[SupabaseAttendanceRepository] Attempted query with invalid userId');
+            return false;
+        }
+        return true;
+    }
 
     // ==================== GESTION DES GROUPES ====================
 
     /** Récupère tous les groupes d'élèves triés par nom. */
-    async getGroups(): Promise<Group[]> {
+    async getGroups(userId: string): Promise<Group[]> {
+        if (!this.validateUserId(userId)) return [];
         const { data, error } = await supabase
             .from('Groupe')
             .select('*')
+            .eq('user_id', userId)
             .order('nom');
         if (error) throw error;
         return data || [];
@@ -72,12 +81,14 @@ export class SupabaseAttendanceRepository implements IAttendanceRepository {
      * Récupère la liste des élèves d'un groupe précis.
      * Cette fonction fait une double lecture : d'abord le lien élève<->groupe, puis les fiches élèves détaillées.
      */
-    async getStudentsByGroup(groupId: string): Promise<Student[]> {
+    async getStudentsByGroup(groupId: string, userId: string): Promise<Student[]> {
+        if (!this.validateUserId(userId)) return [];
         // Étape 1 : On trouve qui appartient au groupe
         const { data: links, error: linkError } = await supabase
             .from('EleveGroupe')
             .select('eleve_id')
-            .eq('groupe_id', groupId);
+            .eq('groupe_id', groupId)
+            .eq('user_id', userId);
 
         if (linkError) throw linkError;
 
@@ -89,6 +100,7 @@ export class SupabaseAttendanceRepository implements IAttendanceRepository {
             .from('Eleve')
             .select('*, Classe(nom), Niveau(nom, ordre)')
             .in('id', studentIds)
+            .eq('titulaire_id', userId)
             .order('nom');
 
         if (error) throw error;
@@ -98,21 +110,23 @@ export class SupabaseAttendanceRepository implements IAttendanceRepository {
     // ==================== CONFIGURATION (SETUPS & CATÉGORIES) ====================
 
     /** Liste les types d'appels configurés. */
-    async getSetups(): Promise<SetupPresence[]> {
+    async getSetups(userId: string): Promise<SetupPresence[]> {
         const { data, error } = await supabase
             .from('SetupPresence')
             .select('*')
+            .eq('user_id', userId)
             .order('nom');
         if (error) throw error;
         return data || [];
     }
 
     /** Liste les statuts (ex: Présent, Absent) liés à un type d'appel. */
-    async getCategories(setupId: string): Promise<CategoriePresence[]> {
+    async getCategories(setupId: string, userId: string): Promise<CategoriePresence[]> {
         const { data, error } = await supabase
             .from('CategoriePresence')
             .select('*')
             .eq('setup_id', setupId)
+            .eq('user_id', userId)
             .order('created_at');
         if (error) throw error;
         return data || [];
@@ -129,37 +143,40 @@ export class SupabaseAttendanceRepository implements IAttendanceRepository {
         return data;
     }
 
-    async updateSetup(id: string, name: string, description: string | null): Promise<void> {
+    async updateSetup(id: string, userId: string, name: string, description: string | null): Promise<void> {
         const { error } = await supabase
             .from('SetupPresence')
             .update({ nom: name, description })
-            .eq('id', id);
+            .eq('id', id)
+            .eq('user_id', userId);
         if (error) throw error;
     }
 
-    async deleteSetup(id: string): Promise<void> {
+    async deleteSetup(id: string, userId: string): Promise<void> {
         const { error } = await supabase
             .from('SetupPresence')
             .delete()
-            .eq('id', id);
+            .eq('id', id)
+            .eq('user_id', userId);
         if (error) throw error;
     }
 
     /** Met à jour plusieurs statuts d'un coup (ex: changer les couleurs des badges). */
-    async upsertCategories(categories: TablesInsert<'CategoriePresence'>[]): Promise<void> {
+    async upsertCategories(categories: TablesInsert<'CategoriePresence'>[], userId: string): Promise<void> {
         for (const cat of categories) {
             const { error } = await supabase
                 .from('CategoriePresence')
-                .upsert(cat);
+                .upsert({ ...cat, user_id: userId });
             if (error) throw error;
         }
     }
 
-    async deleteCategory(id: string): Promise<void> {
+    async deleteCategory(id: string, userId: string): Promise<void> {
         const { error } = await supabase
             .from('CategoriePresence')
             .delete()
-            .eq('id', id);
+            .eq('id', id)
+            .eq('user_id', userId);
         if (error) throw error;
     }
 
@@ -187,13 +204,14 @@ export class SupabaseAttendanceRepository implements IAttendanceRepository {
     // ==================== L'APPEL (ATTENDANCE) ====================
 
     /** Récupère les lignes d'appel déjà enregistrées pour éviter d'écraser des données. */
-    async getAttendances(date: string, period: string, studentIds: string[], setupId: string): Promise<Attendance[]> {
+    async getAttendances(date: string, period: string, studentIds: string[], setupId: string, userId: string): Promise<Attendance[]> {
         const { data, error } = await supabase
             .from('Attendance')
             .select('*')
             .eq('date', date)
             .eq('setup_id', setupId)
             .eq('periode', period)
+            .eq('user_id', userId)
             .in('eleve_id', studentIds);
 
         if (error) throw error;
@@ -201,12 +219,13 @@ export class SupabaseAttendanceRepository implements IAttendanceRepository {
     }
 
     /** Vérifie si un appel a déjà commencé pour ce moment de la journée. */
-    async checkExistingSetup(date: string, period: string, studentIds: string[]): Promise<string | undefined> {
+    async checkExistingSetup(date: string, period: string, studentIds: string[], userId: string): Promise<string | undefined> {
         const { data, error } = await supabase
             .from('Attendance')
             .select('setup_id')
             .eq('date', date)
             .eq('periode', period)
+            .eq('user_id', userId)
             .in('eleve_id', studentIds)
             .limit(1);
 
@@ -218,7 +237,7 @@ export class SupabaseAttendanceRepository implements IAttendanceRepository {
      * Enregistre ou modifie la présence d'un élève. 
      * Gère les identifiants temporaires pour une interface réactive.
      */
-    async upsertAttendance(attendanceRecord: Partial<Attendance> & { id?: string }): Promise<Attendance> {
+    async upsertAttendance(attendanceRecord: Partial<Attendance> & { id?: string }, userId: string): Promise<Attendance> {
         if (attendanceRecord.id && !attendanceRecord.id.toString().startsWith('temp-')) {
             // Modification d'une présence existante
             const { error } = await supabase
@@ -227,7 +246,8 @@ export class SupabaseAttendanceRepository implements IAttendanceRepository {
                     categorie_id: attendanceRecord.categorie_id,
                     status: attendanceRecord.status
                 })
-                .eq('id', attendanceRecord.id);
+                .eq('id', attendanceRecord.id)
+                .eq('user_id', userId);
             if (error) throw error;
             return attendanceRecord as Attendance;
         } else {
@@ -235,7 +255,7 @@ export class SupabaseAttendanceRepository implements IAttendanceRepository {
             const { id: _id, ...payload } = attendanceRecord; 
             const { data, error } = await supabase
                 .from('Attendance')
-                .insert([payload as TablesInsert<'Attendance'>])
+                .insert([{ ...payload, user_id: userId } as TablesInsert<'Attendance'>])
                 .select()
                 .single();
             if (error) throw error;
@@ -243,19 +263,21 @@ export class SupabaseAttendanceRepository implements IAttendanceRepository {
         }
     }
 
-    async deleteAttendance(id: string): Promise<void> {
+    async deleteAttendance(id: string, userId: string): Promise<void> {
         const { error } = await supabase
             .from('Attendance')
             .delete()
-            .eq('id', id);
+            .eq('id', id)
+            .eq('user_id', userId);
         if (error) throw error;
     }
 
     /** Enregistre l'appel pour toute une classe en une seule requête (plus rapide). */
-    async bulkInsertAttendances(records: TablesInsert<'Attendance'>[]): Promise<Attendance[]> {
+    async bulkInsertAttendances(records: TablesInsert<'Attendance'>[], userId: string): Promise<Attendance[]> {
+        const recordsWithUser = records.map(r => ({ ...r, user_id: userId }));
         const { data, error } = await supabase
             .from('Attendance')
-            .insert(records)
+            .insert(recordsWithUser)
             .select();
         if (error) throw error;
         return data || [];
@@ -264,11 +286,12 @@ export class SupabaseAttendanceRepository implements IAttendanceRepository {
     // ==================== RAPPORTS ET EXPORTS ====================
 
     /** Liste les jours où l'enseignant a fait l'appel (pour naviguer dans l'historique). */
-    async getDistinctDates(setupId: string): Promise<string[]> {
+    async getDistinctDates(setupId: string, userId: string): Promise<string[]> {
         const { data, error } = await supabase
             .from('Attendance')
             .select('date')
             .eq('setup_id', setupId)
+            .eq('user_id', userId)
             .order('date', { ascending: false });
 
         if (error) throw error;
@@ -281,7 +304,8 @@ export class SupabaseAttendanceRepository implements IAttendanceRepository {
      * Utilise une boucle de chargement par pages (Pagination) pour ne pas saturer le réseau 
      * si l'école a des milliers de données.
      */
-    async getAttendanceRange(start: string, end: string): Promise<AttendanceWithCategory[]> {
+    async getAttendanceRange(start: string, end: string, userId: string): Promise<AttendanceWithCategory[]> {
+        if (!this.validateUserId(userId)) return [];
         let allData: any[] = [];
         let hasMore = true;
         let page = 0;
@@ -292,6 +316,7 @@ export class SupabaseAttendanceRepository implements IAttendanceRepository {
                 const { data, error } = await supabase
                     .from('Attendance')
                     .select('*, CategoriePresence(nom)')
+                    .eq('user_id', userId)
                     .gte('date', start)
                     .lte('date', end)
                     .range(page * pageSize, (page + 1) * pageSize - 1);
@@ -367,6 +392,7 @@ export class SupabaseAttendanceRepository implements IAttendanceRepository {
 
     /** Récupère les données d'appel optimisées pour l'affichage en liste sur mobile. */
     async getMobileData(userId: string, date: string): Promise<{ student: any, attendances: any }[]> {
+        if (!this.validateUserId(userId)) return [];
         const { data: groups } = await supabase.from('Groupe').select('id').eq('user_id', userId);
         const groupIds = groups?.map(g => g.id) || [];
         if (groupIds.length === 0) return [];
@@ -375,6 +401,7 @@ export class SupabaseAttendanceRepository implements IAttendanceRepository {
             .from('Eleve')
             .select('id, prenom, nom, photo_url, EleveGroupe!inner(groupe_id)')
             .in('EleveGroupe.groupe_id', groupIds)
+            .eq('titulaire_id', userId)
             .order('nom');
 
         if (!students || students.length === 0) return [];
@@ -401,6 +428,7 @@ export class SupabaseAttendanceRepository implements IAttendanceRepository {
 
     /** Calcule en temps réel le décompte des présents/absents pour le résumé d'accueil. */
     async getDailySummary(userId: string, date: string, period: string): Promise<{ present: number; absent: number; hasEncoding: boolean }> {
+        if (!this.validateUserId(userId)) return { present: 0, absent: 0, hasEncoding: false };
         const { data: groups } = await supabase.from('Groupe').select('id').eq('user_id', userId);
         const groupIds = groups?.map(g => g.id) || [];
         if (groupIds.length === 0) return { present: 0, absent: 0, hasEncoding: false };
@@ -408,7 +436,8 @@ export class SupabaseAttendanceRepository implements IAttendanceRepository {
         const { data: students } = await supabase
             .from('Eleve')
             .select('id, EleveGroupe!inner(groupe_id)')
-            .in('EleveGroupe.groupe_id', groupIds);
+            .in('EleveGroupe.groupe_id', groupIds)
+            .eq('titulaire_id', userId);
 
         if (!students) return { present: 0, absent: 0, hasEncoding: false };
         const studentIds = students.map(s => s.id);

@@ -47,7 +47,9 @@ export const useBranchIndices = () => {
      * On récupère la liste officielle des branches (Français, Maths, etc.).
      */
     const fetchBranches = useCallback(async () => {
-        const data = await moduleService.getBranches();
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+        const data = await moduleService.getBranches(user.id);
         setBranches(data);
     }, []);
 

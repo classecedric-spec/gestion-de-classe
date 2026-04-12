@@ -23,49 +23,49 @@ export interface IModuleRepository {
      * LECTURE GLOBALE :
      * Récupérer tous les modules avec leurs relations complètes (Sous-branches, Activités, Matériel, etc.).
      */
-    getAllModulesWithDetails(): Promise<ModuleWithRelations[]>;
+    getAllModulesWithDetails(userId: string): Promise<ModuleWithRelations[]>;
 
     /**
      * SUPPRESSION :
      * Effacer un module via son identifiant.
      */
-    deleteModule(moduleId: string): Promise<void>;
+    deleteModule(moduleId: string, userId: string): Promise<void>;
 
     /**
      * ÉTAT :
      * Mettre à jour si le module est "Actif", "Terminé", etc.
      */
-    updateModuleStatus(moduleId: string, newStatus: string): Promise<void>;
+    updateModuleStatus(moduleId: string, newStatus: string, userId: string): Promise<void>;
 
     /**
      * FILTRAGE :
      * Récupérer uniquement les modules en cours d'utilisation.
      */
-    getActiveModules(): Promise<any[]>;
+    getActiveModules(userId: string): Promise<any[]>;
 
     /**
      * RÉFÉRENTIELS :
      * Récupérer la liste des matières principales (Branches).
      */
-    getBranches(): Promise<Tables<'Branche'>[]>;
+    getBranches(userId: string): Promise<Tables<'Branche'>[]>;
 
     /**
      * LECTURE UNITAIRE :
      * Obtenir les détails complets d'un seul module précis.
      */
-    getModuleWithDetails(moduleId: string): Promise<any>;
+    getModuleWithDetails(moduleId: string, userId: string): Promise<any>;
 
     /**
      * ACTIONS DE CRÉATION ET MISE À JOUR
      */
-    createModule(data: TablesInsert<'Module'>): Promise<Tables<'Module'>>;
-    updateModule(id: string, data: TablesUpdate<'Module'>): Promise<void>;
+    createModule(data: TablesInsert<'Module'>, userId: string): Promise<Tables<'Module'>>;
+    updateModule(id: string, data: TablesUpdate<'Module'>, userId: string): Promise<void>;
 
     /**
      * SUIVI :
      * Identifier les activités qui sont en retard pour une classe donnée.
      */
-    getDetailedLateActivities(classId: string): Promise<any[]>;
+    getDetailedLateActivities(classId: string, userId: string): Promise<any[]>;
 }
 
 /**

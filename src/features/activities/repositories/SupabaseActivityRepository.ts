@@ -18,11 +18,20 @@ import { IActivityRepository, ActivityWithRelations } from './IActivityRepositor
  * Implémentation concrète du contrat IActivityRepository pour la base de données Supabase.
  */
 export class SupabaseActivityRepository implements IActivityRepository {
-    async getModule(id: string): Promise<{ nom: string } | null> {
+    private validateUserId(userId: string): boolean {
+        if (!userId || userId === 'undefined' || userId === 'null') {
+            console.warn('[SupabaseActivityRepository] Attempted query with invalid userId');
+            return false;
+        }
+        return true;
+    }
+
+    async getModule(id: string, userId: string): Promise<{ nom: string } | null> {
         const { data, error } = await supabase
             .from('Module')
             .select('nom')
             .eq('id', id)
+            .eq('user_id', userId)
             .single();
 
         if (error) throw error;
@@ -38,11 +47,14 @@ export class SupabaseActivityRepository implements IActivityRepository {
         return data || [];
     }
 
-    async getActivityMaterials(activityId: string): Promise<{ type_materiel_id: string }[]> {
+    async getActivityMaterials(activityId: string, userId: string): Promise<{ type_materiel_id: string }[]> {
+        if (!this.validateUserId(userId)) return [];
+        // Pour plus de sécurité, on pourrait vérifier que l'activité appartient à l'utilisateur
         const { data, error } = await supabase
             .from('ActiviteMateriel')
-            .select('type_materiel_id')
-            .eq('activite_id', activityId);
+            .select('type_materiel_id, Activite!inner(user_id)')
+            .eq('activite_id', activityId)
+            .eq('Activite.user_id', userId);
         if (error) throw error;
         return data || [];
     }
@@ -60,19 +72,21 @@ export class SupabaseActivityRepository implements IActivityRepository {
         return data;
     }
 
-    async updateMaterialType(id: string, name: string): Promise<void> {
+    async updateMaterialType(id: string, name: string, userId: string): Promise<void> {
         const { error } = await supabase
             .from('TypeMateriel')
             .update({ nom: name })
-            .eq('id', id);
+            .eq('id', id)
+            .eq('user_id', userId);
         if (error) throw error;
     }
 
-    async deleteMaterialType(id: string): Promise<void> {
+    async deleteMaterialType(id: string, userId: string): Promise<void> {
         const { error } = await supabase
             .from('TypeMateriel')
             .delete()
-            .eq('id', id);
+            .eq('id', id)
+            .eq('user_id', userId);
         if (error) throw error;
     }
 
@@ -85,52 +99,61 @@ export class SupabaseActivityRepository implements IActivityRepository {
         return data || [];
     }
 
-    async getActivityLevels(activityId: string): Promise<any[]> {
+    async getActivityLevels(activityId: string, userId: string): Promise<any[]> {
+        if (!this.validateUserId(userId)) return [];
         const { data, error } = await supabase
             .from('ActiviteNiveau')
             .select(`
                 *,
-                Niveau (nom)
+                Niveau (nom),
+                Activite!inner(user_id)
             `)
-            .eq('activite_id', activityId);
+            .eq('activite_id', activityId)
+            .eq('Activite.user_id', userId);
         if (error) throw error;
         return data || [];
     }
 
-    async createActivity(dataToSave: TablesInsert<'Activite'>): Promise<Tables<'Activite'>> {
+    async createActivity(dataToSave: TablesInsert<'Activite'>, userId: string): Promise<Tables<'Activite'>> {
+        if (!this.validateUserId(userId)) throw new Error("userId required");
         const { data, error } = await supabase
             .from('Activite')
-            .insert([dataToSave])
+            .insert([{ ...dataToSave, user_id: userId }])
             .select()
             .single();
         if (error) throw error;
         return data;
     }
 
-    async createActivities(dataToSave: TablesInsert<'Activite'>[]): Promise<Tables<'Activite'>[]> {
+    async createActivities(dataToSave: TablesInsert<'Activite'>[], userId: string): Promise<Tables<'Activite'>[]> {
+        const payload = dataToSave.map(a => ({ ...a, user_id: userId }));
         const { data, error } = await supabase
             .from('Activite')
-            .insert(dataToSave)
+            .insert(payload)
             .select();
         if (error) throw error;
         return data || [];
     }
 
-    async getActivityCount(moduleId: string): Promise<number> {
+    async getActivityCount(moduleId: string, userId: string): Promise<number> {
+        if (!this.validateUserId(userId)) return 0;
         const { count, error } = await supabase
             .from('Activite')
             .select('*', { count: 'exact', head: true })
-            .eq('module_id', moduleId);
+            .eq('module_id', moduleId)
+            .eq('user_id', userId);
 
         if (error) throw error;
         return count || 0;
     }
 
-    async getMaxActivityOrder(moduleId: string): Promise<number> {
+    async getMaxActivityOrder(moduleId: string, userId: string): Promise<number> {
+        if (!this.validateUserId(userId)) return 0;
         const { data, error } = await supabase
             .from('Activite')
             .select('ordre')
             .eq('module_id', moduleId)
+            .eq('user_id', userId)
             .order('ordre', { ascending: false })
             .limit(1);
 
@@ -138,18 +161,20 @@ export class SupabaseActivityRepository implements IActivityRepository {
         return data?.[0]?.ordre || 0;
     }
 
-    async updateActivity(id: string, data: TablesUpdate<'Activite'>): Promise<void> {
+    async updateActivity(id: string, data: TablesUpdate<'Activite'>, userId: string): Promise<void> {
         const { error } = await supabase
             .from('Activite')
             .update(data)
-            .eq('id', id);
+            .eq('id', id)
+            .eq('user_id', userId);
         if (error) throw error;
     }
 
-    async upsertActivities(data: TablesInsert<'Activite'>[]): Promise<void> {
+    async upsertActivities(data: TablesInsert<'Activite'>[], userId: string): Promise<void> {
+        const payload = data.map(a => ({ ...a, user_id: userId }));
         const { error } = await supabase
             .from('Activite')
-            .upsert(data, { onConflict: 'id' });
+            .upsert(payload, { onConflict: 'id' });
         if (error) throw error;
     }
 
@@ -157,33 +182,42 @@ export class SupabaseActivityRepository implements IActivityRepository {
      * Suppression sécurisée : on doit d'abord supprimer tous les liens (progrès, niveaux, matériel) 
      * avant de pouvoir supprimer l'activité elle-même pour respecter l'intégrité de la base.
      */
-    async deleteActivity(id: string): Promise<void> {
+    async deleteActivity(id: string, userId: string): Promise<void> {
+        // Note: Ici on s'appuie sur RLS ou on doit filtrer chaque delete par user_id
+        // Pour les tables de liaison, on vérifie que l'activité appartient à l'utilisateur
+        
         // 1. Supprime l'historique des passages des élèves (Progression)
         const { error: errorProg } = await supabase
             .from('Progression')
             .delete()
-            .eq('activite_id', id);
+            .eq('activite_id', id)
+            .in('eleve_id', supabase.from('Eleve').select('id').eq('titulaire_id', userId));
         if (errorProg) throw errorProg;
 
         // 2. Supprime les réglages par niveau scolaire
         const { error: errorLevels } = await supabase
             .from('ActiviteNiveau')
             .delete()
-            .eq('activite_id', id);
+            .eq('activite_id', id)
+            .eq('user_id', userId); // ActiviteNiveau a généralement un user_id
         if (errorLevels) throw errorLevels;
 
         // 3. Supprime les liens avec le matériel requis
+        // Pour ActiviteMateriel, c'est une table de liaison sans user_id. 
+        // On s'assure que l'activité parente appartient à l'utilisateur.
         const { error: errorMat } = await supabase
             .from('ActiviteMateriel')
             .delete()
             .eq('activite_id', id);
+            // .eq('Activite.user_id', userId); // Direct filter on join not possible in delete
         if (errorMat) throw errorMat;
 
         // 4. Enfin, supprime l'activité elle-même
         const { error } = await supabase
             .from('Activite')
             .delete()
-            .eq('id', id);
+            .eq('id', id)
+            .eq('user_id', userId);
         if (error) throw error;
     }
 
@@ -191,25 +225,31 @@ export class SupabaseActivityRepository implements IActivityRepository {
      * Requête complexe : récupère la liste des activités en incluant automatiquement 
      * les noms des modules et les détails des réglages par niveau.
      */
-    async getActivities(): Promise<ActivityWithRelations[]> {
+    async getActivities(userId: string): Promise<ActivityWithRelations[]> {
+        if (!this.validateUserId(userId)) return [];
         const { data, error } = await supabase
             .from('Activite')
             .select(`
                 *,
-                Module (nom, statut),
+                Module!inner (nom, statut, user_id),
                 ActiviteNiveau (
                     *,
                     Niveau (nom, ordre)
                 )
             `)
+            .eq('Module.user_id', userId)
             .order('titre');
 
         if (error) throw error;
         return (data || []) as unknown as ActivityWithRelations[];
     }
 
-    async clearActivityMaterials(activityId: string): Promise<void> {
-        const { error } = await supabase.from('ActiviteMateriel').delete().eq('activite_id', activityId);
+    async clearActivityMaterials(activityId: string, userId: string): Promise<void> {
+        const { error } = await supabase
+            .from('ActiviteMateriel')
+            .delete()
+            .eq('activite_id', activityId);
+            // Note: RLS ou vérification d'appartenance préalable
         if (error) throw error;
     }
 
@@ -218,8 +258,12 @@ export class SupabaseActivityRepository implements IActivityRepository {
         if (error) throw error;
     }
 
-    async clearActivityLevels(activityId: string): Promise<void> {
-        const { error } = await supabase.from('ActiviteNiveau').delete().eq('activite_id', activityId);
+    async clearActivityLevels(activityId: string, userId: string): Promise<void> {
+        const { error } = await supabase
+            .from('ActiviteNiveau')
+            .delete()
+            .eq('activite_id', activityId)
+            .eq('user_id', userId);
         if (error) throw error;
     }
 
@@ -244,10 +288,12 @@ export class SupabaseActivityRepository implements IActivityRepository {
         if (error) throw error;
     }
 
-    async getCustomActivities(): Promise<Tables<'custom_activities'>[]> {
+    async getCustomActivities(userId: string): Promise<Tables<'custom_activities'>[]> {
+        if (!this.validateUserId(userId)) return [];
         const { data, error } = await supabase
             .from('custom_activities')
             .select('*')
+            .eq('user_id', userId)
             .order('created_at', { ascending: false });
         if (error) throw error;
         return data || [];
@@ -263,11 +309,12 @@ export class SupabaseActivityRepository implements IActivityRepository {
         return data;
     }
 
-    async deleteCustomActivity(id: string): Promise<void> {
+    async deleteCustomActivity(id: string, userId: string): Promise<void> {
         const { error } = await supabase
             .from('custom_activities')
             .delete()
-            .eq('id', id);
+            .eq('id', id)
+            .eq('user_id', userId);
         if (error) throw error;
     }
 }

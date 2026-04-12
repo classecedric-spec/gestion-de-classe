@@ -26,16 +26,16 @@ export class ModuleService {
      * RÉCUPÉRATION GLOBALE :
      * Demande la liste de tous les modules avec leurs activités et matériels.
      */
-    async getAllModules(): Promise<ModuleWithRelations[]> {
-        return await this.repository.getAllModulesWithDetails();
+    async getAllModules(userId: string): Promise<ModuleWithRelations[]> {
+        return await this.repository.getAllModulesWithDetails(userId);
     }
 
     /**
      * SUPPRESSION :
      * Demande l'effacement définitif d'un module.
      */
-    async deleteModule(moduleId: string): Promise<void> {
-        await this.repository.deleteModule(moduleId);
+    async deleteModule(moduleId: string, userId: string): Promise<void> {
+        await this.repository.deleteModule(moduleId, userId);
     }
 
     /**
@@ -45,7 +45,7 @@ export class ModuleService {
      * - Si le module est EN COURS -> il passe en ARCHIVE (fini).
      * - Si le module est en ARCHIVE -> l'enseignant peut le remettre EN COURS.
      */
-    async toggleModuleStatus(module: ModuleWithRelations): Promise<ModuleWithRelations> {
+    async toggleModuleStatus(module: ModuleWithRelations, userId: string): Promise<ModuleWithRelations> {
         const currentStatus = module.statut || 'en_preparation';
         let newStatus = 'en_cours';
 
@@ -53,7 +53,7 @@ export class ModuleService {
         else if (currentStatus === 'en_cours') newStatus = 'archive';
         else if (currentStatus === 'archive') newStatus = 'en_cours';
 
-        await this.repository.updateModuleStatus(module.id, newStatus);
+        await this.repository.updateModuleStatus(module.id, newStatus, userId);
 
         return { ...module, statut: newStatus };
     }
@@ -62,36 +62,36 @@ export class ModuleService {
      * FILTRAGE :
      * Récupère uniquement les modules sur lesquels les élèves travaillent en ce moment.
      */
-    async getActiveModules(): Promise<any[]> {
-        return await this.repository.getActiveModules();
+    async getActiveModules(userId: string): Promise<any[]> {
+        return await this.repository.getActiveModules(userId);
     }
 
     /**
      * RÉFÉRENTIELS :
      * Fournit la liste des matières (Maths, Français, etc.) disponibles pour classer les modules.
      */
-    async getBranches(): Promise<Tables<'Branche'>[]> {
-        return await this.repository.getBranches();
+    async getBranches(userId: string): Promise<Tables<'Branche'>[]> {
+        return await this.repository.getBranches(userId);
     }
 
     /**
      * LECTURE UNITAIRE :
      * Récupère le dossier complet d'un module spécifique.
      */
-    async getModuleDetails(moduleId: string): Promise<ModuleWithRelations> {
-        return await this.repository.getModuleWithDetails(moduleId);
+    async getModuleDetails(moduleId: string, userId: string): Promise<ModuleWithRelations> {
+        return await this.repository.getModuleWithDetails(moduleId, userId);
     }
 
     /**
      * CRÉATION ET MISE À JOUR :
      * Transmet les ordres de création ou de modification au système de stockage.
      */
-    async createModule(data: any): Promise<Tables<'Module'>> {
-        return await this.repository.createModule(data);
+    async createModule(data: any, userId: string): Promise<Tables<'Module'>> {
+        return await this.repository.createModule(data, userId);
     }
 
-    async updateModule(id: string, data: any): Promise<void> {
-        await this.repository.updateModule(id, data);
+    async updateModule(id: string, data: any, userId: string): Promise<void> {
+        await this.repository.updateModule(id, data, userId);
     }
 }
 

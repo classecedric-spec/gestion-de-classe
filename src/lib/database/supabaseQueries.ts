@@ -1,5 +1,5 @@
 import { supabase } from '../database';
-import type { Database } from '../types/supabase';
+import type { Database } from '../../types/supabase';
 
 export type TableName = keyof Database['public']['Tables'];
 export type Row<T extends TableName> = Database['public']['Tables'][T]['Row'];

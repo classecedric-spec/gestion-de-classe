@@ -18,46 +18,46 @@ export interface ITrackingRepository {
     /**
      * Récupère l'historique des exercices pour un groupe d'élèves.
      */
-    fetchProgressions(studentIds: string[], states: string[]): Promise<ProgressionWithDetails[]>;
+    fetchProgressions(studentIds: string[], states: string[], userId: string): Promise<ProgressionWithDetails[]>;
 
     /**
      * Change l'état d'un exercice (ex: passe de "En cours" à "Terminé").
      */
-    updateProgressionStatus(id: string, newState: string, isSuivi: boolean): Promise<void>;
+    updateProgressionStatus(id: string, newState: string, isSuivi: boolean, userId: string): Promise<void>;
 
     /**
      * Supprime une trace d'avancement.
      */
-    deleteProgression(id: string): Promise<void>;
+    deleteProgression(id: string, userId: string): Promise<void>;
 
     /**
      * Enregistre plusieurs avancements d'un coup (importation massive).
      */
-    createProgressions(progressions: TablesInsert<'Progression'>[]): Promise<void>;
+    createProgressions(progressions: TablesInsert<'Progression'>[], userId: string): Promise<void>;
 
     /**
      * Enregistre ou met à jour un avancement s'il existe déjà.
      */
-    upsertProgression(progression: TablesInsert<'Progression'>): Promise<void>;
+    upsertProgression(progression: TablesInsert<'Progression'>, userId: string): Promise<void>;
 
     // ==================== L'ENTRAIDE (HELPERS) ====================
 
     /**
      * Trouve les élèves qui ont déjà fini un exercice précis (pour suggérer des tuteurs).
      */
-    findStudentsByActivityStatus(activityId: string, studentIds: string[], status: string): Promise<StudentBasicInfo[]>;
+    findStudentsByActivityStatus(activityId: string, studentIds: string[], status: string, userId: string): Promise<StudentBasicInfo[]>;
 
     // ==================== LES GROUPES / CLASSES ====================
 
     /**
      * Récupère le nom d'une classe par son code.
      */
-    getGroupInfo(groupId: string): Promise<{ nom: string } | null>;
+    getGroupInfo(groupId: string, userId: string): Promise<{ nom: string } | null>;
 
     /**
      * Récupère la liste complète des élèves d'une classe.
      */
-    getStudentsInGroup(groupId: string): Promise<{ ids: string[], full: Tables<'Eleve'>[] }>;
+    getStudentsInGroup(groupId: string, userId: string): Promise<{ ids: string[], full: Tables<'Eleve'>[] }>;
 
     // ==================== PRÉFÉRENCES DE L'UTILISATEUR ====================
 
@@ -74,60 +74,60 @@ export interface ITrackingRepository {
     // ==================== DONNÉES PÉDAGOGIQUES ====================
     
     /** Récupère les élèves pour l'affichage de la grille de suivi. */
-    getStudentsForPedago(groupId: string): Promise<any[]>;
+    getStudentsForPedago(groupId: string, userId: string): Promise<any[]>;
     
     /** Liste les chapitres disponibles pour un niveau scolaire donné. */
-    fetchModulesForStudent(levelId: string | null): Promise<any[]>;
+    fetchModulesForStudent(levelId: string | null, userId: string): Promise<any[]>;
     
     /** Liste les chapitres pour l'interface mobile. */
-    fetchMobileModules(): Promise<any[]>;
+    fetchMobileModules(userId: string): Promise<any[]>;
     
     /** Liste tous les exercices à l'intérieur d'un chapitre. */
-    fetchActivitiesForModule(moduleId: string): Promise<any[]>;
+    fetchActivitiesForModule(moduleId: string, userId: string): Promise<any[]>;
     
     /** Récupère les avancées globales de toute la classe. */
-    fetchGroupProgressions(studentIds: string[]): Promise<any[]>;
+    fetchGroupProgressions(studentIds: string[], userId: string): Promise<any[]>;
     
     /** Crée une carte (dictionnaire) des progrès d'un élève pour un accès rapide. */
-    fetchStudentProgressionsMap(studentId: string): Promise<Record<string, string>>;
+    fetchStudentProgressionsMap(studentId: string, userId: string): Promise<Record<string, string>>;
 
     // ==================== TABLEAU DE BORD (STATS) ====================
     
     /** Calcule le nombre de mains levées et de validations faites aujourd'hui. */
-    getDashboardStats(filterStudentIds: string[] | null): Promise<{ helpPending: number; validationsToday: number }>;
+    getDashboardStats(filterStudentIds: string[] | null, userId: string): Promise<{ helpPending: number; validationsToday: number }>;
 
     // ==================== RECHERCHES SPÉCIFIQUES (TBI/Vision) ====================
     
     /** Récupère les chapitres avec leurs pourcentages d'avancement. */
-    getModulesWithProgressions(studentId: string, levelId?: string): Promise<any[]>;
+    getModulesWithProgressions(studentId: string, userId: string, levelId?: string): Promise<any[]>;
     
     /** Détaille tous les exercices d'un chapitre pour un élève précis. */
-    getModuleActivitiesAndProgressions(moduleId: string, studentId: string): Promise<{ activities: any[], progressions: any[] }>;
+    getModuleActivitiesAndProgressions(moduleId: string, studentId: string, userId: string): Promise<{ activities: any[], progressions: any[] }>;
     
     /** Liste toutes les demandes d'aide en cours pour la classe. */
-    getHelpRequests(studentIds: string[]): Promise<any[]>;
+    getHelpRequests(studentIds: string[], userId: string): Promise<any[]>;
     
     /** Statistiques d'état pour une liste d'exercices. */
-    getProgressionStatsForActivities(activityIds: string[]): Promise<{ activite_id: string, etat: string }[]>;
+    getProgressionStatsForActivities(activityIds: string[], userId: string): Promise<{ activite_id: string, etat: string }[]>;
     
     /** Qui a fait quoi sur un exercice précis. */
-    fetchProgressionsByActivity(activityId: string): Promise<any[]>;
+    fetchProgressionsByActivity(activityId: string, userId: string): Promise<any[]>;
     
     /** Historique complet et détaillé d'un élève. */
-    fetchStudentProgressDetails(studentId: string): Promise<any[]>;
+    fetchStudentProgressDetails(studentId: string, userId: string): Promise<any[]>;
     
     /** Liste les exercices appartenant à plusieurs chapitres. */
-    getActivitiesByModules(moduleIds: string[]): Promise<any[]>;
+    getActivitiesByModules(moduleIds: string[], userId: string): Promise<any[]>;
     
     /** Récupère les liens entre élèves et exercices spécifiques. */
-    getProgressionsForStudentsAndActivities(studentIds: string[], activityIds: string[]): Promise<any[]>;
+    getProgressionsForStudentsAndActivities(studentIds: string[], activityIds: string[], userId: string): Promise<any[]>;
     
     /** Met à jour le score de confiance algorithmique d'un élève. */
-    updateStudentTrust(eleveId: string, branchId: string, adjustment: number, trend: 'up' | 'down' | 'stable'): Promise<void>;
+    updateStudentTrust(eleveId: string, branchId: string, adjustment: number, trend: 'up' | 'down' | 'stable', userId: string): Promise<void>;
 
     // Gestion des envois hebdomadaires
     /** Liste les exercices non terminés après une date limite. */
-    getUnfinishedModulesByDate(studentId: string, date: string): Promise<any[]>;
+    getUnfinishedModulesByDate(studentId: string, date: string, userId: string): Promise<any[]>;
 }
 
 export type { ProgressionWithDetails, StudentBasicInfo };

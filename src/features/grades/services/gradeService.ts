@@ -24,69 +24,69 @@ export interface GradeStats {
 export class GradeService {
     constructor(private repository: IGradeRepository) {}
 
-    async getEvaluations(brancheId?: string, periode?: string) {
-        return this.repository.findEvaluationsByContext(brancheId, periode);
+    async getEvaluations(userId: string, brancheId?: string, periode?: string) {
+        return this.repository.findEvaluationsByContext(userId, brancheId, periode);
     }
 
-    async getAllEvaluationsDetailed() {
-        return this.repository.findAllEvaluationsDetailed();
+    async getAllEvaluationsDetailed(userId: string) {
+        return this.repository.findAllEvaluationsDetailed(userId);
     }
 
-    async getAllResultsDetailed() {
-        return this.repository.findAllResultsDetailed();
+    async getAllResultsDetailed(userId: string) {
+        return this.repository.findAllResultsDetailed(userId);
     }
 
     // Processus de création d'un devoir : on crée d'abord la coquille vide (l'évaluation physique en DB), puis s'il y a des petites questions dictées par le prof, le service les greffe automatiquement à la nouvelle coquille.
-    async createEvaluation(evaluation: TablesInsert<'Evaluation'>, questions?: { id?: string, titre: string, note_max: number, ratio: number, ordre: number }[], regroupements?: any[]) {
-        const ev = await this.repository.createEvaluation(evaluation);
+    async createEvaluation(evaluation: TablesInsert<'Evaluation'>, userId: string, questions?: { id?: string, titre: string, note_max: number, ratio: number, ordre: number }[], regroupements?: any[]) {
+        const ev = await this.repository.createEvaluation(evaluation, userId);
         
         if (questions && questions.length > 0) {
             await this.repository.createQuestions(questions.map(q => ({
                 ...q,
                 evaluation_id: ev.id
-            })) as any);
+            })) as any, userId);
         }
-
+ 
         if (regroupements && regroupements.length > 0) {
             await this.repository.upsertRegroupements(regroupements.map((r, idx) => ({
                 ...r,
                 evaluation_id: ev.id,
                 ordre: r.ordre ?? idx
-            })));
+            })), userId);
         }
         
         return ev;
     }
 
-    async updateEvaluation(id: string, evaluation: TablesUpdate<'Evaluation'>, questions?: { id?: string, titre: string, note_max: number, ratio: number, ordre: number }[], regroupements?: any[]) {
-        const ev = await this.repository.updateEvaluation(id, evaluation);
+    async updateEvaluation(id: string, evaluation: TablesUpdate<'Evaluation'>, userId: string, questions?: { id?: string, titre: string, note_max: number, ratio: number, ordre: number }[], regroupements?: any[]) {
+        const ev = await this.repository.updateEvaluation(id, evaluation, userId);
         
         // Questions handling
         if (questions) {
-            const existingQuestions = await this.repository.findQuestionsByEvaluation(id);
+            const existingQuestions = await this.repository.findQuestionsByEvaluation(id, userId);
             const newQuestionIds = questions.map(q => q.id).filter(qid => !!qid);
             const toDelete = existingQuestions.filter(eq => !newQuestionIds.includes(eq.id));
             
             for (const q of toDelete) {
-                await this.repository.deleteQuestion(q.id);
+                await this.repository.deleteQuestion(q.id, userId);
             }
             
             if (questions.length > 0) {
                 await this.repository.upsertQuestions(questions.map(q => ({
                     ...q,
                     evaluation_id: ev.id
-                })) as any);
+                })) as any, userId);
             }
         }
 
         // Regroupements handling
         if (regroupements) {
-            const existingRegroups = await this.repository.findRegroupementsByEvaluation(id);
+            const existingRegroups = await this.repository.findRegroupementsByEvaluation(id, userId);
             const newRegroupIds = regroupements.map(r => r.id).filter(rid => !!rid);
             const toDelete = existingRegroups.filter(er => !newRegroupIds.includes(er.id));
 
             for (const r of toDelete) {
-                await this.repository.deleteRegroupement(r.id);
+                await this.repository.deleteRegroupement(r.id, userId);
             }
 
             if (regroupements.length > 0) {
@@ -97,44 +97,77 @@ export class GradeService {
                         evaluation_id: ev.id,
                         ordre: r.ordre ?? idx
                     };
-                }));
+                }), userId);
             }
         }
 
         return ev;
     }
 
-    async deleteEvaluation(id: string) {
-        return this.repository.deleteEvaluation(id);
+    async deleteEvaluation(id: string, userId: string) {
+        return this.repository.deleteEvaluation(id, userId);
     }
 
-    async getQuestions(evaluationId: string) {
-        return this.repository.findQuestionsByEvaluation(evaluationId);
+    async getDeletedEvaluations(userId: string) {
+        return this.repository.findDeletedEvaluations(userId);
     }
 
-    async getRegroupements(evaluationId: string) {
-        return this.repository.findRegroupementsByEvaluation(evaluationId);
+    async restoreEvaluation(id: string, userId: string) {
+        return this.repository.restoreEvaluation(id, userId);
     }
 
-    async getResults(evaluationId: string) {
-        return this.repository.getResultsWithStudents(evaluationId);
+    async permanentDeleteEvaluation(id: string, userId: string) {
+        return this.repository.permanentDeleteEvaluation(id, userId);
     }
 
-    async getResultsForEvaluations(evaluationIds: string[]) {
-        return this.repository.findResultsByEvaluations(evaluationIds);
+    async getQuestions(evaluationId: string, userId: string) {
+        return this.repository.findQuestionsByEvaluation(evaluationId, userId);
     }
 
-    async getQuestionResults(evaluationId: string) {
-        return this.repository.findQuestionResultsByEvaluation(evaluationId);
+    async getRegroupements(evaluationId: string, userId: string) {
+        return this.repository.findRegroupementsByEvaluation(evaluationId, userId);
     }
 
-    async saveResult(result: TablesInsert<'Resultat'>) {
-        return this.repository.upsertResult(result);
+    async getResults(userId: string, evaluationId: string) {
+        return this.repository.getResultsWithStudents(userId, evaluationId);
     }
 
-    async saveQuestionResults(results: TablesInsert<'ResultatQuestion'>[]) {
+    async getResultsForEvaluations(evaluationIds: string[], userId: string) {
+        if (!userId) {
+            console.error('[GradeService] getResultsForEvaluations called without userId');
+            return [];
+        }
+        return this.repository.findResultsByEvaluations(evaluationIds, userId);
+    }
+
+    async getQuestionResults(evaluationId: string, userId: string) {
+        return this.repository.findQuestionResultsByEvaluation(evaluationId, userId);
+    }
+
+    async getQuestionsForEvaluations(evaluationIds: string[], userId: string) {
+        return this.repository.findQuestionsByEvaluations(evaluationIds, userId);
+    }
+    
+    async getQuestionResultsForEvaluations(evaluationIds: string[], userId: string) {
+        return this.repository.findQuestionResultsByEvaluations(evaluationIds, userId);
+    }
+
+    async getRegroupementsForEvaluations(evaluationIds: string[], userId: string) {
+        return this.repository.findRegroupementsByEvaluations(evaluationIds, userId);
+    }
+
+    async saveResult(result: TablesInsert<'Resultat'>, userId: string) {
+        return this.repository.upsertResult(result, userId);
+    }
+
+    async saveResults(results: TablesInsert<'Resultat'>[], userId: string) {
         if (results.length === 0) return [];
-        return this.repository.upsertQuestionResults(results);
+        return this.repository.upsertResults(results, userId);
+    }
+
+    async saveQuestionResults(results: TablesInsert<'ResultatQuestion'>[], userId: string) {
+        if (results.length === 0) return [];
+        return this.repository.upsertQuestionResults(results, userId);
     }
 
     async batchSaveResults(evaluationId: string, userId: string, studentIds: string[], note?: number, statut: string = 'present') {
@@ -145,25 +178,25 @@ export class GradeService {
                 eleve_id: studentId,
                 note,
                 statut
-            })
+            }, userId)
         );
         return Promise.all(promises);
     }
 
     // TypeNote CRUD
-    async getNoteTypes() {
-        return this.repository.findAllNoteTypes();
+    async getNoteTypes(userId: string) {
+        return this.repository.findAllNoteTypes(userId);
     }
 
-    async saveNoteType(typeNote: any) {
+    async saveNoteType(typeNote: any, userId: string) {
         if (typeNote.id) {
-            return this.repository.updateNoteType(typeNote.id, typeNote);
+            return this.repository.updateNoteType(typeNote.id, typeNote, userId);
         }
-        return this.repository.createNoteType(typeNote);
+        return this.repository.createNoteType(typeNote, userId);
     }
 
-    async deleteNoteType(id: string) {
-        return this.repository.deleteNoteType(id);
+    async deleteNoteType(id: string, userId: string) {
+        return this.repository.deleteNoteType(id, userId);
     }
 
     // Calcule la note finale d'un élève pour une évaluation donnée, soit à partir de sa note globale, soit en sommant ses critères (questions).

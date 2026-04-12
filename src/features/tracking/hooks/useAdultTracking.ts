@@ -47,11 +47,14 @@ export function useAdultTracking() {
      * Récupère ce qui a déjà été noté pour aujourd'hui.
      */
     const fetchAdultTracking = async () => {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+
         await fetchWithCache(
             'adult_tracking_today',
             async () => {
                 const today = new Date().toISOString().split('T')[0];
-                return await adultService.fetchAdultActivities(today);
+                return await adultService.fetchAdultActivities(today, user.id);
             },
             (data) => setAdultActivities(data as AdultActivity[]),
             (_err) => { }
@@ -63,10 +66,13 @@ export function useAdultTracking() {
      * Charge les noms des adultes et les types de tâches possibles.
      */
     const fetchAllAdults = async () => {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+
         await fetchWithCache(
             'all_adults',
             async () => {
-                return await adultService.fetchAllAdults();
+                return await adultService.fetchAllAdults(user.id);
             },
             (data) => setAllAdults(data as Adult[]),
             (_err) => { }
@@ -74,10 +80,13 @@ export function useAdultTracking() {
     };
 
     const fetchActivityTypes = async () => {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+
         await fetchWithCache(
             'activity_types_adult',
             async () => {
-                return await adultService.fetchActivityTypes();
+                return await adultService.fetchActivityTypes(user.id);
             },
             (data) => setAvailableActivityTypes(data as ActivityType[]),
             (_err) => { }

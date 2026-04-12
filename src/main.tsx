@@ -12,7 +12,7 @@ if (!rootElement) throw new Error('Failed to find the root element');
 
 createRoot(rootElement).render(
     <StrictMode>
-        <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+        <Router>
             <ThemeProvider>
                 <OfflineSyncProvider>
                     <App />

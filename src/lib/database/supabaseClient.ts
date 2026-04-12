@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
-import type { Database } from '../types/supabase';
+import type { Database } from '../../types/supabase';
 
 // Use import.meta.env for Vite environment variables
 // Add type casting to satisfy TypeScript since it might not see the env shim yet

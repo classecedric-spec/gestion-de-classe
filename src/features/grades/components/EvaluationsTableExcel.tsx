@@ -10,8 +10,9 @@
  * Ce que ça affiche : Un grand tableau listant les devoirs avec leurs attributs (date, moyenne, matière). Les colonnes peuvent être cliquées pour trier, glissées pour réorganiser, ou étirées pour s'élargir.
  */
 
-import React, { useState, useRef, useEffect } from 'react';
-import { Table, Filter, ArrowUp, ArrowDown, Search, X, ChevronRight, Loader2, BarChart3, Trash2, Edit2, Download, Info as InfoIcon } from 'lucide-react';
+import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
+import { createPortal } from 'react-dom';
+import { Table, Filter, ArrowUp, ArrowDown, Search, X, ChevronRight, Loader2, BarChart3, Trash2, Edit2, Download, Info as InfoIcon, FileText } from 'lucide-react';
 import { CardInfo, ConfirmModal } from '../../../core';
 import { useAllEvaluations } from '../hooks/useAllEvaluations';
 import { useGradeMutations } from '../hooks/useGrades';
@@ -80,31 +81,36 @@ const EvaluationsTableExcel: React.FC<EvaluationsTableExcelProps> = ({
 
     useEffect(() => {
         if (!loadingColumns && savedColumns) {
-            const merged = savedColumns.filter(c => DEFAULT_COLUMNS.some(dc => dc.id === c.id));
+            const merged = savedColumns
+                .filter(c => DEFAULT_COLUMNS.some(dc => dc.id === c.id))
+                .map(c => ({
+                    ...c,
+                    width: Math.max(c.width, getMinColumnWidth(c.id))
+                }));
             const missing = DEFAULT_COLUMNS.filter(dc => !merged.some(mc => mc.id === dc.id));
             setColumns([...merged, ...missing]);
         }
     }, [savedColumns, loadingColumns]);
 
-    const savePreferences = (newCols: ColumnConfig[]) => {
+    const savePreferences = useCallback((newCols: ColumnConfig[]) => {
         setColumns(newCols);
         setSavedColumns(newCols);
-    };
+    }, [setSavedColumns]);
 
     // Prépare la mécanique complexe permettant de cliquer, maintenir et glisser une colonne (drag and drop) pour la déplacer ailleurs dans le tableau.
     const [draggedColumnIndex, setDraggedColumnIndex] = useState<number | null>(null);
 
-    const handleDragStart = (e: React.DragEvent, index: number) => {
+    const handleDragStart = useCallback((e: React.DragEvent, index: number) => {
         setDraggedColumnIndex(index);
         e.dataTransfer.effectAllowed = 'move';
-    };
+    }, []);
 
-    const handleDragOver = (e: React.DragEvent) => {
+    const handleDragOver = useCallback((e: React.DragEvent) => {
         e.preventDefault();
         e.dataTransfer.dropEffect = 'move';
-    };
+    }, []);
 
-    const handleDrop = (e: React.DragEvent, dropIndex: number) => {
+    const handleDrop = useCallback((e: React.DragEvent, dropIndex: number) => {
         e.preventDefault();
         if (draggedColumnIndex === null || draggedColumnIndex === dropIndex) return;
         const newCols = [...columns];
@@ -113,6 +119,15 @@ const EvaluationsTableExcel: React.FC<EvaluationsTableExcelProps> = ({
         newCols.splice(dropIndex, 0, draggedCol);
         savePreferences(newCols);
         setDraggedColumnIndex(null);
+    }, [draggedColumnIndex, columns, savePreferences]);
+
+    // Aide pour calculer la largeur minimale d'une colonne en fonction de son titre (5px + texte + 5px)
+    const getMinColumnWidth = (colId: ColumnId): number => {
+        const label = COLUMN_LABELS[colId];
+        if (!label) return 60; // Largeur par défaut pour les colonnes sans titre (ex: actions)
+        
+        // Estimation : environ 8px par caractère pour du texte gras en petites majuscules + 10px de marge + 20px pour les icônes (filtre/tri)
+        return (label.length * 8) + 10 + 20;
     };
 
     // Prépare la mécanique visuelle qui permet d'attraper le bord d'une colonne avec la souris pour l'élargir ou la rétrécir.
@@ -120,23 +135,31 @@ const EvaluationsTableExcel: React.FC<EvaluationsTableExcelProps> = ({
     const [startX, setStartX] = useState<number | null>(null);
     const [startWidth, setStartWidth] = useState<number | null>(null);
 
-    const handleResizeStart = (e: React.MouseEvent, index: number) => {
+    const handleResizeStart = useCallback((e: React.MouseEvent, index: number) => {
         e.preventDefault();
         e.stopPropagation();
         setResizingColumnIndex(index);
         setStartX(e.clientX);
         setStartWidth(columns[index].width);
-    };
+    }, [columns]);
 
     useEffect(() => {
+        let frameId: number;
         const handleMouseMove = (e: MouseEvent) => {
             if (resizingColumnIndex === null || startX === null || startWidth === null) return;
-            const diff = e.clientX - startX;
-            const newWidth = Math.max(60, startWidth + diff);
-            setColumns(prev => {
-                const updated = [...prev];
-                updated[resizingColumnIndex] = { ...updated[resizingColumnIndex], width: newWidth };
-                return updated;
+            
+            cancelAnimationFrame(frameId);
+            frameId = requestAnimationFrame(() => {
+                const diff = e.clientX - startX;
+                const minWidth = getMinColumnWidth(columns[resizingColumnIndex].id);
+                const newWidth = Math.max(minWidth, startWidth + diff);
+                
+                setColumns(prev => {
+                    const updated = [...prev];
+                    if (updated[resizingColumnIndex].width === newWidth) return prev;
+                    updated[resizingColumnIndex] = { ...updated[resizingColumnIndex], width: newWidth };
+                    return updated;
+                });
             });
         };
 
@@ -158,33 +181,35 @@ const EvaluationsTableExcel: React.FC<EvaluationsTableExcelProps> = ({
         }
 
         return () => {
+            cancelAnimationFrame(frameId);
             window.removeEventListener('mousemove', handleMouseMove);
             window.removeEventListener('mouseup', handleMouseUp);
         };
-    }, [resizingColumnIndex, startX, startWidth, setSavedColumns]);
+    }, [resizingColumnIndex, startX, startWidth, setSavedColumns, columns]);
 
     // Prépare la mécanique pour mettre le tableau en ordre (ex: classer alphabétiquement par titre, ou par moyenne de la plus haute à la plus basse).
     const [sortColumn, setSortColumn] = useState<ColumnId | null>(null);
     const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
 
-    const handleSort = (colId: ColumnId) => {
-        if (sortColumn === colId) {
-            if (sortDirection === 'asc') {
-                setSortDirection('desc');
-            } else {
-                setSortColumn(null);
-                setSortDirection('asc');
+    // Calcul de la largeur totale du tableau pour forcer l'ascenseur horizontal
+    const totalTableWidth = useMemo(() => columns.reduce((acc, col) => acc + col.width, 0), [columns]);
+
+    const handleSort = useCallback((colId: ColumnId) => {
+        setSortColumn(current => {
+            if (current === colId) {
+                setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
+                return prev === 'desc' ? null : colId; // Cycle: asc -> desc -> none
             }
-        } else {
-            setSortColumn(colId);
             setSortDirection('asc');
-        }
-    };
+            return colId;
+        });
+    }, []);
 
     // Filters
     const [searchQuery, setSearchQuery] = useState('');
     const [isSearchOpen, setIsSearchOpen] = useState(false);
     const searchMenuRef = useRef<HTMLDivElement>(null);
+    const searchTriggerRef = useRef<HTMLDivElement>(null);
 
     const [isBranchMenuOpen, setIsBranchMenuOpen] = useState(false);
     const branchMenuRef = useRef<HTMLDivElement>(null);
@@ -199,40 +224,49 @@ const EvaluationsTableExcel: React.FC<EvaluationsTableExcelProps> = ({
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
             const target = event.target as Node;
-            if (searchMenuRef.current && !searchMenuRef.current.contains(target)) setIsSearchOpen(false);
+            
+            // Search menu handling
+            if (isSearchOpen && 
+                searchMenuRef.current && !searchMenuRef.current.contains(target) && 
+                searchTriggerRef.current && !searchTriggerRef.current.contains(target)) {
+                setIsSearchOpen(false);
+            }
+            
             if (branchMenuRef.current && !branchMenuRef.current.contains(target)) setIsBranchMenuOpen(false);
             if (groupMenuRef.current && !groupMenuRef.current.contains(target)) setIsGroupMenuOpen(false);
             if (periodeMenuRef.current && !periodeMenuRef.current.contains(target)) setIsPeriodeMenuOpen(false);
         };
         document.addEventListener('mousedown', handleClickOutside);
         return () => document.removeEventListener('mousedown', handleClickOutside);
-    }, []);
+    }, [isSearchOpen]);
 
     // Scanne toutes les évaluations existantes pour en extraire et bâtir astucieusement les listes des matières et groupes disponibles pour les menus de filtrage.
-    const availableBranches = Array.from(new Set(evaluations.map((e: any) => e._brancheName))).filter(Boolean).sort() as string[];
-    const availableGroups = Array.from(new Set(evaluations.map((e: any) => e._groupeName))).filter(Boolean).sort() as string[];
-    const availablePeriodes = Array.from(new Set(evaluations.map((e: any) => e.periode))).filter(Boolean).sort() as string[];
+    const availableBranches = useMemo(() => Array.from(new Set(evaluations.map((e: any) => e._brancheName))).filter(Boolean).sort() as string[], [evaluations]);
+    const availableGroups = useMemo(() => Array.from(new Set(evaluations.map((e: any) => e._groupeName))).filter(Boolean).sort() as string[], [evaluations]);
+    const availablePeriodes = useMemo(() => Array.from(new Set(evaluations.map((e: any) => e.periode))).filter(Boolean).sort() as string[], [evaluations]);
 
     // En comparant la liste brute aux "filtres actifs" choisis par le prof, le système construit la liste définitive des évaluations à afficher à l'écran.
-    const displayedEvaluations = evaluations
-        .filter((ev: any) => {
-            if (searchQuery && !ev.titre.toLowerCase().includes(searchQuery.toLowerCase())) return false;
-            if (branchFilter !== 'all' && ev._brancheName !== branchFilter) return false;
-            if (groupFilter !== 'all' && ev._groupeName !== groupFilter) return false;
-            if (periodeFilter !== 'all' && ev.periode !== periodeFilter) return false;
-            return true;
-        })
-        .sort((a: any, b: any) => {
-            if (!sortColumn) return 0;
-            const dir = sortDirection === 'asc' ? 1 : -1;
-            const valA = getCellSortValue(a, sortColumn);
-            const valB = getCellSortValue(b, sortColumn);
-            if (valA === null && valB === null) return 0;
-            if (valA === null) return 1;
-            if (valB === null) return -1;
-            if (typeof valA === 'string') return valA.localeCompare(valB as string) * dir;
-            return ((valA as number) - (valB as number)) * dir;
-        });
+    const displayedEvaluations = useMemo(() => {
+        return evaluations
+            .filter((ev: any) => {
+                if (searchQuery && !ev.titre.toLowerCase().includes(searchQuery.toLowerCase())) return false;
+                if (branchFilter !== 'all' && ev._brancheName !== branchFilter) return false;
+                if (groupFilter !== 'all' && ev._groupeName !== groupFilter) return false;
+                if (periodeFilter !== 'all' && ev.periode !== periodeFilter) return false;
+                return true;
+            })
+            .sort((a: any, b: any) => {
+                if (!sortColumn) return 0;
+                const dir = sortDirection === 'asc' ? 1 : -1;
+                const valA = getCellSortValue(a, sortColumn);
+                const valB = getCellSortValue(b, sortColumn);
+                if (valA === null && valB === null) return 0;
+                if (valA === null) return 1;
+                if (valB === null) return -1;
+                if (typeof valA === 'string') return valA.localeCompare(valB as string) * dir;
+                return ((valA as number) - (valB as number)) * dir;
+            });
+    }, [evaluations, searchQuery, branchFilter, groupFilter, periodeFilter, sortColumn, sortDirection]);
 
     if (loading) {
         return (
@@ -279,19 +313,22 @@ const EvaluationsTableExcel: React.FC<EvaluationsTableExcelProps> = ({
             </div>
 
             {/* Table */}
-            <CardInfo className="flex-1 overflow-hidden flex flex-col p-0">
-                <div className="flex-1 overflow-auto custom-scrollbar">
-                    <style>{columns.map(c => `.col-${c.id} { width: ${c.width}px; max-width: ${c.width}px; }`).join('\n')}</style>
-                    <table className="w-full text-left border-collapse text-sm whitespace-nowrap table-fixed">
+            <CardInfo className="flex-1 flex flex-col p-0">
+                <div className="flex-1 overflow-auto custom-scrollbar" style={{ minHeight: '480px' }}>
+                    <table 
+                        className="text-left border-collapse text-sm whitespace-nowrap table-fixed"
+                        style={{ minWidth: totalTableWidth, width: '100%' }}
+                    >
                         <thead className="sticky top-0 z-10 bg-table-header select-none">
                             <tr>
                                 {columns.map((col, index) => (
                                     <th
                                         key={col.id}
+                                        style={{ width: col.width, minWidth: col.width, maxWidth: col.width }}
                                         className={clsx(
-                                            `col-${col.id}`,
                                             "p-4 font-bold text-grey-light uppercase tracking-wider text-xs border-b border-white/10 relative transition-colors duration-200",
                                             draggedColumnIndex === index && "opacity-50 bg-white/5",
+                                            col.id === 'titre' && "sticky left-0 z-30 bg-table-header after:content-[''] after:absolute after:right-0 after:top-0 after:h-full after:w-px after:bg-white/10 shadow-[4px_0_8px_-4px_rgba(0,0,0,0.5)]"
                                         )}
                                         draggable
                                         onDragStart={(e) => handleDragStart(e, index)}
@@ -302,7 +339,7 @@ const EvaluationsTableExcel: React.FC<EvaluationsTableExcelProps> = ({
                                             {renderHeaderContent(col.id, {
                                                 handleSort,
                                                 sortColumn, sortDirection,
-                                                searchQuery, setSearchQuery, isSearchOpen, setIsSearchOpen, searchMenuRef,
+                                                searchQuery, setSearchQuery, isSearchOpen, setIsSearchOpen, searchMenuRef, searchTriggerRef,
                                                 branchFilter, setBranchFilter, isBranchMenuOpen, setIsBranchMenuOpen, branchMenuRef, availableBranches,
                                                 groupFilter, setGroupFilter, isGroupMenuOpen, setIsGroupMenuOpen, groupMenuRef, availableGroups,
                                                 periodeFilter, setPeriodeFilter, isPeriodeMenuOpen, setIsPeriodeMenuOpen, periodeMenuRef, availablePeriodes
@@ -325,23 +362,14 @@ const EvaluationsTableExcel: React.FC<EvaluationsTableExcelProps> = ({
                                 </tr>
                             ) : (
                                 displayedEvaluations.map((ev: any) => (
-                                    <tr key={ev.id} className="hover:bg-white/[0.02] transition-colors group">
-                                        {columns.map(col => (
-                                            <td
-                                                key={col.id}
-                                                className={clsx(
-                                                    `col-${col.id}`,
-                                                    "p-4 relative whitespace-nowrap overflow-hidden text-ellipsis",
-                                                    col.id === 'titre' && "cursor-pointer"
-                                                )}
-                                                onClick={() => {
-                                                    if (col.id === 'titre') onSelectEvaluation(ev.id);
-                                                }}
-                                            >
-                                                {renderCellContent(col.id, ev, onSelectEvaluation, setEvalToDelete, onEditEvaluation)}
-                                            </td>
-                                        ))}
-                                    </tr>
+                                    <EvaluationRow
+                                        key={ev.id}
+                                        ev={ev}
+                                        columns={columns}
+                                        onSelectEvaluation={onSelectEvaluation}
+                                        onEditEvaluation={onEditEvaluation}
+                                        setEvalToDelete={setEvalToDelete}
+                                    />
                                 ))
                             )}
                         </tbody>
@@ -354,7 +382,7 @@ const EvaluationsTableExcel: React.FC<EvaluationsTableExcelProps> = ({
                 onClose={() => setEvalToDelete(null)}
                 onConfirm={() => {
                     if (evalToDelete) {
-                        deleteEvaluation(evalToDelete);
+                        deleteEvaluation({ id: evalToDelete });
                         setEvalToDelete(null);
                     }
                 }}
@@ -392,10 +420,22 @@ function renderHeaderContent(colId: ColumnId, ctx: any) {
 
     switch (colId) {
         case 'titre': {
-            const { searchQuery, setSearchQuery, isSearchOpen, setIsSearchOpen, searchMenuRef } = ctx;
+            const { searchQuery, setSearchQuery, isSearchOpen, setIsSearchOpen, searchMenuRef, searchTriggerRef } = ctx;
+            
+            const getPos = () => {
+                if (!searchTriggerRef.current) return { top: 0, left: 0 };
+                const rect = searchTriggerRef.current.getBoundingClientRect();
+                return {
+                    top: rect.bottom + window.scrollY + 8,
+                    left: rect.left + window.scrollX
+                };
+            };
+            const pos = getPos();
+
             return (
                 <>
                     <div
+                        ref={searchTriggerRef}
                         className="flex items-center gap-2 cursor-pointer hover:text-white transition-colors select-none"
                         onClick={() => setIsSearchOpen(!isSearchOpen)}
                     >
@@ -403,10 +443,16 @@ function renderHeaderContent(colId: ColumnId, ctx: any) {
                         <Filter size={14} className={clsx(searchQuery || isSearchOpen ? "text-primary" : "text-grey-medium")} />
                         {SortIcon && <SortIcon size={12} className="text-primary" />}
                     </div>
-                    {isSearchOpen && (
+                    {isSearchOpen && createPortal(
                         <div
                             ref={searchMenuRef}
-                            className="absolute top-full left-0 mt-2 w-64 bg-surface border border-white/10 rounded-xl z-50 py-3 px-4 animate-in fade-in slide-in-from-top-2 duration-200 normal-case tracking-normal font-normal text-sm"
+                            style={{ 
+                                position: 'fixed', 
+                                top: pos.top - window.scrollY, 
+                                left: pos.left - window.scrollX,
+                                zIndex: 9999 
+                            }}
+                            className="w-64 bg-surface border border-white/20 rounded-xl py-3 px-4 shadow-2xl animate-in fade-in slide-in-from-top-2 duration-200 normal-case tracking-normal font-normal text-sm"
                         >
                             <div className="flex items-center justify-between mb-2">
                                 <span className="text-xs font-semibold text-grey-medium uppercase tracking-wider">Recherche</span>
@@ -424,35 +470,79 @@ function renderHeaderContent(colId: ColumnId, ctx: any) {
                                     <input
                                         type="text"
                                         placeholder="Entrez un titre..."
+                                        autoFocus
                                         value={searchQuery}
                                         onChange={(e) => setSearchQuery(e.target.value)}
                                         className="w-full bg-surface-light border border-white/10 rounded-lg pl-8 py-2 text-sm text-text-main focus:outline-none focus:border-primary/50 transition-colors placeholder:text-grey-medium"
                                     />
                                 </div>
                                 <button
-                                    onClick={() => handleSort('titre')}
+                                    onClick={() => {
+                                        handleSort('titre');
+                                        setIsSearchOpen(false);
+                                    }}
                                     className={clsx("p-2 rounded-lg border transition-colors shrink-0", isSorted ? "bg-primary/20 border-primary/30 text-primary" : "border-white/10 text-grey-medium hover:text-white hover:bg-white/5")}
                                     title="Trier"
                                 >
                                     {SortIcon ? <SortIcon size={14} /> : <ArrowUp size={14} />}
                                 </button>
                             </div>
-                        </div>
+                        </div>,
+                        document.body
                     )}
                 </>
             );
         }
         case 'branche': {
-            const { branchFilter, setBranchFilter, isBranchMenuOpen, setIsBranchMenuOpen, branchMenuRef, availableBranches } = ctx;
-            return renderDropdownFilter('Branche', branchFilter, setBranchFilter, isBranchMenuOpen, setIsBranchMenuOpen, branchMenuRef, availableBranches, handleSort, colId, isSorted, SortIcon);
+            const { branchFilter, setBranchFilter, isBranchMenuOpen, setIsBranchMenuOpen, availableBranches } = ctx;
+            return (
+                <FilterDropdown
+                    label="Branche"
+                    filter={branchFilter}
+                    setFilter={setBranchFilter}
+                    isOpen={isBranchMenuOpen}
+                    setIsOpen={setIsBranchMenuOpen}
+                    options={availableBranches}
+                    handleSort={handleSort}
+                    colId={colId}
+                    isSorted={isSorted}
+                    SortIcon={SortIcon}
+                />
+            );
         }
         case 'groupe': {
-            const { groupFilter, setGroupFilter, isGroupMenuOpen, setIsGroupMenuOpen, groupMenuRef, availableGroups } = ctx;
-            return renderDropdownFilter('Groupe', groupFilter, setGroupFilter, isGroupMenuOpen, setIsGroupMenuOpen, groupMenuRef, availableGroups, handleSort, colId, isSorted, SortIcon);
+            const { groupFilter, setGroupFilter, isGroupMenuOpen, setIsGroupMenuOpen, availableGroups } = ctx;
+            return (
+                <FilterDropdown
+                    label="Groupe"
+                    filter={groupFilter}
+                    setFilter={setGroupFilter}
+                    isOpen={isGroupMenuOpen}
+                    setIsOpen={setIsGroupMenuOpen}
+                    options={availableGroups}
+                    handleSort={handleSort}
+                    colId={colId}
+                    isSorted={isSorted}
+                    SortIcon={SortIcon}
+                />
+            );
         }
         case 'periode': {
-            const { periodeFilter, setPeriodeFilter, isPeriodeMenuOpen, setIsPeriodeMenuOpen, periodeMenuRef, availablePeriodes } = ctx;
-            return renderDropdownFilter('Période', periodeFilter, setPeriodeFilter, isPeriodeMenuOpen, setIsPeriodeMenuOpen, periodeMenuRef, availablePeriodes, handleSort, colId, isSorted, SortIcon);
+            const { periodeFilter, setPeriodeFilter, isPeriodeMenuOpen, setIsPeriodeMenuOpen, availablePeriodes } = ctx;
+            return (
+                <FilterDropdown
+                    label="Période"
+                    filter={periodeFilter}
+                    setFilter={setPeriodeFilter}
+                    isOpen={isPeriodeMenuOpen}
+                    setIsOpen={setIsPeriodeMenuOpen}
+                    options={availablePeriodes}
+                    handleSort={handleSort}
+                    colId={colId}
+                    isSorted={isSorted}
+                    SortIcon={SortIcon}
+                />
+            );
         }
         default: {
             return (
@@ -468,22 +558,59 @@ function renderHeaderContent(colId: ColumnId, ctx: any) {
     }
 }
 
-function renderDropdownFilter(
+const FilterDropdown = ({
+    label,
+    filter,
+    setFilter,
+    isOpen,
+    setIsOpen,
+    options,
+    handleSort,
+    colId,
+    isSorted,
+    SortIcon
+}: {
     label: string,
     filter: string,
     setFilter: (v: string) => void,
     isOpen: boolean,
     setIsOpen: (v: boolean) => void,
-    menuRef: React.RefObject<HTMLDivElement>,
     options: string[],
     handleSort: (id: ColumnId) => void,
     colId: ColumnId,
     isSorted: boolean,
     SortIcon: any
-) {
+}) => {
+    const triggerRef = useRef<HTMLDivElement>(null);
+    const menuRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        if (!isOpen) return;
+        const handleClickOutside = (event: MouseEvent) => {
+            if (menuRef.current && !menuRef.current.contains(event.target as Node) && 
+                triggerRef.current && !triggerRef.current.contains(event.target as Node)) {
+                setIsOpen(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, [isOpen, setIsOpen]);
+
+    const getMenuPosition = () => {
+        if (!triggerRef.current) return { top: 0, left: 0 };
+        const rect = triggerRef.current.getBoundingClientRect();
+        return {
+            top: rect.bottom + window.scrollY + 8,
+            left: rect.left + window.scrollX
+        };
+    };
+
+    const pos = getMenuPosition();
+
     return (
         <>
             <div
+                ref={triggerRef}
                 className="flex items-center gap-2 cursor-pointer hover:text-white transition-colors select-none"
                 onClick={() => setIsOpen(!isOpen)}
             >
@@ -491,14 +618,20 @@ function renderDropdownFilter(
                 <Filter size={14} className={clsx(filter !== 'all' || isOpen ? "text-primary" : "text-grey-medium")} />
                 {SortIcon && <SortIcon size={12} className="text-primary" />}
             </div>
-            {isOpen && (
+            {isOpen && createPortal(
                 <div
                     ref={menuRef}
-                    className="absolute top-full left-0 mt-2 w-56 bg-surface border border-white/20 rounded-xl z-50 py-2 animate-in fade-in slide-in-from-top-2 duration-200 normal-case tracking-normal font-normal text-sm max-h-64 overflow-y-auto custom-scrollbar"
+                    style={{ 
+                        position: 'fixed', 
+                        top: pos.top - window.scrollY, 
+                        left: pos.left - window.scrollX,
+                        zIndex: 9999 
+                    }}
+                    className="w-56 bg-surface border border-white/20 rounded-xl py-2 shadow-2xl animate-in fade-in slide-in-from-top-2 duration-200 normal-case tracking-normal font-normal text-sm max-h-64 overflow-y-auto custom-scrollbar"
                 >
                     <div
                         className="px-3 py-1.5 hover:bg-white/5 cursor-pointer flex items-center gap-3 transition-colors text-text-main"
-                        onClick={() => setFilter('all')}
+                        onClick={() => { setFilter('all'); setIsOpen(false); }}
                     >
                         Tous
                         {filter === 'all' && <ChevronRight size={14} className="ml-auto text-primary" />}
@@ -511,7 +644,7 @@ function renderDropdownFilter(
                                 "px-3 py-1.5 hover:bg-white/5 cursor-pointer flex items-center gap-3 transition-colors",
                                 filter === opt ? "text-primary font-semibold" : "text-text-main"
                             )}
-                            onClick={() => setFilter(opt)}
+                            onClick={() => { setFilter(opt); setIsOpen(false); }}
                         >
                             <span className="truncate">{opt}</span>
                             {filter === opt && <ChevronRight size={14} className="ml-auto" />}
@@ -520,18 +653,86 @@ function renderDropdownFilter(
                     <div className="h-px bg-white/10 my-1 mx-3" />
                     <div
                         className="px-3 py-1.5 hover:bg-white/5 cursor-pointer flex items-center gap-2 transition-colors text-grey-medium"
-                        onClick={() => handleSort(colId)}
+                        onClick={() => { handleSort(colId); setIsOpen(false); }}
                     >
-                        {isSorted ? <ArrowDown size={14} /> : <ArrowUp size={14} />}
+                        {isSorted && SortIcon === ArrowDown ? <ArrowUp size={14} /> : <ArrowDown size={14} />}
                         <span>Trier</span>
                     </div>
-                </div>
+                </div>,
+                document.body
             )}
         </>
     );
-}
+};
 
-// Render cell content
+// --- Components memoïsés pour la performance ---
+
+const EvaluationCell = React.memo(({ 
+    colId, 
+    ev, 
+    width,
+    onSelectEvaluation, 
+    setEvalToDelete, 
+    onEditEvaluation 
+}: { 
+    colId: ColumnId, 
+    ev: any, 
+    width: number,
+    onSelectEvaluation: (id: string) => void,
+    setEvalToDelete: (id: string | null) => void,
+    onEditEvaluation: (ev: any) => void
+}) => {
+    return (
+        <td
+            style={{ width, minWidth: width, maxWidth: width }}
+            className={clsx(
+                "p-4 relative whitespace-nowrap overflow-hidden text-ellipsis",
+                colId === 'titre' && "sticky left-0 z-20 bg-surface group-hover:bg-white/[0.05] transition-colors after:content-[''] after:absolute after:right-0 after:top-0 after:h-full after:w-px after:bg-white/10 shadow-[4px_0_8px_-4px_rgba(0,0,0,0.5)] cursor-pointer"
+            )}
+            onClick={() => {
+                if (colId === 'titre') onSelectEvaluation(ev.id);
+            }}
+        >
+            {renderCellContent(colId, ev, onSelectEvaluation, setEvalToDelete, onEditEvaluation)}
+        </td>
+    );
+});
+
+EvaluationCell.displayName = 'EvaluationCell';
+
+const EvaluationRow = React.memo(({ 
+    ev, 
+    columns, 
+    onSelectEvaluation, 
+    onEditEvaluation, 
+    setEvalToDelete 
+}: { 
+    ev: any, 
+    columns: ColumnConfig[], 
+    onSelectEvaluation: (id: string) => void,
+    onEditEvaluation: (ev: any) => void,
+    setEvalToDelete: (id: string | null) => void
+}) => {
+    return (
+        <tr className="hover:bg-white/[0.02] transition-colors group">
+            {columns.map(col => (
+                <EvaluationCell
+                    key={col.id}
+                    colId={col.id}
+                    ev={ev}
+                    width={col.width}
+                    onSelectEvaluation={onSelectEvaluation}
+                    onEditEvaluation={onEditEvaluation}
+                    setEvalToDelete={setEvalToDelete}
+                />
+            ))}
+        </tr>
+    );
+});
+
+EvaluationRow.displayName = 'EvaluationRow';
+
+// Render cell content - helper non-react function for flexibility
 function renderCellContent(
     colId: ColumnId, 
     ev: any, 
@@ -648,6 +849,16 @@ function renderCellContent(
                     <button
                         onClick={(e) => {
                             e.stopPropagation();
+                            exportEvaluationPDF(ev);
+                        }}
+                        className="p-2 rounded-lg text-red-400 hover:text-red-500 hover:bg-red-500/10 transition-colors mr-1"
+                        title="Télécharger PDF"
+                    >
+                        <FileText size={16} />
+                    </button>
+                    <button
+                        onClick={(e) => {
+                            e.stopPropagation();
                             onEditEvaluation(ev);
                         }}
                         className="p-2 rounded-lg text-grey-medium hover:text-white hover:bg-white/10 transition-colors mr-1"
@@ -686,11 +897,18 @@ async function exportEvaluationData(ev: any) {
         const { toast } = await import('sonner');
         toast.loading("Génération du fichier Excel/CSV...", { id: `export_${ev.id}` });
 
-        const { supabase } = await import('../../../lib/database');
+        const { supabase, getCurrentUser } = await import('../../../lib/database');
         const { trackingService } = await import('../../tracking/services/trackingService');
 
+        // 0. Get User
+        const user = await getCurrentUser();
+        if (!user) {
+            toast.error("Utilisateur non connecté", { id: `export_${ev.id}` });
+            return;
+        }
+
         // 1. Get Students
-        const studentData = await trackingService.fetchStudentsInGroup(ev.group_id);
+        const studentData = await trackingService.fetchStudentsInGroup(ev.group_id, user.id);
         const students = studentData.full || [];
 
         // Sort Students
@@ -707,17 +925,17 @@ async function exportEvaluationData(ev: any) {
         });
 
         // 2. Get Global Results
-        const { data: resultsData } = await supabase.from('Resultat').select('*').eq('evaluation_id', ev.id);
+        const { data: resultsData } = await supabase.from('Resultat').select('*').eq('evaluation_id', ev.id).eq('user_id', user.id);
         const results = resultsData || [];
 
         // 3. Get Questions and Question Results
-        const { data: qData } = await supabase.from('EvaluationQuestion').select('*').eq('evaluation_id', ev.id).order('ordre', { ascending: true });
+        const { data: qData } = await supabase.from('EvaluationQuestion').select('*').eq('evaluation_id', ev.id).eq('user_id', user.id).order('ordre', { ascending: true });
         const questions = qData || [];
 
         let questionResults: any[] = [];
         if (questions.length > 0) {
             const questionIds = questions.map((q: any) => q.id);
-            const { data: qrData } = await supabase.from('ResultatQuestion').select('*').in('question_id', questionIds);
+            const { data: qrData } = await supabase.from('ResultatQuestion').select('*').in('question_id', questionIds).eq('user_id', user.id);
             questionResults = qrData || [];
         }
 
@@ -779,6 +997,109 @@ async function exportEvaluationData(ev: any) {
         console.error("Export error", error);
         const { toast } = await import('sonner');
         toast.error("Erreur lors de la génération de l'export", { id: `export_${ev.id}` });
+    }
+}
+
+async function exportEvaluationPDF(ev: any) {
+    try {
+        const { toast } = await import('sonner');
+        toast.loading("Génération du rapport PDF...", { id: `pdf_${ev.id}` });
+
+        const { supabase, getCurrentUser } = await import('../../../lib/database');
+        const { trackingService } = await import('../../tracking/services/trackingService');
+        const { downloadFile } = await import('../../../lib/helpers/download');
+        const { pdf } = await import('@react-pdf/renderer');
+        const { default: EvaluationPDF } = await import('./EvaluationPDF');
+
+        // 0. Get User
+        const user = await getCurrentUser();
+        if (!user) {
+            toast.error("Utilisateur non connecté", { id: `pdf_${ev.id}` });
+            return;
+        }
+
+        // 0.5 S'assurer d'avoir l'évaluation complète (type_note_id peut manquer dans certaines vues)
+        let contextEv = ev;
+        if (!ev.type_note_id || !ev.group_id) {
+            const { data: dbEv } = await supabase
+                .from('Evaluation')
+                .select('*')
+                .eq('id', ev.id)
+                .single();
+            if (dbEv) contextEv = { ...ev, ...dbEv };
+        }
+
+        // 1. Get All Students in Group
+        const studentData = await trackingService.fetchStudentsInGroup(contextEv.group_id, user.id);
+        const students = studentData.full || [];
+
+        // Sort Students (Same logic as Excel export)
+        students.sort((a: any, b: any) => {
+            const niveauA = a.Niveau?.ordre ?? 0;
+            const niveauB = b.Niveau?.ordre ?? 0;
+            if (niveauA !== niveauB) return niveauA - niveauB;
+            const prenomCmp = (a.prenom || '').localeCompare(b.prenom || '');
+            if (prenomCmp !== 0) return prenomCmp;
+            return (a.nom || '').localeCompare(b.nom || '');
+        });
+
+        // 2. Get Data related to Evaluation
+        const [resultsRes, questionsRes, typeNoteRes] = await Promise.all([
+            supabase.from('Resultat').select('*').eq('evaluation_id', contextEv.id).eq('user_id', user.id),
+            supabase.from('EvaluationQuestion').select('*').eq('evaluation_id', contextEv.id).order('ordre', { ascending: true }),
+            contextEv.type_note_id ? supabase.from('TypeNote').select('*').eq('id', contextEv.type_note_id).single() : Promise.resolve({ data: null, error: new Error("ID type note manquant") })
+        ]);
+
+        const results = resultsRes.data || [];
+        const questions = questionsRes.data || [];
+        const typeNote = typeNoteRes.data;
+
+        if (typeNoteRes.error && contextEv.type_note_id) {
+            console.error("TypeNote fetch error:", typeNoteRes.error);
+        }
+
+        if (!typeNote) {
+            toast.error("Système de notation introuvable ou non défini pour cette évaluation", { id: `pdf_${ev.id}` });
+            return;
+        }
+
+        // 3. Get Question Results
+        let questionResults: any[] = [];
+        if (questions.length > 0) {
+            const questionIds = questions.map((q: any) => q.id);
+            const { data: qrData } = await supabase.from('ResultatQuestion').select('*').in('question_id', questionIds);
+            questionResults = qrData || [];
+        }
+
+        // 4. Generate PDF
+        const doc = <EvaluationPDF 
+            evaluation={contextEv}
+            students={students}
+            questions={questions}
+            results={results}
+            questionResults={questionResults}
+            typeNote={typeNote}
+        />;
+
+        // On enveloppe dans un try/catch spécifique pour attraper les erreurs de rendu PDF
+        let blob;
+        try {
+            blob = await pdf(doc).toBlob();
+        } catch (pdfError) {
+            console.error("Rendering PDF error", pdfError);
+            toast.error("Échec du rendu du PDF. Vérifiez les données.", { id: `pdf_${ev.id}` });
+            return;
+        }
+        
+        // 5. Download using the standard downloadFile helper (Save As)
+        const safeTitle = (ev.titre || 'evaluation').replace(/[^a-z0-9]/gi, '_').toLowerCase();
+        await downloadFile(blob, `fiche_${safeTitle}.pdf`, 'Document PDF');
+
+        toast.success("Rapport PDF généré avec succès !", { id: `pdf_${ev.id}` });
+    } catch (error) {
+        console.error("PDF Export error", error);
+        const { toast } = await import('sonner');
+        toast.error("Erreur lors de la génération du PDF", { id: `pdf_${ev.id}` });
     }
 }
 

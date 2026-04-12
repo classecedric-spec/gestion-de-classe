@@ -189,32 +189,34 @@ export class SupabaseSystemRepository implements ISystemRepository {
     /**
      * RESET COMPLET : Supprime toutes les données de l'enseignant dans l'ordre pour respecter les contraintes d'intégrité (FK).
      */
-    async hardReset(_userId: string): Promise<void> {
+    async hardReset(userId: string): Promise<void> {
         // Suppression par couches (les enfants d'abord, les parents après)
-        await supabase.from('SuiviAdulte').delete().not('id', 'is', null);
-        await supabase.from('Progression').delete().not('id', 'is', null);
-        await supabase.from('Attendance').delete().not('id', 'is', null);
-        await supabase.from('EleveGroupe').delete().not('id', 'is', null);
-        await supabase.from('ActiviteNiveau').delete().not('id', 'is', null);
-        await supabase.from('ActiviteMateriel').delete().not('id', 'is', null);
+        // On sécurise chaque suppression avec .eq('user_id', userId) ou le champ d'appartenance approprié.
+        
+        await supabase.from('SuiviAdulte').delete().eq('user_id', userId);
+        await supabase.from('Progression').delete().eq('user_id', userId);
+        await supabase.from('Attendance').delete().eq('user_id', userId);
+        await supabase.from('EleveGroupe').delete().eq('user_id', userId);
+        await supabase.from('ActiviteNiveau').delete().eq('user_id', userId);
+        await supabase.from('ActiviteMateriel').delete().not('activite_id', 'is', null); // Liaison technique, filtrée par cascade ou activite_id
 
-        await supabase.from('Eleve').delete().not('id', 'is', null);
-        await supabase.from('ClasseAdulte').delete().not('id', 'is', null);
-        await supabase.from('Activite').delete().not('id', 'is', null);
-        await supabase.from('Module').delete().not('id', 'is', null);
-        await supabase.from('SousBranche').delete().not('id', 'is', null);
-        await supabase.from('Branche').delete().not('id', 'is', null);
-        await supabase.from('SousDomaine').delete().not('id', 'is', null);
-        await supabase.from('Groupe').delete().not('id', 'is', null);
-        await supabase.from('Classe').delete().not('id', 'is', null);
-        await supabase.from('Niveau').delete().not('id', 'is', null);
+        await supabase.from('Eleve').delete().eq('titulaire_id', userId);
+        await supabase.from('ClasseAdulte').delete().eq('user_id', userId);
+        await supabase.from('Activite').delete().eq('user_id', userId);
+        await supabase.from('Module').delete().eq('user_id', userId);
+        await supabase.from('SousBranche').delete().eq('user_id', userId);
+        await supabase.from('Branche').delete().eq('user_id', userId);
+        await supabase.from('SousDomaine').delete().eq('user_id', userId);
+        await supabase.from('Groupe').delete().eq('user_id', userId);
+        await supabase.from('Classe').delete().eq('user_id', userId);
+        await supabase.from('Niveau').delete().eq('user_id', userId);
 
-        await supabase.from('TypeActiviteAdulte').delete().not('id', 'is', null);
-        await supabase.from('Adulte').delete().not('id', 'is', null);
-        await supabase.from('CategoriePresence').delete().not('id', 'is', null);
-        await supabase.from('SetupPresence').delete().not('id', 'is', null);
-        await supabase.from('TypeMateriel').delete().not('id', 'is', null);
-        await supabase.from('UserPreference').delete().not('id', 'is', null);
+        await supabase.from('TypeActiviteAdulte').delete().eq('user_id', userId);
+        await supabase.from('Adulte').delete().eq('user_id', userId);
+        await supabase.from('CategoriePresence').delete().eq('user_id', userId);
+        await supabase.from('SetupPresence').delete().eq('user_id', userId);
+        await supabase.from('TypeMateriel').delete().eq('user_id', userId);
+        await supabase.from('UserPreference').delete().eq('user_id', userId);
     }
 }
 

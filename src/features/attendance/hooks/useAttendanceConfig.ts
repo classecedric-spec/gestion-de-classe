@@ -67,7 +67,7 @@ export const useAttendanceConfig = ({
         queryKey: ['attendance-setup', user?.id],
         queryFn: async () => {
             if (!user) return [];
-            return await attendanceService.fetchSetups();
+            return await attendanceService.fetchSetups(user.id);
         },
         enabled: isOpen && !!user,
         staleTime: 1000 * 60 * 5,
@@ -77,8 +77,8 @@ export const useAttendanceConfig = ({
     const { data: distinctDates = [] } = useQuery({
         queryKey: ['attendance-dates', user?.id, selectedSetup?.id],
         queryFn: async () => {
-            if (!selectedSetup) return [];
-            return await attendanceService.fetchDistinctDates(selectedSetup.id);
+            if (!user || !selectedSetup) return [];
+            return await attendanceService.fetchDistinctDates(selectedSetup.id, user.id);
         },
         enabled: activeTab === 'export' && !!selectedSetup && !!user,
     });
@@ -89,8 +89,8 @@ export const useAttendanceConfig = ({
     const { data: exportData = [], isLoading: loadingExport } = useQuery({
         queryKey: ['attendance-range', user?.id, exportRange?.start, exportRange?.end],
         queryFn: async () => {
-            if (!exportRange) return [];
-            return await attendanceService.fetchAttendanceRange(exportRange.start, exportRange.end);
+            if (!user || !exportRange) return [];
+            return await attendanceService.fetchAttendanceRange(exportRange.start, exportRange.end, user.id);
         },
         enabled: activeTab === 'export' && !!exportRange && !!user,
     });
@@ -99,7 +99,10 @@ export const useAttendanceConfig = ({
 
     // Suppression d'une configuration
     const deleteSetupMutation = useMutation({
-        mutationFn: (id: string) => attendanceService.deleteSetup(id),
+        mutationFn: (id: string) => {
+            if (!user) throw new Error("User required");
+            return attendanceService.deleteSetup(id, user.id);
+        },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['attendance-setup', user?.id] });
             toast.success("Configuration supprimée");
@@ -113,7 +116,7 @@ export const useAttendanceConfig = ({
             
             let setupId = currentSet.id;
             if (setupId) {
-                await attendanceService.updateSetup(setupId, currentSet.nom, currentSet.description);
+                await attendanceService.updateSetup(setupId, user.id, currentSet.nom, currentSet.description);
             } else {
                 const newSetup = await attendanceService.createSetup(user.id, currentSet.nom, currentSet.description);
                 setupId = newSetup.id;
@@ -128,7 +131,7 @@ export const useAttendanceConfig = ({
                 user_id: user.id
             }));
 
-            await attendanceService.upsertCategories(categoriesToUpsert);
+            await attendanceService.upsertCategories(categoriesToUpsert, user.id);
             // On s'assure que la catégorie 'Absent' existe toujours (système)
             await attendanceService.ensureAbsentCategory(setupId!, user.id);
             
@@ -259,7 +262,8 @@ export const useAttendanceConfig = ({
     const handleEdit = async (set: SetupPresence) => {
         setCurrentSet(set);
         try {
-            const data = await attendanceService.fetchCategories(set.id);
+            if (!user) return;
+            const data = await attendanceService.fetchCategories(set.id, user.id);
             // On filtre 'Absent' car il est géré par le système, pas par l'utilisateur
             setCategories(data.filter((c: any) => c.nom !== 'Absent'));
             setView('edit');
@@ -273,9 +277,10 @@ export const useAttendanceConfig = ({
     const removeCategory = async (index: number) => {
         const newCats = [...categories];
         const cat = newCats[index];
+        if (!user) return;
         if (!cat.isTemp && cat.id) {
             try {
-                await attendanceService.deleteCategory(cat.id);
+                await attendanceService.deleteCategory(cat.id, user.id);
                 newCats.splice(index, 1);
                 setCategories(newCats);
             } catch (e) { console.error(e); }

@@ -50,7 +50,7 @@ export const useGroupsData = () => {
         queryKey: ['groups', user?.id],
         queryFn: async () => {
             if (!user) return [];
-            const data = await groupService.getGroups();
+            const data = await groupService.getGroups(user.id);
             return data || [];
         },
         enabled: !!user,
@@ -61,7 +61,7 @@ export const useGroupsData = () => {
         queryKey: ['classes', user?.id],
         queryFn: async () => {
             if (!user) return [];
-            const data = await classService.getClasses();
+            const data = await classService.getClasses(user.id);
             return data || [];
         },
         enabled: !!user,
@@ -90,7 +90,10 @@ export const useGroupsData = () => {
      * avec un ID temporaire avant même que le serveur ne réponde.
      */
     const createGroupMutation = useMutation({
-        mutationFn: (groupData: { nom: string; acronyme?: string; photo_url?: string; [key: string]: any }) => groupService.createGroup(groupData as any),
+        mutationFn: (groupData: { nom: string; acronyme?: string; photo_url?: string; [key: string]: any }) => {
+            if (!user) throw new Error("User required");
+            return groupService.createGroup(groupData as any, user.id);
+        },
         onMutate: async (newGroupData) => {
             const queryKey = ['groups', user?.id];
             await queryClient.cancelQueries({ queryKey });
@@ -131,7 +134,10 @@ export const useGroupsData = () => {
      * Le groupe disparait de l'écran sans attendre, et la sélection bascule sur un voisin.
      */
     const deleteGroupMutation = useMutation({
-        mutationFn: (groupId: string) => groupService.deleteGroup(groupId),
+        mutationFn: (groupId: string) => {
+            if (!user) throw new Error("User required");
+            return groupService.deleteGroup(groupId, user.id);
+        },
         onMutate: async (groupId) => {
             const queryKey = ['groups', user?.id];
             await queryClient.cancelQueries({ queryKey });
@@ -163,8 +169,9 @@ export const useGroupsData = () => {
      */
     const updateOrderMutation = useMutation({
         mutationFn: async (newGroups: Tables<'Groupe'>[]) => {
+            if (!user) throw new Error("User required");
             await Promise.all(newGroups.map((g, index) =>
-                groupService.updateGroupOrder(g.id, index)
+                groupService.updateGroupOrder(g.id, index, user.id)
             ));
         },
         onMutate: async (newGroups) => {
@@ -220,7 +227,8 @@ export const useGroupsData = () => {
         handleAddGroup,
         handleDeleteGroup: (id: string) => deleteGroupMutation.mutate(id),
         handleDragEnd,
-        createGroupMutation 
+        createGroupMutation,
+        user
     };
 };
 

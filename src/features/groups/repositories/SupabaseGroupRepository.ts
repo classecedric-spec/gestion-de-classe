@@ -24,15 +24,24 @@ import { IGroupRepository } from './IGroupRepository';
  * Cette classe s'occupe de la communication réelle avec les serveurs distants pour la gestion des groupes.
  */
 export class SupabaseGroupRepository implements IGroupRepository {
+    private validateUserId(userId: string): boolean {
+        if (!userId || userId === 'undefined' || userId === 'null') {
+            console.warn('[SupabaseGroupRepository] Attempted query with invalid userId');
+            return false;
+        }
+        return true;
+    }
 
     /**
-     * LECTURE INTÉGRALE : 
-     * Récupère tous les groupes en respectant l'ordre de tri personnalisé de l'enseignant.
+     * LECTURE INTÉGRALE SECURE : 
+     * Récupère tous les groupes d'un utilisateur en respectant l'ordre de tri.
      */
-    async getGroups(): Promise<Tables<'Groupe'>[]> {
+    async getGroups(userId: string): Promise<Tables<'Groupe'>[]> {
+        if (!this.validateUserId(userId)) return [];
         const { data, error } = await supabase
             .from('Groupe')
             .select('*')
+            .eq('user_id', userId)
             // Tri prioritaire par position, puis par nom pour les groupes non classés.
             .order('ordre', { ascending: true })
             .order('nom', { ascending: true });
@@ -46,6 +55,7 @@ export class SupabaseGroupRepository implements IGroupRepository {
      * S'assure de ne récupérer que les groupes appartenant au professeur identifié.
      */
     async getUserGroups(userId: string): Promise<Tables<'Groupe'>[]> {
+        if (!this.validateUserId(userId)) return [];
         const { data, error } = await supabase
             .from('Groupe')
             .select('*')
@@ -61,11 +71,13 @@ export class SupabaseGroupRepository implements IGroupRepository {
      * RECHERCHE UNITAIRE : 
      * Extrait la fiche d'un seul groupe précis par son code ID.
      */
-    async getGroup(id: string): Promise<Tables<'Groupe'> | null> {
+    async getGroup(id: string, userId: string): Promise<Tables<'Groupe'> | null> {
+        if (!this.validateUserId(userId)) return null;
         const { data, error } = await supabase
             .from('Groupe')
             .select('*')
             .eq('id', id)
+            .eq('user_id', userId)
             .maybeSingle(); // Retourne null proprement si le groupe a été supprimé.
 
         if (error) throw error;
@@ -76,10 +88,11 @@ export class SupabaseGroupRepository implements IGroupRepository {
      * ÉCRITURE (CRÉATION) : 
      * Envoie la commande d'insertion d'un nouveau groupe vers les serveurs Supabase.
      */
-    async createGroup(group: TablesInsert<'Groupe'>): Promise<Tables<'Groupe'>> {
+    async createGroup(group: TablesInsert<'Groupe'>, userId: string): Promise<Tables<'Groupe'>> {
+        if (!this.validateUserId(userId)) throw new Error("userId required");
         const { data, error } = await supabase
             .from('Groupe')
-            .insert(group)
+            .insert({ ...group, user_id: userId })
             .select()
             .single(); // On récupère la fiche créée contenant l'ID généré par la base.
 
@@ -91,11 +104,13 @@ export class SupabaseGroupRepository implements IGroupRepository {
      * MODIFICATION : 
      * Envoie les changements (ex: changement de nom ou de couleur) pour un groupe existant.
      */
-    async updateGroup(id: string, updates: TablesUpdate<'Groupe'>): Promise<Tables<'Groupe'>> {
+    async updateGroup(id: string, updates: TablesUpdate<'Groupe'>, userId: string): Promise<Tables<'Groupe'>> {
+        if (!this.validateUserId(userId)) throw new Error("userId required");
         const { data, error } = await supabase
             .from('Groupe')
             .update(updates)
             .eq('id', id)
+            .eq('user_id', userId)
             .select()
             .single();
 
@@ -107,11 +122,13 @@ export class SupabaseGroupRepository implements IGroupRepository {
      * SUPPRESSION DÉFINITIVE : 
      * Demande à la base de données d'effacer la ligne du groupe concerné.
      */
-    async deleteGroup(id: string): Promise<void> {
+    async deleteGroup(id: string, userId: string): Promise<void> {
+        if (!this.validateUserId(userId)) return;
         const { error } = await supabase
             .from('Groupe')
             .delete()
-            .eq('id', id);
+            .eq('id', id)
+            .eq('user_id', userId);
 
         if (error) throw error;
     }
@@ -120,11 +137,13 @@ export class SupabaseGroupRepository implements IGroupRepository {
      * MÉMOIRE DE TRI (DRAG & DROP) : 
      * Met à jour uniquement la position (le rang) d'un groupe dans une liste ordonnée.
      */
-    async updateOrder(id: string, order: number): Promise<void> {
+    async updateOrder(id: string, order: number, userId: string): Promise<void> {
+        if (!this.validateUserId(userId)) return;
         const { error } = await supabase
             .from('Groupe')
             .update({ ordre: order } as any)
-            .eq('id', id);
+            .eq('id', id)
+            .eq('user_id', userId);
 
         if (error) throw error;
     }

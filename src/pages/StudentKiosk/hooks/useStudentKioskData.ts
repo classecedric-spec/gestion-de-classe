@@ -140,6 +140,9 @@ export function useStudentKioskData(studentId: string | undefined) {
 
             } else {
                 // --- AUTH MODE (Teacher Session) ---
+                const { data: { user: authUser } } = await supabase.auth.getUser();
+                if (!authUser) throw new Error("Utilisateur non authentifié.");
+
                 // 1. Fetch Student Details
                 const { data: studentData, error } = await supabase
                     .from('Eleve')
@@ -153,10 +156,10 @@ export function useStudentKioskData(studentId: string | undefined) {
 
                 if (error) throw error;
                 setStudent(studentData);
-                targetTeacherId = studentData?.user_id ?? null;
+                targetTeacherId = studentData?.titulaire_id ?? null;
 
                 // 2. Fetch Active Modules
-                const fetchedModules = await trackingService.getMobileModules();
+                const fetchedModules = await trackingService.getMobileModules(authUser.id);
                 setModules(fetchedModules);
 
                 // 3. Flatten activities from modules for easy display
@@ -252,22 +255,10 @@ export function useStudentKioskData(studentId: string | undefined) {
 
             } else {
                 // --- AUTH MODE ---
-                // If returning to 'a_commencer', we might be deleting or updating
-                // Reuse repository logic
+                const { data: { user: authUser } } = await supabase.auth.getUser();
+                if (!authUser) throw new Error("Utilisateur non authentifié.");
+
                 if (newStatus === 'a_commencer') {
-                    // Determine if we delete (if it was just opened) or update
-                    // For Kiosk simplicity: if 'besoin_d_aide' or 'a_verifier', we can set to 'a_commencer'
-                    // Actually trackingService.updateProgressionStatus handles update.
-                    // But usually we create a new progression if it handles 'create'? 
-                    // trackingService.updateProgressionStatus updates EXISTING record.
-
-                    // We need to know if ID exists.
-                    // The map only holds status.
-                    // We should probably fetch full progression objects or handle upsert.
-
-                    // Let's use upsert to be safe? 
-                    // Repository has `upsertProgression`.
-
                     const { data: existing } = await supabase
                         .from('Progression')
                         .select('id')
@@ -276,7 +267,7 @@ export function useStudentKioskData(studentId: string | undefined) {
                         .maybeSingle();
 
                     if (existing) {
-                        await trackingService.updateProgressionStatus(existing.id, newStatus, false);
+                        await trackingService.updateProgressionStatus(existing.id, newStatus, authUser.id, false);
                     }
                 } else {
                     // Upsert (create or update)
@@ -285,7 +276,7 @@ export function useStudentKioskData(studentId: string | undefined) {
                         activite_id: activityId,
                         etat: statusToSave,
                         updated_at: new Date().toISOString()
-                    });
+                    }, authUser.id);
                 }
 
                 // Recalculate trust if needed? 

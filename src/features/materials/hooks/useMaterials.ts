@@ -42,7 +42,12 @@ export const useMaterials = () => {
     const fetchMateriels = useCallback(async () => {
         setLoading(true);
         try {
-            const data = await materialService.fetchAll();
+            const user = await getCurrentUser();
+            if (!user) {
+                setLoading(false);
+                return;
+            }
+            const data = await materialService.fetchAll(user.id);
             setMateriels(data);
         } catch (error) {
             console.error('Error fetching materiels:', error);

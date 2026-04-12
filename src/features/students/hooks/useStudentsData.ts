@@ -28,7 +28,7 @@ import { toast } from 'sonner';
 /**
  * Structure d'un élève enrichie avec ses relations (Sa classe, son niveau, ses groupes).
  */
-export interface StudentDetailed extends Tables<'Eleve'> {
+export interface StudentDetailed extends Omit<Tables<'Eleve'>, 'trust_trend'> {
     Classe?: {
         nom: string;
         ClasseAdulte?: {
@@ -40,7 +40,6 @@ export interface StudentDetailed extends Tables<'Eleve'> {
     EleveGroupe?: {
         Groupe: { id: string; nom: string };
     }[];
-    importance_suivi?: number | null;
     trust_trend?: 'up' | 'down' | 'stable' | null;
 }
 
@@ -198,15 +197,8 @@ export const useStudentsData = (initialStudentId: string | null = null) => {
      */
     const updateImportanceMutation = useMutation({
         mutationFn: async ({ id, val, prenom }: { id: string; val: number | null, prenom?: string }) => {
-            if (!isOnline) {
-                addToQueue({
-                    type: 'SUPABASE_CALL', table: 'Eleve', method: 'update',
-                    payload: { importance_suivi: val }, match: { id },
-                    contextDescription: `Changement importance pour ${prenom || 'élève'}`
-                });
-                return;
-            }
-            await studentService.updateStudentImportance(id, val);
+            if (!user) throw new Error("Utilisateur non authentifié.");
+            await studentService.updateStudentImportance(id, val, user.id);
         },
         onMutate: async ({ id, val }) => {
             const queryKey = ['students', user?.id];
@@ -232,15 +224,8 @@ export const useStudentsData = (initialStudentId: string | null = null) => {
      */
     const deleteMutation = useMutation({
         mutationFn: async (student: StudentDetailed) => {
-            if (!isOnline) {
-                addToQueue({
-                    type: 'SUPABASE_CALL', table: 'Eleve', method: 'delete',
-                    payload: {}, match: { id: student.id },
-                    contextDescription: `Suppression de l'élève ${student.prenom}`
-                });
-                return;
-            }
-            await studentService.deleteStudent(student.id);
+            if (!user) throw new Error("Utilisateur non authentifié.");
+            await studentService.deleteStudent(student.id, user.id);
         },
         onMutate: async (student) => {
             const queryKey = ['students', user?.id];

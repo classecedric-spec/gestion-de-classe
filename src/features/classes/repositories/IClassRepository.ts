@@ -19,25 +19,25 @@ import { ClassWithAdults, StudentWithRelations } from '../services/classService'
  */
 export interface IClassRepository {
     // Lecture des données
-    getClasses(): Promise<ClassWithAdults[]>;
-    getClassById(classId: string): Promise<ClassWithAdults | null>;
-    getStudentsByClass(classId: string): Promise<StudentWithRelations[]>;
+    getClasses(userId: string): Promise<ClassWithAdults[]>;
+    getClassById(classId: string, userId: string): Promise<ClassWithAdults | null>;
+    getStudentsByClass(classId: string, userId: string): Promise<StudentWithRelations[]>;
     
     // Actions de nettoyage
-    deleteClass(classId: string): Promise<void>;
-    removeStudentFromClass(studentId: string): Promise<void>;
+    deleteClass(classId: string, userId: string): Promise<void>;
+    removeStudentFromClass(studentId: string, userId: string): Promise<void>;
     
     // Mise à jour de profils
-    updateStudentField(studentId: string, field: keyof TablesUpdate<'Eleve'>, value: any): Promise<void>;
+    updateStudentField(studentId: string, field: keyof TablesUpdate<'Eleve'>, value: any, userId: string): Promise<void>;
 
     /**
      * Section regroupant les actions d'écriture (création et modification majeure).
      */
-    createClass(data: any): Promise<{ id: string }>;
-    updateClass(classId: string, data: any): Promise<void>;
-    linkAdult(classId: string, adultId: string, role: string): Promise<void>;
-    unlinkAllAdults(classId: string): Promise<void>;
-    uploadLogo(classId: string, photoBlob: Blob): Promise<string | null>;
+    createClass(data: any, userId: string): Promise<{ id: string }>;
+    updateClass(classId: string, data: any, userId: string): Promise<void>;
+    linkAdult(classId: string, adultId: string, role: string, userId: string): Promise<void>;
+    unlinkAllAdults(classId: string, userId: string): Promise<void>;
+    uploadLogo(classId: string, photoBlob: Blob, userId: string): Promise<string | null>;
 }
 
 /**

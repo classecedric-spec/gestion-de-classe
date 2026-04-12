@@ -36,8 +36,8 @@ export class MaterialService {
     /**
      * Récupère la liste complète du matériel.
      */
-    async fetchAll(): Promise<TypeMateriel[]> {
-        return await this.repository.getAll();
+    async fetchAll(userId: string): Promise<TypeMateriel[]> {
+        return await this.repository.getAll(userId);
     }
 
     /**

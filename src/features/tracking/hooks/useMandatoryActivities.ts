@@ -61,9 +61,11 @@ export function useMandatoryActivities(selectedGroupId: string | null, students:
     // Fetch levels on mount
     useEffect(() => {
         const fetchLevels = async () => {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) return;
             // Adapt levelService to return what we need (Level[])
             // levelService.fetchLevels returns LevelWithStudentCount[] which extends Level
-            const data = await levelService.fetchLevels();
+            const data = await levelService.fetchLevels(user.id);
             setLevels(data);
         };
         fetchLevels();
@@ -111,7 +113,10 @@ export function useMandatoryActivities(selectedGroupId: string | null, students:
     const fetchGroupProgressions = useCallback(async () => {
         if (!selectedGroupId || students.length === 0) return;
 
-        const data = await trackingService.fetchGroupProgressions(students.map(s => s.id));
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+
+        const data = await trackingService.fetchGroupProgressions(students.map(s => s.id), user.id);
         setGroupProgressions(data || []);
     }, [selectedGroupId, students]);
 
@@ -126,10 +131,16 @@ export function useMandatoryActivities(selectedGroupId: string | null, students:
         const fetchModulesForLevel = async () => {
             setLoading(true);
             try {
+                const { data: { user } } = await supabase.auth.getUser();
+                if (!user) {
+                    setLoading(false);
+                    return;
+                }
+
                 // Fetch modules with status 'en_cours'
                 // Note: fetchModulesForStudent ignores levelId arg currently and returns all active modules, 
                 // but we can filter or just use it as is if it includes everything needed.
-                const modules = await trackingService.fetchModulesForStudent(null);
+                const modules = await trackingService.fetchModulesForStudent(null, user.id);
 
                 // Filter modules to only those having mandatory activities for the selected level
                 const modulesWithStats = (modules as any[]).map(mod => {
@@ -239,15 +250,10 @@ export function useMandatoryActivities(selectedGroupId: string | null, students:
             // I should add `fetchModulesByIds` to service/repo.
             // For now, I will keep the supabase query here OR use `fetchModulesForStudent` and hope it covers it.
             // Actually, `fetchModulesForStudent` returns all active modules. If a mandatory module is archive, it won't show up.
-            // Let's add `fetchModulesByIds` to `SupabaseTrackingRepository` and `TrackingService`.
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) return;
 
-            // For this turn, I will stick to refactoring what I can. 
-            // To avoid breaking, I might need to leave this specific query as is or quickly add the method.
-            // I'll leave the complex query here for a moment but using `trackingService` for other parts.
-            // BETTER: I'll use `trackingService.fetchModulesForStudent` and filter in memory, 
-            // accepting that closed modules might not show (which is probably desired behavior anyway).
-
-            const allModules = await trackingService.fetchModulesForStudent(null);
+            const allModules = await trackingService.fetchModulesForStudent(null, user.id);
             const relevantModules = allModules.filter((m: any) => moduleIds.includes(m.id));
             const data = relevantModules;
 

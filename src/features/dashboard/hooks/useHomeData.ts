@@ -83,7 +83,7 @@ export const useHomeData = (userId?: string) => {
         queryKey: ['groups', resolvedUserId],
         queryFn: async () => {
             if (!resolvedUserId) return [];
-            const data = await groupService.getGroups();
+            const data = await groupService.getGroups(resolvedUserId);
             return (data as unknown as Group[]) || [];
         },
         enabled: !!resolvedUserId,

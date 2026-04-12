@@ -30,16 +30,16 @@ export class LevelService {
      * RÉCUPÉRATION DES NIVEAUX :
      * Demande la liste complète des niveaux enregistrés.
      */
-    fetchLevels = async (): Promise<LevelWithStudentCount[]> => {
-        return await this.repository.getLevels();
+    fetchLevels = async (userId: string): Promise<LevelWithStudentCount[]> => {
+        return await this.repository.getLevels(userId);
     }
 
     /**
      * RÉCUPÉRATION DES ÉLÈVES :
      * Demande la liste des enfants inscrits dans un niveau précis.
      */
-    fetchStudents = async (levelId: string): Promise<Tables<'Eleve'>[]> => {
-        return await this.repository.getStudentsByLevel(levelId);
+    fetchStudents = async (levelId: string, userId: string): Promise<Tables<'Eleve'>[]> => {
+        return await this.repository.getStudentsByLevel(levelId, userId);
     }
 
     /**
@@ -48,42 +48,39 @@ export class LevelService {
      * 2. Calcule la position suivante (ex: si on a 4 niveaux, le nouveau sera le 5ème).
      * 3. Commande l'enregistrement définitif.
      */
-    createLevel = async (levelData: TablesInsert<'Niveau'>): Promise<LevelWithStudentCount> => {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) throw new Error("Vous devez être connecté pour créer un niveau.");
-
-        const maxOrder = await this.repository.getMaxOrder();
+    createLevel = async (levelData: TablesInsert<'Niveau'>, userId: string): Promise<LevelWithStudentCount> => {
+        const maxOrder = await this.repository.getMaxOrder(userId);
         const nextOrder = maxOrder + 1;
 
         return await this.repository.createLevel({
             ...levelData,
-            user_id: user.id,
+            user_id: userId,
             ordre: nextOrder
-        });
+        }, userId);
     }
 
     /**
      * MISE À JOUR :
      * Demande au système de stockage de modifier les informations d'un niveau existant.
      */
-    updateLevel = async (id: string, levelData: TablesUpdate<'Niveau'>): Promise<LevelWithStudentCount> => {
-        return await this.repository.updateLevel(id, levelData);
+    updateLevel = async (id: string, levelData: TablesUpdate<'Niveau'>, userId: string): Promise<LevelWithStudentCount> => {
+        return await this.repository.updateLevel(id, levelData, userId);
     }
 
     /**
      * SUPPRESSION :
      * Demande l'effacement définitif d'un niveau.
      */
-    deleteLevel = async (id: string): Promise<void> => {
-        return await this.repository.deleteLevel(id);
+    deleteLevel = async (id: string, userId: string): Promise<void> => {
+        return await this.repository.deleteLevel(id, userId);
     }
 
     /**
      * RÉORGANISATION :
      * Sauvegarde le nouvel ordre général des niveaux (ex: glisser le "CM1" avant le "CE2").
      */
-    updateOrder = async (updates: TablesUpdate<'Niveau'>[]): Promise<void> => {
-        return await this.repository.updateOrders(updates);
+    updateOrder = async (updates: TablesUpdate<'Niveau'>[], userId: string): Promise<void> => {
+        return await this.repository.updateOrders(updates, userId);
     }
 }
 

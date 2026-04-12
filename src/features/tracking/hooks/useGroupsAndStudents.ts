@@ -57,10 +57,13 @@ export function useGroupsAndStudents() {
      * On récupère la liste des groupes créés par l'enseignant.
      */
     const fetchGroups = async () => {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+        
         await fetchWithCache(
             'groups',
             async () => {
-                return await groupService.getGroups();
+                return await groupService.getGroups(user.id);
             },
             setGroups
         );
@@ -76,7 +79,9 @@ export function useGroupsAndStudents() {
             await fetchWithCache(
                 `students_pedago_${groupId}`,
                 async () => {
-                    const data = await trackingService.getStudentsForPedago(groupId);
+                    const { data: { user } } = await supabase.auth.getUser();
+                    if (!user) return [];
+                    const data = await trackingService.getStudentsForPedago(groupId, user.id);
                     return data || [];
                 },
                 (data) => setStudents(data as Student[]),

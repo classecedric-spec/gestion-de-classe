@@ -142,7 +142,10 @@ const MobileDashboard: React.FC = () => {
                 filterStudentIds = students.map(s => s.id);
             }
 
-            const statsData = await trackingRepository.getDashboardStats(filterStudentIds);
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) return;
+
+            const statsData = await trackingRepository.getDashboardStats(filterStudentIds, user.id);
 
             setStats({
                 helpPending: statsData.helpPending,

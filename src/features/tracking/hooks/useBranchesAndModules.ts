@@ -21,6 +21,7 @@
  */
 
 import { useState, useEffect } from 'react';
+import { supabase } from '../../../lib/database';
 import { fetchWithCache } from '../../../lib/sync';
 import { Student } from '../../attendance/services/attendanceService';
 import { branchService } from '../../branches/services/branchService';
@@ -125,11 +126,14 @@ export function useBranchesAndModules(
      * C'est ce qui permet d'afficher les petits indicateurs sous chaque portrait d'élève.
      */
     const fetchGroupProgressions = async (groupId: string) => {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+
         await fetchWithCache(
             `group_progressions_${groupId}`,
             async () => {
-                const allStudents = await trackingService.fetchStudentsInGroup(groupId);
-                const result = await trackingService.fetchGroupProgressions(allStudents.ids);
+                const allStudents = await trackingService.fetchStudentsInGroup(groupId, user.id);
+                const result = await trackingService.fetchGroupProgressions(allStudents.ids, user.id);
                 return result || [];
             },
             (rawData: any[]) => {
@@ -162,7 +166,9 @@ export function useBranchesAndModules(
         await fetchWithCache(
             `modules_pedago_${studentId || selectedGroupId}`,
             async () => {
-                const modules = await trackingService.fetchModulesForStudent(null);
+                const { data: { user } } = await supabase.auth.getUser();
+                if (!user) return [];
+                const modules = await trackingService.fetchModulesForStudent(null, user.id);
                 return modules || [];
             },
             (data: any[]) => {
@@ -255,7 +261,9 @@ export function useBranchesAndModules(
         await fetchWithCache(
             `activities_pedago_${moduleId}`,
             async () => {
-                return await trackingService.fetchActivitiesForModule(moduleId);
+                const { data: { user } } = await supabase.auth.getUser();
+                if (!user) return [];
+                return await trackingService.fetchActivitiesForModule(moduleId, user.id);
             },
             (data: any[]) => {
                 const filteredData = selectedStudent ? data.filter((act) => {

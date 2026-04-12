@@ -22,30 +22,39 @@ export const useAdultTracking = () => {
     const [showTaskSelectorFor, setShowTaskSelectorFor] = useState<string | null>(null);
 
     const fetchAllAdults = useCallback(async () => {
+        const user = await getCurrentUser();
+        if (!user) return;
+
         await fetchWithCache(
             'all_adults',
             async () => {
-                return await adultService.fetchAdults();
+                return await adultService.fetchAdults(user.id);
             },
             setAllAdults
         );
     }, []);
 
     const fetchActivityTypes = useCallback(async () => {
+        const user = await getCurrentUser();
+        if (!user) return;
+
         await fetchWithCache(
             'activity_types_adult',
             async () => {
-                return await activityTypeService.fetchAdultTypes();
+                return await activityTypeService.fetchAdultTypes(user.id);
             },
             setAvailableActivityTypes
         );
     }, []);
 
     const fetchAdultTracking = useCallback(async () => {
+        const user = await getCurrentUser();
+        if (!user) return;
+
         await fetchWithCache(
             'adult_tracking_today',
             async () => {
-                return await adultService.fetchTrackingToday();
+                return await adultService.fetchTrackingToday(user.id);
             },
             setAdultActivities
         );

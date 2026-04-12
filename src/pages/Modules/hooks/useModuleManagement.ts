@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { filterModules, sortModules, extractBranches, extractSubBranches, ModuleWithRelations } from '../utils/moduleHelpers';
 import { toast } from 'react-hot-toast';
 import { moduleService } from '../../../features/modules/services/moduleService';
+import { supabase } from '../../../lib/database';
 
 /**
  * useModuleManagement
@@ -27,7 +28,12 @@ export function useModuleManagement() {
     const fetchModules = useCallback(async () => {
         setLoading(true);
         try {
-            const data = await moduleService.getAllModules();
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) {
+                setModules([]);
+                return;
+            }
+            const data = await moduleService.getAllModules(user.id);
             setModules(data || []);
         } catch (error) {
             console.error("Error fetching modules:", error);
@@ -79,9 +85,11 @@ export function useModuleManagement() {
         }
 
         setModuleToDelete(null); // Close modal
-
+ 
         try {
-            await moduleService.deleteModule(idToDelete);
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) throw new Error("Utilisateur non authentifié.");
+            await moduleService.deleteModule(idToDelete, user.id);
             toast.success("Module supprimé");
         } catch (err) {
             console.error('Error deleting module:', err);
@@ -103,9 +111,11 @@ export function useModuleManagement() {
         // Optimistic Update
         const updatedModule = { ...module, statut: newStatus };
         setModules(prev => prev.map(m => m.id === module.id ? updatedModule : m));
-
+ 
         try {
-            await moduleService.toggleModuleStatus(module);
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) throw new Error("Utilisateur non authentifié.");
+            await moduleService.toggleModuleStatus(module, user.id);
             // Success - no action needed as we already updated
         } catch (err) {
             console.error('Error updating status:', err);
@@ -145,7 +155,9 @@ export function useModuleManagement() {
         // Optimistic update
         setModules(prev => prev.map(m => m.id === moduleId ? { ...m, ...data } : m));
         try {
-            await moduleService.updateModule(moduleId, data);
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) throw new Error("Utilisateur non authentifié.");
+            await moduleService.updateModule(moduleId, data, user.id);
         } catch (error) {
             console.error('Error updating module:', error);
             toast.error("Erreur lors de la mise à jour");
@@ -211,7 +223,9 @@ export function useModuleManagement() {
                 const idToRefresh = selectedModuleId || selectedModule?.id;
                 if (idToRefresh) {
                     try {
-                        const updated = await moduleService.getModuleDetails(idToRefresh);
+                        const { data: { user } } = await supabase.auth.getUser();
+                        if (!user) return;
+                        const updated = await moduleService.getModuleDetails(idToRefresh, user.id);
                         setModules(prev => prev.map(m => m.id === idToRefresh ? updated : m));
                     } catch (err) {
                         console.error("Error refreshing module", err);

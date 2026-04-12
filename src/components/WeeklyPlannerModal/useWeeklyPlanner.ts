@@ -163,7 +163,10 @@ export const useWeeklyPlanner = (isOpen: boolean) => {
     const fetchData = useCallback(async () => {
         setDbError(false);
         try {
-            const data = await plannerService.getPlanningForWeek(currentWeek);
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) return;
+
+            const data = await plannerService.getPlanningForWeek(currentWeek, user.id);
             if (data) {
                 setSchedule(data);
             }
@@ -177,6 +180,9 @@ export const useWeeklyPlanner = (isOpen: boolean) => {
      */
     const fetchModules = useCallback(async () => {
         try {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) return;
+
             const { data, error } = await supabase
                 .from('Module')
                 .select(`
@@ -191,6 +197,7 @@ export const useWeeklyPlanner = (isOpen: boolean) => {
                        ActiviteNiveau (niveau_id, Niveau (nom))
                     )
                 `)
+                .eq('user_id', user.id)
                 .order('nom');
             if (error) throw error;
             setModules((data as any) || []);

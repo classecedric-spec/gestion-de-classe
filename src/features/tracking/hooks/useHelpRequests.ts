@@ -21,6 +21,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../../../lib/database';
+import { trackingService } from '../services/trackingService';
 import { Student } from '../../attendance/services/attendanceService';
 
 export interface HelpRequest {
@@ -87,40 +88,12 @@ export function useHelpRequests(
         queryFn: async () => {
             if (studentIds.length === 0) return [];
 
-            const { data, error } = await supabase
-                .from('Progression')
-                .select(`
-                    id,
-                    etat,
-                    is_suivi,
-                    eleve:Eleve(id, prenom, nom, importance_suivi),
-                    activite:Activite(
-                        id,
-                        titre,
-                        Module(
-                            id,
-                            nom,
-                            date_fin,
-                            statut,
-                            SousBranche (
-                                Branche (
-                                    id
-                                )
-                            )
-                        ),
-                        ActiviteMateriel (
-                            TypeMateriel (
-                                acronyme
-                            )
-                        )
-                    )
-                `)
-                .in('etat', ['besoin_d_aide', 'ajustement'])
-                .in('eleve_id', studentIds)
-                .order('updated_at', { ascending: true }); // Les plus anciens en premier
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) return [];
 
-            if (error) throw error;
-            return data as unknown as HelpRequest[];
+            // Seuls 'besoin_d_aide' et 'ajustement' sont affichés dans cette liste (les 'à vérifier' sont ailleurs ou filtrés)
+            const allRequests = await trackingService.fetchHelpRequests(studentIds, user.id);
+            return allRequests.filter(r => r.etat === 'besoin_d_aide' || r.etat === 'ajustement') as unknown as HelpRequest[];
         },
         enabled: studentIds.length > 0,
         staleTime: 1000 * 30, // On garde les données fraîches pendant 30 secondes.
@@ -163,14 +136,10 @@ export function useHelpRequests(
         if (helpersCache[requestId]) return;
 
         try {
-            const { data } = await supabase
-                .from('Progression')
-                .select('eleve:Eleve(id, prenom, nom)')
-                .eq('activite_id', activityId)
-                .eq('etat', 'termine')
-                .in('eleve_id', studentIds);
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) return;
 
-            const finishers = (data as any[])?.map(p => p.eleve).filter(Boolean) || [];
+            const finishers = await trackingService.findHelpers(activityId, studentIds, user.id);
             // On tire au sort 3 élèves parmi tous les experts disponibles.
             const randomHelpers = finishers.sort(() => 0.5 - Math.random()).slice(0, 3);
 

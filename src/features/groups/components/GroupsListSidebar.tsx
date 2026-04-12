@@ -58,7 +58,7 @@ interface GroupsListSidebarProps {
 /**
  * Colonne latérale gauche permettant de naviguer et d'organiser les groupes d'ateliers.
  */
-export const GroupsListSidebar: React.FC<GroupsListSidebarProps> = ({
+export const GroupsListSidebar = React.memo<GroupsListSidebarProps>(({
     groups,
     filteredGroups,
     selectedGroup,
@@ -168,7 +168,8 @@ export const GroupsListSidebar: React.FC<GroupsListSidebarProps> = ({
             </CardList>
         </div>
     );
-};
+});
+GroupsListSidebar.displayName = 'GroupsListSidebar';
 
 /**
  * LOGIGRAMME DE FONCTIONNEMENT :

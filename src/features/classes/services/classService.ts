@@ -56,15 +56,15 @@ export class ClassService {
      * @returns {Promise<ClassWithAdults[]>} Liste des classes avec détails des adultes
      * @throws {PostgrestError} Si la requête échoue
      */
-    getClasses = async (): Promise<ClassWithAdults[]> => {
-        return await this.repository.getClasses();
+    getClasses = async (userId: string): Promise<ClassWithAdults[]> => {
+        return await this.repository.getClasses(userId);
     }
 
     /**
      * Récupère une classe par son ID avec ses relations
      */
-    getClassById = async (classId: string): Promise<ClassWithAdults | null> => {
-        return await this.repository.getClassById(classId);
+    getClassById = async (classId: string, userId: string): Promise<ClassWithAdults | null> => {
+        return await this.repository.getClassById(classId, userId);
     }
 
     /**
@@ -73,8 +73,8 @@ export class ClassService {
      * @returns {Promise<StudentWithRelations[]>} Liste des élèves avec relations
      * @throws {PostgrestError} Si la requête échoue
      */
-    getStudentsByClass = async (classId: string): Promise<StudentWithRelations[]> => {
-        return await this.repository.getStudentsByClass(classId);
+    getStudentsByClass = async (classId: string, userId: string): Promise<StudentWithRelations[]> => {
+        return await this.repository.getStudentsByClass(classId, userId);
     }
 
     /**
@@ -83,8 +83,8 @@ export class ClassService {
      * @returns {Promise<void>}
      * @throws {PostgrestError} Si la requête échoue
      */
-    deleteClass = async (classId: string): Promise<void> => {
-        return await this.repository.deleteClass(classId);
+    deleteClass = async (classId: string, userId: string): Promise<void> => {
+        return await this.repository.deleteClass(classId, userId);
     }
 
     /**
@@ -93,8 +93,8 @@ export class ClassService {
      * @returns {Promise<void>}
      * @throws {PostgrestError} Si la requête échoue
      */
-    removeStudentFromClass = async (studentId: string): Promise<void> => {
-        return await this.repository.removeStudentFromClass(studentId);
+    removeStudentFromClass = async (studentId: string, userId: string): Promise<void> => {
+        return await this.repository.removeStudentFromClass(studentId, userId);
     }
 
     /**
@@ -105,43 +105,43 @@ export class ClassService {
      * @returns {Promise<void>}
      * @throws {PostgrestError} Si la requête échoue
      */
-    updateStudentField = async (studentId: string, field: keyof TablesUpdate<'Eleve'>, value: any): Promise<void> => {
-        return await this.repository.updateStudentField(studentId, field, value);
+    updateStudentField = async (studentId: string, field: keyof TablesUpdate<'Eleve'>, value: any, userId: string): Promise<void> => {
+        return await this.repository.updateStudentField(studentId, field, value, userId);
     }
 
     /**
      * Crée une nouvelle classe dans la base de données.
      */
-    createClass = async (data: any): Promise<{ id: string }> => {
-        return await this.repository.createClass(data);
+    createClass = async (data: any, userId: string): Promise<{ id: string }> => {
+        return await this.repository.createClass(data, userId);
     }
 
     /**
      * Met à jour le nom ou les propriétés d'une classe existante.
      */
-    updateClass = async (classId: string, data: any): Promise<void> => {
-        return await this.repository.updateClass(classId, data);
+    updateClass = async (classId: string, data: any, userId: string): Promise<void> => {
+        return await this.repository.updateClass(classId, data, userId);
     }
 
     /**
      * Associe un intervenant adulte (ex: maître/maîtresse) à une classe avec un rôle spécifique.
      */
-    linkAdult = async (classId: string, adultId: string, role: string): Promise<void> => {
-        return await this.repository.linkAdult(classId, adultId, role);
+    linkAdult = async (classId: string, adultId: string, role: string, userId: string): Promise<void> => {
+        return await this.repository.linkAdult(classId, adultId, role, userId);
     }
 
     /**
      * Supprime tous les liens existants entre les adultes et une classe (utilisé avant un changement d'équipe).
      */
-    unlinkAllAdults = async (classId: string): Promise<void> => {
-        return await this.repository.unlinkAllAdults(classId);
+    unlinkAllAdults = async (classId: string, userId: string): Promise<void> => {
+        return await this.repository.unlinkAllAdults(classId, userId);
     }
 
     /**
      * Gère l'enregistrement d'une image de logo/blason pour personnaliser la classe.
      */
-    uploadLogo = async (classId: string, photoBlob: Blob): Promise<string | null> => {
-        return await this.repository.uploadLogo(classId, photoBlob);
+    uploadLogo = async (classId: string, photoBlob: Blob, userId: string): Promise<string | null> => {
+        return await this.repository.uploadLogo(classId, photoBlob, userId);
     }
 }
 

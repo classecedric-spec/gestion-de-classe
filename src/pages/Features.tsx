@@ -112,7 +112,7 @@ const Features: React.FC = () => {
                 {/* Bottom CTA */}
                 <div className="mt-32 relative">
                     <div className="bg-gradient-to-br from-primary to-primary-dark p-12 md:p-20 rounded-[3rem] text-center shadow-2xl relative overflow-hidden">
-                        <div className="absolute top-0 right-0 w-full h-full bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20 brightness-100 contrast-150"></div>
+                        <div className="absolute top-0 right-0 w-full h-full opacity-20 pointer-events-none mix-blend-overlay" style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E")` }}></div>
                         <h2 className="text-4xl md:text-6xl font-black text-text-dark mb-8 tracking-tighter leading-[0.9] relative z-10">
                             Prêt à enseigner <br className="hidden md:block" /> différemment ?
                         </h2>

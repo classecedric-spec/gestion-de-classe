@@ -17,7 +17,7 @@ export interface IActivityTypeRepository {
     /**
      * Récupère la liste complète des types d'activités, triés par date de création.
      */
-    getAll(): Promise<ActivityType[]>;
+    getAll(userId: string): Promise<ActivityType[]>;
 
     /**
      * Enregistre un nouveau type d'activité.

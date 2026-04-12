@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { trackingService } from '../../../features/tracking/services/trackingService';
+import { supabase } from '../../../lib/database';
 import { DragEndEvent } from '@dnd-kit/core';
 
 /**
@@ -29,7 +30,9 @@ export function useProgressionTracking(
         if (!activityId) return;
         setLoadingProgressions(true);
         try {
-            const data = await trackingService.fetchProgressionsByActivity(activityId);
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) return;
+            const data = await trackingService.fetchProgressionsByActivity(activityId, user.id);
             setProgressions(data || []);
         } catch (err) {
             console.error('Error fetching progressions:', err);
@@ -47,7 +50,9 @@ export function useProgressionTracking(
         ));
 
         try {
-            await trackingService.updateProgressionStatus(progressionId, newStatus);
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) throw new Error("Utilisateur non authentifié.");
+            await trackingService.updateProgressionStatus(progressionId, newStatus, user.id);
         } catch (err) {
             // Revert on error
             setProgressions(oldProgressions);

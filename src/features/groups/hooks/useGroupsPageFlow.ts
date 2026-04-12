@@ -60,7 +60,7 @@ export function useGroupsPageFlow() {
      * On récupère la logique des données, des élèves et des impressions PDF.
      */
     const groupsData = useGroupsData();
-    const groupStudentsData = useGroupStudents(groupsData.selectedGroup);
+    const groupStudentsData = useGroupStudents(groupsData.selectedGroup, groupsData.user);
     const pdfGenerator = useGroupPdfGenerator();
 
     /** 
@@ -82,7 +82,11 @@ export function useGroupsPageFlow() {
                 if (profile) setEleveProfilCompetences(profile);
 
                 // Liste des matières pour construire les colonnes dynamiques.
-                const { data: branchData } = await supabase.from('Branche').select('id, nom').order('ordre');
+                const { data: branchData } = await supabase
+                    .from('Branche')
+                    .select('id, nom')
+                    .eq('user_id', user.id)
+                    .order('ordre');
                 if (branchData) setBranches(branchData || []);
             }
         };
@@ -143,7 +147,8 @@ export function useGroupsPageFlow() {
             const { error } = await supabase
                 .from('Eleve')
                 .update({ [field]: value })
-                .eq('id', studentId);
+                .eq('id', studentId)
+                .eq('titulaire_id', user.id);
 
             if (error) throw error;
             groupStudentsData.fetchStudentsInGroup(groupsData.selectedGroup?.id || '');
@@ -154,30 +159,44 @@ export function useGroupsPageFlow() {
 
     /**
      * ALIGNEMENT VISUEL : 
-     * Force les entêtes de gauche et de droite à avoir la même hauteur pour une ligne d'horizon parfaite.
+     * Observe et synchronise les entêtes de gauche et de droite pour une ligne d'horizon parfaite.
+     * Utilise ResizeObserver pour éviter les saccades et les calculs inutiles.
      */
     useLayoutEffect(() => {
+        const leftEl = leftContentRef.current;
+        const rightEl = rightContentRef.current;
+
         const syncHeight = () => {
-            const leftEl = leftContentRef.current;
-            const rightEl = rightContentRef.current;
-
-            if (leftEl) {
-                const h1 = leftEl.getBoundingClientRect().height;
-                const h2 = rightEl ? rightEl.getBoundingClientRect().height : 0;
-
-                if (h2 > 0) {
-                    const max = Math.max(h1, h2);
-                    setHeaderHeight(max);
-                } else {
-                    setHeaderHeight(undefined);
+            if (!leftEl) return;
+            const h1 = leftEl.getBoundingClientRect().height;
+            const h2 = rightEl ? rightEl.getBoundingClientRect().height : 0;
+            const max = h2 > 0 ? Math.max(h1, h2) : undefined;
+            
+            // On ne met à jour que si la valeur a changé de manière significative (> 2px)
+            // Cela évite les micro-mises à jour dues aux arrondis de pixels du navigateur
+            setHeaderHeight(current => {
+                const prev = typeof current === 'number' ? current : 0;
+                const next = max || 0;
+                if (Math.abs(prev - next) > 2) {
+                    return max;
                 }
-            }
+                return current;
+            });
         };
 
+        // Création de l'observateur pour détecter tout changement de taille physique
+        const observer = new ResizeObserver(() => {
+            // Découplage via requestAnimationFrame pour ne pas bloquer le thread principal
+            requestAnimationFrame(syncHeight);
+        });
+
+        if (leftEl) observer.observe(leftEl);
+        if (rightEl) observer.observe(rightEl);
+
+        // Appel initial pour caler le layout dès le montage
         syncHeight();
-        const t = setTimeout(syncHeight, 50); // Gestion des rendus différés
-        const t2 = setTimeout(syncHeight, 300);
-        return () => { clearTimeout(t); clearTimeout(t2); };
+
+        return () => observer.disconnect();
     }, [groupsData.groups.length, groupsData.selectedGroup, groupStudentsData.studentsInGroup.length]);
 
     // Raccourci clavier : Échap pour annuler une génération PDF trop longue.

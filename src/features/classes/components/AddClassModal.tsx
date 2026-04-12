@@ -25,13 +25,19 @@ import ImageUpload from '../../../core/ImageUpload';
 import { useClassForm } from '../hooks/useClassForm';
 import ImportStudentsSection, { ImportedStudent } from './ImportStudentsSection';
 import { Tables, TablesInsert } from '../../../types/supabase';
-import { ClassWithAdults } from '../services/classService';
 import { studentService } from '../../students/services/studentService';
 import { supabase } from '../../../lib/database';
 import { resetSync } from '../../../lib/sync';
 import { SupabaseLevelRepository } from '../../levels/repositories/SupabaseLevelRepository';
 
 const levelRepository = new SupabaseLevelRepository();
+
+interface AddClassModalProps {
+    isOpen: boolean;
+    onClose: () => void;
+    onAdded: () => void;
+    classToEdit?: Tables<'Classe'> | null;
+}
 
 /**
  * Interface pour la gestion locale des lignes d'enseignants dans le formulaire.

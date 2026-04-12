@@ -15,8 +15,16 @@ import { Tables, TablesInsert, TablesUpdate } from '../../../types/supabase';
 import { IGradeRepository } from './IGradeRepository';
 
 export class SupabaseGradeRepository implements IGradeRepository {
-    async findEvaluationsByContext(brancheId?: string, periode?: string): Promise<Tables<'Evaluation'>[]> {
-        let query = supabase.from('Evaluation').select('*');
+    private validateUserId(userId: string): boolean {
+        if (!userId || userId === 'undefined' || userId === 'null') {
+            console.warn('[SupabaseGradeRepository] Attempted query with invalid userId');
+            return false;
+        }
+        return true;
+    }
+
+    async findEvaluationsByContext(userId: string, brancheId?: string, periode?: string): Promise<Tables<'Evaluation'>[]> {
+        let query = supabase.from('Evaluation').select('*').eq('user_id', userId);
         
         if (brancheId) {
             query = query.eq('branche_id', brancheId);
@@ -26,6 +34,9 @@ export class SupabaseGradeRepository implements IGradeRepository {
             query = query.eq('periode', periode);
         }
         
+        // Soft delete filter
+        query = query.is('deleted_at', null);
+        
         const { data, error } = await query.order('date', { ascending: false });
         
         if (error) throw error;
@@ -33,7 +44,8 @@ export class SupabaseGradeRepository implements IGradeRepository {
     }
 
     // Récupère toutes les évaluations, tout en exigeant du serveur qu'il utilise des "Jointures" (Joins) pour rapatrier "en même temps" le nom en clair du Groupe, de la Branche et du Barème (sinon on n'aurait que des suites de chiffres).
-    async findAllEvaluationsDetailed(): Promise<any[]> {
+    async findAllEvaluationsDetailed(userId: string): Promise<any[]> {
+        if (!this.validateUserId(userId)) return [];
         const { data, error } = await supabase
             .from('EvaluationWithStats')
             .select(`
@@ -42,16 +54,18 @@ export class SupabaseGradeRepository implements IGradeRepository {
                 Branche (nom),
                 TypeNote (nom)
             `)
+            .eq('user_id', userId)
+            .is('deleted_at', null)
             .order('date', { ascending: false });
             
         if (error) throw error;
         return data || [];
     }
 
-    async createEvaluation(evaluation: TablesInsert<'Evaluation'>): Promise<Tables<'Evaluation'>> {
+    async createEvaluation(evaluation: TablesInsert<'Evaluation'>, userId: string): Promise<Tables<'Evaluation'>> {
         const { data, error } = await supabase
             .from('Evaluation')
-            .insert(evaluation)
+            .insert({ ...evaluation, user_id: userId })
             .select()
             .single();
             
@@ -59,11 +73,12 @@ export class SupabaseGradeRepository implements IGradeRepository {
         return data;
     }
 
-    async updateEvaluation(id: string, evaluation: TablesUpdate<'Evaluation'>): Promise<Tables<'Evaluation'>> {
+    async updateEvaluation(id: string, evaluation: TablesUpdate<'Evaluation'>, userId: string): Promise<Tables<'Evaluation'>> {
         const { data, error } = await supabase
             .from('Evaluation')
             .update(evaluation)
             .eq('id', id)
+            .eq('user_id', userId)
             .select()
             .single();
             
@@ -71,28 +86,86 @@ export class SupabaseGradeRepository implements IGradeRepository {
         return data;
     }
 
-    async deleteEvaluation(id: string): Promise<void> {
+    async deleteEvaluation(id: string, userId: string): Promise<void> {
+        const { error } = await supabase
+            .from('Evaluation')
+            .update({ deleted_at: new Date().toISOString() })
+            .eq('id', id)
+            .eq('user_id', userId);
+            
+        if (error) throw error;
+    }
+
+    async findDeletedEvaluations(userId: string): Promise<Tables<'Evaluation'>[]> {
+        const { data, error } = await supabase
+            .from('Evaluation')
+            .select(`
+                *,
+                Groupe (nom),
+                Branche (nom),
+                TypeNote (nom)
+            `)
+            .eq('user_id', userId)
+            .not('deleted_at', 'is', null)
+            .order('deleted_at', { ascending: false });
+            
+        if (error) throw error;
+        return data || [];
+    }
+
+    async restoreEvaluation(id: string, userId: string): Promise<void> {
+        const { error } = await supabase
+            .from('Evaluation')
+            .update({ deleted_at: null })
+            .eq('id', id)
+            .eq('user_id', userId);
+            
+        if (error) throw error;
+    }
+
+    async permanentDeleteEvaluation(id: string, userId: string): Promise<void> {
         const { error } = await supabase
             .from('Evaluation')
             .delete()
-            .eq('id', id);
+            .eq('id', id)
+            .eq('user_id', userId);
             
         if (error) throw error;
     }
 
     // Questions CRUD
-    async findQuestionsByEvaluation(evaluationId: string): Promise<Tables<'EvaluationQuestion'>[]> {
+    async findQuestionsByEvaluation(evaluationId: string, userId: string): Promise<Tables<'EvaluationQuestion'>[]> {
+        if (!this.validateUserId(userId)) return [];
+        
         const { data, error } = await supabase
             .from('EvaluationQuestion')
             .select('*')
             .eq('evaluation_id', evaluationId)
             .order('ordre', { ascending: true });
             
-        if (error) throw error;
+        if (error) {
+            console.error("[SupabaseGradeRepository] Error fetching questions:", error);
+            return [];
+        }
         return data || [];
     }
 
-    async createQuestions(questions: TablesInsert<'EvaluationQuestion'>[]): Promise<Tables<'EvaluationQuestion'>[]> {
+    async findQuestionsByEvaluations(evaluationIds: string[], userId: string): Promise<Tables<'EvaluationQuestion'>[]> {
+        if (!this.validateUserId(userId) || evaluationIds.length === 0) return [];
+        const { data, error } = await supabase
+            .from('EvaluationQuestion')
+            .select('*')
+            .in('evaluation_id', evaluationIds)
+            .order('ordre', { ascending: true });
+            
+        if (error) {
+            console.error("Error fetching multi-questions:", error);
+            throw error;
+        }
+        return data || [];
+    }
+
+    async createQuestions(questions: TablesInsert<'EvaluationQuestion'>[], userId: string): Promise<Tables<'EvaluationQuestion'>[]> {
         const sanitized = questions.map(q => {
             const { id, ...rest } = q as any;
             return id ? q : rest;
@@ -107,7 +180,7 @@ export class SupabaseGradeRepository implements IGradeRepository {
         return data || [];
     }
 
-    async upsertQuestions(questions: TablesInsert<'EvaluationQuestion'>[]): Promise<Tables<'EvaluationQuestion'>[]> {
+    async upsertQuestions(questions: TablesInsert<'EvaluationQuestion'>[], userId: string): Promise<Tables<'EvaluationQuestion'>[]> {
         const toInsert: any[] = [];
         const toUpdate: any[] = [];
 
@@ -143,7 +216,7 @@ export class SupabaseGradeRepository implements IGradeRepository {
         return results;
     }
 
-    async deleteQuestion(id: string): Promise<void> {
+    async deleteQuestion(id: string, userId: string): Promise<void> {
         const { error } = await supabase
             .from('EvaluationQuestion')
             .delete()
@@ -153,28 +226,32 @@ export class SupabaseGradeRepository implements IGradeRepository {
     }
 
     // Resultat CRUD
-    async findResultsByEvaluation(evaluationId: string): Promise<Tables<'Resultat'>[]> {
+    async findResultsByEvaluation(evaluationId: string, userId: string): Promise<Tables<'Resultat'>[]> {
+        if (!this.validateUserId(userId)) return [];
         const { data, error } = await supabase
             .from('Resultat')
             .select('*')
-            .eq('evaluation_id', evaluationId);
+            .eq('evaluation_id', evaluationId)
+            .eq('user_id', userId);
             
         if (error) throw error;
         return data || [];
     }
 
-    async findResultsByEvaluations(evaluationIds: string[]): Promise<Tables<'Resultat'>[]> {
-        if (evaluationIds.length === 0) return [];
+    async findResultsByEvaluations(evaluationIds: string[], userId: string): Promise<Tables<'Resultat'>[]> {
+        if (!this.validateUserId(userId) || evaluationIds.length === 0) return [];
         const { data, error } = await supabase
             .from('Resultat')
             .select('*')
-            .in('evaluation_id', evaluationIds);
+            .in('evaluation_id', evaluationIds)
+            .eq('user_id', userId);
             
         if (error) throw error;
         return data || [];
     }
 
-    async findAllResultsDetailed(): Promise<any[]> {
+    async findAllResultsDetailed(userId: string): Promise<any[]> {
+        if (!this.validateUserId(userId)) return [];
         const { data, error } = await supabase
             .from('Resultat')
             .select(`
@@ -191,19 +268,34 @@ export class SupabaseGradeRepository implements IGradeRepository {
                     TypeNote (id, nom)
                 )
             `)
+            .eq('user_id', userId)
             .order('created_at', { ascending: false });
             
         if (error) throw error;
         return data || [];
     }
 
-    // "Upsert" est la contraction de 'Update' (Mettre à jour) et 'Insert' (Insérer). C'est un ordre intelligent : "Si cet élève a déjà une note pour ce devoir précis, alors écrase-la. Sinon, crée-lui une nouvelle case".
-    async upsertResult(result: TablesInsert<'Resultat'>): Promise<Tables<'Resultat'>> {
+    async upsertResults(results: TablesInsert<'Resultat'>[], userId: string): Promise<Tables<'Resultat'>[]> {
+        if (results.length === 0) return [];
+        const sanitized = results.map(r => {
+            const { Eleve, Evaluation, ...rest } = r as any;
+            return { ...rest, user_id: userId };
+        });
+        const { data, error } = await supabase
+            .from('Resultat')
+            .upsert(sanitized, { onConflict: 'evaluation_id,eleve_id' })
+            .select();
+            
+        if (error) throw error;
+        return data || [];
+    }
+
+    async upsertResult(result: TablesInsert<'Resultat'>, userId: string): Promise<Tables<'Resultat'>> {
         // Sanitize to remove relationship fields that aren't columns
         const { Eleve, Evaluation, ...sanitized } = result as any;
         const { data, error } = await supabase
             .from('Resultat')
-            .upsert(sanitized, { onConflict: 'evaluation_id,eleve_id' })
+            .upsert({ ...sanitized, user_id: userId }, { onConflict: 'evaluation_id,eleve_id' })
             .select()
             .single();
             
@@ -211,31 +303,54 @@ export class SupabaseGradeRepository implements IGradeRepository {
         return data;
     }
 
-    async deleteResult(id: string): Promise<void> {
+    async deleteResult(id: string, userId: string): Promise<void> {
         const { error } = await supabase
             .from('Resultat')
             .delete()
-            .eq('id', id);
+            .eq('id', id)
+            .eq('user_id', userId);
             
         if (error) throw error;
     }
 
     // ResultatQuestion CRUD
-    async findQuestionResultsByEvaluation(evaluationId: string): Promise<Tables<'ResultatQuestion'>[]> {
+    async findQuestionResultsByEvaluation(evaluationId: string, userId: string): Promise<Tables<'ResultatQuestion'>[]> {
+        if (!this.validateUserId(userId)) return [];
+        
+        // We first get the question IDs for this evaluation.
+        const questions = await this.findQuestionsByEvaluation(evaluationId, userId);
+        const questionIds = questions.map(q => q.id);
+        
+        if (questionIds.length === 0) return [];
+
         const { data, error } = await supabase
             .from('ResultatQuestion')
-            .select('*, EvaluationQuestion!inner(*)')
-            .eq('EvaluationQuestion.evaluation_id', evaluationId);
+            .select('*')
+            .in('question_id', questionIds);
             
         if (error) throw error;
         return data || [];
     }
 
-    async upsertQuestionResults(results: TablesInsert<'ResultatQuestion'>[]): Promise<Tables<'ResultatQuestion'>[]> {
+    async findQuestionResultsByEvaluations(evaluationIds: string[], userId: string): Promise<Tables<'ResultatQuestion'>[]> {
+        if (!this.validateUserId(userId) || evaluationIds.length === 0) return [];
+        // Filtering by evaluationIds via the joined EvaluationQuestion table
+        // and by userId via the joined Evaluation table
+        const { data, error } = await supabase
+            .from('ResultatQuestion')
+            .select('*, EvaluationQuestion!inner(evaluation_id, Evaluation!inner(user_id))')
+            .in('EvaluationQuestion.evaluation_id', evaluationIds)
+            .eq('EvaluationQuestion.Evaluation.user_id', userId);
+            
+        if (error) throw error;
+        return data || [];
+    }
+
+    async upsertQuestionResults(results: TablesInsert<'ResultatQuestion'>[], userId: string): Promise<Tables<'ResultatQuestion'>[]> {
         // Sanitize to remove relationship fields that aren't columns
         const sanitized = results.map(r => {
             const { EvaluationQuestion, ...rest } = r as any;
-            return rest;
+            return { ...rest };
         });
         
         const { data, error } = await supabase
@@ -248,18 +363,33 @@ export class SupabaseGradeRepository implements IGradeRepository {
     }
 
     // Regroupement CRUD
-    async findRegroupementsByEvaluation(evaluationId: string): Promise<any[]> {
+    async findRegroupementsByEvaluation(evaluationId: string, userId: string): Promise<any[]> {
+        if (!this.validateUserId(userId)) return [];
         const { data, error } = await supabase
             .from('EvaluationRegroupement')
-            .select('*')
+            .select('*, Evaluation!inner(user_id)')
             .eq('evaluation_id', evaluationId)
+            .eq('Evaluation.user_id', userId)
             .order('ordre', { ascending: true });
             
         if (error) throw error;
         return data || [];
     }
 
-    async upsertRegroupements(regroupements: any[]): Promise<any[]> {
+    async findRegroupementsByEvaluations(evaluationIds: string[], userId: string): Promise<any[]> {
+        if (!this.validateUserId(userId) || evaluationIds.length === 0) return [];
+        const { data, error } = await supabase
+            .from('EvaluationRegroupement')
+            .select('*, Evaluation!inner(user_id)')
+            .in('evaluation_id', evaluationIds)
+            .eq('Evaluation.user_id', userId)
+            .order('ordre', { ascending: true });
+            
+        if (error) throw error;
+        return data || [];
+    }
+
+    async upsertRegroupements(regroupements: any[], userId: string): Promise<any[]> {
         const sanitized = regroupements.map(r => {
             const { id, ...rest } = r;
             return id ? r : rest;
@@ -274,7 +404,7 @@ export class SupabaseGradeRepository implements IGradeRepository {
         return data || [];
     }
 
-    async deleteRegroupement(id: string): Promise<void> {
+    async deleteRegroupement(id: string, userId: string): Promise<void> {
         const { error } = await supabase
             .from('EvaluationRegroupement')
             .delete()
@@ -284,20 +414,22 @@ export class SupabaseGradeRepository implements IGradeRepository {
     }
 
     // TypeNote CRUD
-    async findAllNoteTypes(): Promise<Tables<'TypeNote'>[]> {
+    async findAllNoteTypes(userId: string): Promise<Tables<'TypeNote'>[]> {
+        if (!this.validateUserId(userId)) return [];
         const { data, error } = await supabase
             .from('TypeNote')
             .select('*')
+            .eq('user_id', userId)
             .order('nom', { ascending: true });
             
         if (error) throw error;
         return data || [];
     }
 
-    async createNoteType(typeNote: TablesInsert<'TypeNote'>): Promise<Tables<'TypeNote'>> {
+    async createNoteType(typeNote: TablesInsert<'TypeNote'>, userId: string): Promise<Tables<'TypeNote'>> {
         const { data, error } = await supabase
             .from('TypeNote')
-            .insert(typeNote)
+            .insert({ ...typeNote, user_id: userId })
             .select()
             .single();
             
@@ -305,11 +437,12 @@ export class SupabaseGradeRepository implements IGradeRepository {
         return data;
     }
 
-    async updateNoteType(id: string, typeNote: TablesUpdate<'TypeNote'>): Promise<Tables<'TypeNote'>> {
+    async updateNoteType(id: string, typeNote: TablesUpdate<'TypeNote'>, userId: string): Promise<Tables<'TypeNote'>> {
         const { data, error } = await supabase
             .from('TypeNote')
             .update(typeNote)
             .eq('id', id)
+            .eq('user_id', userId)
             .select()
             .single();
             
@@ -317,17 +450,18 @@ export class SupabaseGradeRepository implements IGradeRepository {
         return data;
     }
 
-    async deleteNoteType(id: string): Promise<void> {
+    async deleteNoteType(id: string, userId: string): Promise<void> {
         const { error } = await supabase
             .from('TypeNote')
             .delete()
-            .eq('id', id);
+            .eq('id', id)
+            .eq('user_id', userId);
             
         if (error) throw error;
     }
 
     // Helpers
-    async getResultsWithStudents(evaluationId: string): Promise<any[]> {
+    async getResultsWithStudents(userId: string, evaluationId: string): Promise<any[]> {
         const { data, error } = await supabase
             .from('Resultat')
             .select(`
@@ -339,6 +473,7 @@ export class SupabaseGradeRepository implements IGradeRepository {
                     photo_url
                 )
             `)
+            .eq('user_id', userId)
             .eq('evaluation_id', evaluationId);
             
         if (error) throw error;

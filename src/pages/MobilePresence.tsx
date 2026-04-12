@@ -55,7 +55,9 @@ const MobilePresence: React.FC = () => {
     useEffect(() => {
         const loadSetups = async () => {
             try {
-                const data = await attendanceService.fetchSetups();
+                const user = await getCurrentUser();
+                if (!user) return;
+                const data = await attendanceService.fetchSetups(user.id);
                 setSetups(data);
             } catch (error) {
                 console.error("Error fetching setups", error);
@@ -115,12 +117,16 @@ const MobilePresence: React.FC = () => {
                 throw new Error("Aucune configuration de présence trouvée.");
             }
 
+            const user = await getCurrentUser();
+            if (!user) throw new Error("Non connecté");
+
             await attendanceService.upsertAttendance({
                 eleve_id: studentId,
                 date: selectedDate,
                 periode: selectedPeriod,
                 status: newStatus,
-                setup_id: setupId
+                setup_id: setupId,
+                user_id: user.id
             });
 
         } catch (err) {

@@ -43,15 +43,15 @@ export class AdultService {
     /**
      * RÉCUPÉRATION : Liste complète (format Supabase)
      */
-    async fetchAdults(): Promise<Tables<'Adulte'>[]> {
-        return await this.adultRepository.getAll();
+    async fetchAdults(userId: string): Promise<Tables<'Adulte'>[]> {
+        return await this.adultRepository.getAll(userId);
     }
 
     /**
      * RÉCUPÉRATION : Format simplifié pour l'affichage du suivi
      */
-    async fetchAllAdults(): Promise<Adult[]> {
-        const adults = await this.adultRepository.getAll();
+    async fetchAllAdults(userId: string): Promise<Adult[]> {
+        const adults = await this.adultRepository.getAll(userId);
         return adults.map(a => ({ id: a.id, nom: a.nom, prenom: a.prenom }));
     }
 
@@ -81,16 +81,16 @@ export class AdultService {
     /**
      * SUIVI DU JOUR : Récupère les actions saisies aujourd'hui
      */
-    async fetchTrackingToday(): Promise<AdultActivity[]> {
-        return await this.adultRepository.fetchTrackingToday();
+    async fetchTrackingToday(userId: string): Promise<AdultActivity[]> {
+        return await this.adultRepository.fetchTrackingToday(userId);
     }
 
     /**
      * HISTORIQUE : Récupère les activités depuis une date donnée
      */
-    async fetchAdultActivities(_sinceDate: string): Promise<AdultActivity[]> {
+    async fetchAdultActivities(_sinceDate: string, userId: string): Promise<AdultActivity[]> {
         // Note : Actuellement limité au suivi du jour par le repository
-        return await this.adultRepository.fetchTrackingToday();
+        return await this.adultRepository.fetchTrackingToday(userId);
     }
 
     /**
@@ -123,8 +123,8 @@ export class AdultService {
 
     // --- GESTION DES TYPES D'ACTIONS (Délégation) ---
 
-    async fetchActivityTypes(): Promise<ActivityType[]> {
-        return await this.activityTypeRepository.getAll();
+    async fetchActivityTypes(userId: string): Promise<ActivityType[]> {
+        return await this.activityTypeRepository.getAll(userId);
     }
 
     /**

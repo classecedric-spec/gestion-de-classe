@@ -100,10 +100,13 @@ export const useStudentForm = ({ isEditing, editId, onSaved, onClose }: UseStude
      */
     const loadDependencies = async () => {
         try {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) return;
+
             const [classes, groups, niveaux] = await Promise.all([
-                classService.getClasses(),
-                groupService.getGroups(),
-                levelService.fetchLevels()
+                classService.getClasses(user.id),
+                groupService.getGroups(user.id),
+                levelService.fetchLevels(user.id)
             ]);
             setClassesList(classes);
             setGroupsList(groups);
@@ -118,8 +121,11 @@ export const useStudentForm = ({ isEditing, editId, onSaved, onClose }: UseStude
      */
     const loadStudentData = async (id: string) => {
         try {
-            const data = await studentService.getStudent(id);
-            const groupIds = await studentService.getStudentGroupIds(id);
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) return;
+
+            const data = await studentService.getStudent(id, user.id);
+            const groupIds = await studentService.getStudentGroupIds(id, user.id);
 
             if (data) {
                 setStudent({
@@ -217,7 +223,9 @@ export const useStudentForm = ({ isEditing, editId, onSaved, onClose }: UseStude
 
     const handleLevelSubmit = async (levelData: TablesInsert<'Niveau'>) => {
         try {
-            const newLevel = await levelService.createLevel(levelData);
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) throw new Error("Utilisateur non authentifié.");
+            const newLevel = await levelService.createLevel(levelData, user.id);
             if (newLevel) {
                 handleNiveauAdded(newLevel);
                 return true;

@@ -19,25 +19,25 @@ import { LevelWithStudentCount } from '../../../types';
  */
 export interface ILevelRepository {
     // Récupérer la liste de tous les niveaux avec le nombre d'élèves dans chacun
-    getLevels(): Promise<LevelWithStudentCount[]>;
+    getLevels(userId: string): Promise<LevelWithStudentCount[]>;
     
     // Lister les élèves inscrits dans un niveau spécifique
-    getStudentsByLevel(levelId: string): Promise<Tables<'Eleve'>[]>;
+    getStudentsByLevel(levelId: string, userId: string): Promise<Tables<'Eleve'>[]>;
     
     // Créer un nouveau niveau scolaire
-    createLevel(level: TablesInsert<'Niveau'>): Promise<LevelWithStudentCount>;
+    createLevel(level: TablesInsert<'Niveau'>, userId: string): Promise<LevelWithStudentCount>;
     
     // Modifier les informations d'un niveau (nom, etc.)
-    updateLevel(id: string, updates: TablesUpdate<'Niveau'>): Promise<LevelWithStudentCount>;
+    updateLevel(id: string, updates: TablesUpdate<'Niveau'>, userId: string): Promise<LevelWithStudentCount>;
     
     // Supprimer définitivement un niveau
-    deleteLevel(id: string): Promise<void>;
+    deleteLevel(id: string, userId: string): Promise<void>;
     
     // Sauvegarder un nouvel ordre d'affichage (ex: mettre le CP avant le CE1)
-    updateOrders(updates: TablesUpdate<'Niveau'>[]): Promise<void>;
+    updateOrders(updates: TablesUpdate<'Niveau'>[], userId: string): Promise<void>;
     
     // Calculer quel est le numéro d'ordre le plus élevé actuellement
-    getMaxOrder(): Promise<number>;
+    getMaxOrder(userId: string): Promise<number>;
 }
 
 /**

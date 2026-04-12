@@ -20,6 +20,14 @@ import { calculateModuleProgress, ModuleWithRelations } from '../../../pages/Mod
 import { Tables, TablesInsert, TablesUpdate } from '../../../types/supabase';
 
 export class SupabaseModuleRepository implements IModuleRepository {
+    private validateUserId(userId: string): boolean {
+        if (!userId || userId === 'undefined' || userId === 'null') {
+            console.warn('[SupabaseModuleRepository] Attempted query with invalid userId');
+            return false;
+        }
+        return true;
+    }
+
     /**
      * LANGAGE DE REQUÊTE (selectQuery) :
      * C'est la liste de course géante que l'on donne à la base de données.
@@ -60,10 +68,12 @@ export class SupabaseModuleRepository implements IModuleRepository {
      * LECTURE DE TOUS LES MODULES :
      * Récupère la liste complète et calcule pour chacun le pourcentage de réussite globale.
      */
-    async getAllModulesWithDetails(): Promise<ModuleWithRelations[]> {
+    async getAllModulesWithDetails(userId: string): Promise<ModuleWithRelations[]> {
+        if (!this.validateUserId(userId)) return [];
         const { data, error } = await supabase
             .from('Module')
             .select(this.selectQuery)
+            .eq('user_id', userId)
             .order('nom')
             .order('ordre', { foreignTable: 'Activite', ascending: true });
 
@@ -79,16 +89,18 @@ export class SupabaseModuleRepository implements IModuleRepository {
      * LECTURE D'UN MODULE PRÉCIS :
      * Identique à la lecture globale, mais pour un seul identifiant.
      */
-    async getModuleWithDetails(moduleId: string): Promise<any> {
+    async getModuleWithDetails(moduleId: string, userId: string): Promise<any> {
+        if (!this.validateUserId(userId)) return null;
         const { data, error } = await supabase
             .from('Module')
             .select(this.selectQuery)
             .eq('id', moduleId)
+            .eq('user_id', userId)
             .order('ordre', { foreignTable: 'Activite', ascending: true })
             .single();
-
+ 
         if (error) throw error;
-
+ 
         return {
             ...data,
             ...calculateModuleProgress(data)
@@ -99,8 +111,12 @@ export class SupabaseModuleRepository implements IModuleRepository {
      * SUPPRESSION :
      * Retire le module de la base (les activités liées seront aussi supprimées par cascade).
      */
-    async deleteModule(moduleId: string): Promise<void> {
-        const { error } = await supabase.from('Module').delete().eq('id', moduleId);
+    async deleteModule(moduleId: string, userId: string): Promise<void> {
+        const { error } = await supabase
+            .from('Module')
+            .delete()
+            .eq('id', moduleId)
+            .eq('user_id', userId);
         if (error) throw error;
     }
 
@@ -108,8 +124,12 @@ export class SupabaseModuleRepository implements IModuleRepository {
      * CHANGEMENT DE STATUT :
      * Permet de passer un module de "En cours" à "Terminé".
      */
-    async updateModuleStatus(moduleId: string, newStatus: string): Promise<void> {
-        const { error } = await supabase.from('Module').update({ statut: newStatus }).eq('id', moduleId);
+    async updateModuleStatus(moduleId: string, newStatus: string, userId: string): Promise<void> {
+        const { error } = await supabase
+            .from('Module')
+            .update({ statut: newStatus })
+            .eq('id', moduleId)
+            .eq('user_id', userId);
         if (error) throw error;
     }
 
@@ -117,10 +137,12 @@ export class SupabaseModuleRepository implements IModuleRepository {
      * MODULES ACTIFS :
      * Récupère uniquement les modules sur lesquels les élèves travaillent actuellement.
      */
-    async getActiveModules(): Promise<any[]> {
+    async getActiveModules(userId: string): Promise<any[]> {
+        if (!this.validateUserId(userId)) return [];
         const { data } = await supabase
             .from('Module')
             .select('*, SousBranche(id, nom, ordre, Branche(id, nom, ordre))')
+            .eq('user_id', userId)
             .eq('statut', 'en_cours');
         return data || [];
     }
@@ -129,8 +151,9 @@ export class SupabaseModuleRepository implements IModuleRepository {
      * RÉFÉRENTIELS :
      * Liste toutes les branches (Français, Maths, etc.) disponibles.
      */
-    async getBranches(): Promise<Tables<'Branche'>[]> {
-        const { data } = await supabase.from('Branche').select('*').order('ordre');
+    async getBranches(userId: string): Promise<Tables<'Branche'>[]> {
+        if (!this.validateUserId(userId)) return [];
+        const { data } = await supabase.from('Branche').select('*').eq('user_id', userId).order('ordre');
         return data || [];
     }
 
@@ -138,13 +161,14 @@ export class SupabaseModuleRepository implements IModuleRepository {
      * CRÉATION :
      * Enregistre un nouveau module.
      */
-    async createModule(data: TablesInsert<'Module'>): Promise<Tables<'Module'>> {
+    async createModule(data: TablesInsert<'Module'>, userId: string): Promise<Tables<'Module'>> {
+        if (!this.validateUserId(userId)) throw new Error("userId required");
         const { data: created, error } = await supabase
             .from('Module')
-            .insert(data)
+            .insert({ ...data, user_id: userId })
             .select()
             .single();
-
+ 
         if (error) throw error;
         return created;
     }
@@ -154,27 +178,30 @@ export class SupabaseModuleRepository implements IModuleRepository {
      * Modifie le module. Si la date de fin change, le programme met à jour 
      * automatiquement toutes les "dates limites" des activités des élèves.
      */
-    async updateModule(id: string, data: TablesUpdate<'Module'>): Promise<void> {
+    async updateModule(id: string, data: TablesUpdate<'Module'>, userId: string): Promise<void> {
         const { error } = await supabase
             .from('Module')
             .update(data)
-            .eq('id', id);
-
+            .eq('id', id)
+            .eq('user_id', userId);
+ 
         if (error) throw error;
-
+ 
         // Mise à jour en cascade des dates pour les élèves
         if (data.date_fin) {
             const { data: activities, error: actError } = await supabase
                 .from('Activite')
                 .select('id')
-                .eq('module_id', id);
-
+                .eq('module_id', id)
+                .eq('user_id', userId);
+ 
             if (!actError && activities && activities.length > 0) {
                 const activityIds = activities.map(a => a.id);
                 await supabase
                     .from('Progression')
                     .update({ date_limite: data.date_fin })
-                    .in('activite_id', activityIds);
+                    .in('activite_id', activityIds)
+                    .eq('user_id', userId);
             }
         }
     }
@@ -186,7 +213,8 @@ export class SupabaseModuleRepository implements IModuleRepository {
      * 2. Trouve toutes les activités non terminées dont la date limite est passée.
      * 3. Récupère le nom de l'élève, sa photo, sa classe et le nom de l'activité.
      */
-    async getDetailedLateActivities(classId: string): Promise<any[]> {
+    async getDetailedLateActivities(classId: string, userId: string): Promise<any[]> {
+        if (!this.validateUserId(userId)) return [];
         const today = new Date();
         const day = today.getDay() || 7; 
         const monday = new Date(today);
@@ -194,9 +222,9 @@ export class SupabaseModuleRepository implements IModuleRepository {
         const lastFriday = new Date(monday);
         lastFriday.setDate(monday.getDate() - 3);
         lastFriday.setHours(23, 59, 59, 999);
-
+ 
         const lastFridayISO = lastFriday.toISOString().split('T')[0];
-
+ 
         const { data, error } = await supabase
             .from('Progression')
             .select(`
@@ -210,7 +238,7 @@ export class SupabaseModuleRepository implements IModuleRepository {
                 Activite:activite_id!inner (
                     titre,
                     Module:module_id!inner (
-                        nom, date_fin, statut,
+                        nom, date_fin, statut, user_id,
                         SousBranche:sous_branche_id (
                             nom, ordre,
                             Branche:branche_id (
@@ -223,8 +251,9 @@ export class SupabaseModuleRepository implements IModuleRepository {
             .not('etat', 'in', '("termine","verifie")')
             .eq('Eleve.classe_id', classId)
             .eq('Activite.Module.statut', 'en_cours')
+            .eq('Activite.Module.user_id', userId)
             .lte('Activite.Module.date_fin', lastFridayISO);
-
+ 
         if (error) throw error;
         return data || [];
     }

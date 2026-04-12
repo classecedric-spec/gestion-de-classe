@@ -59,8 +59,14 @@ export const useHomeworkTracking = (selectedGroupId: string | null, date: Date |
 
             setLoading(true);
             try {
+                const { data: { user } } = await supabase.auth.getUser();
+                if (!user) {
+                    setStudents([]);
+                    return;
+                }
+
                 // 1. On récupère d'abord tous les élèves de la classe sélectionnée.
-                const groupStudents = await studentService.getStudentsByGroup(selectedGroupId);
+                const groupStudents = await studentService.getStudentsByGroup(selectedGroupId, user.id);
                 if (!groupStudents || groupStudents.length === 0) {
                     setStudents([]);
                     return;
@@ -112,6 +118,7 @@ export const useHomeworkTracking = (selectedGroupId: string | null, date: Date |
                             )
                         )
                     `)
+                    .eq('user_id', user.id)
                     .in('eleve_id', studentIds)
                     .eq('Activite.Module.statut', 'en_cours');
 

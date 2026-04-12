@@ -30,15 +30,15 @@ export class StudentService {
     /**
      * Récupère la fiche complète d'un élève par son identifiant unique.
      */
-    getStudent = async (id: string): Promise<Tables<'Eleve'> | null> => {
-        return await this.repository.findById(id);
+    getStudent = async (id: string, userId: string): Promise<Tables<'Eleve'> | null> => {
+        return await this.repository.findById(id, userId);
     }
 
     /**
      * Liste les identifiants techniques des groupes auxquels l'élève est rattaché.
      */
-    getStudentGroupIds = async (studentId: string): Promise<string[]> => {
-        return await this.repository.getLinkedGroupIds(studentId);
+    getStudentGroupIds = async (studentId: string, userId: string): Promise<string[]> => {
+        return await this.repository.getLinkedGroupIds(studentId, userId);
     }
 
     /**
@@ -93,7 +93,7 @@ export class StudentService {
                     (dataToSave as any).photo_url = photoUrl;
                 }
             }
-            await this.repository.update(editId, dataToSave as TablesUpdate<'Eleve'>);
+            await this.repository.update(editId, dataToSave as TablesUpdate<'Eleve'>, userId);
         } else {
             /**
              * Cas de la CRÉATION :
@@ -101,13 +101,13 @@ export class StudentService {
              * 2. Si une photo est fournie, on utilise cet ID pour la nommer correctement dans le stockage.
              * 3. On met enfin à jour le dossier avec l'adresse de la photo.
              */
-            const createdStudent = await this.repository.create(dataToSave as TablesInsert<'Eleve'>);
+            const createdStudent = await this.repository.create(dataToSave as TablesInsert<'Eleve'>, userId);
             studentId = createdStudent.id;
-
+ 
             if (photoBase64Arg && photoBase64Arg.startsWith('data:image')) {
                 const photoUrl = await this.uploadStudentPhoto(studentId, photoBase64Arg);
                 if (photoUrl) {
-                    await this.repository.update(studentId, { photo_url: photoUrl } as TablesUpdate<'Eleve'>);
+                    await this.repository.update(studentId, { photo_url: photoUrl } as TablesUpdate<'Eleve'>, userId);
                 }
             }
         }
@@ -116,7 +116,7 @@ export class StudentService {
 
         // SYNCHRONISATION DES GROUPES :
         // L'objectif est de comparer les groupes actuels de l'élève avec la nouvelle liste cochée par le prof.
-        const currentLinks = await this.repository.getStudentGroupLinks(studentId);
+        const currentLinks = await this.repository.getStudentGroupLinks(studentId, userId);
         const currentLinkedGroupIds = currentLinks.map(l => l.groupe_id);
         
         // Groupes que l'élève vient de rejoindre
@@ -136,7 +136,7 @@ export class StudentService {
                 .map(link => link.id);
 
             if (linkIdsToRemove.length > 0) {
-                await this.repository.unlinkMultiFromGroup(linkIdsToRemove);
+                await this.repository.unlinkMultiFromGroup(linkIdsToRemove, userId);
             }
         }
 
@@ -146,8 +146,8 @@ export class StudentService {
     /**
      * Supprime définitivement le dossier d'un élève.
      */
-    deleteStudent = async (id: string): Promise<void> => {
-        return await this.repository.delete(id);
+    deleteStudent = async (id: string, userId: string): Promise<void> => {
+        return await this.repository.delete(id, userId);
     }
 
     /**
@@ -160,30 +160,30 @@ export class StudentService {
     /**
      * Récupère les élèves appartenant à un groupe spécifique.
      */
-    getStudentsByGroup = async (groupId: string): Promise<any[]> => {
-        return await this.repository.findByGroup(groupId);
+    getStudentsByGroup = async (groupId: string, userId: string): Promise<any[]> => {
+        return await this.repository.findByGroup(groupId, userId);
     }
 
     /**
      * Récupère les élèves appartenant à une liste de groupes (ex: tous les groupes de soutien).
      */
-    getStudentsByGroups = async (groupIds: string[]): Promise<any[]> => {
-        return await this.repository.findByGroups(groupIds);
+    getStudentsByGroups = async (groupIds: string[], userId: string): Promise<any[]> => {
+        return await this.repository.findByGroups(groupIds, userId);
     }
 
 
     /**
      * Met à jour le niveau "d'importance de suivi" (couleur visuelle sur la fiche élève).
      */
-    updateStudentImportance = async (id: string, importance: number | null): Promise<void> => {
-        return await this.repository.updateImportance(id, importance);
+    updateStudentImportance = async (id: string, importance: number | null, userId: string): Promise<void> => {
+        return await this.repository.updateImportance(id, importance, userId);
     }
 
     /**
      * Met à jour n'importe quel champ simple de l'élève (ex: changer le prénom).
      */
-    updateStudent = async (id: string, updates: TablesUpdate<'Eleve'>): Promise<void> => {
-        await this.repository.update(id, updates);
+    updateStudent = async (id: string, updates: TablesUpdate<'Eleve'>, userId: string): Promise<void> => {
+        await this.repository.update(id, updates, userId);
     }
 
     /**

@@ -5,7 +5,7 @@
  */
 
 import { supabase } from '../database';
-import { Database } from '../types/supabase';
+import type { Database } from '../../types/supabase';
 
 type TableName = keyof Database['public']['Tables'];
 

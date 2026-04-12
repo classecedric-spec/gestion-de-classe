@@ -15,14 +15,16 @@ import { gradeService } from '../services';
 import { TablesInsert } from '../../../types/supabase';
 import { useState } from 'react';
 import { toast } from 'sonner';
+import { supabase, getCurrentUser } from '../../../lib/database';
 
 /**
  * Ce petit hook récupère simplement la liste des barèmes configurés par l'enseignant (ex: "Interro sur 20", "Lettres A-E").
  */
-export const useNoteTypes = () => {
+export const useNoteTypes = (userId?: string) => {
     return useQuery({
-        queryKey: ['note_types'],
-        queryFn: () => gradeService.getNoteTypes()
+        queryKey: ['note_types', userId],
+        queryFn: () => userId ? gradeService.getNoteTypes(userId) : Promise.resolve([]),
+        enabled: !!userId
     });
 };
 
@@ -36,9 +38,19 @@ export const useNoteTypes = () => {
 export const useGradeMutations = (selectedEvaluationId?: string | null) => {
     const queryClient = useQueryClient();
 
+    // On récupère l'utilisateur actuel pour l'injecter automatiquement dans les mutations si besoin.
+    const { data: user } = useQuery({
+        queryKey: ['user'],
+        queryFn: getCurrentUser,
+        staleTime: Infinity,
+    });
+
     const createEvaluationMutation = useMutation({
-        mutationFn: ({ evaluation, questions, regroupements }: { evaluation: TablesInsert<'Evaluation'>, questions?: any[], regroupements?: any[] }) => 
-            gradeService.createEvaluation(evaluation, questions, regroupements),
+        mutationFn: ({ evaluation, questions, regroupements, userId: providedUserId }: { evaluation: TablesInsert<'Evaluation'>, userId?: string, questions?: any[], regroupements?: any[] }) => {
+            const effectiveUserId = providedUserId || user?.id;
+            if (!effectiveUserId) throw new Error("Utilisateur non identifié");
+            return gradeService.createEvaluation(evaluation, effectiveUserId, questions, regroupements);
+        },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['evaluations'] });
             queryClient.invalidateQueries({ queryKey: ['all_evaluations_detailed'] });
@@ -48,8 +60,11 @@ export const useGradeMutations = (selectedEvaluationId?: string | null) => {
     });
 
     const updateEvaluationMutation = useMutation({
-        mutationFn: ({ id, evaluation, questions, regroupements }: { id: string, evaluation: any, questions?: any[], regroupements?: any[] }) => 
-            gradeService.updateEvaluation(id, evaluation, questions, regroupements),
+        mutationFn: ({ id, evaluation, questions, regroupements, userId: providedUserId }: { id: string, evaluation: any, userId?: string, questions?: any[], regroupements?: any[] }) => {
+            const effectiveUserId = providedUserId || user?.id;
+            if (!effectiveUserId) throw new Error("Utilisateur non identifié");
+            return gradeService.updateEvaluation(id, evaluation, effectiveUserId, questions, regroupements);
+        },
         onSuccess: (_data, variables) => {
             queryClient.invalidateQueries({ queryKey: ['evaluations'] });
             queryClient.invalidateQueries({ queryKey: ['all_evaluations_detailed'] });
@@ -62,8 +77,12 @@ export const useGradeMutations = (selectedEvaluationId?: string | null) => {
     });
 
     const deleteEvaluationMutation = useMutation({
-        mutationFn: (id: string) => gradeService.deleteEvaluation(id),
-        onMutate: async (id) => {
+        mutationFn: ({ id, userId: providedUserId }: { id: string, userId?: string }) => {
+            const effectiveUserId = providedUserId || user?.id;
+            if (!effectiveUserId) throw new Error("Utilisateur non identifié");
+            return gradeService.deleteEvaluation(id, effectiveUserId);
+        },
+        onMutate: async ({ id }) => {
             // On annule les chargements en cours pour éviter les télescopages de données.
             await queryClient.cancelQueries({ queryKey: ['all_evaluations_detailed'] });
             await queryClient.cancelQueries({ queryKey: ['evaluations'] });
@@ -99,19 +118,51 @@ export const useGradeMutations = (selectedEvaluationId?: string | null) => {
             }
             toast.error("Erreur lors de la suppression");
         },
-        onSuccess: (_data, deletedId) => {
+        onSuccess: (_data, variables) => {
             // On force un rafraîchissement final pour certifier les totaux et moyennes.
             queryClient.invalidateQueries({ queryKey: ['evaluations'] });
             queryClient.invalidateQueries({ queryKey: ['all_evaluations_detailed'] });
             queryClient.invalidateQueries({ queryKey: ['context_results'] });
-            toast.success("Évaluation supprimée");
+            queryClient.invalidateQueries({ queryKey: ['deleted_evaluations'] });
+            toast.success("Évaluation déplacée vers la corbeille");
+        }
+    });
+
+    const restoreEvaluationMutation = useMutation({
+        mutationFn: ({ id, userId: providedUserId }: { id: string, userId?: string }) => {
+            const effectiveUserId = providedUserId || user?.id;
+            if (!effectiveUserId) throw new Error("Utilisateur non identifié");
+            return gradeService.restoreEvaluation(id, effectiveUserId);
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['evaluations'] });
+            queryClient.invalidateQueries({ queryKey: ['all_evaluations_detailed'] });
+            queryClient.invalidateQueries({ queryKey: ['deleted_evaluations'] });
+            queryClient.invalidateQueries({ queryKey: ['context_results'] });
+            toast.success("Évaluation restaurée");
+        }
+    });
+
+    const permanentDeleteEvaluationMutation = useMutation({
+        mutationFn: ({ id, userId: providedUserId }: { id: string, userId?: string }) => {
+            const effectiveUserId = providedUserId || user?.id;
+            if (!effectiveUserId) throw new Error("Utilisateur non identifié");
+            return gradeService.permanentDeleteEvaluation(id, effectiveUserId);
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['deleted_evaluations'] });
+            toast.success("Évaluation définitivement supprimée");
         }
     });
 
     const saveResultMutation = useMutation({
-        mutationFn: (result: TablesInsert<'Resultat'>) => gradeService.saveResult(result),
+        mutationFn: ({ result, userId: providedUserId }: { result: TablesInsert<'Resultat'>, userId?: string }) => {
+            const effectiveUserId = providedUserId || user?.id;
+            if (!effectiveUserId) throw new Error("Utilisateur non identifié");
+            return gradeService.saveResult(result, effectiveUserId);
+        },
         // L'"Optimistic Update" en action : le professeur encode une note. On annule les chargements en cours, on affiche la note de suite sur son écran, et s'il y a un bug côté serveur (onError), on remettra l'ancienne note incognito.
-        onMutate: async (newResult) => {
+        onMutate: async ({ result: newResult }) => {
             if (!selectedEvaluationId) return;
             const queryKey = ['evaluation_results', selectedEvaluationId];
             await queryClient.cancelQueries({ queryKey });
@@ -131,7 +182,7 @@ export const useGradeMutations = (selectedEvaluationId?: string | null) => {
             if (context?.previous) queryClient.setQueryData(context.queryKey, context.previous);
         },
         onSuccess: (_data, variables) => {
-            const evId = variables.evaluation_id || selectedEvaluationId;
+            const evId = variables.result.evaluation_id || selectedEvaluationId;
             if (evId) {
                 queryClient.invalidateQueries({ queryKey: ['evaluation_results', evId] });
                 queryClient.invalidateQueries({ queryKey: ['context_results'] });
@@ -141,9 +192,30 @@ export const useGradeMutations = (selectedEvaluationId?: string | null) => {
         }
     });
 
+    const saveResultsMutation = useMutation({
+        mutationFn: ({ results, userId: providedUserId }: { results: TablesInsert<'Resultat'>[], userId?: string }) => {
+            const effectiveUserId = providedUserId || user?.id;
+            if (!effectiveUserId) throw new Error("Utilisateur non identifié");
+            return gradeService.saveResults(results, effectiveUserId);
+        },
+        onSuccess: (_data, variables) => {
+            const evId = variables.results[0]?.evaluation_id || selectedEvaluationId;
+            if (evId) {
+                queryClient.invalidateQueries({ queryKey: ['evaluation_results', evId] });
+                queryClient.invalidateQueries({ queryKey: ['context_results'] });
+                queryClient.invalidateQueries({ queryKey: ['all_evaluations_detailed'] });
+            }
+            toast.success(`${variables.results.length} notes importées avec succès`);
+        }
+    });
+
     const saveQuestionResultsMutation = useMutation({
-        mutationFn: (results: TablesInsert<'ResultatQuestion'>[]) => gradeService.saveQuestionResults(results),
-        onMutate: async (newResults) => {
+        mutationFn: ({ results, userId: providedUserId }: { results: TablesInsert<'ResultatQuestion'>[], userId?: string }) => {
+            const effectiveUserId = providedUserId || user?.id;
+            if (!effectiveUserId) throw new Error("Utilisateur non identifié");
+            return gradeService.saveQuestionResults(results, effectiveUserId);
+        },
+        onMutate: async ({ results: newResults }) => {
             if (!selectedEvaluationId) return;
             const queryKey = ['question_results', selectedEvaluationId];
             await queryClient.cancelQueries({ queryKey });
@@ -176,7 +248,11 @@ export const useGradeMutations = (selectedEvaluationId?: string | null) => {
     });
 
     const saveNoteTypeMutation = useMutation({
-        mutationFn: (typeNote: any) => gradeService.saveNoteType(typeNote),
+        mutationFn: ({ typeNote, userId: providedUserId }: { typeNote: any, userId?: string }) => {
+            const effectiveUserId = providedUserId || user?.id;
+            if (!effectiveUserId) throw new Error("Utilisateur non identifié");
+            return gradeService.saveNoteType(typeNote, effectiveUserId);
+        },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['note_types'] });
             toast.success("Type de note enregistré");
@@ -184,8 +260,12 @@ export const useGradeMutations = (selectedEvaluationId?: string | null) => {
     });
 
     const deleteNoteTypeMutation = useMutation({
-        mutationFn: (id: string) => gradeService.deleteNoteType(id),
-        onMutate: async (id) => {
+        mutationFn: ({ id, userId: providedUserId }: { id: string, userId?: string }) => {
+            const effectiveUserId = providedUserId || user?.id;
+            if (!effectiveUserId) throw new Error("Utilisateur non identifié");
+            return gradeService.deleteNoteType(id, effectiveUserId);
+        },
+        onMutate: async ({ id }) => {
             await queryClient.cancelQueries({ queryKey: ['note_types'] });
             const previous = queryClient.getQueryData<any[]>(['note_types']);
             queryClient.setQueryData(['note_types'], (old: any[] | undefined) =>
@@ -207,9 +287,12 @@ export const useGradeMutations = (selectedEvaluationId?: string | null) => {
         updateEvaluation: updateEvaluationMutation.mutateAsync,
         deleteEvaluation: deleteEvaluationMutation.mutate,
         saveResult: saveResultMutation.mutateAsync,
+        saveResults: saveResultsMutation.mutateAsync,
         saveQuestionResults: saveQuestionResultsMutation.mutateAsync,
         saveNoteType: saveNoteTypeMutation.mutateAsync,
         deleteNoteType: deleteNoteTypeMutation.mutateAsync,
+        restoreEvaluation: restoreEvaluationMutation.mutateAsync,
+        permanentDeleteEvaluation: permanentDeleteEvaluationMutation.mutateAsync,
     };
 };
 
@@ -221,50 +304,66 @@ export const useGradeMutations = (selectedEvaluationId?: string | null) => {
 export const useGrades = (brancheId?: string, periode?: string) => {
     const [selectedEvaluationId, setSelectedEvaluationId] = useState<string | null>(null);
 
+    const { data: user } = useQuery({
+        queryKey: ['user'],
+        queryFn: getCurrentUser,
+        staleTime: Infinity,
+    });
+
     // Fetch evaluations
     const { data: evaluations = [], isLoading: loadingEvaluations } = useQuery({
-        queryKey: ['evaluations', brancheId, periode],
-        queryFn: () => gradeService.getEvaluations(brancheId, periode),
-        enabled: !!brancheId && !!periode
+        queryKey: ['evaluations', brancheId, periode, user?.id],
+        queryFn: () => user ? gradeService.getEvaluations(user.id, brancheId, periode) : Promise.resolve([]),
+        enabled: !!brancheId && !!periode && !!user
     });
 
     // Fetch questions for selected evaluation
     const { data: questions = [], isLoading: loadingQuestions } = useQuery({
-        queryKey: ['evaluation_questions', selectedEvaluationId],
-        queryFn: () => selectedEvaluationId ? gradeService.getQuestions(selectedEvaluationId) : Promise.resolve([]),
-        enabled: !!selectedEvaluationId
+        queryKey: ['evaluation_questions', selectedEvaluationId, user?.id],
+        queryFn: async () => {
+            if (!selectedEvaluationId || !user) return [];
+            return await gradeService.getQuestions(selectedEvaluationId, user.id);
+        },
+        enabled: !!selectedEvaluationId && !!user
     });
 
     // Fetch results for selected evaluation
     const { data: currentResults = [], isLoading: loadingResults } = useQuery({
-        queryKey: ['evaluation_results', selectedEvaluationId],
-        queryFn: () => selectedEvaluationId ? gradeService.getResults(selectedEvaluationId) : Promise.resolve([]),
-        enabled: !!selectedEvaluationId
+        queryKey: ['evaluation_results', selectedEvaluationId, user?.id],
+        queryFn: () => (selectedEvaluationId && user) ? gradeService.getResults(user.id, selectedEvaluationId) : Promise.resolve([]),
+        enabled: !!selectedEvaluationId && !!user
     });
 
     // Fetch all results for current context (branch/period)
     const { data: contextResults = [], isLoading: loadingContextResults } = useQuery({
-        queryKey: ['context_results', brancheId, periode],
-        queryFn: () => evaluations.length > 0 ? gradeService.getResultsForEvaluations(evaluations.map(e => e.id)) : Promise.resolve([]),
-        enabled: !!brancheId && !!periode && evaluations.length > 0
+        queryKey: ['context_results', brancheId, periode, user?.id],
+        queryFn: () => (evaluations.length > 0 && user) ? gradeService.getResultsForEvaluations(evaluations.map(e => e.id), user.id) : Promise.resolve([]),
+        enabled: !!brancheId && !!periode && evaluations.length > 0 && !!user
     });
 
     // Fetch individual question results
     const { data: questionResults = [], isLoading: loadingQuestionResults } = useQuery({
-        queryKey: ['question_results', selectedEvaluationId],
-        queryFn: () => selectedEvaluationId ? gradeService.getQuestionResults(selectedEvaluationId) : Promise.resolve([]),
-        enabled: !!selectedEvaluationId
+        queryKey: ['question_results', selectedEvaluationId, user?.id],
+        queryFn: () => (selectedEvaluationId && user) ? gradeService.getQuestionResults(selectedEvaluationId, user.id) : Promise.resolve([]),
+        enabled: !!selectedEvaluationId && !!user
     });
 
     // Mutations and NoteTypes via shared hooks
     const mutations = useGradeMutations(selectedEvaluationId);
-    const { data: noteTypes = [], isLoading: loadingNoteTypes } = useNoteTypes();
+    const { data: noteTypes = [], isLoading: loadingNoteTypes } = useNoteTypes(user?.id);
+
+    // Fetch deleted evaluations for the trash view
+    const { data: deletedEvaluations = [], isLoading: loadingDeleted } = useQuery({
+        queryKey: ['deleted_evaluations', user?.id],
+        queryFn: () => user ? gradeService.getDeletedEvaluations(user.id) : Promise.resolve([]),
+        enabled: !!user
+    });
 
     // Fetch active evaluation details independently of context
     const { data: activeEvalData } = useQuery({
-        queryKey: ['evaluation_detail', selectedEvaluationId],
-        queryFn: () => selectedEvaluationId ? gradeService.getEvaluations() : Promise.resolve([]),
-        enabled: !!selectedEvaluationId,
+        queryKey: ['evaluation_detail', selectedEvaluationId, user?.id],
+        queryFn: () => (selectedEvaluationId && user) ? gradeService.getEvaluations(user.id) : Promise.resolve([]),
+        enabled: !!selectedEvaluationId && !!user,
         select: (data) => data.find(e => e.id === selectedEvaluationId)
     });
 
@@ -279,7 +378,8 @@ export const useGrades = (brancheId?: string, periode?: string) => {
         contextResults,
         questionResults,
         noteTypes,
-        loading: loadingEvaluations || loadingResults || loadingQuestions || loadingQuestionResults || loadingNoteTypes || loadingContextResults,
+        deletedEvaluations,
+        loading: loadingEvaluations || loadingResults || loadingQuestions || loadingQuestionResults || loadingNoteTypes || loadingContextResults || loadingDeleted,
         activeEvaluation: evaluation,
         selectedEvaluationId,
         setSelectedEvaluationId,

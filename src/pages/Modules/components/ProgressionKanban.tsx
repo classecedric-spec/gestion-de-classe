@@ -4,7 +4,7 @@ import { DndContext, closestCenter, PointerSensor, KeyboardSensor, useSensor, us
 import { SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import clsx from 'clsx';
-import { Tables } from '../../../../types/supabase';
+import type { Tables } from '../../../types/supabase';
 
 // Progression Card Component
 interface ProgressionCardProps {

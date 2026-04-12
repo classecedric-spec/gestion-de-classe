@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { getCurrentUser } from '../../../lib/database';
+import { supabase } from '../../../lib/database';
 import { studentService } from '../../../features/students/services/studentService';
 import { trackingService } from '../../../features/tracking/services/trackingService';
 
@@ -29,8 +29,14 @@ export function useProgressionGeneration(
         setProgressText('Recherche des élèves...');
 
         try {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) {
+                showNotification("Utilisateur non authentifié.", 'error');
+                return;
+            }
+ 
             // 1. Fetch all students from selected groups
-            const students = await studentService.getStudentsByGroups(selectedGroups);
+            const students = await studentService.getStudentsByGroups(selectedGroups, user.id);
             const studentIds = students.map(s => s.id);
 
             setProgress(15);
@@ -42,13 +48,13 @@ export function useProgressionGeneration(
 
             // 3. Fetch EXISTING progressions to prevent duplicates/errors
             // We need to know which (student, activity) pairs already exist.
-            const existingProgressions = await trackingService.getProgressionsForStudentsAndActivities(studentIds, activityIds);
+            const existingProgressions = await trackingService.getProgressionsForStudentsAndActivities(studentIds, activityIds, user.id);
             const existingMap = new Set(
                 existingProgressions.map((p: any) => `${p.eleve_id}_${p.activite_id}`)
             );
 
             const progressionsToInsert: any[] = [];
-            const currentUser = await getCurrentUser();
+            const currentUser = user;
 
             let activityIndex = 0;
             for (const activity of activities) {
@@ -89,7 +95,7 @@ export function useProgressionGeneration(
                 // Use upsert or create? Repository create uses insert.
                 // Since we filtered existing, insert should be safe, but concurrent races could happen.
                 // We'll trust our filter.
-                await trackingService.createProgressions(progressionsToInsert);
+                await trackingService.createProgressions(progressionsToInsert, user.id);
 
                 setProgress(100);
                 showNotification(`${progressionsToInsert.length} lignes de progression générées avec succès !`, 'success');

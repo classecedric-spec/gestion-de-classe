@@ -17,7 +17,7 @@ export interface IAdultRepository {
     /**
      * Récupère la liste de tous les adultes enregistrés, triés par nom.
      */
-    getAll(): Promise<Tables<'Adulte'>[]>;
+    getAll(userId: string): Promise<Tables<'Adulte'>[]>;
 
     /**
      * Ajoute un nouvel adulte dans le répertoire.
@@ -37,7 +37,7 @@ export interface IAdultRepository {
     /**
      * Récupère les données de suivi (présence/activité) pour tous les adultes à la date d'aujourd'hui.
      */
-    fetchTrackingToday(): Promise<any[]>;
+    fetchTrackingToday(userId: string): Promise<any[]>;
 
     /**
      * Enregistre une activité spécifique effectuée par un adulte à un moment donné.

@@ -36,10 +36,11 @@ export class TrackingService {
      * Cherche tous les élèves qui ont levé la main (aide), envoyé un travail (à vérifier) 
      * ou qui stagnent (ajustement).
      */
-    async fetchHelpRequests(studentIds: string[]): Promise<ProgressionWithDetails[]> {
+    async fetchHelpRequests(studentIds: string[], userId: string): Promise<ProgressionWithDetails[]> {
+        if (!userId) throw new Error("userId is required in fetchHelpRequests");
         const states = ['besoin_d_aide', 'a_verifier', 'ajustement'];
         // On demande au dépôt de chercher ces statuts précis.
-        const progressions = await this.repository.fetchProgressions(studentIds, states);
+        const progressions = await this.repository.fetchProgressions(studentIds, states, userId);
 
         // RÈGLE MÉTIER : On ne montre que les demandes liées à des modules actuelement "En cours".
         // Si un enseignant a clôturé un module, les demandes d'aide liées n'apparaissent plus pour ne pas polluer l'écran.
@@ -55,16 +56,18 @@ export class TrackingService {
      * Trouve les élèves qui ont déjà validé l'exercice (statut 'termine') 
      * pour qu'ils puissent aider leurs camarades en difficulté.
      */
-    async findHelpers(activityId: string, studentIds: string[]): Promise<StudentBasicInfo[]> {
-        return await this.repository.findStudentsByActivityStatus(activityId, studentIds, 'termine');
+    async findHelpers(activityId: string, studentIds: string[], userId: string): Promise<StudentBasicInfo[]> {
+        if (!userId) throw new Error("userId is required in findHelpers");
+        return await this.repository.findStudentsByActivityStatus(activityId, studentIds, 'termine', userId);
     }
 
     /**
      * MISE À JOUR DU STATUT : 
      * Change l'état d'un exercice pour un élève (ex: de 'À vérifier' vers 'Terminé').
      */
-    async updateProgressionStatus(id: string, newState: string, isSuivi: boolean = false): Promise<boolean> {
-        await this.repository.updateProgressionStatus(id, newState, isSuivi);
+    async updateProgressionStatus(id: string, newState: string, userId: string, isSuivi: boolean = false): Promise<boolean> {
+        if (!userId) throw new Error("userId is required in updateProgressionStatus");
+        await this.repository.updateProgressionStatus(id, newState, isSuivi, userId);
         return true;
     }
 
@@ -73,16 +76,18 @@ export class TrackingService {
      * Ajuste discrètement le "poids" de la parole d'un élève. 
      * Si un élève valide ses exercices avec succès plusieurs fois de suite sans aide, sa "tendance" monte.
      */
-    async updateStudentTrust(eleveId: string, branchId: string, adjustment: number, trend: 'up' | 'down' | 'stable'): Promise<void> {
-        return await this.repository.updateStudentTrust(eleveId, branchId, adjustment, trend);
+    async updateStudentTrust(eleveId: string, branchId: string, adjustment: number, trend: 'up' | 'down' | 'stable', userId: string): Promise<void> {
+        if (!userId) throw new Error("userId is required in updateStudentTrust");
+        return await this.repository.updateStudentTrust(eleveId, branchId, adjustment, trend, userId);
     }
 
     /**
      * SUPPRESSION : 
      * Retire une ligne de progression (utilisé pour faire le ménage ou annuler une erreur).
      */
-    async deleteProgression(id: string): Promise<boolean> {
-        await this.repository.deleteProgression(id);
+    async deleteProgression(id: string, userId: string): Promise<boolean> {
+        if (!userId) throw new Error("userId is required in deleteProgression");
+        await this.repository.deleteProgression(id, userId);
         return true;
     }
 
@@ -90,11 +95,12 @@ export class TrackingService {
      * CRÉATION EN MASSE : 
      * Permet d'injecter plusieurs lignes de suivi d'un coup (ex: début de séance).
      */
-    async createProgressions(progressions: TablesInsert<'Progression'>[]): Promise<boolean> {
+    async createProgressions(progressions: TablesInsert<'Progression'>[], userId: string): Promise<boolean> {
+        if (!userId) throw new Error("userId is required in createProgressions");
         if (!progressions || progressions.length === 0) {
             throw new Error('Au moins une progression doit être fournie');
         }
-        await this.repository.createProgressions(progressions);
+        await this.repository.createProgressions(progressions, userId);
         return true;
     }
 
@@ -102,22 +108,25 @@ export class TrackingService {
      * MISE À JOUR OU CRÉATION (UPSERT) : 
      * Enregistre une progression. Si elle existait déjà, elle est mise à jour, sinon elle est créée.
      */
-    async upsertProgression(progression: TablesInsert<'Progression'>): Promise<void> {
-        return await this.repository.upsertProgression(progression);
+    async upsertProgression(progression: TablesInsert<'Progression'>, userId: string): Promise<void> {
+        if (!userId) throw new Error("userId is required in upsertProgression");
+        return await this.repository.upsertProgression(progression, userId);
     }
 
     /**
      * RÉCUPÉRATION DU NOM DU GROUPE : (ex: CM1-A)
      */
-    async fetchGroupInfo(groupId: string): Promise<{ nom: string } | null> {
-        return await this.repository.getGroupInfo(groupId);
+    async fetchGroupInfo(groupId: string, userId: string): Promise<{ nom: string } | null> {
+        if (!userId) throw new Error("userId is required in fetchGroupInfo");
+        return await this.repository.getGroupInfo(groupId, userId);
     }
 
     /**
      * LISTE DES ÉLÈVES D'UN GROUPE
      */
-    async fetchStudentsInGroup(groupId: string) {
-        return await this.repository.getStudentsInGroup(groupId);
+    async fetchStudentsInGroup(groupId: string, userId: string) {
+        if (!userId) throw new Error("userId is required in fetchStudentsInGroup");
+        return await this.repository.getStudentsInGroup(groupId, userId);
     }
 
     /**
@@ -125,10 +134,12 @@ export class TrackingService {
      * Sauvegarde les réglages personnalisés de l'enseignant (ex: largeur des colonnes, thèmes).
      */
     async saveUserPreference(userId: string, key: string, value: any): Promise<void> {
+        if (!userId) throw new Error("userId is required in saveUserPreference");
         await this.repository.saveUserPreference(userId, key, value);
     }
 
     async loadUserPreference(userId: string, key: string): Promise<any | null> {
+        if (!userId) throw new Error("userId is required in loadUserPreference");
         return await this.repository.loadUserPreference(userId, key);
     }
 
@@ -137,73 +148,88 @@ export class TrackingService {
     /** 
      * Récupère tout ce dont un élève a besoin pour son parcours pédagogique.
      */
-    async getStudentsForPedago(groupId: string): Promise<any[]> {
-        return await this.repository.getStudentsForPedago(groupId);
+    async getStudentsForPedago(groupId: string, userId: string): Promise<any[]> {
+        if (!userId) throw new Error("userId is required in getStudentsForPedago");
+        return await this.repository.getStudentsForPedago(groupId, userId);
     }
 
-    async fetchModulesForStudent(levelId: string | null): Promise<any[]> {
-        return await this.repository.fetchModulesForStudent(levelId);
+    async fetchModulesForStudent(levelId: string | null, userId: string): Promise<any[]> {
+        if (!userId) throw new Error("userId is required in fetchModulesForStudent");
+        return await this.repository.fetchModulesForStudent(levelId, userId);
     }
 
-    async fetchActivitiesForModule(moduleId: string): Promise<any[]> {
-        return await this.repository.fetchActivitiesForModule(moduleId);
+    async fetchActivitiesForModule(moduleId: string, userId: string): Promise<any[]> {
+        if (!userId) throw new Error("userId is required in fetchActivitiesForModule");
+        return await this.repository.fetchActivitiesForModule(moduleId, userId);
     }
 
-    async fetchGroupProgressions(studentIds: string[]): Promise<any[]> {
-        return await this.repository.fetchGroupProgressions(studentIds);
+    async fetchGroupProgressions(studentIds: string[], userId: string): Promise<any[]> {
+        if (!userId) throw new Error("userId is required in fetchGroupProgressions");
+        return await this.repository.fetchGroupProgressions(studentIds, userId);
     }
 
-    async fetchStudentProgressionsMap(studentId: string): Promise<Record<string, string>> {
-        return await this.repository.fetchStudentProgressionsMap(studentId);
+    async fetchStudentProgressionsMap(studentId: string, userId: string): Promise<Record<string, string>> {
+        if (!userId) throw new Error("userId is required in fetchStudentProgressionsMap");
+        return await this.repository.fetchStudentProgressionsMap(studentId, userId);
     }
 
-    async getMobileModules(): Promise<any[]> {
-        return await this.repository.fetchMobileModules();
+    async getMobileModules(userId: string): Promise<any[]> {
+        if (!userId) throw new Error("userId is required in getMobileModules");
+        return await this.repository.fetchMobileModules(userId);
     }
 
     // ==================== MÉTHODES SPÉCIFIQUES POUR LE TABLEAU DE BORD (TBI) ====================
 
-    async getModulesWithProgressions(studentId: string, levelId?: string): Promise<any[]> {
-        return await this.repository.getModulesWithProgressions(studentId, levelId);
+    async getModulesWithProgressions(studentId: string, userId: string, levelId?: string): Promise<any[]> {
+        if (!userId) throw new Error("userId is required in getModulesWithProgressions");
+        return await this.repository.getModulesWithProgressions(studentId, userId, levelId);
     }
 
-    async getModuleActivitiesAndProgressions(moduleId: string, studentId: string): Promise<{ activities: any[], progressions: any[] }> {
-        return await this.repository.getModuleActivitiesAndProgressions(moduleId, studentId);
+    async getModuleActivitiesAndProgressions(moduleId: string, studentId: string, userId: string): Promise<{ activities: any[], progressions: any[] }> {
+        if (!userId) throw new Error("userId is required in getModuleActivitiesAndProgressions");
+        return await this.repository.getModuleActivitiesAndProgressions(moduleId, studentId, userId);
     }
 
     /** 
      * Redondance de fetchHelpRequests adaptée au format de données du Dashboard principal.
      */
-    async getHelpRequests(studentIds: string[]): Promise<any[]> {
-        const data = await this.repository.getHelpRequests(studentIds);
+    async getHelpRequests(studentIds: string[], userId: string): Promise<any[]> {
+        if (!userId) throw new Error("userId is required in getHelpRequests");
+        const data = await this.repository.getHelpRequests(studentIds, userId);
         return data.filter((req: any) => {
             if (req.is_suivi) return true;
             return req.activite?.Module?.statut === 'en_cours';
         });
     }
 
-    async getProgressionStatsForActivities(activityIds: string[]): Promise<{ activite_id: string, etat: string }[]> {
-        return await this.repository.getProgressionStatsForActivities(activityIds);
+    async getProgressionStatsForActivities(activityIds: string[], userId: string): Promise<{ activite_id: string, etat: string }[]> {
+        if (!userId) throw new Error("userId is required in getProgressionStatsForActivities");
+        return await this.repository.getProgressionStatsForActivities(activityIds, userId);
     }
 
-    async fetchProgressionsByActivity(activityId: string): Promise<any[]> {
-        return await this.repository.fetchProgressionsByActivity(activityId);
+    async fetchProgressionsByActivity(activityId: string, userId: string): Promise<any[]> {
+        if (!userId) throw new Error("userId is required in fetchProgressionsByActivity");
+        return await this.repository.fetchProgressionsByActivity(activityId, userId);
     }
 
-    async fetchStudentProgressDetails(studentId: string): Promise<any[]> {
-        return await this.repository.fetchStudentProgressDetails(studentId);
+    async fetchStudentProgressDetails(studentId: string, userId: string): Promise<any[]> {
+        if (!userId) throw new Error("userId is required in fetchStudentProgressDetails");
+        return await this.repository.fetchStudentProgressDetails(studentId, userId);
     }
 
-    async getActivitiesByModules(moduleIds: string[]): Promise<any[]> {
-        return await this.repository.getActivitiesByModules(moduleIds);
+    async getActivitiesByModules(moduleIds: string[], userId: string): Promise<any[]> {
+        if (!userId) throw new Error("userId is required in getActivitiesByModules");
+        return await this.repository.getActivitiesByModules(moduleIds, userId);
     }
 
-    async getProgressionsForStudentsAndActivities(studentIds: string[], activityIds: string[]): Promise<any[]> {
-        return await this.repository.getProgressionsForStudentsAndActivities(studentIds, activityIds);
+    async getProgressionsForStudentsAndActivities(studentIds: string[], activityIds: string[], userId: string): Promise<any[]> {
+        if (!userId) throw new Error("userId is required in getProgressionsForStudentsAndActivities");
+        return await this.repository.getProgressionsForStudentsAndActivities(studentIds, activityIds, userId);
     }
 
-    async getUnfinishedModulesByDate(studentId: string, date: string): Promise<any[]> {
-        return await this.repository.getUnfinishedModulesByDate(studentId, date);
+    async getUnfinishedModulesByDate(studentId: string, date: string, userId: string): Promise<any[]> {
+        if (!userId) throw new Error("userId is required in getUnfinishedModulesByDate");
+        return await this.repository.getUnfinishedModulesByDate(studentId, date, userId);
     }
 }
 

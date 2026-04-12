@@ -3,6 +3,7 @@ import { studentService } from '../../../features/students/services/studentServi
 import { trackingService } from '../../../features/tracking/services/trackingService';
 import { Student } from '../../../features/attendance/services/attendanceService';
 import { AvancementModule } from './useAvancementData';
+import { getCurrentUser } from '../../../lib/database';
 
 export interface AvancementActivity {
     id: string;
@@ -36,7 +37,9 @@ export const useStudentsAndActivities = (
     const fetchStudents = useCallback(async (groupId: string) => {
         setLoading(true);
         try {
-            const data = await studentService.getStudentsByGroup(groupId);
+            const user = await getCurrentUser();
+            if (!user) return;
+            const data = await studentService.getStudentsByGroup(groupId, user.id);
             const sortedStudents = (data as Student[] || []).sort((a, b) => {
                 const levelA = a.Niveau?.ordre || 0;
                 const levelB = b.Niveau?.ordre || 0;
@@ -60,7 +63,10 @@ export const useStudentsAndActivities = (
     const fetchActivitiesAndProgress = useCallback(async (moduleIds: string[]) => {
         setLoading(true);
         try {
-            const acts = await trackingService.getActivitiesByModules(moduleIds);
+            const user = await getCurrentUser();
+            if (!user) return;
+            
+            const acts = await trackingService.getActivitiesByModules(moduleIds, user.id);
 
             const sortedActs = (acts as AvancementActivity[] || []).sort((a, b) => {
                 const modA = a.Module;
@@ -95,7 +101,7 @@ export const useStudentsAndActivities = (
                 const studentIds = students.map(s => s.id);
                 const actIds = sortedActs.map(a => a.id);
 
-                const allProgs = await trackingService.getProgressionsForStudentsAndActivities(studentIds, actIds);
+                const allProgs = await trackingService.getProgressionsForStudentsAndActivities(studentIds, actIds, user.id);
 
                 const progMap: ProgressionMap = {};
                 const modulesWithProgs = new Set<string>();

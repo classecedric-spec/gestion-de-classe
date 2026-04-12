@@ -243,7 +243,7 @@ export const useDashboardData = (userId?: string, allStudents: Student[] = []) =
                     .neq('day_of_week', 'DOCK'),
                 
                 // 13. Travaux en retard (via le repository spécialisé)
-                classId ? moduleRepo.getDetailedLateActivities(classId) : Promise.resolve([])
+                classId ? moduleRepo.getDetailedLateActivities(classId, userId) : Promise.resolve([])
             ]);
 
             // --- PHASE 3 : CALCUL DES PRÉSENCES ---

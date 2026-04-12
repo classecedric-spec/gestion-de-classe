@@ -21,6 +21,7 @@ import { useState, useEffect, ChangeEvent } from 'react';
 import { Tables } from '../../../types/supabase';
 import { ClassWithAdults, classService } from '../services/classService';
 import { adultService } from '../../adults/services/adultService';
+import { supabase } from '../../../lib/database';
 
 /**
  * Structure de données simplifiée pour la manipulation dans le formulaire.
@@ -140,6 +141,9 @@ export const useClassForm = ({ isEditing, classToEdit }: UseClassFormProps) => {
         setLoading(true);
 
         try {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) throw new Error("User not authenticated");
+
             let savedClassId = classToEdit?.id;
             let finalLogoUrl = classData.logo_url;
 
@@ -188,7 +192,7 @@ export const useClassForm = ({ isEditing, classToEdit }: UseClassFormProps) => {
             }
 
             // ÉTAPE 4 : Récupération de la fiche complète pour mettre à jour l'interface sans recharger la page
-            let updatedClass = await classService.getClassById(savedClassId);
+            let updatedClass = await classService.getClassById(savedClassId, user.id);
 
             // En cas de latence serveur, on construit un objet temporaire pour que l'enseignant voit ses changements de suite
             if (!updatedClass) {

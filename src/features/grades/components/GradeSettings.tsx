@@ -11,7 +11,7 @@
  */
 
 import React, { useState } from 'react';
-import { Settings, Plus, Trash2, Edit2, Save, X, Calculator, CalendarDays } from 'lucide-react';
+import { Settings, Plus, Trash2, Edit2, Save, X, Calculator, CalendarDays, Trash } from 'lucide-react';
 import Card from '../../../core/Card';
 import Button from '../../../core/Button';
 import Input from '../../../core/Input';
@@ -20,11 +20,12 @@ import { useGrades } from '../hooks/useGrades';
 import { Tables } from '../../../types/supabase';
 import { useAuth } from '../../../hooks/useAuth';
 import PeriodSettings from './PeriodSettings';
+import EvaluationTrash from './EvaluationTrash';
 
 const GradeSettings: React.FC = () => {
     const { noteTypes, saveNoteType, deleteNoteType } = useGrades();
     const { session } = useAuth();
-    const [activeTab, setActiveTab] = useState<'noteTypes' | 'periods'>('noteTypes');
+    const [activeTab, setActiveTab] = useState<'noteTypes' | 'periods' | 'trash'>('noteTypes');
     const [isAdding, setIsAdding] = useState(false);
     const [editingId, setEditingId] = useState<string | null>(null);
     const [formData, setFormData] = useState({
@@ -44,10 +45,12 @@ const GradeSettings: React.FC = () => {
         }
 
         await saveNoteType({
-            ...formData,
-            config: finalConfig,
-            id: editingId || undefined,
-            user_id: session.user.id
+            typeNote: {
+                ...formData,
+                config: finalConfig,
+                id: editingId || undefined,
+                user_id: session.user.id
+            }
         });
         resetForm();
     };
@@ -112,7 +115,8 @@ const GradeSettings: React.FC = () => {
 
     const settingsTabs = [
         { id: 'noteTypes', label: 'Systèmes de Notation', icon: Calculator },
-        { id: 'periods', label: 'Périodes d\'évaluation', icon: CalendarDays }
+        { id: 'periods', label: 'Périodes d\'évaluation', icon: CalendarDays },
+        { id: 'trash', label: 'Corbeille', icon: Trash }
     ];
 
     return (
@@ -131,6 +135,10 @@ const GradeSettings: React.FC = () => {
             {activeTab === 'periods' ? (
                 <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
                     <PeriodSettings />
+                </div>
+            ) : activeTab === 'trash' ? (
+                <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
+                    <EvaluationTrash />
                 </div>
             ) : (
                 <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
@@ -395,7 +403,7 @@ const GradeSettings: React.FC = () => {
                                 <Button 
                                     variant="ghost" 
                                     icon={Trash2} 
-                                    onClick={() => deleteNoteType(type.id)} 
+                                    onClick={() => deleteNoteType({ id: type.id })} 
                                     size="sm" 
                                     className="text-danger/60 hover:text-danger hover:bg-danger/10 rounded-xl"
                                     title="Supprimer"

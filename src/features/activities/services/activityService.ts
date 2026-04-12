@@ -30,10 +30,11 @@ export class ActivityService {
     /**
      * Récupère les détails d'un module
      * @param {string} id - ID du module
+     * @param {string} userId - ID de l'utilisateur
      * @returns {Promise<any>} Détails du module
      */
-    getModule = async (id: string) => {
-        return await this.repository.getModule(id);
+    getModule = async (id: string, userId: string) => {
+        return await this.repository.getModule(id, userId);
     }
 
     /**
@@ -47,10 +48,11 @@ export class ActivityService {
     /**
      * Récupère les matériaux liés à une activité
      * @param {string} activityId - ID de l'activité
+     * @param {string} userId - ID de l'utilisateur
      * @returns {Promise<{type_materiel_id: string}[]>} Liste des IDs de type matériel
      */
-    getActivityMaterials = async (activityId: string) => {
-        return await this.repository.getActivityMaterials(activityId);
+    getActivityMaterials = async (activityId: string, userId: string) => {
+        return await this.repository.getActivityMaterials(activityId, userId);
     }
 
     /**
@@ -67,19 +69,21 @@ export class ActivityService {
      * Met à jour un type de matériel
      * @param {string} id - ID du matériel
      * @param {string} name - Nouveau nom
+     * @param {string} userId - ID de l'utilisateur
      * @returns {Promise<void>}
      */
-    updateMaterialType = async (id: string, name: string) => {
-        await this.repository.updateMaterialType(id, name);
+    updateMaterialType = async (id: string, name: string, userId: string) => {
+        await this.repository.updateMaterialType(id, name, userId);
     }
 
     /**
      * Supprime un type de matériel
      * @param {string} id - ID du matériel
+     * @param {string} userId - ID de l'utilisateur
      * @returns {Promise<void>}
      */
-    deleteMaterialType = async (id: string) => {
-        await this.repository.deleteMaterialType(id);
+    deleteMaterialType = async (id: string, userId: string) => {
+        await this.repository.deleteMaterialType(id, userId);
     }
 
     /**
@@ -93,10 +97,11 @@ export class ActivityService {
     /**
      * Récupère les niveaux spécifiques (exceptions) d'une activité
      * @param {string} activityId - ID de l'activité
+     * @param {string} userId - ID de l'utilisateur
      * @returns {Promise<any[]>} Liste des niveaux liés avec détails
      */
-    getActivityLevels = async (activityId: string) => {
-        return await this.repository.getActivityLevels(activityId);
+    getActivityLevels = async (activityId: string, userId: string) => {
+        return await this.repository.getActivityLevels(activityId, userId);
     }
 
     /**
@@ -115,6 +120,7 @@ export class ActivityService {
      * @param {TablesInsert<'Activite'> | TablesUpdate<'Activite'>} activityData - Données de l'activité
      * @param {string[]} materialTypeIds - IDs des matériels liés
      * @param {ActivityLevelInput[]} activityLevels - Niveaux spécifiques
+     * @param {string} userId - ID de l'utilisateur
      * @param {boolean} [isEdit=false] - Mode édition
      * @returns {Promise<string>} ID de l'activité
      * @throws {Error} Si validation échoue ou erreur DB
@@ -124,6 +130,7 @@ export class ActivityService {
         activityData: TablesInsert<'Activite'> | TablesUpdate<'Activite'>,
         materialTypeIds: string[],
         activityLevels: ActivityLevelInput[],
+        userId: string,
         isEdit = false
     ) => {
         // Étape 1 : On vérifie que les données envoyées respectent bien le format attendu pour éviter d'enregistrer n'importe quoi.
@@ -152,17 +159,17 @@ export class ActivityService {
                 }
             }
 
-            await this.repository.updateActivity(activityId, dataToSave as TablesUpdate<'Activite'>);
+            await this.repository.updateActivity(activityId, dataToSave as TablesUpdate<'Activite'>, userId);
         } else {
             // Création d'une nouvelle activité.
-            const createdStart = await this.repository.createActivity(dataToSave as TablesInsert<'Activite'>);
+            const createdStart = await this.repository.createActivity(dataToSave as TablesInsert<'Activite'>, userId);
             activityId = createdStart.id;
 
             // Envoi de la photo juste après la création pour lier l'ID généré.
             if (photoBase64 && photoBase64.startsWith('data:image')) {
                 const publicUrl = await this.uploadPhoto(activityId, photoBase64);
                 if (publicUrl) {
-                    await this.repository.updateActivity(activityId, { photo_url: publicUrl } as any);
+                    await this.repository.updateActivity(activityId, { photo_url: publicUrl } as any, userId);
                 }
             }
         }
@@ -170,7 +177,7 @@ export class ActivityService {
         if (!activityId) throw new Error("Erreur: ID de l'activité manquant après sauvegarde.");
 
         // Gestion du matériel : on vide l'ancienne liste de matériel pour cette activité et on la remplace par la nouvelle (méthode 'nettoyer et recréer').
-        await this.repository.clearActivityMaterials(activityId);
+        await this.repository.clearActivityMaterials(activityId, userId);
 
         if (materialTypeIds.length > 0) {
             const links = materialTypeIds.map(mtId => ({
@@ -181,7 +188,7 @@ export class ActivityService {
         }
 
         // Spécificités par niveau : on fait de même pour les réglages particuliers (ex: plus d'exercices demandés en GS qu'en MS pour la même activité).
-        await this.repository.clearActivityLevels(activityId);
+        await this.repository.clearActivityLevels(activityId, userId);
 
         if (activityLevels.length > 0) {
             const userId = (activityData as any).user_id; 
@@ -203,26 +210,30 @@ export class ActivityService {
 
     /**
      * Récupère la liste complète des activités avec relations
+     * @param {string} userId - ID de l'utilisateur
      * @returns {Promise<ActivityWithRelations[]>} Liste des activités
      */
-    fetchActivities = async () => {
-        return await this.repository.getActivities();
+    fetchActivities = async (userId: string) => {
+        return await this.repository.getActivities(userId);
     }
 
     /**
      * Supprime une activité
      * @param {string} activityId - ID de l'activité
+     * @param {string} userId - ID de l'utilisateur
      * @returns {Promise<void>}
      */
-    deleteActivity = async (activityId: string) => {
-        await this.repository.deleteActivity(activityId);
+    deleteActivity = async (activityId: string, userId: string) => {
+        await this.repository.deleteActivity(activityId, userId);
     }
 
     /**
      * Upsert multiple activities (e.g. for reordering)
+     * @param {TablesInsert<'Activite'>[]} data - Liste des activités
+     * @param {string} userId - ID de l'utilisateur
      */
-    upsertActivities = async (data: TablesInsert<'Activite'>[]) => {
-        await this.repository.upsertActivities(data);
+    upsertActivities = async (data: TablesInsert<'Activite'>[], userId: string) => {
+        await this.repository.upsertActivities(data, userId);
     }
 
     /**

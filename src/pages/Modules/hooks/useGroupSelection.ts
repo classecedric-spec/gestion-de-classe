@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { groupService } from '../../../features/groups/services/groupService';
+import { supabase } from '../../../lib/database';
 import { Tables } from '../../../types/supabase';
 
 /**
@@ -16,7 +17,9 @@ export function useGroupSelection(detailTab: string) {
     // Fetch groups
     const fetchGroups = async () => {
         try {
-            const data = await groupService.getGroups();
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) return;
+            const data = await groupService.getGroups(user.id);
             setGroups(data || []);
         } catch (err) {
             console.error('Error fetching groups:', err);

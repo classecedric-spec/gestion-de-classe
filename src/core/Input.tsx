@@ -64,7 +64,7 @@ const Input = forwardRef<HTMLInputElement, InputProps>(({
                         'focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary',
                         'transition-all duration-200',
                         'disabled:opacity-50 disabled:cursor-not-allowed',
-                        error && 'border-danger focus:ring-danger/40 focus:border-danger',
+                        error && 'bg-danger/50 border-danger focus:ring-danger/40 focus:border-danger',
                         Icon && 'pl-10',
                         className
                     )}
@@ -139,7 +139,7 @@ export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(({
                     'transition-all duration-200',
                     'disabled:opacity-50 disabled:cursor-not-allowed',
                     'resize-vertical',
-                    error && 'border-danger focus:ring-danger/40 focus:border-danger',
+                    error && 'bg-danger/50 border-danger focus:ring-danger/40 focus:border-danger',
                     className
                 )}
                 {...rest}

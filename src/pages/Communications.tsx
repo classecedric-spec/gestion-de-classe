@@ -36,6 +36,7 @@ const Communications: React.FC = () => {
 
     const [loading, setLoading] = useState(true);
     const [sending, setSending] = useState(false);
+    const [user, setUser] = useState<any>(null);
     const [userEmail, setUserEmail] = useState<string>('');
     
     // Dispatch Queue state
@@ -78,13 +79,16 @@ const Communications: React.FC = () => {
 
     const loadInitialData = async () => {
         try {
-            const user = await getCurrentUser();
-            if (!user) return;
-            
-            if (user.email) setUserEmail(user.email);
+            const currentUser = await getCurrentUser();
+            if (!currentUser) {
+                setLoading(false);
+                return;
+            }
+            setUser(currentUser);
+            if (currentUser.email) setUserEmail(currentUser.email);
 
             // Load groups
-            const userGroups = await groupRepository.getUserGroups(user.id);
+            const userGroups = await groupRepository.getUserGroups(currentUser.id);
             setGroups(userGroups);
             if (userGroups.length > 0) {
                 setSelectedGroupId(userGroups[0].id);
@@ -98,6 +102,7 @@ const Communications: React.FC = () => {
     };
 
     const loadAvailableDates = async () => {
+        if (!user?.id) return;
         try {
             // Fetch modules associated with this group via students progressions or directly if we assume modules are assigned to class
             // To be accurate and follow user's request "afficher toutes les activités qui sont en retard et encore actives", 
@@ -105,6 +110,7 @@ const Communications: React.FC = () => {
             const { data, error } = await supabase
                 .from('Module')
                 .select('date_fin')
+                .eq('user_id', user.id)
                 .eq('statut', 'en_cours')
                 .not('date_fin', 'is', null)
                 .order('date_fin', { ascending: false });
@@ -122,8 +128,9 @@ const Communications: React.FC = () => {
     };
 
     const loadStudents = async (groupId: string) => {
+        if (!user?.id || !groupId) return;
         try {
-            const data = await attendanceRepository.getStudentsByGroup(groupId);
+            const data = await attendanceRepository.getStudentsByGroup(groupId, user.id);
             setStudents(data);
             // Default select all students with emails
             const initialSelected = new Set<string>();
@@ -139,6 +146,7 @@ const Communications: React.FC = () => {
     };
 
     const loadLateWorks = async (date: string) => {
+        if (!user?.id || !date) return;
         try {
             const studentIds = students.map(s => s.id);
             if (studentIds.length === 0) return;
@@ -155,6 +163,7 @@ const Communications: React.FC = () => {
                         )
                     )
                 `)
+                .eq('user_id', user.id)
                 .in('eleve_id', studentIds)
                 .eq('Activite.Module.statut', 'en_cours')
                 .not('etat', 'in', '("termine","valide","a_verifier")')

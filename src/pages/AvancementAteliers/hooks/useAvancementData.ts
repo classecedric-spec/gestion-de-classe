@@ -1,6 +1,7 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { groupService } from '../../../features/groups/services/groupService';
 import { moduleService } from '../../../features/modules/services/moduleService';
+import { getCurrentUser } from '../../../lib/database';
 
 export interface AvancementGroup {
     id: string;
@@ -48,13 +49,23 @@ export const useAvancementData = () => {
     const [dateOperator, setDateOperator] = useState<string>('eq');
 
     const fetchGroups = useCallback(async () => {
+        const user = await getCurrentUser();
+        if (!user) {
+            setGroups([]);
+            return;
+        }
         // Casting as AvancementGroup[] because service returns Tables<'Groupe'> which is compatible
-        const data = await groupService.getGroups();
+        const data = await groupService.getGroups(user.id);
         setGroups(data as unknown as AvancementGroup[]);
     }, []);
 
     const fetchModules = useCallback(async () => {
-        const data = await moduleService.getActiveModules();
+        const user = await getCurrentUser();
+        if (!user) {
+            setModules([]);
+            return;
+        }
+        const data = await moduleService.getActiveModules(user.id);
 
         const sorted = (data as AvancementModule[] || []).sort((a, b) => {
             if (a.date_fin !== b.date_fin) {
@@ -80,7 +91,12 @@ export const useAvancementData = () => {
     }, []);
 
     const fetchBranches = useCallback(async () => {
-        const data = await moduleService.getBranches();
+        const user = await getCurrentUser();
+        if (!user) {
+            setBranches([]);
+            return;
+        }
+        const data = await moduleService.getBranches(user.id);
         setBranches(data as unknown as AvancementBranch[]);
     }, []);
 

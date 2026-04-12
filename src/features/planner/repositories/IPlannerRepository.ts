@@ -38,7 +38,7 @@ export interface IPlannerRepository {
     /**
      * LECTURE : Récupérer tout le programme d'une semaine précise.
      */
-    getPlanningForWeek(weekStartDate: string): Promise<WeeklyPlanningItem[]>;
+    getPlanningForWeek(weekStartDate: string, userId: string): Promise<WeeklyPlanningItem[]>;
 
     /**
      * CRÉATION : Ajouter une nouvelle activité à l'agenda.

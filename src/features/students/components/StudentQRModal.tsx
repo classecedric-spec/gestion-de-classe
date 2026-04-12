@@ -28,7 +28,7 @@ interface StudentQRModalProps {
         id: string;
         prenom: string;
         nom: string;
-        access_token?: string;
+        access_token?: string | null;
     } | null;
     initialTab?: QRTab;
 }

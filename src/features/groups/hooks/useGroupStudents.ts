@@ -26,7 +26,7 @@ export interface StudentWithClass extends Tables<'Eleve'> {
 /**
  * Assistant spécialisé dans la gestion des élèves au sein d'un groupe.
  */
-export const useGroupStudents = (selectedGroup: Tables<'Groupe'> | null) => {
+export const useGroupStudents = (selectedGroup: Tables<'Groupe'> | null, user: any) => {
     // ÉTATS LOCAUX
     const [studentsInGroup, setStudentsInGroup] = useState<StudentWithClass[]>([]);
     const [loadingStudents, setLoadingStudents] = useState(false);
@@ -39,52 +39,37 @@ export const useGroupStudents = (selectedGroup: Tables<'Groupe'> | null) => {
      * les fiches complètes des élèves inscrits dans le groupe.
      */
     const fetchStudentsInGroup = useCallback(async (groupId: string) => {
-        if (!groupId) {
+        if (!groupId || !user) {
             setStudentsInGroup([]);
             return;
         }
 
         setLoadingStudents(true);
         try {
-            /** 
-             * ÉTAPE 1 : RÉCUPÉRATION DES LIENS
-             * On cherche d'abord dans la "table de liaison" (EleveGroupe) 
-             * pour savoir quels identifiants d'élèves sont associés à ce groupe.
-             */
-            const { data: links, error: linkError } = await supabase
-                .from('EleveGroupe')
-                .select('eleve_id')
-                .eq('groupe_id', groupId);
-
-            if (linkError) throw linkError;
-
-            // On extrait simplement la liste des identifiants (IDs).
-            const studentIds = links.map(l => l.eleve_id);
-
-            // Si le groupe est vide, on s'arrête ici.
-            if (studentIds.length === 0) {
-                setStudentsInGroup([]);
-                return;
-            }
-
-            /** 
-             * ÉTAPE 2 : RÉCUPÉRATION DES FICHES DÉTAILLÉES
-             * On télécharge les informations (nom, prénom, classe) de tous les élèves identifiés.
-             */
+            // SINGLE OPTIMIZED QUERY with inner join
+            // This is more robust and secure as it combines the group filtering 
+            // and the teacher ownership (titulaire) in one go.
             const { data, error } = await supabase
                 .from('Eleve')
-                .select('*, Classe(nom), niveau_id')
-                .in('id', studentIds)
-                .order('nom'); // Tri alphabétique pour un affichage ordonné.
+                .select(`
+                    *,
+                    Classe (nom),
+                    Niveau (nom, ordre),
+                    EleveGroupe!inner(groupe_id, user_id)
+                `)
+                .eq('EleveGroupe.groupe_id', groupId)
+                .eq('EleveGroupe.user_id', user.id)
+                .eq('titulaire_id', user.id)
+                .order('nom');
 
             if (error) throw error;
-            setStudentsInGroup(data as StudentWithClass[] || []);
+            setStudentsInGroup(data as any as StudentWithClass[] || []);
         } catch (error) {
             console.error('Erreur lors de la récupération des élèves du groupe:', error);
         } finally {
             setLoadingStudents(false);
         }
-    }, []);
+    }, [user]);
 
     /**
      * PRÉPARATION DU RETRAIT : 
@@ -119,7 +104,7 @@ export const useGroupStudents = (selectedGroup: Tables<'Groupe'> | null) => {
             const { error } = await supabase
                 .from('EleveGroupe')
                 .delete()
-                .match({ eleve_id: studentId, groupe_id: selectedGroup.id });
+                .match({ eleve_id: studentId, groupe_id: selectedGroup.id, user_id: user.id });
 
             if (error) throw error;
         } catch (error: any) {

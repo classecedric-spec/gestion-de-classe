@@ -154,7 +154,7 @@ const Select: React.FC<SelectProps> = ({
                         'transition-all appearance-none cursor-pointer',
                         Icon && 'pl-10',
                         !Icon && 'pl-4',
-                        error && 'border-danger focus:ring-danger/50 focus:border-danger'
+                        error && 'bg-danger/50 border-danger focus:ring-danger/50 focus:border-danger'
                     )}
                     {...props}
                 >

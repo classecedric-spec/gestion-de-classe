@@ -27,8 +27,8 @@ export class PlannerService {
     /**
      * RÉCUPÉRATION : Demande au répertoire de fournir le programme de la semaine.
      */
-    async getPlanningForWeek(weekStartDate: string): Promise<WeeklyPlanningItem[]> {
-        return await this.repository.getPlanningForWeek(weekStartDate);
+    async getPlanningForWeek(weekStartDate: string, userId: string): Promise<WeeklyPlanningItem[]> {
+        return await this.repository.getPlanningForWeek(weekStartDate, userId);
     }
 
     /**

@@ -20,7 +20,10 @@ import {
     CheckCircle2,
     MessageSquare,
     Info
+    // Mic,
+    // MicOff
 } from 'lucide-react';
+// import { useSpeechRecognition } from '../../../hooks/useSpeechRecognition';
 import { useAuth } from '../../../hooks/useAuth';
 import { useGradeMutations } from '../hooks/useGrades';
 import { Tables } from '../../../types/supabase';
@@ -59,6 +62,54 @@ const StudentGradeEntryModal: React.FC<StudentGradeEntryModalProps> = ({
     const [statut, setStatut] = useState<string>('present');
     const [commentaire, setCommentaire] = useState<string>('');
     const [isSaving, setIsSaving] = useState(false);
+
+    /*
+    const [dictatingField, setDictatingField] = useState<'total' | string | null>(null);
+    
+    // Voice recognition for comments and notes
+    const { isListening, isSupported, toggleListening, stopListening } = useSpeechRecognition({
+        onResult: (text, isFinal) => {
+            if (dictatingField === 'commentaire') {
+                if (isFinal) {
+                    setCommentaire(prev => (prev + ' ' + text).trim());
+                    setDictatingField(null);
+                }
+            } else if (dictatingField) {
+                // Pour les notes (total ou question spécifique)
+                const numText = text.toLowerCase().replace(/,/g, '.').replace(/[^0-9.]/g, '');
+                const num = parseFloat(numText);
+                
+                if (!isNaN(num) && isFinal) {
+                    if (dictatingField === 'total') {
+                        setLocalTotal(num.toString());
+                    } else {
+                        setLocalQuestions(prev => ({
+                            ...prev,
+                            [dictatingField]: num.toString()
+                        }));
+                    }
+                    setDictatingField(null);
+                }
+            }
+        },
+        onError: (err) => {
+            console.error('Speech recognition error:', err);
+            toast.error("Erreur de reconnaissance vocale");
+            setDictatingField(null);
+        }
+    });
+
+    const handleCommentMicClick = () => {
+        if (dictatingField === 'commentaire' && isListening) {
+            stopListening();
+            setDictatingField(null);
+        } else {
+            setDictatingField('commentaire');
+            toggleListening();
+        }
+    };
+    */
+
     const firstInputRef = useRef<HTMLInputElement>(null);
 
     // Auto-focus on first input when modal opens
@@ -111,19 +162,21 @@ const StudentGradeEntryModal: React.FC<StudentGradeEntryModalProps> = ({
                     }));
                 
                 if (qResults.length > 0) {
-                    await saveQuestionResults(qResults);
+                    await saveQuestionResults({ results: qResults });
                 }
             }
 
             // 2. Save main result
             const totalNote = localTotal !== '' ? parseFloat(localTotal) : null;
             await saveResult({
-                evaluation_id: evaluation.id,
-                eleve_id: student.id,
-                user_id: userId,
-                note: totalNote,
-                statut: statut as any,
-                commentaire: commentaire
+                result: {
+                    evaluation_id: evaluation.id,
+                    eleve_id: student.id,
+                    user_id: userId,
+                    note: totalNote,
+                    statut: statut as any,
+                    commentaire: commentaire
+                }
             });
 
             toast.success(`Notes de ${student.prenom} enregistrées`);
@@ -292,7 +345,7 @@ const StudentGradeEntryModal: React.FC<StudentGradeEntryModalProps> = ({
                                                         {qPalier.letter}
                                                     </Badge>
                                                 )}
-                                                <div className="w-24 relative">
+                                                <div className="w-24 relative flex items-center gap-2">
                                                     <Input
                                                         ref={idx === 0 ? firstInputRef : null}
                                                         type="number"
@@ -334,7 +387,7 @@ const StudentGradeEntryModal: React.FC<StudentGradeEntryModalProps> = ({
                                             {palierTotal.letter}
                                         </div>
                                     )}
-                                    <div className="w-32 relative">
+                                    <div className="w-32 relative flex items-center gap-2">
                                         <Input
                                             ref={!hasQuestions ? firstInputRef : null}
                                             type="number"
@@ -396,17 +449,47 @@ const StudentGradeEntryModal: React.FC<StudentGradeEntryModalProps> = ({
 
                         {/* Comment */}
                         <div className="space-y-4 flex-1 flex flex-col">
-                            <div className="flex items-center gap-3">
-                                <div className="p-2 rounded-lg bg-blue-500/10 text-blue-500">
-                                    <MessageSquare size={20} />
+                            <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-3">
+                                    <div className="p-2 rounded-lg bg-blue-500/10 text-blue-500">
+                                        <MessageSquare size={20} />
+                                    </div>
+                                    <h4 className="font-black text-white uppercase text-sm tracking-widest">Commentaires</h4>
                                 </div>
-                                <h4 className="font-black text-white uppercase text-sm tracking-widest">Commentaires</h4>
+                                { /* Commented out voice dictation
+                                isSupported && (
+                                    <button
+                                        onClick={handleCommentMicClick}
+                                        className={clsx(
+                                            "flex items-center gap-2 px-3 py-1.5 rounded-xl border transition-all font-black text-[10px] uppercase tracking-widest",
+                                            dictatingField === 'commentaire' && isListening 
+                                                ? "bg-danger text-white border-danger animate-pulse" 
+                                                : "bg-white/5 text-grey-medium border-white/5 hover:bg-white/10 hover:text-white"
+                                        )}
+                                    >
+                                        {dictatingField === 'commentaire' && isListening ? (
+                                            <>
+                                                <MicOff size={14} />
+                                                En écoute...
+                                            </>
+                                        ) : (
+                                            <>
+                                                <Mic size={14} />
+                                                Dictée vocale
+                                            </>
+                                        )}
+                                    </button>
+                                )
+                                */ }
                             </div>
                             <textarea
                                 value={commentaire}
                                 onChange={(e) => setCommentaire(e.target.value)}
                                 placeholder="Observations particulières..."
-                                className="w-full flex-1 min-h-[150px] p-6 rounded-3xl bg-grey-dark/40 border border-white/10 focus:border-primary/50 focus:ring-0 outline-none transition-all text-sm italic resize-none text-grey-light placeholder:opacity-30"
+                                className={clsx(
+                                    "w-full flex-1 min-h-[150px] p-6 rounded-3xl bg-grey-dark/40 border transition-all text-sm italic resize-none text-grey-light placeholder:opacity-30 outline-none border-white/10 focus:border-primary/50"
+                                    // dictatingField === 'commentaire' && isListening ? "border-danger ring-1 ring-danger/20" : "border-white/10 focus:border-primary/50"
+                                )}
                             />
                         </div>
                     </div>

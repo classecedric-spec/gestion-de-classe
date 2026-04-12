@@ -89,10 +89,14 @@ export function useStudentPlanningData(studentId: string | undefined) {
                 setStudent(studentData);
                 resolvedLevelId = studentData.niveau_id;
             } else {
+                const { data: { user: authUser } } = await supabase.auth.getUser();
+                if (!authUser) throw new Error("Non authentifié");
+
                 const { data: sData, error } = await supabase
                     .from('Eleve')
                     .select('*, Niveau(id, nom)')
                     .eq('id', studentId!)
+                    .eq('titulaire_id', authUser.id)
                     .single();
                 if (error) throw error;
                 studentData = sData;
@@ -115,7 +119,9 @@ export function useStudentPlanningData(studentId: string | undefined) {
                     (progData as any[]).forEach(p => { progMap[p.activite_id] = p.etat; });
                 }
             } else {
-                progMap = await trackingService.fetchStudentProgressionsMap(studentId!);
+                const { data: { user: authUser } } = await supabase.auth.getUser();
+                if (!authUser) throw new Error("Non authentifié");
+                progMap = await trackingService.fetchStudentProgressionsMap(studentId!, authUser.id);
             }
 
             // 2.2 Charger toutes les activités disponibles via Secure RPC ou trackingService
@@ -128,7 +134,9 @@ export function useStudentPlanningData(studentId: string | undefined) {
                 if (modulesError) throw modulesError;
                 fetchedModules = (modulesData || []) as any[];
             } else {
-                fetchedModules = await trackingService.getMobileModules();
+                const { data: { user: authUser } } = await supabase.auth.getUser();
+                if (!authUser) throw new Error("Non authentifié");
+                fetchedModules = await trackingService.getMobileModules(authUser.id);
             }
 
             fetchedModules.forEach((mod: any) => {
@@ -217,7 +225,7 @@ export function useStudentPlanningData(studentId: string | undefined) {
             }
 
             // 5. Charger les préférences de confiance (indices)
-            const teacherId = studentData.user_id;
+            const teacherId = studentData.titulaire_id;
             if (teacherId) {
                 try {
                     const { data: prefData } = await supabase
@@ -416,19 +424,22 @@ export function useStudentPlanningData(studentId: string | undefined) {
 
                 // Mettre à jour les progressions réelles (uniquement si NON silencieux = Validation Finale)
                 if (!silent) {
-                    for (const choice of Object.values(currentChoices)) {
-                    let nextEtat = '';
-                    if (choice.statut === 'demarre') nextEtat = 'en_cours';
-                    else if (choice.statut === 'fini') nextEtat = 'a_verifier';
+                    const { data: { user: authUser } } = await supabase.auth.getUser();
+                    if (!authUser) throw new Error("Non authentifié");
 
-                    if (nextEtat) {
-                        await trackingService.upsertProgression({
-                            eleve_id: studentId,
-                            activite_id: choice.activite_id,
-                            etat: nextEtat,
-                            updated_at: new Date().toISOString()
-                        });
-                    }
+                    for (const choice of Object.values(currentChoices)) {
+                        let nextEtat = '';
+                        if (choice.statut === 'demarre') nextEtat = 'en_cours';
+                        else if (choice.statut === 'fini') nextEtat = 'a_verifier';
+
+                        if (nextEtat) {
+                            await trackingService.upsertProgression({
+                                eleve_id: studentId,
+                                activite_id: choice.activite_id,
+                                etat: nextEtat,
+                                updated_at: new Date().toISOString()
+                            }, authUser.id);
+                        }
                     }
                 }
             }
@@ -483,12 +494,15 @@ export function useStudentPlanningData(studentId: string | undefined) {
                             p_status: nextEtat
                         });
                     } else {
+                        const { data: { user: authUser } } = await supabase.auth.getUser();
+                        if (!authUser) throw new Error("Non authentifié");
+
                         await trackingService.upsertProgression({
                             eleve_id: studentId,
                             activite_id: choice.activite_id,
                             etat: nextEtat,
                             updated_at: new Date().toISOString()
-                        });
+                        }, authUser.id);
                     }
 
                     results.push({ title: act.titre, status: nextEtat });

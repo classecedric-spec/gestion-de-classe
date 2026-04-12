@@ -3,6 +3,7 @@ import { trackingService } from '../features/tracking/services/trackingService';
 import { useOfflineSync } from '../context/OfflineSyncContext';
 import { getNextStatus } from '../lib/helpers';
 import { toast } from 'sonner';
+import { useAuth } from './useAuth';
 
 export interface UpdateProgressionOptions {
     setProgressions?: React.Dispatch<React.SetStateAction<Record<string, string>>>;
@@ -17,6 +18,7 @@ export interface UpdateProgressionOptions {
  * Hook to handle progression status updates with offline support and optimistic UI
  */
 export const useUpdateProgression = () => {
+    const { session } = useAuth();
     const { isOnline, addToQueue } = useOfflineSync();
     const [updating, setUpdating] = useState(false);
 
@@ -88,7 +90,8 @@ export const useUpdateProgression = () => {
 
         // 4. Online update
         try {
-            await trackingService.upsertProgression(payload);
+            if (!session?.user?.id) throw new Error("Utilisateur non authentifié.");
+            await trackingService.upsertProgression(payload, session.user.id);
 
             if (successCallback) successCallback();
             return nextStatus;

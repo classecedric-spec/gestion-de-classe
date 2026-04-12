@@ -22,10 +22,11 @@ export class SupabaseActivityTypeRepository implements IActivityTypeRepository {
     /**
      * Lit tous les types d'activités enregistrés.
      */
-    async getAll(): Promise<ActivityType[]> {
+    async getAll(userId: string): Promise<ActivityType[]> {
         const { data, error } = await supabase
             .from('TypeActiviteAdulte' as any)
             .select('*')
+            .eq('user_id', userId)
             .order('created_at');
 
         if (error) throw error;

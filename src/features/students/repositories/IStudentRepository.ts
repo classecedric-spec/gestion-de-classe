@@ -17,29 +17,29 @@ import { Tables, TablesInsert, TablesUpdate } from '../../../types/supabase';
  */
 export interface IStudentRepository {
     // OPERATIONS DE BASE (C.R.U.D)
-    findById(id: string): Promise<Tables<'Eleve'> | null>;
-    findAll(): Promise<Tables<'Eleve'>[]>;
-    create(student: TablesInsert<'Eleve'>): Promise<Tables<'Eleve'>>;
-    update(id: string, student: TablesUpdate<'Eleve'>): Promise<Tables<'Eleve'>>;
-    delete(id: string): Promise<void>;
+    findById(id: string, userId: string): Promise<Tables<'Eleve'> | null>;
+    findAll(userId: string): Promise<Tables<'Eleve'>[]>;
+    create(student: TablesInsert<'Eleve'>, userId: string): Promise<Tables<'Eleve'>>;
+    update(id: string, student: TablesUpdate<'Eleve'>, userId: string): Promise<Tables<'Eleve'>>;
+    delete(id: string, userId: string): Promise<void>;
 
     // GESTION DES RELATIONS (Liaisons É élèves <-> Groupes)
     // Permet de savoir dans quels groupes est un enfant et de modifier ces liens.
-    getLinkedGroupIds(studentId: string): Promise<string[]>;
+    getLinkedGroupIds(studentId: string, userId: string): Promise<string[]>;
     linkToGroup(studentId: string, groupId: string, userId: string): Promise<void>;
-    unlinkFromGroup(linkId: string): Promise<void>;
-    unlinkMultiFromGroup(linkIds: string[]): Promise<void>;
-    getStudentGroupLinks(studentId: string): Promise<{ id: string, groupe_id: string }[]>;
+    unlinkFromGroup(linkId: string, userId: string): Promise<void>;
+    unlinkMultiFromGroup(linkIds: string[], userId: string): Promise<void>;
+    getStudentGroupLinks(studentId: string, userId: string): Promise<{ id: string, groupe_id: string }[]>;
 
     // REQUÊTES SPÉCIFIQUES ET FILTRAGES
     // Fonctions optimisées pour récupérer des listes d'enfants selon différents critères métier.
-    findByClass(classId: string): Promise<Tables<'Eleve'>[]>;
-    findByGroup(groupId: string): Promise<any[]>;
-    findByGroups(groupIds: string[]): Promise<any[]>;
+    findByClass(classId: string, userId: string): Promise<Tables<'Eleve'>[]>;
+    findByGroup(groupId: string, userId: string): Promise<any[]>;
+    findByGroups(groupIds: string[], userId: string): Promise<any[]>;
     findAllForTeacher(teacherId: string): Promise<any[]>;
     
     // Suivi particulier : met à jour le niveau d'alerte (importance) d'un élève.
-    updateImportance(id: string, importance: number | null): Promise<void>;
+    updateImportance(id: string, importance: number | null, userId: string): Promise<void>;
     
     // Synchronisation : récupère uniquement les changements récents.
     getStudentsDelta(teacherId: string): Promise<{ delta: any[], isFirstSync: boolean }>;

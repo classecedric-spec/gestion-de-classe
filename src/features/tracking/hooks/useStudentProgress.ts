@@ -19,7 +19,8 @@
  *   - L'intégration de la "Probabilité de contrôle" : lors d'une validation, le logiciel décide si l'exercice doit être vérifié par l'enseignant (🟣) ou s'il est validé d'office (✅).
  */
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
+import { supabase } from '../../../lib/database';
 import { trackingService } from '../services/trackingService';
 
 /**
@@ -50,9 +51,12 @@ export const useStudentProgress = () => {
      * ACTION : Charger le dossier de l'élève.
      */
     const fetchStudentProgress = useCallback(async (studentId: string, _students?: any[], _selectedStudent?: any) => {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+
         setLoadingProgress(true);
         try {
-            const data = await trackingService.fetchStudentProgressDetails(studentId);
+            const data = await trackingService.fetchStudentProgressDetails(studentId, user.id);
             setStudentProgress(data || []);
         } catch (error) {
             console.error('Error fetching progress:', error);
@@ -107,7 +111,9 @@ export const useStudentProgress = () => {
         }));
 
         try {
-            if (progressionItem?.id) await trackingService.updateProgressionStatus(progressionItem.id, newStatus);
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) throw new Error("Utilisateur non authentifié.");
+            if (progressionItem?.id) await trackingService.updateProgressionStatus(progressionItem.id, newStatus, user.id);
         } catch (error) {
             console.error("Error", error);
             setStudentProgress(originalProgress); // En cas d'erreur de réseau, on remet l'ancien état.
@@ -125,7 +131,9 @@ export const useStudentProgress = () => {
             return p;
         }));
         try {
-            await trackingService.updateProgressionStatus(progressionId, 'a_commencer');
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) throw new Error("Utilisateur non authentifié.");
+            await trackingService.updateProgressionStatus(progressionId, 'a_commencer', user.id);
         } catch (error) {
             setStudentProgress(originalProgress);
         }

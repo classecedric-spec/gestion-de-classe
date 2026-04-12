@@ -14,18 +14,24 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { adultService, ActivityType } from '../services/adultService';
+import { useAuth } from '../../../hooks/useAuth';
 import { toast } from 'sonner';
 
 export const useActivityTypes = () => {
+    const { session } = useAuth();
+    const userId = session?.user.id;
+
     // ÉTATS LOCAUX
     const [activityTypes, setActivityTypes] = useState<ActivityType[]>([]);
     const [loading, setLoading] = useState<boolean>(true);
 
     // CHARGEMENT ET GÉNÉRATION AUTOMATIQUE
     const fetchActivityTypes = useCallback(async () => {
+        if (!userId) return;
+        
         setLoading(true);
         try {
-            let data = await adultService.fetchActivityTypes();
+            let data = await adultService.fetchActivityTypes(userId);
             if (data.length === 0) {
                 // Si aucune action n'existe, on injecte les actions par défaut (Observation, Aide, etc.)
                 const seeded = await adultService.seedDefaultActivityTypes();
@@ -38,7 +44,7 @@ export const useActivityTypes = () => {
         } finally {
             setLoading(false);
         }
-    }, []);
+    }, [userId]);
 
     useEffect(() => {
         fetchActivityTypes();

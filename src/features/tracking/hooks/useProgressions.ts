@@ -56,10 +56,13 @@ export function useProgressions(
      * Récupère l'état de tous les exercices pour l'élève sélectionné.
      */
     const fetchStudentProgressions = async (studentId: string) => {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+
         await fetchWithCache(
             `progressions_pedago_${studentId}`,
             async () => {
-                return await trackingService.fetchStudentProgressionsMap(studentId);
+                return await trackingService.fetchStudentProgressionsMap(studentId, user.id);
             },
             (data: any) => {
                 setProgressions(data);
@@ -131,12 +134,15 @@ export function useProgressions(
             const branchId = act?.Module?.SousBranche?.Branche?.id;
 
             if (branchId) {
-                if (finalStatus === 'termine') {
-                    trackingService.updateStudentTrust(targetStudentId, branchId, -2, 'up');
-                    toast.success("Confiance augmentée (-2%)");
-                } else if (finalStatus === 'a_commencer') {
-                    trackingService.updateStudentTrust(targetStudentId, branchId, 5, 'down');
-                    toast.error("Confiance diminuée (+5%)");
+                const { data: { user } } = await supabase.auth.getUser();
+                if (user) {
+                    if (finalStatus === 'termine') {
+                        trackingService.updateStudentTrust(targetStudentId, branchId, -2, 'up', user.id);
+                        toast.success("Confiance augmentée (-2%)");
+                    } else if (finalStatus === 'a_commencer') {
+                        trackingService.updateStudentTrust(targetStudentId, branchId, 5, 'down', user.id);
+                        toast.error("Confiance diminuée (+5%)");
+                    }
                 }
             }
         }
@@ -233,18 +239,17 @@ export function useProgressions(
             updated_at: new Date().toISOString()
         }));
 
-        await trackingService.createProgressions(newProgs);
+        if (user) await trackingService.createProgressions(newProgs, user.id);
         toast.success("3 élèves ajoutés au suivi personnalisé");
         if (fetchHelpRequests) fetchHelpRequests();
     };
 
-    /** 
-     * SUPPRESSION D'UN TICKET DE SUIVI
-     */
     const handleDeleteSuivi = async () => {
         if (!itemToDelete) return;
         try {
-            await trackingService.deleteProgression(itemToDelete.id);
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) throw new Error("Utilisateur non authentifié.");
+            await trackingService.deleteProgression(itemToDelete.id, user.id);
             toast.success("Élève retiré du suivi");
             setItemToDelete(null);
             if (fetchHelpRequests) fetchHelpRequests();

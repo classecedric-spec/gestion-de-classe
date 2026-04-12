@@ -23,8 +23,8 @@ export class ActivityTypeService {
     /**
      * Récupère la liste complète des catégories d'ateliers pour adultes.
      */
-    async fetchAdultTypes(): Promise<Tables<'TypeActiviteAdulte'>[]> {
-        return await this.repository.getAll();
+    async fetchAdultTypes(userId: string): Promise<Tables<'TypeActiviteAdulte'>[]> {
+        return await this.repository.getAll(userId);
     }
 }
 

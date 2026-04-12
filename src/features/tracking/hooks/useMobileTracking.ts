@@ -43,20 +43,34 @@ export function useMobileTracking() {
     // Récupère toutes les classes accessibles.
     const { data: groups = [] } = useQuery({
         queryKey: ['groups'],
-        queryFn: () => groupService.getGroups(),
+        queryFn: async () => {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) return [];
+            return await groupService.getGroups(user.id);
+        },
     });
 
     // Récupère les infos de la classe choisie (nom, etc.).
     const { data: groupInfo } = useQuery({
         queryKey: ['group', groupId],
-        queryFn: () => groupId ? trackingService.fetchGroupInfo(groupId) : null,
+        queryFn: async () => {
+            if (!groupId) return null;
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) return null;
+            return trackingService.fetchGroupInfo(groupId, user.id);
+        },
         enabled: !!groupId,
     });
 
     // Récupère les élèves de la classe.
     const { data: studentsData } = useQuery({
         queryKey: ['students', 'group', groupId],
-        queryFn: () => groupId ? trackingService.fetchStudentsInGroup(groupId) : null,
+        queryFn: async () => {
+            if (!groupId) return null;
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) return null;
+            return trackingService.fetchStudentsInGroup(groupId, user.id);
+        },
         enabled: !!groupId,
     });
 
@@ -68,7 +82,9 @@ export function useMobileTracking() {
         queryKey: ['help-requests', studentsIds],
         queryFn: async () => {
             if (studentsIds.length === 0) return [];
-            return trackingService.fetchHelpRequests(studentsIds);
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) return [];
+            return trackingService.fetchHelpRequests(studentsIds, user.id);
         },
         enabled: studentsIds.length > 0,
     });
@@ -124,7 +140,9 @@ export function useMobileTracking() {
         if (helpersCache[requestId]) return;
 
         try {
-            const helpers = await trackingService.findHelpers(activityId, studentsIds);
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) return;
+            const helpers = await trackingService.findHelpers(activityId, studentsIds, user.id);
             const randomHelpers = helpers.sort(() => 0.5 - Math.random()).slice(0, 3);
             setHelpersCache(prev => ({ ...prev, [requestId]: randomHelpers }));
         } catch (err) { console.error(err); }
@@ -158,7 +176,7 @@ export function useMobileTracking() {
 
             await trackingService.saveUserPreference(userPrefs.userId, 'suivi_rotation_skips', newRotationSkips);
             const newProgs = candidates.map(student => ({ eleve_id: student.id, activite_id: null, etat: 'besoin_d_aide', is_suivi: true, user_id: userPrefs.userId, updated_at: new Date().toISOString() }));
-            await trackingService.createProgressions(newProgs as any);
+            await trackingService.createProgressions(newProgs as any, userPrefs.userId);
             toast.success("3 élèves ajoutés");
             queryClient.invalidateQueries({ queryKey: ['help-requests'] });
         } catch (err) { toast.error("Erreur"); } finally { setIsAutoGenerating(false); }
@@ -200,7 +218,9 @@ export function useMobileTracking() {
                 addToQueue({ type: 'SUPABASE_CALL', table: 'Progression', method: 'update', payload: { etat: newStatus, updated_at: new Date().toISOString(), is_suivi: false }, match: { id: req.id }, contextDescription: `Maj statut ${req.eleve?.prenom}` });
                 toast.success("Action sauvegardée (Hors ligne)");
             } else {
-                await trackingService.updateProgressionStatus(req.id, newStatus, req.is_suivi || false);
+                const { data: { user } } = await supabase.auth.getUser();
+                if (!user) throw new Error("Utilisateur non authentifié.");
+                await trackingService.updateProgressionStatus(req.id, newStatus, user.id, req.is_suivi || false);
                 toast.success("Mis à jour");
             }
             queryClient.invalidateQueries({ queryKey: ['help-requests'] });
@@ -215,8 +235,10 @@ export function useMobileTracking() {
             if (!isOnline) {
                 addToQueue({ type: 'SUPABASE_CALL', table: 'Progression', method: req.is_suivi ? 'delete' : 'update', payload: req.is_suivi ? null : { etat: 'a_commencer', updated_at: new Date().toISOString() }, match: { id: req.id }, contextDescription: `Reset statut ${req.eleve?.prenom}` });
             } else {
-                if (req.is_suivi) await trackingService.deleteProgression(req.id);
-                else await trackingService.updateProgressionStatus(req.id, 'a_commencer');
+                const { data: { user } } = await supabase.auth.getUser();
+                if (!user) throw new Error("Utilisateur non authentifié.");
+                if (req.is_suivi) await trackingService.deleteProgression(req.id, user.id);
+                else await trackingService.updateProgressionStatus(req.id, 'a_commencer', user.id);
             }
             queryClient.invalidateQueries({ queryKey: ['help-requests'] });
             toast.success("Retiré");
