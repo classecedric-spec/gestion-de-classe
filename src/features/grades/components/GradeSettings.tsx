@@ -35,7 +35,7 @@ const GradeSettings: React.FC = () => {
     });
 
     // Prépare l'envoi sécurisé du nouveau barème (ou de ses modifications) vers la base de données du professeur.
-    const handleSave = async () => {
+    const handleSave = () => {
         if (!session?.user) return;
         
         // Ensure config has at least an empty paliers array for conversion
@@ -44,7 +44,7 @@ const GradeSettings: React.FC = () => {
             finalConfig.paliers = [];
         }
 
-        await saveNoteType({
+        saveNoteType({
             typeNote: {
                 ...formData,
                 config: finalConfig,

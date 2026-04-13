@@ -382,6 +382,12 @@ const StudentPlanning: React.FC = () => {
                     <h1 className="text-4xl font-black text-white uppercase tracking-tight">Planification Fermée</h1>
                     <p className="text-xl text-grey-medium">L'accès à la planification est désactivé pour le moment.</p>
                 </div>
+
+                <div className="flex items-center gap-2 text-primary/60 text-sm font-medium animate-pulse">
+                    <Loader2 size={16} className="animate-spin" />
+                    <span>Synchronisation en temps réel activée...</span>
+                </div>
+
                 <button onClick={refresh} className="flex items-center gap-2 px-6 py-3 rounded-xl bg-primary/20 hover:bg-primary/30 text-primary font-bold border border-primary/30 transition-all active:scale-95">
                     <RotateCcw size={20} />
                     <span>Réessayer</span>

@@ -18,6 +18,9 @@ import { gradeService } from '../features/grades/services';
 import { TablesInsert } from '../types/supabase';
 import { getCurrentUser } from '../lib/database';
 import { useQuery } from '@tanstack/react-query';
+import { toast } from 'sonner';
+import { useCallback, useRef } from 'react';
+import { usePeriods } from '../features/grades/hooks/usePeriods';
 
 const Grades: React.FC = () => {
     // UI State
@@ -29,10 +32,38 @@ const Grades: React.FC = () => {
     const [editingRegroupements, setEditingRegroupements] = useState<any[]>([]);
     const location = useLocation();
     
-    // Filters State (lifted from EvaluationsTableExcel for context-awareness)
-    const [branchFilter, setBranchFilter] = useState<string>('all');
-    const [groupFilter, setGroupFilter] = useState<string>('all');
-    const [periodeFilter, setPeriodeFilter] = useState<string>('all');
+    // Multi-Select Filters State (Sync across all tabs)
+    const [selectedBranches, setSelectedBranches] = useState<string[]>([]);
+    const [selectedGroups, setSelectedGroups] = useState<string[]>([]);
+    const [selectedPeriodes, setSelectedPeriodes] = useState<string[]>([]);
+
+    const handleResetFilters = useCallback(() => {
+        setSelectedBranches([]);
+        setSelectedGroups([]);
+        setSelectedPeriodes([]);
+    }, []);
+
+    // Period synchronization logic: update filters if a period is renamed in settings
+    const { periods } = usePeriods();
+    const prevPeriodsRef = useRef(periods);
+
+    useEffect(() => {
+        if (prevPeriodsRef.current !== periods && periods.length > 0 && prevPeriodsRef.current.length > 0) {
+            // Check for renames (same ID, different label)
+            const renames: Record<string, string> = {};
+            prevPeriodsRef.current.forEach(oldP => {
+                const newP = periods.find(p => p.id === oldP.id);
+                if (newP && newP.label !== oldP.label) {
+                    renames[oldP.label] = newP.label;
+                }
+            });
+
+            if (Object.keys(renames).length > 0) {
+                setSelectedPeriodes(prev => prev.map(label => renames[label] || label));
+            }
+        }
+        prevPeriodsRef.current = periods;
+    }, [periods]);
 
     // User State
     const { data: user } = useQuery({
@@ -47,33 +78,39 @@ const Grades: React.FC = () => {
 
     // Reset view to encodage table when navigating to this page (e.g. sidebar click)
     useEffect(() => {
-        if (location.pathname === '/dashboard/notes') {
+        if (location.pathname === '/dashboard/notes' && !location.search) {
             setSelectedEvaluationId(null);
-            setActiveTab('encodage');
+            // Only switch to encodage if we are in settings (prevents losing tab state on simple nav)
+            if (activeTab === 'settings') setActiveTab('encodage');
         }
     }, [location.key, location.pathname]);
 
     // Data for Add Modal (use mutations only to avoid over-fetching)
     const {
         createEvaluation,
-        updateEvaluation
+        updateEvaluation,
+        isCreating,
+        isUpdating
     } = useGradeMutations();
 
     // Handlers
-    const handleCreateEvaluation = async (data: TablesInsert<'Evaluation'>, questions: any[], regroupements?: any[]) => {
-        try {
-            if (editingEvaluationData) {
-                await updateEvaluation({ id: editingEvaluationData.id, evaluation: data, questions, regroupements });
-            } else {
-                const newEval = await createEvaluation({ evaluation: data, questions, regroupements });
-                if (newEval) setSelectedEvaluationId(newEval.id);
-            }
+    const handleCreateEvaluation = (data: TablesInsert<'Evaluation'>, questions: any[], regroupements?: any[], results?: any[], options: { shouldClose?: boolean } = { shouldClose: true }) => {
+        const isUpdate = !!editingEvaluationData;
+        const finalId = isUpdate ? editingEvaluationData.id : (data.id || crypto.randomUUID());
+        const effectiveData = { ...data, id: finalId };
+
+        if (isUpdate) {
+            updateEvaluation({ id: finalId, evaluation: data, questions, regroupements, results });
+        } else {
+            createEvaluation({ evaluation: effectiveData, questions, regroupements, results });
+            setSelectedEvaluationId(finalId);
+        }
+        
+        if (options.shouldClose !== false) {
             setIsAddModalOpen(false);
             setEditingEvaluationData(null);
             setEditingQuestions([]);
             setEditingRegroupements([]);
-        } catch (error) {
-            console.error(error);
         }
     };
 
@@ -168,23 +205,33 @@ const Grades: React.FC = () => {
                 </div>
             ) : activeTab === 'par_enfant' ? (
                 <div className="animate-in fade-in slide-in-from-right-4 duration-300">
-                    <GradesByStudentTable />
+                    <GradesByStudentTable 
+                        selectedBranches={selectedBranches}
+                        setSelectedBranches={setSelectedBranches}
+                        selectedGroups={selectedGroups}
+                        setSelectedGroups={setSelectedGroups}
+                        selectedPeriodes={selectedPeriodes}
+                        setSelectedPeriodes={setSelectedPeriodes}
+                        onResetFilters={handleResetFilters}
+                    />
                 </div>
             ) : selectedEvaluationId ? (
                 <EvaluationDetailTable
                     evaluationId={selectedEvaluationId}
                     onBack={() => setSelectedEvaluationId(null)}
+                    onEdit={handleEditClick}
                 />
             ) : (
                 <EvaluationsTableExcel
                     onSelectEvaluation={setSelectedEvaluationId}
                     onEditEvaluation={handleEditClick}
-                    branchFilter={branchFilter}
-                    setBranchFilter={setBranchFilter}
-                    groupFilter={groupFilter}
-                    setGroupFilter={setGroupFilter}
-                    periodeFilter={periodeFilter}
-                    setPeriodeFilter={setPeriodeFilter}
+                    selectedBranches={selectedBranches}
+                    setSelectedBranches={setSelectedBranches}
+                    selectedGroups={selectedGroups}
+                    setSelectedGroups={setSelectedGroups}
+                    selectedPeriodes={selectedPeriodes}
+                    setSelectedPeriodes={setSelectedPeriodes}
+                    onResetFilters={handleResetFilters}
                 />
             )}
 
@@ -198,12 +245,13 @@ const Grades: React.FC = () => {
                     setEditingRegroupements([]);
                 }}
                 onSubmit={handleCreateEvaluation}
-                brancheId={branchFilter !== 'all' ? branchFilter : ''}
-                groupId={groupFilter !== 'all' ? groupFilter : ''}
-                periode={periodeFilter !== 'all' ? periodeFilter : ''}
+                brancheId={selectedBranches.length === 1 ? selectedBranches[0] : ''}
+                groupId={selectedGroups.length === 1 ? selectedGroups[0] : ''}
+                periode={selectedPeriodes.length === 1 ? selectedPeriodes[0] : ''}
                 initialData={editingEvaluationData}
                 initialQuestions={editingQuestions}
                 initialRegroupements={editingRegroupements}
+                isLoading={isCreating || isUpdating}
             />
         </div>
     );

@@ -104,13 +104,14 @@ const SuiviGlobal: React.FC = () => {
         }
     };
 
-    const toggleKioskPlanning = async (forceNextState?: boolean) => {
+    const toggleKioskPlanning = async (forceNextState?: boolean | any) => {
         if (!userId) return;
 
-        const nextState = forceNextState !== undefined ? forceNextState : !kioskPlanningOpen;
+        const isExplicit = typeof forceNextState === 'boolean';
+        const nextState = isExplicit ? forceNextState : !kioskPlanningOpen;
 
-        // Si on veut OUVRIR (nextState = true) et qu'on n'est pas déjà ouvert
-        if (nextState && !kioskPlanningOpen && forceNextState === undefined) {
+        // Si on veut OUVRIR (nextState = true) et qu'on n'est pas déjà ouvert et que ce n'est pas une commande explicite
+        if (nextState && !kioskPlanningOpen && !isExplicit) {
             setShowResetConfirm(true);
             return;
         }
@@ -125,9 +126,6 @@ const SuiviGlobal: React.FC = () => {
             if (error) throw error;
 
             setKioskPlanningOpen(nextState);
-            if (!nextState) {
-                setSelectedStudentId(null);
-            }
             toast.success(nextState ? 'Kiosque Planification OUVERT' : 'Kiosque Planification FERMÉ');
         } catch (e) {
             console.error(e);
@@ -155,9 +153,9 @@ const SuiviGlobal: React.FC = () => {
         }
     };
 
-    const handleCancelReset = () => {
+    const handleCancelReset = async () => {
         setShowResetConfirm(false);
-        toggleKioskPlanning(true);
+        await toggleKioskPlanning(true);
     };
 
     const closeAllKiosks = async () => {
@@ -177,7 +175,6 @@ const SuiviGlobal: React.FC = () => {
 
             setKioskOpen(false);
             setKioskPlanningOpen(false);
-            setSelectedStudentId(null);
             toast.success("Tous les accès kiosque sont FERMÉS");
         } catch (e) {
             console.error(e);

@@ -147,46 +147,38 @@ const StudentGradeEntryModal: React.FC<StudentGradeEntryModalProps> = ({
     }, [isOpen, student, currentResult, questions, questionResults]);
 
     // Capture le clic sur le bouton "Valider" : compresse les notes de toutes les petites questions (si elles existent) plus la note finale, et envoie le tout au coffre-fort web.
-    const handleSave = async () => {
+    const handleSave = () => {
         if (!userId || !student) return;
-        setIsSaving(true);
-        try {
-            // 1. Save question results if any
-            if (hasQuestions) {
-                const qResults = Object.entries(localQuestions)
-                    .filter(([_, val]) => val !== '')
-                    .map(([qid, val]) => ({
-                        eleve_id: student.id,
-                        question_id: qid,
-                        note: parseFloat(val)
-                    }));
-                
-                if (qResults.length > 0) {
-                    await saveQuestionResults({ results: qResults });
-                }
-            }
-
-            // 2. Save main result
-            const totalNote = localTotal !== '' ? parseFloat(localTotal) : null;
-            await saveResult({
-                result: {
-                    evaluation_id: evaluation.id,
+        
+        // 1. Save question results if any
+        if (hasQuestions) {
+            const qResults = Object.entries(localQuestions)
+                .filter(([_, val]) => val !== '')
+                .map(([qid, val]) => ({
                     eleve_id: student.id,
-                    user_id: userId,
-                    note: totalNote,
-                    statut: statut as any,
-                    commentaire: commentaire
-                }
-            });
-
-            toast.success(`Notes de ${student.prenom} enregistrées`);
-            onClose();
-        } catch (error) {
-            console.error(error);
-            toast.error("Erreur lors de l'enregistrement");
-        } finally {
-            setIsSaving(false);
+                    question_id: qid,
+                    note: parseFloat(val)
+                }));
+            
+            if (qResults.length > 0) {
+                saveQuestionResults({ results: qResults });
+            }
         }
+
+        // 2. Save main result
+        const totalNote = localTotal !== '' ? parseFloat(localTotal) : null;
+        saveResult({
+            result: {
+                evaluation_id: evaluation.id,
+                eleve_id: student.id,
+                user_id: userId,
+                note: totalNote,
+                statut: statut as any,
+                commentaire: commentaire
+            }
+        });
+
+        onClose();
     };
 
     const handleQuestionChange = (qid: string, val: string) => {
@@ -430,20 +422,32 @@ const StudentGradeEntryModal: React.FC<StudentGradeEntryModalProps> = ({
                                     { id: 'absent', label: 'Absent', color: 'danger' },
                                     { id: 'malade', label: 'Non évaluable', color: 'amber' },
                                     { id: 'non_remis', label: 'Non remis', color: 'rose' }
-                                ].map((s) => (
-                                    <button
-                                        key={s.id}
-                                        onClick={() => setStatut(s.id)}
-                                        className={clsx(
-                                            "h-14 px-6 rounded-2xl text-xs font-black uppercase tracking-widest transition-all border-2 flex items-center justify-center text-center",
-                                            statut === s.id 
-                                                ? "bg-primary border-primary text-grey-dark" 
-                                                : "bg-white/[0.03] border-white/5 text-grey-light hover:border-white/20 hover:bg-white/[0.08]"
-                                        )}
-                                    >
-                                        {s.label}
-                                    </button>
-                                ))}
+                                ].map((s) => {
+                                    const handleStatutClick = (newStatut: string) => {
+                                        setStatut(newStatut);
+                                        if (newStatut === 'absent') {
+                                            setLocalTotal('');
+                                            const clearedQs: Record<string, string> = {};
+                                            questions.forEach(q => { clearedQs[q.id] = ''; });
+                                            setLocalQuestions(clearedQs);
+                                        }
+                                    };
+
+                                    return (
+                                        <button
+                                            key={s.id}
+                                            onClick={() => handleStatutClick(s.id)}
+                                            className={clsx(
+                                                "h-14 px-6 rounded-2xl text-xs font-black uppercase tracking-widest transition-all border-2 flex items-center justify-center text-center",
+                                                statut === s.id 
+                                                    ? "bg-primary border-primary text-grey-dark" 
+                                                    : "bg-white/[0.03] border-white/5 text-grey-light hover:border-white/20 hover:bg-white/[0.08]"
+                                            )}
+                                        >
+                                            {s.label}
+                                        </button>
+                                    );
+                                })}
                             </div>
                         </div>
 

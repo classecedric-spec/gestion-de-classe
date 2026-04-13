@@ -100,18 +100,23 @@ export const useAllEvaluations = () => {
                     console.warn(`[DIAGNOSTIC] Moyenne absente pour "${ev.titre}" : ${evResults.length} résultats trouvés, mais 0 notes valides calculées. Statuts :`, evResults.map(r => r.statut));
                 }
 
-                let realNoteMax = ev.note_max;
+                // On définit la note maximale théorique (pour l'affichage des points bruts)
+                let totalPointsPossibles = ev.note_max;
                 if (evQs.length > 0) {
-                    realNoteMax = evQs.reduce((acc: number, q: any) => acc + (Number(q.note_max) * (q.ratio != null ? Number(q.ratio) : 1)), 0);
+                    totalPointsPossibles = evQs.reduce((acc: number, q: any) => acc + (Number(q.note_max) * (q.ratio != null ? Number(q.ratio) : 1)), 0);
                 }
 
-                const avg = effectiveNotes.length > 0 
-                    ? effectiveNotes.reduce((a, b) => a + b, 0) / effectiveNotes.length 
+                // La moyenne en pourcentage doit être calculée sur l'échelle globale de l'évaluation (ex: sur 20)
+                const evalMaxScale = Number(ev.note_max) || 20;
+                
+                // Formule demandée : Somme(notes) / (Nombre d'élèves * Max de l'évaluation) * 100 pour avoir le %
+                const avg = (effectiveNotes.length > 0 && evalMaxScale > 0) 
+                    ? (effectiveNotes.reduce((acc, note) => acc + note, 0) / (effectiveNotes.length * evalMaxScale) * 100) 
                     : null;
 
                 return { 
                     ...ev, 
-                    _real_note_max: realNoteMax,
+                    _real_note_max: totalPointsPossibles,
                     _nbQuestions: evQs.length,
                     _nbResultats: effectiveNotes.length,
                     _moyenne: avg

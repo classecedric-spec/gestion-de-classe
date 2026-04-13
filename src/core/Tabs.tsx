@@ -149,7 +149,7 @@ const Tabs: React.FC<TabsProps> = ({
                 "transition-all duration-300",
                 level === 1 ? "smart-tabs-container" :
                     level === 2 ? "smart-tabs-container-level2" :
-                        "flex items-center gap-1 p-1 rounded-full border border-white/10 bg-black/20"
+                        "flex items-center gap-1 p-1 rounded-full border border-white/10 bg-black/40"
             )}>
                 {tabs.map((tab) => {
                     const Icon = tab.icon;

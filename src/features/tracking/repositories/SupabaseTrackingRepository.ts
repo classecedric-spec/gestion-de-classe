@@ -165,11 +165,38 @@ export class SupabaseTrackingRepository implements ITrackingRepository {
 
         if (error) throw error;
 
-        return {
-            ids: data.map((d: any) => d.eleve_id),
-            full: data.map((d: any) => d.Eleve).filter(Boolean)
-        };
-    }
+    return {
+      ids: data.map((d: any) => d.eleve_id),
+      full: data.map((d: any) => d.Eleve).filter(Boolean)
+    };
+  }
+
+  /**
+   * Récupère tous les élèves de plusieurs groupes avec leurs informations de niveau scolaire.
+   */
+  async getStudentsInGroups(groupIds: string[], userId: string): Promise<{ ids: string[], full: Tables<'Eleve'>[] }> {
+    if (!this.validateUserId(userId) || groupIds.length === 0) return { ids: [], full: [] };
+    const { data, error } = await supabase
+      .from('EleveGroupe')
+      .select('eleve_id, Eleve!inner(*, Niveau(*))')
+      .in('groupe_id', groupIds)
+      .eq('Eleve.titulaire_id', userId);
+
+    if (error) throw error;
+
+    // Remove duplicates if a student is in multiple groups
+    const uniqueMap = new Map();
+    data.forEach((d: any) => {
+      if (d.Eleve && !uniqueMap.has(d.eleve_id)) {
+        uniqueMap.set(d.eleve_id, d.Eleve);
+      }
+    });
+
+    return {
+      ids: Array.from(uniqueMap.keys()),
+      full: Array.from(uniqueMap.values())
+    };
+  }
 
     // ==================== PRÉFÉRENCES (RÉGLAGES) ====================
 

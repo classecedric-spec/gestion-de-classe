@@ -130,6 +130,14 @@ export class TrackingService {
     }
 
     /**
+     * LISTE DES ÉLÈVES DE PLUSIEURS GROUPES
+     */
+    async fetchStudentsInGroups(groupIds: string[], userId: string) {
+        if (!userId) throw new Error("userId is required in fetchStudentsInGroups");
+        return await this.repository.getStudentsInGroups(groupIds, userId);
+    }
+
+    /**
      * PRÉFÉRENCES UTILISATEUR : 
      * Sauvegarde les réglages personnalisés de l'enseignant (ex: largeur des colonnes, thèmes).
      */

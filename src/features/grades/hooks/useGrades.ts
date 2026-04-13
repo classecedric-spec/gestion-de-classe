@@ -46,10 +46,54 @@ export const useGradeMutations = (selectedEvaluationId?: string | null) => {
     });
 
     const createEvaluationMutation = useMutation({
-        mutationFn: ({ evaluation, questions, regroupements, userId: providedUserId }: { evaluation: TablesInsert<'Evaluation'>, userId?: string, questions?: any[], regroupements?: any[] }) => {
+        mutationFn: ({ 
+            evaluation, 
+            questions, 
+            regroupements, 
+            results, // New optional parameter
+            userId: providedUserId 
+        }: { 
+            evaluation: TablesInsert<'Evaluation'>, 
+            userId?: string, 
+            questions?: any[], 
+            regroupements?: any[],
+            results?: any[] // Optional results for bulk creation
+        }) => {
             const effectiveUserId = providedUserId || user?.id;
             if (!effectiveUserId) throw new Error("Utilisateur non identifié");
+            
+            if (results && results.length > 0) {
+                return gradeService.createEvaluationWithResults(evaluation, effectiveUserId, questions || [], results);
+            }
+            
             return gradeService.createEvaluation(evaluation, effectiveUserId, questions, regroupements);
+        },
+        onMutate: async (variables) => {
+            await queryClient.cancelQueries({ queryKey: ['evaluations'] });
+            await queryClient.cancelQueries({ queryKey: ['all_evaluations_detailed'] });
+
+            const previousEvaluations = queryClient.getQueryData<any[]>(['evaluations']);
+            const previousDetailed = queryClient.getQueryData<any[]>(['all_evaluations_detailed']);
+
+            const optimisticId = variables.evaluation.id || `temp-${Date.now()}`;
+            const optimisticEval = {
+                ...variables.evaluation,
+                id: optimisticId,
+                date: variables.evaluation.date || new Date().toISOString(),
+                created_at: new Date().toISOString(),
+                is_optimistic: true 
+            };
+
+            queryClient.setQueryData(['all_evaluations_detailed'], (old: any[] | undefined) =>
+                [optimisticEval, ...(old || [])]
+            );
+
+            return { previousEvaluations, previousDetailed };
+        },
+        onError: (_err, _variables, context) => {
+            if (context?.previousEvaluations) queryClient.setQueryData(['evaluations'], context.previousEvaluations);
+            if (context?.previousDetailed) queryClient.setQueryData(['all_evaluations_detailed'], context.previousDetailed);
+            toast.error("Erreur lors de la création");
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['evaluations'] });
@@ -60,10 +104,55 @@ export const useGradeMutations = (selectedEvaluationId?: string | null) => {
     });
 
     const updateEvaluationMutation = useMutation({
-        mutationFn: ({ id, evaluation, questions, regroupements, userId: providedUserId }: { id: string, evaluation: any, userId?: string, questions?: any[], regroupements?: any[] }) => {
+        mutationFn: ({ 
+            id, 
+            evaluation, 
+            questions, 
+            regroupements, 
+            results, // Accept results even if not fully used here yet
+            userId: providedUserId 
+        }: { 
+            id: string, 
+            evaluation: any, 
+            userId?: string, 
+            questions?: any[], 
+            regroupements?: any[],
+            results?: any[]
+        }) => {
             const effectiveUserId = providedUserId || user?.id;
             if (!effectiveUserId) throw new Error("Utilisateur non identifié");
+            // Note: Results during update aren't processed here yet by gradeService.updateEvaluation
             return gradeService.updateEvaluation(id, evaluation, effectiveUserId, questions, regroupements);
+        },
+        onMutate: async (variables) => {
+            const { id, evaluation } = variables;
+            await queryClient.cancelQueries({ queryKey: ['evaluations'] });
+            await queryClient.cancelQueries({ queryKey: ['all_evaluations_detailed'] });
+            await queryClient.cancelQueries({ queryKey: ['evaluation_detail', id] });
+
+            const previousEvaluations = queryClient.getQueryData<any[]>(['evaluations']);
+            const previousDetailed = queryClient.getQueryData<any[]>(['all_evaluations_detailed']);
+            const previousDetail = queryClient.getQueryData(['evaluation_detail', id]);
+
+            // Optimistically update all caches
+            const updateFn = (old: any) => {
+                if (!Array.isArray(old)) return old;
+                return old.map(ev => ev.id === id ? { ...ev, ...evaluation } : ev);
+            };
+
+            queryClient.setQueryData(['all_evaluations_detailed'], updateFn);
+            queryClient.setQueryData(['evaluations'], updateFn);
+            if (previousDetail) {
+                queryClient.setQueryData(['evaluation_detail', id], (old: any) => ({ ...old, ...evaluation }));
+            }
+
+            return { previousEvaluations, previousDetailed, previousDetail };
+        },
+        onError: (_err, variables, context) => {
+            if (context?.previousEvaluations) queryClient.setQueryData(['evaluations'], context.previousEvaluations);
+            if (context?.previousDetailed) queryClient.setQueryData(['all_evaluations_detailed'], context.previousDetailed);
+            if (context?.previousDetail) queryClient.setQueryData(['evaluation_detail', variables.id], context.previousDetail);
+            toast.error("Erreur lors de la mise à jour");
         },
         onSuccess: (_data, variables) => {
             queryClient.invalidateQueries({ queryKey: ['evaluations'] });
@@ -253,6 +342,29 @@ export const useGradeMutations = (selectedEvaluationId?: string | null) => {
             if (!effectiveUserId) throw new Error("Utilisateur non identifié");
             return gradeService.saveNoteType(typeNote, effectiveUserId);
         },
+        onMutate: async (variables) => {
+            const { typeNote } = variables;
+            await queryClient.cancelQueries({ queryKey: ['note_types'] });
+            const previous = queryClient.getQueryData<any[]>(['note_types']);
+
+            if (typeNote.id) {
+                // Update
+                queryClient.setQueryData(['note_types'], (old: any[] | undefined) =>
+                    old?.map(nt => nt.id === typeNote.id ? { ...nt, ...typeNote } : nt) ?? []
+                );
+            } else {
+                // Creation
+                queryClient.setQueryData(['note_types'], (old: any[] | undefined) =>
+                    [{ ...typeNote, id: `temp-${Date.now()}` }, ...(old || [])]
+                );
+            }
+
+            return { previous };
+        },
+        onError: (_err, _variables, context) => {
+            if (context?.previous) queryClient.setQueryData(['note_types'], context.previous);
+            toast.error("Erreur lors de l'enregistrement du barème");
+        },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['note_types'] });
             toast.success("Type de note enregistré");
@@ -282,6 +394,20 @@ export const useGradeMutations = (selectedEvaluationId?: string | null) => {
         }
     });
 
+    const updateEvaluationsPeriodMutation = useMutation({
+        mutationFn: ({ oldLabel, newLabel, userId: providedUserId }: { oldLabel: string, newLabel: string, userId?: string }) => {
+            const effectiveUserId = providedUserId || user?.id;
+            if (!effectiveUserId) throw new Error("Utilisateur non identifié");
+            return gradeService.updateEvaluationsPeriod(effectiveUserId, oldLabel, newLabel);
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['evaluations'] });
+            queryClient.invalidateQueries({ queryKey: ['all_evaluations_detailed'] });
+            queryClient.invalidateQueries({ queryKey: ['context_results'] });
+            queryClient.invalidateQueries({ queryKey: ['deleted_evaluations'] });
+        }
+    });
+
     return {
         createEvaluation: createEvaluationMutation.mutateAsync,
         updateEvaluation: updateEvaluationMutation.mutateAsync,
@@ -293,6 +419,9 @@ export const useGradeMutations = (selectedEvaluationId?: string | null) => {
         deleteNoteType: deleteNoteTypeMutation.mutateAsync,
         restoreEvaluation: restoreEvaluationMutation.mutateAsync,
         permanentDeleteEvaluation: permanentDeleteEvaluationMutation.mutateAsync,
+        updateEvaluationsPeriod: updateEvaluationsPeriodMutation.mutateAsync,
+        isCreating: createEvaluationMutation.isPending,
+        isUpdating: updateEvaluationMutation.isPending,
     };
 };
 
@@ -362,10 +491,10 @@ export const useGrades = (brancheId?: string, periode?: string) => {
     // Fetch active evaluation details independently of context
     const { data: activeEvalData } = useQuery({
         queryKey: ['evaluation_detail', selectedEvaluationId, user?.id],
-        queryFn: () => (selectedEvaluationId && user) ? gradeService.getEvaluations(user.id) : Promise.resolve([]),
-        enabled: !!selectedEvaluationId && !!user,
-        select: (data) => data.find(e => e.id === selectedEvaluationId)
+        queryFn: () => (selectedEvaluationId && user) ? gradeService.getEvaluationById(selectedEvaluationId, user.id) : Promise.resolve(null),
+        enabled: !!selectedEvaluationId && !!user
     });
+
 
     // Helper to calculate stats
     const evaluation = activeEvalData || evaluations.find(e => e.id === selectedEvaluationId);

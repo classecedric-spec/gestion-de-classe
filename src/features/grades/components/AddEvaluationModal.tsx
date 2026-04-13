@@ -12,12 +12,13 @@
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Modal, Input, Button, Select } from '../../../core';
-import { Trash2, Plus, Settings2, ListChecks, FileText, ClipboardList, ArrowRightLeft, GripVertical, Check, X, Info as InfoIcon, Calculator } from 'lucide-react';
+import { Trash2, Plus, Settings2, ListChecks, FileText, ClipboardList, ArrowRightLeft, GripVertical, Check, X, Info as InfoIcon, Calculator, Table as TableIcon, Search, Grid, CheckCircle2, ChevronRight, AlertCircle, UserCheck } from 'lucide-react';
 import { useAuth } from '../../../hooks/useAuth';
 import { useNoteTypes } from '../hooks/useGrades';
 import { useBranches } from '../../branches/hooks/useBranches';
 import { useGroupsData } from '../../groups/hooks/useGroupsData';
 import { usePeriods } from '../hooks/usePeriods';
+import { useGroupStudents } from '../../groups/hooks/useGroupStudents';
 import clsx from 'clsx';
 import { toast } from 'sonner';
 
@@ -25,13 +26,14 @@ import { toast } from 'sonner';
 interface AddEvaluationModalProps {
     isOpen: boolean;
     onClose: () => void;
-    onSubmit: (data: any, questions: any[], regroupements?: any[]) => void;
+    onSubmit: (data: any, questions: any[], regroupements?: any[], results?: any[], options?: { shouldClose?: boolean }) => void;
     brancheId?: string;
     groupId?: string;
     periode?: string;
     initialData?: any;
     initialQuestions?: any[];
     initialRegroupements?: any[];
+    isLoading?: boolean;
 }
 
 // Composant principal de la fenêtre de création d'une évaluation.
@@ -44,7 +46,8 @@ const AddEvaluationModal: React.FC<AddEvaluationModalProps> = ({
     periode,
     initialData,
     initialQuestions,
-    initialRegroupements
+    initialRegroupements,
+    isLoading = false
 }) => {
     // Collecte les informations de connexion de l'utilisateur et les réglages de l'application (barèmes, branches, groupes, périodes).
     const { session } = useAuth();
@@ -81,6 +84,23 @@ const AddEvaluationModal: React.FC<AddEvaluationModalProps> = ({
         { id: `temp_${Math.random().toString(36).substr(2, 9)}`, label: '', slots: [null, null, null, null], isSuggested: false }
     ]);
     const [attemptedSubmit, setAttemptedSubmit] = useState(false);
+    
+    // Excel Import States
+    const [activeTab, setActiveTab] = useState<'manual' | 'import'>('manual');
+    
+    // Correctly fetch group object for the hook
+    const currentGroup = useMemo(() => 
+        groups.find(g => g.id === effectiveGroupId) || null
+    , [groups, effectiveGroupId]);
+
+    const { studentsInGroup: groupStudents, loadingStudents } = useGroupStudents(currentGroup, session?.user);
+    const [excelText, setExcelText] = useState('');
+    const [importStep, setImportStep] = useState<'paste' | 'mapping' | 'preview'>('paste');
+    const [studentMapping, setStudentMapping] = useState<{[key: string]: string}>({}); // Excel Name -> Student ID
+    const [parsedData, setParsedData] = useState<any[]>([]); // Raw rows
+    const [importQuestions, setImportQuestions] = useState<any[]>([]); // Parsed headers
+    const [importQueue, setImportQueue] = useState<any[]>([]);
+    const [currentQueueIndex, setCurrentQueueIndex] = useState(0);
 
     // Fonction pour déterminer si un champ doit afficher une erreur visuelle.
     // Elle ne s'active que si l'utilisateur a déjà cliqué une fois sur "Envoyer" (attemptedSubmit).
@@ -100,6 +120,82 @@ const AddEvaluationModal: React.FC<AddEvaluationModalProps> = ({
     // Utilise une référence pour savoir si on vient d'ouvrir la fenêtre ou si l'ID du contrôle a changé.
     // Cela évite d'effacer ce que le prof est en train de taper si le parent (Grades.tsx) se rafraîchit.
     const lastInitializedIdRef = React.useRef<string | null | undefined>(undefined);
+
+    const normalizeName = (s: string) => {
+        return s
+            .normalize("NFD")
+            .replace(/[\u0300-\u036f]/g, "") 
+            .replace(/[.,\/#!$%\^&\*;:{}=\-_`~()]/g, " ") 
+            .toLowerCase()
+            .replace(/\s+/g, ' ') 
+            .trim();
+    };
+
+    const findStudentMatch = useCallback((excelName: string, students: any[]) => {
+        if (!students || students.length === 0) return null;
+        
+        const normExcel = normalizeName(excelName);
+        if (!normExcel) return null;
+        
+        // 1. Exact Match (normalized)
+        let match = students.find(s => {
+            const combined1 = normalizeName(`${s.prenom} ${s.nom}`);
+            const combined2 = normalizeName(`${s.nom} ${s.prenom}`);
+            return normExcel === combined1 || normExcel === combined2;
+        });
+
+        if (match) return match;
+
+        // 2. Component Match (Order Independent)
+        // Split the excel name into words and see if they all exist in the student's name
+        const excelWords = normExcel.split(' ').filter(w => w.length > 1);
+        match = students.find(s => {
+            const fullName = normalizeName(`${s.prenom} ${s.nom}`);
+            return excelWords.length > 0 && excelWords.every(word => fullName.includes(word));
+        });
+
+        if (match) return match;
+
+        // 3. Reversed Component Match (DB words in Excel)
+        match = students.find(s => {
+            const sNameWord = normalizeName(s.nom);
+            const sPrenomWord = normalizeName(s.prenom);
+            return (sNameWord.length > 1 && normExcel.includes(sNameWord)) && 
+                   (sPrenomWord.length > 1 && normExcel.includes(sPrenomWord));
+        });
+
+        if (match) return match;
+        
+        // 4. Simple contains (last resort)
+        match = students.find(s => {
+            const fullName = normalizeName(`${s.prenom} ${s.nom}`);
+            return fullName.includes(normExcel) || normExcel.includes(fullName);
+        });
+
+        return match;
+    }, []);
+
+    // Reactive Student Matching
+    useEffect(() => {
+        if (activeTab === 'import' && groupStudents && groupStudents.length > 0 && parsedData.length > 0) {
+            setStudentMapping(prev => {
+                const next = { ...prev };
+                let madeChanges = false;
+                
+                parsedData.forEach(row => {
+                    if (!next[row.name]) {
+                        const match = findStudentMatch(row.name, groupStudents);
+                        if (match) {
+                            next[row.name] = match.id;
+                            madeChanges = true;
+                        }
+                    }
+                });
+                
+                return madeChanges ? next : prev;
+            });
+        }
+    }, [activeTab, groupStudents, parsedData, findStudentMatch]);
 
     useEffect(() => {
         if (isOpen) {
@@ -154,6 +250,17 @@ const AddEvaluationModal: React.FC<AddEvaluationModalProps> = ({
 
                 setScratchpad('');
                 setAttemptedSubmit(false);
+                
+                // Reset Excel Import state
+                setExcelText('');
+                setImportStep('paste');
+                setStudentMapping({});
+                setParsedData([]);
+                setImportQuestions([]);
+                setImportQueue([]);
+                setCurrentQueueIndex(0);
+                setActiveTab('manual');
+                
                 lastInitializedIdRef.current = currentId;
             }
         } else {
@@ -269,9 +376,309 @@ const AddEvaluationModal: React.FC<AddEvaluationModalProps> = ({
         setScratchpad('');
     };
     // Prépare l'action finale de validation lorsque l'enseignant clique sur "Créer l'évaluation".
+    // Excel Import Logic
+    const handleAnalyzeExcel = () => {
+        if (!excelText.trim()) {
+            toast.error("Veuillez coller des données depuis Excel");
+            return;
+        }
+
+        // Robust TSV Parsing logic to handle quotes and internal newlines
+        const parseTSV = (text: string) => {
+            const rows: string[][] = [];
+            let currentRow: string[] = [];
+            let currentCell = '';
+            let inQuotes = false;
+
+            for (let i = 0; i < text.length; i++) {
+                const char = text[i];
+                const nextChar = text[i + 1];
+
+                if (inQuotes) {
+                    if (char === '"' && nextChar === '"') {
+                        currentCell += '"';
+                        i++;
+                    } else if (char === '"') {
+                        inQuotes = false;
+                    } else {
+                        currentCell += char;
+                    }
+                } else {
+                    if (char === '"') {
+                        inQuotes = true;
+                    } else if (char === '\t') {
+                        currentRow.push(currentCell);
+                        currentCell = '';
+                    } else if (char === '\n' || char === '\r') {
+                        if (char === '\r' && nextChar === '\n') i++;
+                        currentRow.push(currentCell);
+                        rows.push(currentRow);
+                        currentRow = [];
+                        currentCell = '';
+                    } else {
+                        currentCell += char;
+                    }
+                }
+            }
+            
+            if (currentCell !== '' || currentRow.length > 0) {
+                currentRow.push(currentCell);
+                rows.push(currentRow);
+            }
+
+            return rows;
+        };
+
+        const allRows = parseTSV(excelText);
+        
+        // Filter out empty rows
+        const lines = allRows.filter(row => row.length > 0 && row.some(cell => cell.trim().length > 0));
+
+        if (lines.length < 2) {
+            toast.error("Format de données invalide : besoin d'une ligne d'en-tête et de données");
+            return;
+        }
+
+        const cleanCell = (c: string) => {
+            if (!c) return '';
+            return c.replace(/^["']|["']$/g, '').trim().replace(/[\n\r\t]/g, ' ').trim();
+        };
+
+        const firstRow = lines[0].map(cleanCell);
+        const dataRows = lines.slice(1).map(row => row.map(cleanCell));
+
+        // Detection of serial imports (multiple sections starting with **)
+        const sections: { startIndex: number; header: string }[] = [];
+        firstRow.forEach((cell, idx) => {
+            if (cell.startsWith('**')) {
+                sections.push({ startIndex: idx, header: cell });
+            }
+        });
+
+        if (sections.length === 0) {
+            toast.error("Aucune évaluation détectée (commençant par '**')");
+            return;
+        }
+
+        const parseDateFromHeader = (header: string) => {
+            const dateRegex = /(\d{1,2})[\./](\d{1,2})[\./](\d{2,4})/;
+            const match = header.match(dateRegex);
+            if (match) {
+                let [fullDate, d, m, y] = match;
+                if (y.length === 2) y = "20" + y; // Assume 20xx
+                d = d.padStart(2, '0');
+                m = m.padStart(2, '0');
+                return { 
+                    formatted: `${y}-${m}-${d}`,
+                    original: fullDate
+                };
+            }
+            return {
+                formatted: new Date().toISOString().split('T')[0],
+                original: null
+            };
+        };
+
+        const jobs = sections.map((section, sIdx) => {
+            const nextSectionIndex = sections[sIdx + 1]?.startIndex || firstRow.length;
+            const dateResult = parseDateFromHeader(section.header);
+            
+            // Clean title: remove **, remove the date string if found, remove non-breaking spaces, and take first part if multi-line
+            let title = section.header.replace('**', '');
+            if (dateResult.original) {
+                title = title.replace(dateResult.original, '');
+            }
+            title = title.split(/[\n\r]/)[0].trim().replace(/\s+/g, ' ');
+            
+            const jobDate = dateResult.formatted;
+            
+            // Sub-questions are the columns between this ** and the next
+            // We ignore the first column of the section if it's the "Total / 100" (which is the case here)
+            // But we need to check if the user wants the criteria. 
+            // Usually: Col[0] = Section Header (Total), Col[1..N] = Questions.
+            const questionHeaders = firstRow.slice(section.startIndex + 1, nextSectionIndex);
+            
+            const questions = questionHeaders.map((h, i) => ({
+                titre: h || `Critère ${i + 1}`,
+                note_max: 10, // default, will be adjusted by data
+                ratio: 1,
+                ordre: i
+            }));
+
+            const jobParsedData = dataRows.map(row => {
+                const name = row[0]; // First column is always name
+                const scoreCells = row.slice(section.startIndex + 1, nextSectionIndex);
+                const scores = scoreCells.map(cell => {
+                    if (!cell) return { score: null, max: null };
+                    const numPattern = '(?:[0-9]+(?:[.,][0-9]*)?|[.,][0-9]+)';
+                    const regex = new RegExp(`(${numPattern})\\s*\\/\\s*(${numPattern})`);
+                    const match = cell.match(regex);
+                    if (match) {
+                        return { 
+                            score: parseFloat(match[1].replace(',', '.')), 
+                            max: parseFloat(match[2].replace(',', '.')) 
+                        };
+                    }
+                    const valMatch = cell.match(new RegExp(`^${numPattern}$`));
+                    if (valMatch) {
+                        const val = parseFloat(valMatch[0].replace(',', '.'));
+                        return { score: isNaN(val) ? null : val, max: null };
+                    }
+                    return { score: null, max: null };
+                });
+                return { name, scores };
+            });
+
+            // Adjust note_max for questions in this job
+            questions.forEach((q, i) => {
+                const detectedMax = jobParsedData.filter(r => r.scores[i]?.max !== null).map(r => r.scores[i]?.max);
+                if (detectedMax.length > 0) {
+                    const counts: any = {};
+                    detectedMax.forEach(m => counts[m!] = (counts[m!] || 0) + 1);
+                    const mostCommon = Object.keys(counts).reduce((a, b) => counts[a] > counts[b] ? a : b);
+                    q.note_max = parseFloat(mostCommon);
+                }
+            });
+
+            return { title, date: jobDate, questions, parsedData: jobParsedData };
+        });
+
+        // Initialize with the first job
+        const firstJob = jobs[0];
+        setImportQueue(jobs);
+        setCurrentQueueIndex(0);
+        
+        setTitre(firstJob.title);
+        setDate(firstJob.date);
+        setImportQuestions(firstJob.questions);
+        setParsedData(firstJob.parsedData);
+        
+        // Calculate noteMax for first job
+        const totalQuestionMax = firstJob.questions.reduce((sum, q) => sum + (q.note_max || 0), 0);
+        setNoteMax(totalQuestionMax > 0 ? totalQuestionMax : 20);
+
+        // Student mapping (shared for all jobs)
+        const excelStudentNames = dataRows.map(row => row[0]);
+        const mapping: {[key: string]: string} = {};
+        excelStudentNames.forEach(name => {
+            const match = findStudentMatch(name, groupStudents || []);
+            if (match) mapping[name] = match.id;
+        });
+        setStudentMapping(mapping);
+
+        if (jobs.length > 1) {
+            toast.info(`${jobs.length} évaluations détectées. Début de l'importation en série.`);
+        }
+
+        setImportStep('mapping');
+    };
+
+    const handleExcelSubmit = () => {
+        if (!titre.trim()) {
+            toast.error("Veuillez donner un titre à l'évaluation");
+            setAttemptedSubmit(true);
+            return;
+        }
+
+        if (!effectiveBrancheId || !effectiveGroupId || !effectivePeriode) {
+            toast.error("Veuillez remplir les champs obligatoires (Matière, Groupe, Période)");
+            setAttemptedSubmit(true);
+            return;
+        }
+
+        if (isNaN(noteMax) || noteMax <= 0) {
+            toast.error("La note maximale de l'évaluation doit être un nombre supérieur à 0");
+            setActiveTab('import');
+            setImportStep('paste');
+            return;
+        }
+
+        // Check if all students are mapped
+        const unmapped = parsedData.filter(row => !studentMapping[row.name]);
+        if (unmapped.length > 0) {
+            toast.error(`${unmapped.length} élève(s) non associé(s). Veuillez corriger le tableau de correspondance.`);
+            setImportStep('mapping');
+            return;
+        }
+
+        // Prepare results structure
+        const results = parsedData.map(row => {
+            const eleve_id = studentMapping[row.name];
+            const questionNotes: {[key: string]: number | null} = {};
+            
+            row.scores.forEach((s: any, idx: number) => {
+                const question = importQuestions[idx];
+                if (question) {
+                    questionNotes[question.titre] = s.score;
+                }
+            });
+
+            // Detect Absent (all null) and All Zeros
+            const isAbsent = row.scores.every((s: any) => s.score === null);
+            const isAllZeros = !isAbsent && row.scores.every((s: any) => s.score === 0 || s.score === null);
+
+            // Calculate global note
+            const totalScore = row.scores.reduce((acc: number, s: any) => acc + (s.score || 0), 0);
+            const totalMax = importQuestions.reduce((acc: number, q: any) => acc + (q.note_max * q.ratio), 0);
+            const globalNote = totalMax > 0 ? (totalScore / totalMax) * noteMax : 0;
+
+            if (isAbsent) return null; // Skip absent students
+
+            return {
+                eleve_id,
+                note: globalNote,
+                questionNotes
+            };
+        }).filter(Boolean);
+
+        const evaluationData = {
+            titre,
+            date,
+            note_max: noteMax,
+            type_note_id: typeNoteId || null,
+            branche_id: effectiveBrancheId,
+            group_id: effectiveGroupId,
+            periode: effectivePeriode
+        };
+
+        const inSeries = importQueue.length > 1;
+        const isLastInSeries = currentQueueIndex === importQueue.length - 1;
+
+        onSubmit(evaluationData, importQuestions, [], results, { shouldClose: !inSeries || isLastInSeries });
+
+        if (inSeries && !isLastInSeries) {
+            const nextIndex = currentQueueIndex + 1;
+            const nextJob = importQueue[nextIndex];
+            
+            // Advance to next job
+            setCurrentQueueIndex(nextIndex);
+            setTitre(nextJob.title);
+            setDate(nextJob.date);
+            setImportQuestions(nextJob.questions);
+            setParsedData(nextJob.parsedData);
+            
+            const nextTotalMax = nextJob.questions.reduce((sum: number, q: any) => sum + (q.note_max || 0), 0);
+            setNoteMax(nextTotalMax > 0 ? nextTotalMax : 20);
+            
+            // Stay in import mode, but go back to mapping if needed (though mapping is shared)
+            // Go to preview step for the next one
+            setImportStep('preview');
+            toast.info(`Chargement de l'évaluation suivante : ${nextJob.title}`);
+        } else if (inSeries && isLastInSeries) {
+            toast.success("Importation en série terminée avec succès !");
+            onClose();
+        }
+    };
+
     const handleFormSubmit = (e: React.FormEvent) => {
         // Empêche la page web de se recharger brusquement comme elle le ferait par défaut avec un formulaire.
         e.preventDefault();
+
+        if (activeTab === 'import') {
+            handleExcelSubmit();
+            return;
+        }
+
         setAttemptedSubmit(true);
         
         // Vérifie qu'on sait bien qui est connecté et pour quelle classe/branche l'évaluation est faite avant de continuer.
@@ -322,6 +729,15 @@ const AddEvaluationModal: React.FC<AddEvaluationModalProps> = ({
             { id: `temp_${Math.random().toString(36).substr(2, 9)}`, label: '', slots: [null, null, null, null], isSuggested: false }
         ]);
         setAttemptedSubmit(false);
+
+        // Reset Excel Import States
+        setActiveTab('manual');
+        setExcelText('');
+        setImportStep('paste');
+        setStudentMapping({});
+        setParsedData([]);
+        setImportQuestions([]);
+
         onClose();
     };
 
@@ -432,8 +848,14 @@ const AddEvaluationModal: React.FC<AddEvaluationModalProps> = ({
                     <Button variant="ghost" type="button" onClick={onClose}>
                         Annuler
                     </Button>
-                    <Button variant="primary" type="submit" form="add-evaluation-form">
-                        {initialData ? "Mettre à jour" : "Créer l'évaluation"}
+                    <Button 
+                        variant="primary" 
+                        type="submit" 
+                        form="add-evaluation-form"
+                        disabled={isLoading}
+                        loading={isLoading}
+                    >
+                        {initialData ? (isLoading ? "Mise à jour..." : "Mettre à jour") : (isLoading ? "Création..." : "Créer l'évaluation")}
                     </Button>
                 </>
             }
@@ -464,8 +886,36 @@ const AddEvaluationModal: React.FC<AddEvaluationModalProps> = ({
                         />
                     </div>
                 )}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="md:col-span-2">
+
+                <div className="flex p-1 bg-black/20 rounded-xl mb-6">
+                    <button
+                        type="button"
+                        onClick={() => setActiveTab('manual')}
+                        className={clsx(
+                            "flex-1 flex items-center justify-center gap-2 py-2 text-[10px] font-black uppercase tracking-widest rounded-lg transition-all",
+                            activeTab === 'manual' ? "bg-primary text-white shadow-lg" : "text-grey-medium hover:text-grey-light hover:bg-white/5"
+                        )}
+                    >
+                        <ListChecks size={14} />
+                        Saisie Manuelle
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => setActiveTab('import')}
+                        className={clsx(
+                            "flex-1 flex items-center justify-center gap-2 py-2 text-[10px] font-black uppercase tracking-widest rounded-lg transition-all",
+                            activeTab === 'import' ? "bg-primary text-white shadow-lg" : "text-grey-medium hover:text-grey-light hover:bg-white/5"
+                        )}
+                    >
+                        <TableIcon size={14} />
+                        Import Excel
+                    </button>
+                </div>
+
+                {activeTab === 'manual' ? (
+                    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="md:col-span-2">
                         <Input
                             label="Titre de l'évaluation"
                             placeholder="ex: Dictée, Contrôle de mathématiques..."
@@ -889,6 +1339,409 @@ const AddEvaluationModal: React.FC<AddEvaluationModalProps> = ({
                         </div>
                     )}
                 </div>
+            </div>
+        ) : (
+                    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                        {importStep === 'paste' && (
+                            <div className="space-y-6">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div className="md:col-span-2">
+                                        <Input
+                                            label="Titre de l'évaluation"
+                                            placeholder="ex: Dictée, Contrôle de mathématiques..."
+                                            value={titre}
+                                            onChange={(e) => setTitre(e.target.value)}
+                                            error={isInvalid(titre) ? 'Un titre est obligatoire' : undefined}
+                                        />
+                                    </div>
+                                    <Input
+                                        label="Date"
+                                        type="date"
+                                        value={date}
+                                        onChange={(e) => setDate(e.target.value)}
+                                    />
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <Input
+                                            label="Sur combien ?"
+                                            type="number"
+                                            value={noteMax}
+                                            onChange={(e) => setNoteMax(Number(e.target.value))}
+                                            error={isInvalid(noteMax) ? 'Requis (> 0)' : undefined}
+                                        />
+                                         <div className={clsx(
+                                             "transition-all duration-300 rounded-xl p-0.5",
+                                             typeNoteId ? "bg-gradient-to-br from-success/40 to-primary/40 shadow-lg shadow-success/10" : "bg-white/5"
+                                         )}>
+                                             <Select
+                                                 label="Barème de notation"
+                                                 value={typeNoteId}
+                                                 onChange={(e) => handleTypeNoteChange(e.target.value)}
+                                                 options={noteTypeOptions}
+                                                 className={clsx(
+                                                     "!bg-black/40 !border-0",
+                                                     !typeNoteId && "animate-pulse border border-warning/30"
+                                                 )}
+                                             />
+                                             {typeNoteId && (
+                                                 <div className="px-3 py-1 flex items-center gap-1.5">
+                                                     <div className="w-1.5 h-1.5 rounded-full bg-success animate-pulse" />
+                                                     <span className="text-[9px] font-black text-success uppercase tracking-widest">
+                                                         {noteTypes.find(nt => nt.id === typeNoteId)?.systeme === 'conversion' ? 'Conversion Active' : 'Calcul de Moyenne'}
+                                                     </span>
+                                                 </div>
+                                             )}
+                                         </div>
+                                    </div>
+                                </div>
+
+                                <div className="space-y-3">
+                                    <div className="flex items-center justify-between px-1">
+                                        <div className="flex items-center gap-2">
+                                            <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center text-primary">
+                                                <ClipboardList size={18} />
+                                            </div>
+                                            <div>
+                                                <h4 className="text-xs font-black uppercase tracking-widest text-white">Copier-coller Excel</h4>
+                                                <p className="text-[10px] text-grey-medium font-medium">Collez votre tableau complet incluant la ligne d'en-tête</p>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div className="relative group/excel">
+                                        <textarea
+                                            value={excelText}
+                                            onChange={(e) => setExcelText(e.target.value)}
+                                            placeholder="Nom élève	Question 1	Question 2...&#10;Jean Dupont	14/20	8/10...&#10;Marie Durant	18/20	9/10..."
+                                            className="w-full h-48 bg-black/40 border border-white/5 rounded-2xl p-4 text-sm font-mono text-grey-light focus:ring-2 focus:ring-primary/20 focus:border-primary/30 transition-all resize-none placeholder:text-grey-medium/20"
+                                        />
+                                        <div className="absolute inset-x-0 bottom-0 p-4 flex justify-end">
+                                            <Button 
+                                                variant="primary" 
+                                                onClick={handleAnalyzeExcel}
+                                                className="shadow-2xl shadow-primary/20"
+                                                disabled={!excelText.trim()}
+                                            >
+                                                Analyser les données
+                                                <ChevronRight size={16} className="ml-2" />
+                                            </Button>
+                                        </div>
+                                    </div>
+
+                                    <div className="p-4 bg-primary/5 rounded-xl border border-primary/10 flex gap-3">
+                                        <AlertCircle size={16} className="text-primary mt-0.5" />
+                                        <p className="text-[10px] leading-relaxed text-grey-medium font-medium lowercase first-letter:uppercase italic">
+                                            Le système détectera automatiquement les noms des élèves, les titres des questions et les points maximums si ils sont notés sous la forme "note / max" (ex: 2 / 5).
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {importStep === 'mapping' && (
+                            <div className="space-y-6">
+                                <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-2">
+                                        <button 
+                                            onClick={() => setImportStep('paste')}
+                                            className="p-2 rounded-lg hover:bg-white/5 text-grey-medium transition-colors"
+                                        >
+                                            <ChevronRight size={16} className="rotate-180" />
+                                        </button>
+                                        <h4 className="text-xs font-black uppercase tracking-widest text-white">Association des élèves</h4>
+                                    </div>
+                                    <span className="text-[10px] font-black text-primary bg-primary/10 px-2 py-1 rounded">
+                                        {Object.keys(studentMapping).length} / {parsedData.length} ASSOCIÉS
+                                    </span>
+                                </div>
+
+                                <div className="bg-black/20 rounded-2xl border border-white/5 overflow-hidden">
+                                    <table className="w-full text-left border-collapse">
+                                        <thead>
+                                            <tr className="bg-white/5">
+                                                <th className="px-4 py-3 text-[10px] font-black text-grey-medium uppercase tracking-widest">Nom dans Excel</th>
+                                                <th className="px-4 py-3 text-[10px] font-black text-grey-medium uppercase tracking-widest">Élève dans le système</th>
+                                                <th className="px-4 py-3 text-[10px] font-black text-grey-medium uppercase tracking-widest text-center w-16">Statut</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-white/5">
+                                            {parsedData.map((row, idx) => {
+                                                const studentId = studentMapping[row.name];
+                                                const isMatched = !!studentId;
+                                                return (
+                                                    <tr key={idx} className="hover:bg-white/[0.02] transition-colors">
+                                                        <td className="px-4 py-3 text-sm font-bold text-grey-light">{row.name}</td>
+                                                        <td className="px-4 py-2">
+                                                            <Select
+                                                                value={studentId || ''}
+                                                                onChange={(e) => setStudentMapping(prev => ({ ...prev, [row.name]: e.target.value }))}
+                                                                options={[
+                                                                    { value: '', label: loadingStudents ? 'Chargement...' : 'Sélectionner l\'élève...' },
+                                                                    ...(groupStudents || []).map(s => ({ 
+                                                                        value: s.id, 
+                                                                        label: `${s.prenom} ${s.nom}` 
+                                                                    }))
+                                                                ]}
+                                                                className="h-9 py-0 text-xs"
+                                                            />
+                                                        </td>
+                                                        <td className="px-4 py-3 text-center">
+                                                            {isMatched ? (
+                                                                <CheckCircle2 size={16} className="text-green-500 mx-auto" />
+                                                            ) : (
+                                                                <AlertCircle size={16} className="text-red-400 mx-auto" />
+                                                            )}
+                                                        </td>
+                                                    </tr>
+                                                );
+                                            })}
+                                        </tbody>
+                                    </table>
+                                </div>
+
+                                <div className="flex justify-end gap-3">
+                                    <Button variant="ghost" onClick={() => setImportStep('paste')}>Retour</Button>
+                                    <Button 
+                                        variant="primary" 
+                                        onClick={() => setImportStep('preview')}
+                                        disabled={Object.keys(studentMapping).length < parsedData.length}
+                                    >
+                                        Vérifier les notes
+                                        <ChevronRight size={16} className="ml-2" />
+                                    </Button>
+                                </div>
+                            </div>
+                        )}
+
+                        {importStep === 'preview' && (
+                            <div className="space-y-6">
+                                <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-2">
+                                        <button 
+                                            onClick={() => setImportStep('mapping')}
+                                            className="p-2 rounded-lg hover:bg-white/5 text-grey-medium transition-colors"
+                                        >
+                                            <ChevronRight size={16} className="rotate-180" />
+                                        </button>
+                                        <h4 className="text-xs font-black uppercase tracking-widest text-white">Aperçu des questions & notes</h4>
+                                    </div>
+                                </div>
+
+                                {/* Questions and Max Correction */}
+                                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 bg-white/5 p-4 rounded-2xl border border-white/10">
+                                    {importQuestions.map((q, idx) => (
+                                        <div key={idx} className="space-y-1.5 p-3 rounded-xl bg-black/20 border border-white/5">
+                                            <div className="text-[9px] font-black text-primary uppercase tracking-widest truncate">{q.titre}</div>
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-[10px] text-grey-medium uppercase font-bold">Max:</span>
+                                                <input 
+                                                    type="number" 
+                                                    value={q.note_max}
+                                                    onChange={(e) => {
+                                                        const newVal = parseFloat(e.target.value);
+                                                        setImportQuestions(prev => prev.map((item, i) => i === idx ? { ...item, note_max: newVal } : item));
+                                                    }}
+                                                    className="w-12 bg-transparent border-b border-primary/30 text-xs font-black text-white focus:border-primary focus:outline-none text-center"
+                                                />
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+
+                                 {/* Summary Stats */}
+                                 {parsedData.length > 0 && (
+                                     <div className="flex flex-wrap gap-4 p-4 bg-primary/10 rounded-2xl border border-primary/20">
+                                         {importQueue.length > 1 ? (
+                                             <div className="w-full mb-3 flex flex-col gap-2 border-b border-primary/10 pb-3">
+                                                 <div className="flex items-center justify-between">
+                                                     <div className="flex items-center gap-2">
+                                                         <div className="px-2 py-0.5 rounded-full bg-primary text-white text-[10px] font-black uppercase tracking-widest">
+                                                             Série en cours
+                                                         </div>
+                                                         <span className="text-xs font-bold text-white/80">
+                                                             Évaluation {currentQueueIndex + 1} sur {importQueue.length}
+                                                         </span>
+                                                     </div>
+                                                     <div className="flex gap-1">
+                                                         {importQueue.map((_, idx) => (
+                                                             <div 
+                                                                 key={idx} 
+                                                                 className={clsx(
+                                                                     "w-8 h-1 rounded-full transition-all duration-300",
+                                                                     idx === currentQueueIndex ? "bg-primary w-12" : (idx < currentQueueIndex ? "bg-success" : "bg-white/10")
+                                                                 )}
+                                                             />
+                                                         ))}
+                                                     </div>
+                                                 </div>
+                                                 <h3 className="text-xl font-black text-white px-1 mt-1 flex items-center flex-wrap gap-2">
+                                                     <div className="w-1.5 h-6 bg-primary rounded-full" />
+                                                     {titre || "Sans titre"}
+                                                     {date && (
+                                                         <span className="px-2 py-0.5 rounded-lg bg-white/5 border border-white/10 text-xs font-bold text-white/40">
+                                                             {new Date(date).toLocaleDateString('fr-FR')}
+                                                         </span>
+                                                     )}
+                                                 </h3>
+                                             </div>
+                                         ) : (
+                                             <div className="w-full mb-3 border-b border-primary/10 pb-3">
+                                                 <h3 className="text-xl font-black text-white px-1 flex items-center flex-wrap gap-2">
+                                                     <div className="w-1.5 h-6 bg-primary rounded-full" />
+                                                     {titre || "Nouvelle Évaluation"}
+                                                     {date && (
+                                                         <span className="px-2 py-0.5 rounded-lg bg-white/5 border border-white/10 text-xs font-bold text-white/40">
+                                                             {new Date(date).toLocaleDateString('fr-FR')}
+                                                         </span>
+                                                     )}
+                                                 </h3>
+                                             </div>
+                                         )}
+                                         <div className="flex items-center gap-3">
+                                             <div className="w-10 h-10 rounded-xl bg-primary/20 flex items-center justify-center text-primary">
+                                                 <Calculator size={20} />
+                                             </div>
+                                             <div>
+                                                 <div className="text-[10px] font-black text-primary/60 uppercase tracking-widest">Moyenne de classe</div>
+                                                 <div className="text-xl font-black text-white">
+                                                     {(parsedData.reduce((acc, row) => acc + row.scores.reduce((sAcc: number, s: any) => sAcc + (s.score || 0), 0), 0) / (parsedData.length || 1)).toFixed(2)}
+                                                     <span className="text-xs text-grey-medium ml-1">/ {noteMax}</span>
+                                                 </div>
+                                             </div>
+                                         </div>
+                                         
+                                         {typeNoteId && noteTypes.find(nt => nt.id === typeNoteId)?.systeme === 'conversion' && (
+                                             <div className="flex items-center gap-3 border-l border-white/10 pl-4">
+                                                 <div className="w-10 h-10 rounded-xl bg-success/20 flex items-center justify-center text-success">
+                                                     <UserCheck size={20} />
+                                                 </div>
+                                                 <div>
+                                                     <div className="text-[10px] font-black text-success/60 uppercase tracking-widest">Système actif</div>
+                                                     <div className="text-sm font-bold text-white">
+                                                         {noteTypes.find(nt => nt.id === typeNoteId)?.nom}
+                                                     </div>
+                                                 </div>
+                                             </div>
+                                         )}
+                                     </div>
+                                 )}
+
+                                 <div className="bg-black/20 rounded-2xl border border-white/5 overflow-hidden max-h-[400px] overflow-y-auto">
+                                     <table className="w-full text-left border-collapse">
+                                         <thead className="sticky top-0 bg-grey-dark z-10 shadow-lg">
+                                             <tr className="bg-white/5">
+                                                 <th className="px-4 py-3 text-[10px] font-black text-grey-medium uppercase tracking-widest sticky left-0 bg-grey-dark z-10">Élève</th>
+                                                 <th className="px-4 py-3 text-[10px] font-black text-primary bg-primary/10 uppercase tracking-widest text-center border-x border-white/5 whitespace-nowrap">
+                                                     Total / {noteMax}
+                                                 </th>
+                                                 {typeNoteId && noteTypes.find(nt => nt.id === typeNoteId)?.systeme === 'conversion' && (
+                                                     <th className="px-4 py-3 text-[10px] font-black text-success bg-success/10 uppercase tracking-widest text-center border-r border-white/5 whitespace-nowrap">
+                                                         Statut
+                                                     </th>
+                                                 )}
+                                                 {importQuestions.map((q, idx) => (
+                                                     <th key={idx} className="px-4 py-3 text-[10px] font-black text-grey-medium uppercase tracking-widest text-center">{q.titre}</th>
+                                                 ))}
+                                             </tr>
+                                         </thead>
+                                         <tbody className="divide-y divide-white/5">
+                                             {parsedData.map((row, idx) => {
+                                                 const totalScore = row.scores.reduce((acc: number, s: any) => acc + (s.score || 0), 0);
+                                                 const noteMaxPossible = importQuestions.reduce((acc, q) => acc + (q.note_max || 0), 0);
+                                                 
+                                                 // Local conversion logic for preview
+                                                 const activeTypeNote = noteTypes.find(nt => nt.id === typeNoteId);
+                                                 let palier = null;
+                                                 if (activeTypeNote?.systeme === 'conversion') {
+                                                     const percentage = (totalScore / (noteMaxPossible || 1)) * 100;
+                                                     const config = activeTypeNote.config as any;
+                                                     if (config?.paliers) {
+                                                         palier = config.paliers.find((p: any) => {
+                                                             const min = p.minPercent ?? 0;
+                                                             const max = p.maxPercent ?? 101;
+                                                             if (percentage >= 100 && max >= 100) return percentage >= min;
+                                                             return percentage >= min && percentage < max;
+                                                         });
+                                                     }
+                                                 }
+
+                                                 const isAbsent = row.scores.every((s: any) => s.score === null);
+                                                 const isAllZeros = !isAbsent && row.scores.every((s: any) => s.score === 0 || s.score === null);
+
+                                                 return (
+                                                     <tr key={idx} className={clsx(
+                                                         "transition-colors",
+                                                         isAllZeros ? "bg-red-500/10 hover:bg-red-500/20" : "hover:bg-white/[0.02]"
+                                                     )}>
+                                                         <td className={clsx(
+                                                             "px-4 py-3 text-sm font-bold sticky left-0 z-10",
+                                                             isAllZeros ? "text-red-400 bg-red-900/40" : "text-grey-light bg-black/20"
+                                                         )}>
+                                                             {row.name}
+                                                         </td>
+                                                         <td className={clsx(
+                                                             "px-4 py-3 text-center border-x border-white/5",
+                                                             isAllZeros ? "bg-red-500/20" : "bg-primary/5"
+                                                         )}>
+                                                             {isAbsent ? (
+                                                                 <span className="text-[10px] font-black text-grey-medium uppercase tracking-tighter opacity-50 px-1 py-0.5 rounded border border-white/10">Absent</span>
+                                                             ) : (
+                                                                 <span className={clsx("text-sm font-black", isAllZeros ? "text-red-500" : "text-primary")}>
+                                                                     {totalScore.toFixed(1).replace('.0', '')}
+                                                                 </span>
+                                                             )}
+                                                         </td>
+                                                         {activeTypeNote?.systeme === 'conversion' && (
+                                                             <td className={clsx(
+                                                                 "px-4 py-3 text-center border-r border-white/5",
+                                                                 isAllZeros ? "bg-red-500/10" : "bg-success/5"
+                                                             )}>
+                                                                 {isAbsent ? (
+                                                                     <span className="text-[10px] text-grey-medium italic">-</span>
+                                                                 ) : palier ? (
+                                                                     <div className="flex flex-col items-center">
+                                                                         <span className={clsx("text-xs font-black px-2 py-0.5 rounded-full border border-current", 
+                                                                             palier.color === 'blue' ? 'text-info border-info/30 bg-info/10' :
+                                                                             palier.color === 'green' ? 'text-success border-success/30 bg-success/10' :
+                                                                             palier.color === 'orange' ? 'text-warning border-warning/30 bg-warning/10' :
+                                                                             'text-danger border-danger/30 bg-danger/10'
+                                                                         )}>
+                                                                             {palier.letter}
+                                                                         </span>
+                                                                         <span className="text-[8px] font-bold uppercase mt-1 opacity-60">
+                                                                             {palier.label}
+                                                                         </span>
+                                                                     </div>
+                                                                 ) : (
+                                                                     <span className="text-[10px] text-grey-medium italic">-</span>
+                                                                 )}
+                                                             </td>
+                                                         )}
+                                                         {row.scores.map((s: any, sIdx: number) => (
+                                                             <td key={sIdx} className={clsx(
+                                                                 "px-4 py-3 text-center text-xs font-medium border-r border-white/5 last:border-r-0",
+                                                                 isAllZeros ? "text-red-400/60" : "text-grey-medium"
+                                                             )}>
+                                                                 {s.score !== null ? s.score : <span className="opacity-20">-</span>}
+                                                             </td>
+                                                         ))}
+                                                     </tr>
+                                                 );
+                                             })}
+                                         </tbody>
+                                     </table>
+                                 </div>
+
+                                <div className="flex justify-end gap-3 p-4 bg-primary/5 rounded-2xl border border-primary/10">
+                                    <div className="flex-1 flex items-center gap-2 text-grey-medium">
+                                        <InfoIcon size={14} className="text-primary" />
+                                        <span className="text-[10px] font-medium italic">Cliquez sur "Créer l'évaluation" en bas pour valider tout.</span>
+                                    </div>
+                                    <Button variant="ghost" onClick={() => setImportStep('mapping')}>Précédent</Button>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                )}
             </form>
         </Modal>
     );

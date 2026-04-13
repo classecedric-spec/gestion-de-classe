@@ -55,11 +55,41 @@ export function useStudentPlanningData(studentId: string | undefined) {
         }
     }, [studentId, token]);
 
+    // Synchronisation temps réel du statut du kiosque
+    useEffect(() => {
+        const teacherId = student?.user_id || student?.titulaire_id;
+        if (!teacherId) return;
+
+        const channel = supabase
+            .channel(`kiosk-planning-status-${teacherId}`)
+            .on(
+                'postgres_changes',
+                {
+                    event: 'UPDATE',
+                    schema: 'public',
+                    table: 'CompteUtilisateur',
+                    filter: `id=eq.${teacherId}`,
+                },
+                (payload) => {
+                    if (payload.new && payload.new.kiosk_planning_open !== undefined) {
+                        setKioskPlanningOpen(payload.new.kiosk_planning_open);
+                    }
+                }
+            )
+            .subscribe();
+
+        return () => {
+            supabase.removeChannel(channel);
+        };
+    }, [student?.user_id, student?.titulaire_id]);
+
     const checkPlanningStatus = async () => {
         if (!studentId) return;
         try {
             const { data, error } = await supabase.rpc('get_kiosk_planning_status', { p_student_id: studentId });
-            if (!error && data !== null) setKioskPlanningOpen(data);
+            if (!error && data !== null) {
+                setKioskPlanningOpen(data);
+            }
         } catch (e) {
             console.error('Erreur vérification statut planification:', e);
         }

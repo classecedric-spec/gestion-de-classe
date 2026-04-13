@@ -21,7 +21,7 @@ import {
     LayoutGrid, 
     X, 
     Trash2,
-    FileSpreadsheet,
+    Settings2,
     Upload
 } from 'lucide-react';
 // import { useSpeechRecognition } from '../../../hooks/useSpeechRecognition';
@@ -29,15 +29,16 @@ import { useGrades, useGradeMutations } from '../hooks/useGrades';
 import { useAuth } from '../../../hooks/useAuth';
 import { trackingService } from '../../tracking/services/trackingService';
 import { Badge, Button, ConfirmModal } from '../../../core';
+import { gradeService } from '../services';
 import clsx from 'clsx';
 
 import StudentGradeEntryModal from './StudentGradeEntryModal';
 import GradeRow from './GradeRow';
-import BulkImportModal from './BulkImportModal';
 
 interface EvaluationDetailTableProps {
     evaluationId: string;
     onBack: () => void;
+    onEdit: (evaluation: any) => void;
 }
 
 interface StudentQueryResult {
@@ -45,10 +46,9 @@ interface StudentQueryResult {
     full: any[];
 }
 
-const EvaluationDetailTable: React.FC<EvaluationDetailTableProps> = ({ evaluationId, onBack }) => {
+const EvaluationDetailTable: React.FC<EvaluationDetailTableProps> = ({ evaluationId, onBack, onEdit }) => {
     const [selectedStudent, setSelectedStudent] = useState<any>(null);
     const [isEntryModalOpen, setIsEntryModalOpen] = useState(false);
-    const [isImportModalOpen, setIsImportModalOpen] = useState(false);
     const [isBulkEdit, setIsBulkEdit] = useState(false);
     const [evalToDelete, setEvalToDelete] = useState<string | null>(null);
     const [pendingAbsences, setPendingAbsences] = useState<Record<string, { timeoutId: any, startTime: number }>>({});
@@ -105,99 +105,15 @@ const EvaluationDetailTable: React.FC<EvaluationDetailTableProps> = ({ evaluatio
 
     const { deleteEvaluation } = useGradeMutations();
 
-    const handleBulkImport = useCallback(async (mappedResults: any[]) => {
-        if (!userId) return;
-        const noteMaxVal = Number(evaluation?.note_max) || 20;
-
-        try {
-            if (hasQuestions) {
-                // Collect all question results AND calculate totals for the Resultat table
-                const allQResults: any[] = [];
-                const allResults: any[] = [];
-
-                mappedResults.forEach(result => {
-                    if (!result.hasError && result.isMatched) {
-                        let weightedSum = 0;
-                        let maxWeightedSum = 0;
-                        let hasAnyNoteInRow = false;
-
-                        result.questionResults.forEach((qr: any) => {
-                            const q = questions.find(question => question.id === qr.question_id);
-                            if (q) {
-                                const ratio = q.ratio != null ? parseFloat(q.ratio.toString()) : 1;
-                                const qMax = parseFloat(q.note_max.toString());
-                                maxWeightedSum += qMax * ratio;
-
-                                if (qr.note !== null) {
-                                    allQResults.push({
-                                        eleve_id: qr.eleve_id,
-                                        question_id: qr.question_id,
-                                        note: qr.note,
-                                        user_id: userId
-                                    });
-                                    weightedSum += qr.note * ratio;
-                                    hasAnyNoteInRow = true;
-                                } else {
-                                    // If note is null, we can either skip it or treat it as 0
-                                    // For now, we just don't add to allQResults (keeps existing)
-                                    // and we don't add to weightedSum.
-                                }
-                            }
-                        });
-
-                        if (hasAnyNoteInRow && maxWeightedSum > 0) {
-                            const finalTotal = (weightedSum / maxWeightedSum) * noteMaxVal;
-                            const currentResult = currentResults.find((r: any) => r.eleve_id === result.student.id);
-                            
-                            allResults.push({
-                                id: currentResult?.id,
-                                eleve_id: result.student.id,
-                                evaluation_id: evaluationId,
-                                note: parseFloat(finalTotal.toFixed(2)),
-                                statut: currentResult?.statut || 'present',
-                                user_id: userId
-                            });
-                        }
-                    }
-                });
-
-                if (allQResults.length > 0) {
-                    await saveQuestionResults({ results: allQResults });
-                }
-                if (allResults.length > 0) {
-                    await saveResults({ results: allResults });
-                }
-            } else {
-                // Collect all global results to update
-                const allResults: any[] = [];
-                mappedResults.forEach(result => {
-                    if (!result.hasError && result.isMatched && result.note !== null) {
-                        const currentResult = currentResults.find((r: any) => r.eleve_id === result.student.id);
-                        allResults.push({
-                            id: currentResult?.id,
-                            eleve_id: result.student.id,
-                            evaluation_id: evaluationId,
-                            note: result.note,
-                            statut: 'present',
-                            user_id: userId
-                        });
-                    }
-                });
-
-                if (allResults.length > 0) {
-                    await saveResults({ results: allResults });
-                }
-            }
-            toast.success("Importation réussie !");
-        } catch (error) {
-            console.error('[EvaluationDetailTable] Import error:', error);
-            toast.error("Une erreur est survenue lors de l'importation");
-            throw error;
+    // Synchronisation de l'ID avec le hook useGrades pour charger les questions et résultats
+    useEffect(() => {
+        if (evaluationId) {
+            setSelectedEvaluationId(evaluationId);
         }
-    }, [userId, evaluationId, hasQuestions, evaluation, questions, currentResults, saveResults, saveQuestionResults]);
+    }, [evaluationId, setSelectedEvaluationId]);
 
     // Memoized changes handlers
-    const handleStatutChange = useCallback(async (studentId: string, newStatut: string) => {
+    const handleStatutChange = useCallback((studentId: string, newStatut: string) => {
         if (!userId) return;
 
         if (pendingAbsences[studentId]) {
@@ -213,7 +129,7 @@ const EvaluationDetailTable: React.FC<EvaluationDetailTableProps> = ({ evaluatio
         if (newStatut === 'absent') {
             const timeoutId = setTimeout(async () => {
                 const currentResult = currentResults.find((r: any) => r.eleve_id === studentId);
-                await saveResult({
+                saveResult({
                     result: {
                         id: currentResult?.id,
                         eleve_id: studentId,
@@ -229,7 +145,7 @@ const EvaluationDetailTable: React.FC<EvaluationDetailTableProps> = ({ evaluatio
                     const studentQs = questions.filter(q => q.evaluation_id === evaluationId);
                     const resultsToDelete = questionResults.filter(qr => qr.eleve_id === studentId && studentQs.some(q => q.id === qr.question_id));
                     if (resultsToDelete.length > 0) {
-                         await saveQuestionResults({ results: resultsToDelete.map(r => ({ ...r, note: null })) });
+                         saveQuestionResults({ results: resultsToDelete.map(r => ({ ...r, note: null })) });
                     }
                 }
 
@@ -248,7 +164,7 @@ const EvaluationDetailTable: React.FC<EvaluationDetailTableProps> = ({ evaluatio
         }
 
         const currentResult = currentResults.find((r: any) => r.eleve_id === studentId);
-        await saveResult({
+        saveResult({
             result: {
                 id: currentResult?.id,
                 eleve_id: studentId,
@@ -261,13 +177,13 @@ const EvaluationDetailTable: React.FC<EvaluationDetailTableProps> = ({ evaluatio
         });
     }, [userId, pendingAbsences, currentResults, evaluationId, hasQuestions, questions, questionResults, saveResult, saveQuestionResults]);
 
-    const handleNoteChange = useCallback(async (studentId: string, note: string) => {
+    const handleNoteChange = useCallback((studentId: string, note: string) => {
         if (!userId) return;
         const val = note === '' ? null : parseFloat(note);
         if (evaluation?.note_max && val !== null && (val < 0 || val > evaluation.note_max)) return;
 
         const currentResult = currentResults.find((r: any) => r.eleve_id === studentId);
-        await saveResult({
+        saveResult({
             result: {
                 id: currentResult?.id,
                 eleve_id: studentId,
@@ -322,13 +238,13 @@ const EvaluationDetailTable: React.FC<EvaluationDetailTableProps> = ({ evaluatio
         };
     }, [evaluation, questions, questionResults]);
 
-    const handleQuestionNoteChange = useCallback(async (studentId: string, questionId: string, note: string) => {
+    const handleQuestionNoteChange = useCallback((studentId: string, questionId: string, note: string) => {
         if (!userId) return;
         const q = questions.find(q => q.id === questionId);
         const val = note === '' ? null : parseFloat(note);
         if (q && val !== null && (val < 0 || val > q.note_max)) return;
 
-        await saveQuestionResults({
+        saveQuestionResults({
             results: [{ eleve_id: studentId, question_id: questionId, note: val }]
         });
 
@@ -361,7 +277,7 @@ const EvaluationDetailTable: React.FC<EvaluationDetailTableProps> = ({ evaluatio
                 const finalTotal = (weightedSum / maxWeightedSum) * evalMax;
                 const currentResult = currentResults.find((r: any) => r.eleve_id === studentId);
                 
-                await saveResult({
+                saveResult({
                     result: {
                         id: currentResult?.id,
                         eleve_id: studentId,
@@ -376,10 +292,11 @@ const EvaluationDetailTable: React.FC<EvaluationDetailTableProps> = ({ evaluatio
         }
     }, [userId, questions, evaluation, questionResults, currentResults, evaluationId, saveResult, saveQuestionResults]);
 
-    const handleCommentChange = useCallback(async (studentId: string, comment: string) => {
+    const handleCommentChange = useCallback((studentId: string, comment: string) => {
         if (!userId) return;
         const currentResult = currentResults.find((r: any) => r.eleve_id === studentId);
-        await saveResult({
+
+        saveResult({
             result: {
                 id: currentResult?.id,
                 eleve_id: studentId,
@@ -423,30 +340,29 @@ const EvaluationDetailTable: React.FC<EvaluationDetailTableProps> = ({ evaluatio
     }, []);
 
     // Va chercher dans la base de données numérique le "contexte" de l'évaluation (quelle matière, quel groupe d'élèves).
-    const { data: evalDetails } = useQuery({
-        queryKey: ['evaluation_meta', evaluationId],
-        queryFn: async () => {
-            const { supabase } = await import('../../../lib/database');
-            const { data } = await supabase
-                .from('Evaluation')
-                .select('*, Branche(nom), Groupe(nom)')
-                .eq('id', evaluationId)
-                .single();
-            return data;
-        },
-        enabled: !!evaluationId
+    const { data: evalDetails, isLoading: loadingMeta } = useQuery({
+        queryKey: ['evaluation_meta', evaluationId, userId],
+        queryFn: () => userId ? gradeService.getEvaluationById(evaluationId, userId) : Promise.resolve(null),
+        enabled: !!evaluationId && !!userId
     });
 
     // Identifie tous les élèves inscrits dans le groupe de l'évaluation pour constuire la liste du tableau.
     const { data: studentData, isLoading: loadingStudents } = useQuery<StudentQueryResult>({
-        queryKey: ['students_group', evalDetails?.group_id || evaluation?.group_id],
+        queryKey: ['students_group', 
+            evalDetails?.group_id || (evalDetails as any)?.groupe_id || (evalDetails as any)?.id_groupe || 
+            evaluation?.group_id || (evaluation as any)?.groupe_id || (evaluation as any)?.id_groupe,
+            userId
+        ],
         queryFn: async (): Promise<StudentQueryResult> => {
-            const gid = evalDetails?.group_id || evaluation?.group_id;
+            const gid = evalDetails?.group_id || (evalDetails as any)?.groupe_id || (evalDetails as any)?.id_groupe || 
+                        evaluation?.group_id || (evaluation as any)?.groupe_id || (evaluation as any)?.id_groupe;
             if (!gid) return { ids: [], full: [] };
             const result = await trackingService.fetchStudentsInGroup(gid, userId!);
             return result as StudentQueryResult;
         },
-        enabled: !!(evalDetails?.group_id || evaluation?.group_id) && !!userId
+        enabled: !!(evalDetails?.group_id || (evalDetails as any)?.groupe_id || (evalDetails as any)?.id_groupe || 
+                    evaluation?.group_id || (evaluation as any)?.groupe_id || (evaluation as any)?.id_groupe) && !!userId,
+        staleTime: 1000 * 60 * 5 // 5 minutes
     });
 
     // Trie rigoureusement les élèves pour l'affichage (d'abord par section/niveau, puis par ordre alphabétique de prénom).
@@ -476,15 +392,26 @@ const EvaluationDetailTable: React.FC<EvaluationDetailTableProps> = ({ evaluatio
     const activeNoteType = useMemo(() => noteTypes.find(nt => nt.id === evaluation?.type_note_id), [noteTypes, evaluation]);
     const isConversion = useMemo(() => activeNoteType?.systeme === 'conversion', [activeNoteType]);
     // hasQuestions is declared above near useGrades to be available in handlers
-    const noteMax = useMemo(() => Number(evaluation?.note_max) || 20, [evaluation]);
+    
+    // Calcul de la note maximale réelle (somme des questions ou note_max configurée)
+    const noteMax = useMemo(() => {
+        if (hasQuestions && questions && questions.length > 0) {
+            return questions.reduce((acc, q) => acc + (Number(q.note_max) * (q.ratio != null ? Number(q.ratio) : 1)), 0);
+        }
+        return Number(evaluation?.note_max) || 20;
+    }, [evaluation, questions, hasQuestions]);
     
     // Calcul de la moyenne des notes déjà encodées
     const averageGrade = useMemo(() => {
         const resultsWithNotes = currentResults.filter((r: any) => r.note !== null && r.note !== undefined);
-        if (resultsWithNotes.length === 0) return null;
-        const sum = resultsWithNotes.reduce((acc: number, r: any) => acc + Number(r.note), 0);
-        return sum / resultsWithNotes.length;
-    }, [currentResults]);
+        const evalMaxScale = Number(evaluation?.note_max) || 20;
+
+        if (resultsWithNotes.length === 0 || evalMaxScale <= 0) return null;
+        
+        // Formule : (Somme des notes / (Nombre d'élèves * Max de l'évaluation)) * 100
+        const notesSum = resultsWithNotes.reduce((acc: number, r: any) => acc + Number(r.note), 0);
+        return (notesSum / (resultsWithNotes.length * evalMaxScale)) * 100;
+    }, [currentResults, evaluation]);
 
     const colorMap = useMemo(() => ({
         emerald: 'text-emerald-400',
@@ -505,7 +432,7 @@ const EvaluationDetailTable: React.FC<EvaluationDetailTableProps> = ({ evaluatio
         getConversionPalier(total, max, type), [getConversionPalier]);
 
 
-    const isLoading = hookLoading || loadingStudents;
+    const isLoading = hookLoading || loadingStudents || loadingMeta;
 
     if (isLoading) {
         return (
@@ -516,8 +443,8 @@ const EvaluationDetailTable: React.FC<EvaluationDetailTableProps> = ({ evaluatio
         );
     }
 
-    const brancheName = (evalDetails as any)?.Branche?.nom || '';
-    const groupeName = (evalDetails as any)?.Groupe?.nom || '';
+    const brancheName = (evalDetails as any)?.Branche?.nom || (evalDetails as any)?.branche_nom || evaluation?.Branche?.nom || evaluation?.branche_nom || '';
+    const groupeName = (evalDetails as any)?.Groupe?.nom || (evalDetails as any)?.groupe_nom || evaluation?.Groupe?.nom || evaluation?.groupe_nom || '';
 
     return (
         <div className="w-full flex flex-col gap-4 overflow-hidden animate-in fade-in duration-200">
@@ -544,7 +471,12 @@ const EvaluationDetailTable: React.FC<EvaluationDetailTableProps> = ({ evaluatio
                                 </span>
                                 {averageGrade !== null && (
                                     <span className="text-primary font-bold ml-2">
-                                        • MOYENNE: {averageGrade.toFixed(2)} / {evaluation?.note_max}
+                                        • MOYENNE: {averageGrade.toFixed(2)}%
+                                        {isConversion && activeNoteType && (
+                                            <span className="ml-1 opacity-80">
+                                                ({memoizedGetConversionPalier(averageGrade, 100, activeNoteType)?.letter || '-'})
+                                            </span>
+                                        )}
                                     </span>
                                 )}
                                 <span className="ml-[50px]">
@@ -569,11 +501,11 @@ const EvaluationDetailTable: React.FC<EvaluationDetailTableProps> = ({ evaluatio
 
                     <Button 
                         variant="secondary"
-                        onClick={() => setIsImportModalOpen(true)}
+                        onClick={() => evaluation && onEdit(evaluation)}
                         className="h-10 px-4 rounded-xl font-black uppercase tracking-widest text-[10px] border border-white/10 text-grey-medium hover:text-white transition-all flex items-center"
                     >
-                        <FileSpreadsheet size={16} className="mr-2 text-primary" />
-                        <span>Importer Excel</span>
+                        <Settings2 size={16} className="mr-2 text-primary" />
+                        <span>Modifier paramètres</span>
                     </Button>
 
                     <div className="w-px h-8 bg-white/10 mx-1" />

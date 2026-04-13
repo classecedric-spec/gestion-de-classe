@@ -12,11 +12,26 @@
 
 import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { Table, Filter, ArrowUp, ArrowDown, Search, X, ChevronRight, Loader2, BarChart3, Trash2, Edit2, Download, Info as InfoIcon, FileText } from 'lucide-react';
-import { CardInfo, ConfirmModal } from '../../../core';
+import { CardInfo, ConfirmModal, MultiFilterSelect } from '../../../core';
 import { useAllEvaluations } from '../hooks/useAllEvaluations';
 import { useGradeMutations } from '../hooks/useGrades';
 import { useUserPreferences } from '../../../hooks/useUserPreferences';
+import { 
+    Table, 
+    X, 
+    FileText, 
+    Loader2, 
+    BarChart3, 
+    Search, 
+    ArrowUp, 
+    ArrowDown, 
+    Filter, 
+    Edit2, 
+    Trash2, 
+    ChevronRight,
+    Download,
+    Info as InfoIcon
+} from 'lucide-react';
 import clsx from 'clsx';
 
 type ColumnId = 'select' | 'titre' | 'branche' | 'groupe' | 'periode' | 'date' | 'note_max' | 'type_note' | 'nbQuestions' | 'nbResultats' | 'moyenne' | 'actions';
@@ -55,22 +70,25 @@ const COLUMN_LABELS: Record<ColumnId, string> = {
 interface EvaluationsTableExcelProps {
     onSelectEvaluation: (evalId: string) => void;
     onEditEvaluation: (ev: any) => void;
-    branchFilter: string;
-    setBranchFilter: (v: string) => void;
-    groupFilter: string;
-    setGroupFilter: (v: string) => void;
-    periodeFilter: string;
+    selectedBranches: string[];
+    setSelectedBranches: (v: string[]) => void;
+    selectedGroups: string[];
+    setSelectedGroups: (v: string[]) => void;
+    selectedPeriodes: string[];
+    setSelectedPeriodes: (v: string[]) => void;
+    onResetFilters: () => void;
 }
 
 const EvaluationsTableExcel: React.FC<EvaluationsTableExcelProps> = ({ 
     onSelectEvaluation, 
     onEditEvaluation,
-    branchFilter,
-    setBranchFilter,
-    groupFilter,
-    setGroupFilter,
-    periodeFilter,
-    setPeriodeFilter
+    selectedBranches,
+    setSelectedBranches,
+    selectedGroups,
+    setSelectedGroups,
+    selectedPeriodes,
+    setSelectedPeriodes,
+    onResetFilters
 }) => {
     /*
     // --- DEBUG SYSTEM ---
@@ -232,19 +250,23 @@ const EvaluationsTableExcel: React.FC<EvaluationsTableExcelProps> = ({
     }, [resizingColumnIndex, startX, startWidth, setSavedColumns, columns]);
 
     // Prépare la mécanique pour mettre le tableau en ordre (ex: classer alphabétiquement par titre, ou par moyenne de la plus haute à la plus basse).
-    const [sortColumn, setSortColumn] = useState<ColumnId | null>(null);
+    // Sorting state: Default to date_evaluation ascending (Oldest first)
+    const [sortColumn, setSortColumn] = useState<ColumnId | null>('date_evaluation');
     const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
 
     const handleSort = useCallback((colId: ColumnId) => {
-        setSortColumn(current => {
-            if (current === colId) {
-                setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
-                return prev === 'desc' ? null : colId; // Cycle: asc -> desc -> none
+        if (sortColumn === colId) {
+            if (sortDirection === 'asc') {
+                setSortDirection('desc');
+            } else {
+                setSortColumn(null);
+                setSortDirection('asc');
             }
+        } else {
+            setSortColumn(colId);
             setSortDirection('asc');
-            return colId;
-        });
-    }, []);
+        }
+    }, [sortColumn, sortDirection]);
 
     // Filters
     const [searchQuery, setSearchQuery] = useState('');
@@ -252,14 +274,13 @@ const EvaluationsTableExcel: React.FC<EvaluationsTableExcelProps> = ({
     const searchMenuRef = useRef<HTMLDivElement>(null);
     const searchTriggerRef = useRef<HTMLDivElement>(null);
 
-    const [isBranchMenuOpen, setIsBranchMenuOpen] = useState(false);
-    const branchMenuRef = useRef<HTMLDivElement>(null);
-
-    const [isGroupMenuOpen, setIsGroupMenuOpen] = useState(false);
-    const groupMenuRef = useRef<HTMLDivElement>(null);
-
-    const [isPeriodeMenuOpen, setIsPeriodeMenuOpen] = useState(false);
-    const periodeMenuRef = useRef<HTMLDivElement>(null);
+    // Logic for resetting all filters
+    const hasActiveFilters = searchQuery.length > 0 || selectedBranches.length > 0 || selectedGroups.length > 0 || selectedPeriodes.length > 0;
+    
+    const handleResetFilters = useCallback(() => {
+        setSearchQuery('');
+        onResetFilters();
+    }, [setSearchQuery, onResetFilters]);
 
     // Close menus when clicking outside
     useEffect(() => {
@@ -272,10 +293,6 @@ const EvaluationsTableExcel: React.FC<EvaluationsTableExcelProps> = ({
                 searchTriggerRef.current && !searchTriggerRef.current.contains(target)) {
                 setIsSearchOpen(false);
             }
-            
-            if (branchMenuRef.current && !branchMenuRef.current.contains(target)) setIsBranchMenuOpen(false);
-            if (groupMenuRef.current && !groupMenuRef.current.contains(target)) setIsGroupMenuOpen(false);
-            if (periodeMenuRef.current && !periodeMenuRef.current.contains(target)) setIsPeriodeMenuOpen(false);
         };
         document.addEventListener('mousedown', handleClickOutside);
         return () => document.removeEventListener('mousedown', handleClickOutside);
@@ -284,16 +301,23 @@ const EvaluationsTableExcel: React.FC<EvaluationsTableExcelProps> = ({
     // Scanne toutes les évaluations existantes pour en extraire et bâtir astucieusement les listes des matières et groupes disponibles pour les menus de filtrage.
     const availableBranches = useMemo(() => Array.from(new Set(evaluations.map((e: any) => e._brancheName))).filter(Boolean).sort() as string[], [evaluations]);
     const availableGroups = useMemo(() => Array.from(new Set(evaluations.map((e: any) => e._groupeName))).filter(Boolean).sort() as string[], [evaluations]);
-    const availablePeriodes = useMemo(() => Array.from(new Set(evaluations.map((e: any) => e.periode))).filter(Boolean).sort() as string[], [evaluations]);
+    const availablePeriodes = useMemo(() => {
+        const p = Array.from(new Set(evaluations.map((e: any) => e.periode || "Sans période"))) as string[];
+        return p.sort((a, b) => {
+            if (a === "Sans période") return 1;
+            if (b === "Sans période") return -1;
+            return a.localeCompare(b);
+        });
+    }, [evaluations]);
 
     // En comparant la liste brute aux "filtres actifs" choisis par le prof, le système construit la liste définitive des évaluations à afficher à l'écran.
     const displayedEvaluations = useMemo(() => {
         return evaluations
             .filter((ev: any) => {
                 if (searchQuery && !ev.titre.toLowerCase().includes(searchQuery.toLowerCase())) return false;
-                if (branchFilter !== 'all' && ev._brancheName !== branchFilter) return false;
-                if (groupFilter !== 'all' && ev._groupeName !== groupFilter) return false;
-                if (periodeFilter !== 'all' && ev.periode !== periodeFilter) return false;
+                if (selectedBranches.length > 0 && !selectedBranches.includes(ev._brancheName)) return false;
+                if (selectedGroups.length > 0 && !selectedGroups.includes(ev._groupeName)) return false;
+                if (selectedPeriodes.length > 0 && !selectedPeriodes.includes(ev.periode || "Sans période")) return false;
                 return true;
             })
             .sort((a: any, b: any) => {
@@ -307,7 +331,7 @@ const EvaluationsTableExcel: React.FC<EvaluationsTableExcelProps> = ({
                 if (typeof valA === 'string') return valA.localeCompare(valB as string) * dir;
                 return ((valA as number) - (valB as number)) * dir;
             });
-    }, [evaluations, searchQuery, branchFilter, groupFilter, periodeFilter, sortColumn, sortDirection]);
+    }, [evaluations, searchQuery, selectedBranches, selectedGroups, selectedPeriodes, sortColumn, sortDirection]);
 
     const activeColumns = useMemo(() => {
         if (!isPrintMode) return columns.filter(c => c.id !== 'select');
@@ -351,7 +375,7 @@ const EvaluationsTableExcel: React.FC<EvaluationsTableExcelProps> = ({
                     </div>
                     <div>
                         <h2 className="text-xl font-black tracking-tight text-text-main uppercase">
-                            {groupFilter !== 'all' ? `Évaluations - ${groupFilter}` : 'Tableau des Évaluations'}
+                            {selectedGroups.length === 1 ? `Évaluations - ${selectedGroups[0]}` : 'Tableau des Évaluations'}
                         </h2>
                         <p className="text-xs font-medium text-grey-medium uppercase tracking-widest mt-0.5">
                             {displayedEvaluations.length} évaluation{displayedEvaluations.length > 1 ? 's' : ''}{evaluations.length !== displayedEvaluations.length ? ` / ${evaluations.length} total` : ''}
@@ -360,6 +384,17 @@ const EvaluationsTableExcel: React.FC<EvaluationsTableExcelProps> = ({
                 </div>
 
                 <div className="flex items-center gap-4">
+                    {/* Reset Filters Button */}
+                    {hasActiveFilters && (
+                        <button
+                            onClick={handleResetFilters}
+                            className="flex items-center gap-2 px-3 py-1.5 bg-white/5 hover:bg-white/10 text-grey-medium hover:text-white border border-white/10 rounded-xl font-bold text-[10px] uppercase tracking-widest transition-all animate-in fade-in slide-in-from-right-4 duration-300 group"
+                        >
+                            <X size={14} className="group-hover:rotate-90 transition-transform duration-300" />
+                            Réinitialiser
+                        </button>
+                    )}
+
                     <div className="flex items-center gap-3 pr-4 border-r border-white/10">
                         <span className={clsx(
                             "text-[10px] font-black uppercase tracking-widest transition-colors",
@@ -421,9 +456,9 @@ const EvaluationsTableExcel: React.FC<EvaluationsTableExcelProps> = ({
                                                 handleSort,
                                                 sortColumn, sortDirection,
                                                 searchQuery, setSearchQuery, isSearchOpen, setIsSearchOpen, searchMenuRef, searchTriggerRef,
-                                                branchFilter, setBranchFilter, isBranchMenuOpen, setIsBranchMenuOpen, branchMenuRef, availableBranches,
-                                                groupFilter, setGroupFilter, isGroupMenuOpen, setIsGroupMenuOpen, groupMenuRef, availableGroups,
-                                                periodeFilter, setPeriodeFilter, isPeriodeMenuOpen, setIsPeriodeMenuOpen, periodeMenuRef, availablePeriodes,
+                                                selectedBranches, setSelectedBranches, availableBranches,
+                                                selectedGroups, setSelectedGroups, availableGroups,
+                                                selectedPeriodes, setSelectedPeriodes, availablePeriodes,
                                                 // Pour la sélection
                                                 displayedEvaluations,
                                                 selectedEvalIds,
@@ -642,54 +677,54 @@ function renderHeaderContent(colId: ColumnId, ctx: any) {
             );
         }
         case 'branche': {
-            const { branchFilter, setBranchFilter, isBranchMenuOpen, setIsBranchMenuOpen, availableBranches } = ctx;
+            const { selectedBranches, setSelectedBranches, availableBranches } = ctx;
             return (
-                <FilterDropdown
-                    label="Branche"
-                    filter={branchFilter}
-                    setFilter={setBranchFilter}
-                    isOpen={isBranchMenuOpen}
-                    setIsOpen={setIsBranchMenuOpen}
-                    options={availableBranches}
-                    handleSort={handleSort}
-                    colId={colId}
-                    isSorted={isSorted}
-                    SortIcon={SortIcon}
-                />
+                <div className="flex items-center gap-2">
+                    <MultiFilterSelect
+                        label="Branche"
+                        options={availableBranches}
+                        selectedValues={selectedBranches}
+                        onChange={setSelectedBranches}
+                        portal
+                        className="bg-transparent border-none !h-auto !p-0 hover:bg-transparent"
+                        icon={<Filter size={14} className={selectedBranches.length > 0 ? "text-primary" : "text-grey-light opacity-50"} />}
+                    />
+                    {isSorted && <SortIcon size={12} className="text-primary cursor-pointer" onClick={() => handleSort(colId)} />}
+                </div>
             );
         }
         case 'groupe': {
-            const { groupFilter, setGroupFilter, isGroupMenuOpen, setIsGroupMenuOpen, availableGroups } = ctx;
+            const { selectedGroups, setSelectedGroups, availableGroups } = ctx;
             return (
-                <FilterDropdown
-                    label="Groupe"
-                    filter={groupFilter}
-                    setFilter={setGroupFilter}
-                    isOpen={isGroupMenuOpen}
-                    setIsOpen={setIsGroupMenuOpen}
-                    options={availableGroups}
-                    handleSort={handleSort}
-                    colId={colId}
-                    isSorted={isSorted}
-                    SortIcon={SortIcon}
-                />
+                <div className="flex items-center gap-2">
+                    <MultiFilterSelect
+                        label="Groupe"
+                        options={availableGroups}
+                        selectedValues={selectedGroups}
+                        onChange={setSelectedGroups}
+                        portal
+                        className="bg-transparent border-none !h-auto !p-0 hover:bg-transparent"
+                        icon={<Filter size={14} className={selectedGroups.length > 0 ? "text-primary" : "text-grey-light opacity-50"} />}
+                    />
+                    {isSorted && <SortIcon size={12} className="text-primary cursor-pointer" onClick={() => handleSort(colId)} />}
+                </div>
             );
         }
         case 'periode': {
-            const { periodeFilter, setPeriodeFilter, isPeriodeMenuOpen, setIsPeriodeMenuOpen, availablePeriodes } = ctx;
+            const { selectedPeriodes, setSelectedPeriodes, availablePeriodes } = ctx;
             return (
-                <FilterDropdown
-                    label="Période"
-                    filter={periodeFilter}
-                    setFilter={setPeriodeFilter}
-                    isOpen={isPeriodeMenuOpen}
-                    setIsOpen={setIsPeriodeMenuOpen}
-                    options={availablePeriodes}
-                    handleSort={handleSort}
-                    colId={colId}
-                    isSorted={isSorted}
-                    SortIcon={SortIcon}
-                />
+                <div className="flex items-center gap-2">
+                    <MultiFilterSelect
+                        label="Période"
+                        options={availablePeriodes}
+                        selectedValues={selectedPeriodes}
+                        onChange={setSelectedPeriodes}
+                        portal
+                        className="bg-transparent border-none !h-auto !p-0 hover:bg-transparent"
+                        icon={<Filter size={14} className={selectedPeriodes.length > 0 ? "text-primary" : "text-grey-light opacity-50"} />}
+                    />
+                    {isSorted && <SortIcon size={12} className="text-primary cursor-pointer" onClick={() => handleSort(colId)} />}
+                </div>
             );
         }
         default: {
@@ -763,8 +798,8 @@ const FilterDropdown = ({
                 onClick={() => setIsOpen(!isOpen)}
             >
                 {label}
-                <Filter size={14} className={clsx(filter !== 'all' || isOpen ? "text-primary" : "text-grey-medium")} />
-                {SortIcon && <SortIcon size={12} className="text-primary" />}
+                <Filter size={14} className={clsx(filter !== 'all' || isOpen ? "text-primary" : "text-grey-medium/60")} />
+                {SortIcon && <SortIcon size={12} className="text-primary opacity-80" />}
             </div>
             {isOpen && createPortal(
                 <div
@@ -978,13 +1013,11 @@ function renderCellContent(
             );
         case 'moyenne':
             const realAvgMax = ev._real_note_max !== undefined ? ev._real_note_max : ev.note_max;
-            let displayAvg = ev._moyenne;
+            let displayAvg = 0;
             let percentage = 0;
-            if (ev._moyenne !== null && ev.note_max > 0) {
-                percentage = (ev._moyenne / ev.note_max) * 100;
-                if (ev._real_note_max !== undefined) {
-                    displayAvg = (ev._moyenne / ev.note_max) * ev._real_note_max;
-                }
+            if (ev._moyenne !== null) {
+                percentage = ev._moyenne;
+                displayAvg = (ev._moyenne / 100) * realAvgMax;
             }
             return (
                 <div className="flex items-center gap-2 group">
@@ -1206,9 +1239,10 @@ async function exportBulkEvaluationPDF(evalIds: string[], evalSummaryList: any[]
         
         // 1. Fetch all detailed evaluation data (to get group_id, type_note_id, etc.)
         const { data: fullEvals, error: evalError } = await supabase
-            .from('Evaluation')
+            .from('EvaluationWithStats')
             .select('*, Branche(nom), Groupe(nom)')
             .in('id', evalIds);
+
         
         if (evalError) throw evalError;
 

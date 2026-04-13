@@ -23,6 +23,39 @@ export class SupabaseGradeRepository implements IGradeRepository {
         return true;
     }
 
+    /**
+     * Méthode utilitaire pour récupérer récursivement toutes les lignes d'une requête Supabase (contourne la limite de 1000).
+     */
+    private async recursiveFetch<T>(queryBase: any, pageSize = 1000): Promise<T[]> {
+        let allData: T[] = [];
+        let from = 0;
+        let to = pageSize - 1;
+        let hasMore = true;
+
+        while (hasMore) {
+            const { data, error } = await queryBase.range(from, to);
+            
+            if (error) {
+                console.error("[SupabaseGradeRepository] Error in recursiveFetch:", error);
+                throw error;
+            }
+
+            if (data && data.length > 0) {
+                allData = [...allData, ...data];
+                // Si on a récupéré moins de données que la page demandée, c'est qu'il n'y a plus rien
+                if (data.length < pageSize) {
+                    hasMore = false;
+                } else {
+                    from += pageSize;
+                    to += pageSize;
+                }
+            } else {
+                hasMore = false;
+            }
+        }
+        return allData;
+    }
+
     async findEvaluationsByContext(userId: string, brancheId?: string, periode?: string): Promise<Tables<'Evaluation'>[]> {
         let query = supabase.from('Evaluation').select('*').eq('user_id', userId);
         
@@ -43,23 +76,23 @@ export class SupabaseGradeRepository implements IGradeRepository {
         return data || [];
     }
 
-    // Récupère toutes les évaluations, tout en exigeant du serveur qu'il utilise des "Jointures" (Joins) pour rapatrier "en même temps" le nom en clair du Groupe, de la Branche et du Barème (sinon on n'aurait que des suites de chiffres).
     async findAllEvaluationsDetailed(userId: string): Promise<any[]> {
         if (!this.validateUserId(userId)) return [];
         const { data, error } = await supabase
             .from('EvaluationWithStats')
-            .select(`
-                *,
-                Groupe (nom),
-                Branche (nom),
-                TypeNote (nom)
-            `)
+            .select('*')
             .eq('user_id', userId)
             .is('deleted_at', null)
             .order('date', { ascending: false });
             
         if (error) throw error;
-        return data || [];
+
+        return (data || []).map((ev: any) => ({
+            ...ev,
+            Groupe: ev.groupe_nom ? { nom: ev.groupe_nom } : null,
+            Branche: ev.branche_nom ? { nom: ev.branche_nom } : null,
+            TypeNote: ev.type_note_nom ? { nom: ev.type_note_nom } : null
+        }));
     }
 
     async createEvaluation(evaluation: TablesInsert<'Evaluation'>, userId: string): Promise<Tables<'Evaluation'>> {
@@ -113,6 +146,18 @@ export class SupabaseGradeRepository implements IGradeRepository {
         return data || [];
     }
 
+    async updateEvaluationsPeriod(userId: string, oldLabel: string, newLabel: string): Promise<void> {
+        if (!this.validateUserId(userId)) return;
+        
+        const { error } = await supabase
+            .from('Evaluation')
+            .update({ periode: newLabel })
+            .eq('user_id', userId)
+            .eq('periode', oldLabel);
+            
+        if (error) throw error;
+    }
+
     async restoreEvaluation(id: string, userId: string): Promise<void> {
         const { error } = await supabase
             .from('Evaluation')
@@ -133,6 +178,35 @@ export class SupabaseGradeRepository implements IGradeRepository {
         if (error) throw error;
     }
 
+    async findEvaluationById(id: string, userId: string): Promise<any> {
+        if (!this.validateUserId(userId)) return null;
+        const tableName = 'EvaluationWithStats';
+        log(`📡 [GradeRepo] findEvaluationById(ID: ${id}) using ${tableName}`);
+        
+        const { data, error } = await supabase
+            .from(tableName)
+            .select('*')
+            .eq('id', id)
+            .eq('user_id', userId)
+            .single();
+            
+        if (error) {
+            log(`❌ [GradeRepo] Error in findEvaluationById: ${error.message}`);
+            throw error;
+        }
+
+        if (data) {
+            return {
+                ...data,
+                Groupe: data.groupe_nom ? { nom: data.groupe_nom } : null,
+                Branche: data.branche_nom ? { nom: data.branche_nom } : null,
+                TypeNote: data.type_note_nom ? { nom: data.type_note_nom } : null
+            };
+        }
+        return null;
+    }
+
+
     // Questions CRUD
     async findQuestionsByEvaluation(evaluationId: string, userId: string): Promise<Tables<'EvaluationQuestion'>[]> {
         if (!this.validateUserId(userId)) return [];
@@ -152,17 +226,13 @@ export class SupabaseGradeRepository implements IGradeRepository {
 
     async findQuestionsByEvaluations(evaluationIds: string[], userId: string): Promise<Tables<'EvaluationQuestion'>[]> {
         if (!this.validateUserId(userId) || evaluationIds.length === 0) return [];
-        const { data, error } = await supabase
+        const query = supabase
             .from('EvaluationQuestion')
             .select('*')
             .in('evaluation_id', evaluationIds)
             .order('ordre', { ascending: true });
             
-        if (error) {
-            console.error("Error fetching multi-questions:", error);
-            throw error;
-        }
-        return data || [];
+        return this.recursiveFetch(query);
     }
 
     async createQuestions(questions: TablesInsert<'EvaluationQuestion'>[], userId: string): Promise<Tables<'EvaluationQuestion'>[]> {
@@ -240,19 +310,36 @@ export class SupabaseGradeRepository implements IGradeRepository {
 
     async findResultsByEvaluations(evaluationIds: string[], userId: string): Promise<Tables<'Resultat'>[]> {
         if (!this.validateUserId(userId) || evaluationIds.length === 0) return [];
-        const { data, error } = await supabase
+        const query = supabase
             .from('Resultat')
             .select('*')
             .in('evaluation_id', evaluationIds)
             .eq('user_id', userId);
             
-        if (error) throw error;
-        return data || [];
+        return this.recursiveFetch(query);
+    }
+
+    /**
+     * Découpe un tableau en morceaux plus petits pour éviter de saturer la base de données.
+     */
+    private async chunkUpsert<T>(table: string, items: any[], onConflict: string, chunkSize = 500): Promise<T[]> {
+        const allResults: T[] = [];
+        for (let i = 0; i < items.length; i += chunkSize) {
+            const chunk = items.slice(i, i + chunkSize);
+            const { data, error } = await supabase
+                .from(table)
+                .upsert(chunk, { onConflict })
+                .select();
+            
+            if (error) throw error;
+            if (data) allResults.push(...data);
+        }
+        return allResults;
     }
 
     async findAllResultsDetailed(userId: string): Promise<any[]> {
         if (!this.validateUserId(userId)) return [];
-        const { data, error } = await supabase
+        const query = supabase
             .from('Resultat')
             .select(`
                 *,
@@ -271,8 +358,7 @@ export class SupabaseGradeRepository implements IGradeRepository {
             .eq('user_id', userId)
             .order('created_at', { ascending: false });
             
-        if (error) throw error;
-        return data || [];
+        return this.recursiveFetch(query);
     }
 
     async upsertResults(results: TablesInsert<'Resultat'>[], userId: string): Promise<Tables<'Resultat'>[]> {
@@ -281,13 +367,8 @@ export class SupabaseGradeRepository implements IGradeRepository {
             const { Eleve, Evaluation, ...rest } = r as any;
             return { ...rest, user_id: userId };
         });
-        const { data, error } = await supabase
-            .from('Resultat')
-            .upsert(sanitized, { onConflict: 'evaluation_id,eleve_id' })
-            .select();
-            
-        if (error) throw error;
-        return data || [];
+        
+        return this.chunkUpsert('Resultat', sanitized, 'evaluation_id,eleve_id');
     }
 
     async upsertResult(result: TablesInsert<'Resultat'>, userId: string): Promise<Tables<'Resultat'>> {
@@ -336,30 +417,23 @@ export class SupabaseGradeRepository implements IGradeRepository {
         if (!this.validateUserId(userId) || evaluationIds.length === 0) return [];
         // Filtering by evaluationIds via the joined EvaluationQuestion table
         // and by userId via the joined Evaluation table
-        const { data, error } = await supabase
+        const query = supabase
             .from('ResultatQuestion')
             .select('*, EvaluationQuestion!inner(evaluation_id, Evaluation!inner(user_id))')
             .in('EvaluationQuestion.evaluation_id', evaluationIds)
             .eq('EvaluationQuestion.Evaluation.user_id', userId);
             
-        if (error) throw error;
-        return data || [];
+        return this.recursiveFetch(query);
     }
 
     async upsertQuestionResults(results: TablesInsert<'ResultatQuestion'>[], userId: string): Promise<Tables<'ResultatQuestion'>[]> {
         // Sanitize to remove relationship fields that aren't columns
         const sanitized = results.map(r => {
-            const { EvaluationQuestion, ...rest } = r as any;
+            const { EvaluationQuestion, user_id, ...rest } = r as any;
             return { ...rest };
         });
         
-        const { data, error } = await supabase
-            .from('ResultatQuestion')
-            .upsert(sanitized, { onConflict: 'eleve_id,question_id' })
-            .select();
-            
-        if (error) throw error;
-        return data || [];
+        return this.chunkUpsert('ResultatQuestion', sanitized, 'eleve_id,question_id');
     }
 
     // Regroupement CRUD

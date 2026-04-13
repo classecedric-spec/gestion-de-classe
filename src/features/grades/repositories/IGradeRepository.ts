@@ -20,8 +20,10 @@ export interface IGradeRepository {
     updateEvaluation(id: string, evaluation: TablesUpdate<'Evaluation'>, userId: string): Promise<Tables<'Evaluation'>>;
     deleteEvaluation(id: string, userId: string): Promise<void>;
     findDeletedEvaluations(userId: string): Promise<Tables<'Evaluation'>[]>;
+    updateEvaluationsPeriod(userId: string, oldLabel: string, newLabel: string): Promise<void>;
     restoreEvaluation(id: string, userId: string): Promise<void>;
     permanentDeleteEvaluation(id: string, userId: string): Promise<void>;
+    findEvaluationById(id: string, userId: string): Promise<any>;
 
     // Questions CRUD
     findQuestionsByEvaluation(evaluationId: string, userId: string): Promise<Tables<'EvaluationQuestion'>[]>;

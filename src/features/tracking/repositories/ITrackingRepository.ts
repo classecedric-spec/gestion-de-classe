@@ -59,6 +59,11 @@ export interface ITrackingRepository {
      */
     getStudentsInGroup(groupId: string, userId: string): Promise<{ ids: string[], full: Tables<'Eleve'>[] }>;
 
+    /**
+     * Récupère la liste complète des élèves pour plusieurs classes.
+     */
+    getStudentsInGroups(groupIds: string[], userId: string): Promise<{ ids: string[], full: Tables<'Eleve'>[] }>;
+
     // ==================== PRÉFÉRENCES DE L'UTILISATEUR ====================
 
     /**

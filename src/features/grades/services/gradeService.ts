@@ -58,6 +58,66 @@ export class GradeService {
         return ev;
     }
 
+    /**
+     * Crée une évaluation, ses questions, ET les résultats associés en une seule opération logique.
+     * Utilisé principalement pour l'import Excel lors de la création.
+     */
+    async createEvaluationWithResults(
+        evaluation: TablesInsert<'Evaluation'>, 
+        userId: string, 
+        questions: { titre: string, note_max: number, ratio: number, ordre: number }[], 
+        studentResults: { eleve_id: string, note: number | null, questionNotes?: { [titre: string]: number | null } }[]
+    ) {
+        // 1. Créer l'évaluation
+        const ev = await this.repository.createEvaluation(evaluation, userId);
+        
+        // 2. Créer les questions et récupérer leurs IDs
+        let createdQuestions: Tables<'EvaluationQuestion'>[] = [];
+        if (questions.length > 0) {
+            createdQuestions = await this.repository.createQuestions(questions.map(q => ({
+                ...q,
+                evaluation_id: ev.id
+            })) as any, userId);
+        }
+
+        // 3. Préparer les résultats globaux (table Resultat)
+        const resultatsToInsert = studentResults.map(sr => ({
+            evaluation_id: ev.id,
+            eleve_id: sr.eleve_id,
+            note: sr.note,
+            statut: 'present' as const,
+            user_id: userId
+        }));
+
+        if (resultatsToInsert.length > 0) {
+            await this.repository.upsertResults(resultatsToInsert, userId);
+        }
+
+        // 4. Préparer et insérer les résultats par question (table ResultatQuestion)
+        const qResultsToInsert: TablesInsert<'ResultatQuestion'>[] = [];
+        
+        studentResults.forEach(sr => {
+            if (sr.questionNotes) {
+                Object.entries(sr.questionNotes).forEach(([qTitre, note]) => {
+                    const question = createdQuestions.find(q => q.titre.trim() === qTitre.trim());
+                    if (question && note !== null) {
+                        qResultsToInsert.push({
+                            eleve_id: sr.eleve_id,
+                            question_id: question.id,
+                            note: note
+                        });
+                    }
+                });
+            }
+        });
+
+        if (qResultsToInsert.length > 0) {
+            await this.repository.upsertQuestionResults(qResultsToInsert, userId);
+        }
+
+        return ev;
+    }
+
     async updateEvaluation(id: string, evaluation: TablesUpdate<'Evaluation'>, userId: string, questions?: { id?: string, titre: string, note_max: number, ratio: number, ordre: number }[], regroupements?: any[]) {
         const ev = await this.repository.updateEvaluation(id, evaluation, userId);
         
@@ -118,6 +178,14 @@ export class GradeService {
 
     async permanentDeleteEvaluation(id: string, userId: string) {
         return this.repository.permanentDeleteEvaluation(id, userId);
+    }
+
+    async getEvaluationById(id: string, userId: string) {
+        return this.repository.findEvaluationById(id, userId);
+    }
+
+    async updateEvaluationsPeriod(userId: string, oldLabel: string, newLabel: string) {
+        return this.repository.updateEvaluationsPeriod(userId, oldLabel, newLabel);
     }
 
     async getQuestions(evaluationId: string, userId: string) {

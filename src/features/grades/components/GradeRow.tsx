@@ -117,8 +117,8 @@ const GradeRow: React.FC<GradeRowProps> = React.memo(({
                 isDataMissing && "bg-danger/[0.15]"
             )}
         >
-            <td className="p-4 sticky left-0 bg-surface z-20 border-r border-white/10 transition-all group-hover:shadow-[inset_0_0_0_2000px_rgba(255,255,255,0.05)]">
-                <div className="flex items-center gap-4">
+            <td className="p-4 sticky left-0 bg-surface z-20 border-r border-white/10 transition-all group-hover:shadow-[inset_0_0_0_2000px_rgba(255,255,255,0.05)] min-w-[240px]">
+                <div className="flex items-center gap-4 pr-6">
                     <div className="w-10 h-10 rounded-full bg-grey-dark/50 p-0.5 border-2 border-white/10 overflow-hidden shrink-0 group-hover:border-primary/50 transition-colors">
                         {student.photo_url ? (
                             <img src={student.photo_url} alt="" className="w-full h-full object-cover rounded-full" />

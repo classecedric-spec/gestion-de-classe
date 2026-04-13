@@ -39,6 +39,8 @@ export type { StatCardProps, StatCardVariant } from './StatCard';
 export { default as ImageUpload } from './ImageUpload';
 
 export { SearchBar } from './SearchBar';
+export { MultiFilterSelect } from './MultiFilterSelect';
+export type { MultiFilterOption, MultiFilterSelectProps } from './MultiFilterSelect';
 export { FilterSelect } from './FilterSelect';
 export { CardInfo } from './CardInfo';
 export { CardList } from './CardList';

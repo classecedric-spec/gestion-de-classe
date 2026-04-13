@@ -12,6 +12,10 @@
 
 import { useUserPreferences } from '../../../hooks/useUserPreferences';
 import { useCallback } from 'react';
+import { useAuth } from '../../../hooks/useAuth';
+import { gradeService } from '../services';
+import { useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
 
 // Définit le moule d'une période (les informations qu'elle doit contenir pour exister).
 export interface Period {
@@ -34,6 +38,16 @@ const PREFERENCE_KEY = 'grades_periods_v1';
 export function usePeriods() {
     // Demande au système de récupérer les préférences sauvegardées, ou d'utiliser le modèle par défaut si c'est vide.
     const [periods, setPeriods, loading] = useUserPreferences<Period[]>(PREFERENCE_KEY, DEFAULT_PERIODS);
+    const { session } = useAuth();
+    const userId = session?.user?.id;
+    const queryClient = useQueryClient();
+
+    const invalidateGrades = useCallback(() => {
+        queryClient.invalidateQueries({ queryKey: ['evaluations'] });
+        queryClient.invalidateQueries({ queryKey: ['all_evaluations_detailed'] });
+        queryClient.invalidateQueries({ queryKey: ['context_results'] });
+        queryClient.invalidateQueries({ queryKey: ['deleted_evaluations'] });
+    }, [queryClient]);
 
     // Prépare la mécanique pour créer une nouvelle période lorsqu'un utilisateur clique sur le bouton "Ajouter".
     const addPeriod = useCallback(async (label: string) => {
@@ -49,19 +63,55 @@ export function usePeriods() {
 
     // Prépare la mécanique pour changer le texte d'une période existante (ex: renommer "Trimestre 1" en "Semestre 1").
     const updatePeriod = useCallback(async (id: string, label: string) => {
-        // Inspecte toutes les périodes et ne change le nom que pour la période ciblée.
+        if (!userId) return;
+        
+        const oldPeriod = periods.find(p => p.id === id);
+        const oldLabel = oldPeriod?.label;
+
+        // 1. Cascade update evaluations in database first
+        if (oldLabel && oldLabel !== label) {
+            try {
+                await gradeService.updateEvaluationsPeriod(userId, oldLabel, label);
+            } catch (err) {
+                console.error("Failed to cascade period rename:", err);
+                toast.error("Erreur lors de la mise à jour des évaluations");
+                return;
+            }
+        }
+
+        // 2. Update preference
         const updated = periods.map(p => p.id === id ? { ...p, label } : p);
-        // Enregistre et sauvegarde la liste une fois la modification effectuée.
         await setPeriods(updated);
-    }, [periods, setPeriods]);
+        
+        // 3. Refresh display
+        invalidateGrades();
+    }, [periods, setPeriods, userId, invalidateGrades]);
 
     // Prépare la mécanique pour détruire une période et la retirer définitivement de la liste.
     const deletePeriod = useCallback(async (id: string) => {
-        // Met de côté la période à jeter et renumérote proprement celles qui restent pour ne pas laisser de trou dans le classement.
+        if (!userId) return;
+
+        const periodToDelete = periods.find(p => p.id === id);
+        const oldLabel = periodToDelete?.label;
+
+        // 1. Move evaluations to "Sans période"
+        if (oldLabel) {
+            try {
+                await gradeService.updateEvaluationsPeriod(userId, oldLabel, "Sans période");
+            } catch (err) {
+                console.error("Failed to cascade period delete:", err);
+                toast.error("Erreur lors du déplacement des évaluations");
+                // We continue to delete the period from preferences anyway
+            }
+        }
+
+        // 2. Remove from preferences
         const filtered = periods.filter(p => p.id !== id).map((p, i) => ({ ...p, ordre: i }));
-        // Enregistre et sauvegarde la nouvelle liste nettoyée.
         await setPeriods(filtered);
-    }, [periods, setPeriods]);
+
+        // 3. Refresh display
+        invalidateGrades();
+    }, [periods, setPeriods, userId, invalidateGrades]);
 
     // Prépare la mécanique pour pouvoir déplacer manuellement les périodes et changer leur ordre (ex: monter ou descendre un élément de la liste).
     const reorderPeriods = useCallback(async (reordered: Period[]) => {

@@ -33,18 +33,21 @@ const PeriodSettings: React.FC = () => {
     const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
 
     // Intercepte le clic sur "Ajouter" pour créer officiellement la nouvelle période en base de données, à la stricte condition que le nom ne soit pas composé que d'espaces vides.
-    const handleAdd = async () => {
+    const handleAdd = () => {
         if (!newLabel.trim()) return;
-        await addPeriod(newLabel.trim());
-        setNewLabel('');
+        const label = newLabel.trim();
         setIsAdding(false);
+        setNewLabel('');
+        addPeriod(label); // Triggers optimistic update in cache
     };
 
-    const handleEdit = async () => {
+    const handleEdit = () => {
         if (!editingId || !editLabel.trim()) return;
-        await updatePeriod(editingId, editLabel.trim());
+        const id = editingId;
+        const label = editLabel.trim();
         setEditingId(null);
         setEditLabel('');
+        updatePeriod(id, label); // Triggers optimistic update in cache
     };
 
     const startEdit = (period: Period) => {
@@ -96,7 +99,7 @@ const PeriodSettings: React.FC = () => {
         setDragOverIndex(null);
     };
 
-    if (loading) {
+    if (loading && periods.length === 0) {
         return (
             <div className="space-y-3 animate-pulse">
                 {[1, 2, 3].map(i => (

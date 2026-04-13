@@ -3,7 +3,7 @@ import { supabase } from '../lib/database';
 import { toast } from 'sonner';
 
 /**
- * Hook for updating activity status
+ * Hook for updating activity status 3
  */
 export const useActivityStatus = (
     studentId: string | null,
