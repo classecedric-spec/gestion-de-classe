@@ -47,6 +47,7 @@ interface TrackingDashboardProps {
     toggleKioskPlanning?: () => void;
     loadingKioskPlanning?: boolean;
     closeAllKiosks?: () => void;
+    forceOpenKioskPlanning?: () => void;
 }
 
 const withStyle = (style: React.CSSProperties) => ({ style });
@@ -63,7 +64,8 @@ const TrackingDashboard: React.FC<TrackingDashboardProps> = ({
     kioskPlanningOpen,
     toggleKioskPlanning,
     loadingKioskPlanning,
-    closeAllKiosks
+    closeAllKiosks,
+    forceOpenKioskPlanning
 }) => {
     // ÉTAT : On mémorise si on veut voir tout le monde ou seulement ceux qui n'ont pas fini.
     const [showPendingOnly, setShowPendingOnly] = useState(true);
@@ -130,6 +132,7 @@ const TrackingDashboard: React.FC<TrackingDashboardProps> = ({
                     toggleKioskPlanning={toggleKioskPlanning}
                     loadingKioskPlanning={loadingKioskPlanning}
                     closeAllKiosks={closeAllKiosks}
+                    forceOpenKioskPlanning={forceOpenKioskPlanning}
                 />
 
                 <GroupSelector

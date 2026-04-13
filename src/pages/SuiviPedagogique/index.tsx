@@ -14,6 +14,7 @@ interface SuiviPedagogiqueProps {
     toggleKioskPlanning?: () => void;
     loadingKioskPlanning?: boolean;
     closeAllKiosks?: () => void;
+    forceOpenKioskPlanning?: () => void;
 }
 
 /**

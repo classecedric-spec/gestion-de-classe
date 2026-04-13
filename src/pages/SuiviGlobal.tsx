@@ -188,6 +188,27 @@ const SuiviGlobal: React.FC = () => {
         }
     };
 
+    const forceOpenKioskPlanning = async () => {
+        if (!userId) return;
+        setLoadingKioskPlanning(true);
+        try {
+            const { error } = await supabase
+                .from('CompteUtilisateur')
+                .update({ kiosk_planning_open: true })
+                .eq('id', userId);
+
+            if (error) throw error;
+
+            setKioskPlanningOpen(true);
+            toast.success("Kiosque Planification OUVERT (Direct)");
+        } catch (e) {
+            console.error(e);
+            toast.error("Échec de l'ouverture directe");
+        } finally {
+            setLoadingKioskPlanning(false);
+        }
+    };
+
 
     // --- Header Content Components ---
     const leftContent = (
@@ -277,6 +298,7 @@ const SuiviGlobal: React.FC = () => {
                         toggleKioskPlanning={toggleKioskPlanning}
                         loadingKioskPlanning={loadingKioskPlanning}
                         closeAllKiosks={closeAllKiosks}
+                        forceOpenKioskPlanning={forceOpenKioskPlanning}
                     />
                 ) : (
                     <AvancementAteliers />

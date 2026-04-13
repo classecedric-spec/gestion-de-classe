@@ -15,7 +15,7 @@
  */
 
 import React from 'react';
-import { Users, Settings2, Maximize, Minimize, Check, Loader2, Keyboard, CalendarDays, Power } from 'lucide-react';
+import { Users, Settings2, Maximize, Minimize, Check, Loader2, Keyboard, CalendarDays, Power, CalendarCheck } from 'lucide-react';
 import { Button } from '../../../../core';
 import clsx from 'clsx';
 
@@ -34,6 +34,7 @@ interface DashboardControlsProps {
     toggleKioskPlanning?: () => void;
     loadingKioskPlanning?: boolean;
     closeAllKiosks?: () => void;
+    forceOpenKioskPlanning?: () => void;
 }
 
 /**
@@ -53,7 +54,8 @@ export const DashboardControls: React.FC<DashboardControlsProps> = ({
     kioskPlanningOpen,
     toggleKioskPlanning,
     loadingKioskPlanning,
-    closeAllKiosks
+    closeAllKiosks,
+    forceOpenKioskPlanning
 }) => {
 
     /** 
@@ -195,6 +197,23 @@ export const DashboardControls: React.FC<DashboardControlsProps> = ({
                                     kioskPlanningOpen ? "bg-success animate-pulse" : "bg-danger"
                                 )} />
                             </div>
+                        )}
+                    </Button>
+                )}
+                
+                {/* BOUTON D'OUVERTURE RAPIDE (Temporaire pour débloquer) */}
+                {forceOpenKioskPlanning && !kioskPlanningOpen && (
+                    <Button
+                        onClick={forceOpenKioskPlanning}
+                        variant="secondary"
+                        disabled={loadingKioskPlanning}
+                        className="p-2.5 h-auto backdrop-blur-xl bg-primary/20 text-primary border-primary/30 hover:bg-primary/30 animate-in fade-in slide-in-from-right-2 transition-all active:scale-95"
+                        title="OUVRIR PLANNING (Rapide)"
+                    >
+                        {loadingKioskPlanning ? (
+                            <Loader2 size={20} className="animate-spin" />
+                        ) : (
+                            <CalendarCheck size={20} />
                         )}
                     </Button>
                 )}
