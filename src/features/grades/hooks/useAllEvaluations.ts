@@ -36,7 +36,6 @@ export const useAllEvaluations = () => {
             const evs = await gradeService.getAllEvaluationsDetailed(user.id);
             
             if (!evs || evs.length === 0) return [];
-            const evIds = evs.map((e: any) => e.id);
 
             // Fetch data in chunks to avoid URL length limits with the .in() filter
             const fetchInChunks = async (table: string, idField: string, ids: string[], selectString: string = '*') => {
@@ -56,6 +55,12 @@ export const useAllEvaluations = () => {
                 }
                 return { data: results };
             };
+
+            const evIds = evs.map((e: any) => e.id).filter(id => id != null);
+            
+            if (evIds.length === 0) {
+                return [];
+            }
 
             const { data: allQuestions } = await fetchInChunks('EvaluationQuestion', 'evaluation_id', evIds);
             const { data: allResults } = await fetchInChunks('Resultat', 'evaluation_id', evIds);

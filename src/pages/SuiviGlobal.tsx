@@ -13,6 +13,9 @@ import { useAuth } from '../hooks/useAuth';
 import { toast } from 'sonner';
 import { cleanupOrphanProgressions } from '../lib/database';
 import { useTimer } from '../features/tracking/hooks/useTimer';
+import ConfirmModal from '../core/ConfirmModal';
+import { trackingService } from '../features/tracking/services/trackingService';
+import { getMonday } from '../utils/dateUtils';
 
 const SuiviGlobal: React.FC = () => {
     const location = useLocation();
@@ -29,6 +32,8 @@ const SuiviGlobal: React.FC = () => {
     const [loadingKiosk, setLoadingKiosk] = useState(false);
     const [kioskPlanningOpen, setKioskPlanningOpen] = useState(false);
     const [loadingKioskPlanning, setLoadingKioskPlanning] = useState(false);
+    const [showResetConfirm, setShowResetConfirm] = useState(false);
+
 
     const {
         timer,
@@ -99,28 +104,90 @@ const SuiviGlobal: React.FC = () => {
         }
     };
 
-    const toggleKioskPlanning = async () => {
+    const toggleKioskPlanning = async (forceNextState?: boolean) => {
         if (!userId) return;
-        setLoadingKioskPlanning(true);
-        const newState = !kioskPlanningOpen;
 
+        const nextState = forceNextState !== undefined ? forceNextState : !kioskPlanningOpen;
+
+        // Si on veut OUVRIR (nextState = true) et qu'on n'est pas déjà ouvert
+        if (nextState && !kioskPlanningOpen && forceNextState === undefined) {
+            setShowResetConfirm(true);
+            return;
+        }
+
+        setLoadingKioskPlanning(true);
         try {
             const { error } = await supabase
                 .from('CompteUtilisateur')
-                .update({ kiosk_planning_open: newState })
+                .update({ kiosk_planning_open: nextState })
                 .eq('id', userId);
 
             if (error) throw error;
 
-            setKioskPlanningOpen(newState);
-            toast.success(newState ? 'Kiosque Planification OUVERT' : 'Kiosque Planification FERMÉ');
+            setKioskPlanningOpen(nextState);
+            if (!nextState) {
+                setSelectedStudentId(null);
+            }
+            toast.success(nextState ? 'Kiosque Planification OUVERT' : 'Kiosque Planification FERMÉ');
         } catch (e) {
             console.error(e);
-            toast.error('Erreur lors de la modification du statut');
+            toast.error('Erreur lors du changement de statut');
         } finally {
             setLoadingKioskPlanning(false);
         }
     };
+
+    const handleConfirmReset = async () => {
+        setShowResetConfirm(false);
+        if (!userId) return;
+
+        try {
+            setLoadingKioskPlanning(true);
+            const weekStart = getMonday();
+            await trackingService.deleteWeeklyPlanning(userId, weekStart);
+            toast.success("Données de la semaine effacées");
+            await toggleKioskPlanning(true);
+        } catch (e) {
+            console.error(e);
+            toast.error("Erreur lors de l'effacement des données");
+        } finally {
+            setLoadingKioskPlanning(false);
+        }
+    };
+
+    const handleCancelReset = () => {
+        setShowResetConfirm(false);
+        toggleKioskPlanning(true);
+    };
+
+    const closeAllKiosks = async () => {
+        if (!userId) return;
+        setLoadingKiosk(true);
+        setLoadingKioskPlanning(true);
+        try {
+            const { error } = await supabase
+                .from('CompteUtilisateur')
+                .update({ 
+                    kiosk_is_open: false, 
+                    kiosk_planning_open: false 
+                })
+                .eq('id', userId);
+
+            if (error) throw error;
+
+            setKioskOpen(false);
+            setKioskPlanningOpen(false);
+            setSelectedStudentId(null);
+            toast.success("Tous les accès kiosque sont FERMÉS");
+        } catch (e) {
+            console.error(e);
+            toast.error("Erreur lors de la fermeture globale");
+        } finally {
+            setLoadingKiosk(false);
+            setLoadingKioskPlanning(false);
+        }
+    };
+
 
     // --- Header Content Components ---
     const leftContent = (
@@ -209,6 +276,7 @@ const SuiviGlobal: React.FC = () => {
                         kioskPlanningOpen={kioskPlanningOpen}
                         toggleKioskPlanning={toggleKioskPlanning}
                         loadingKioskPlanning={loadingKioskPlanning}
+                        closeAllKiosks={closeAllKiosks}
                     />
                 ) : (
                     <AvancementAteliers />
@@ -250,7 +318,19 @@ const SuiviGlobal: React.FC = () => {
                     </div>
                 </div>
             )}
+            <ConfirmModal
+                isOpen={showResetConfirm}
+                onClose={() => setShowResetConfirm(false)}
+                onConfirm={handleConfirmReset}
+                onCancel={handleCancelReset}
+                title="Réinitialiser la planification ?"
+                message="Souhaitez-vous effacer TOUTES les données de planification de cette semaine pour que les élèves recommencent avec une fiche vide ?"
+                confirmText="Oui, effacer"
+                cancelText="Non, garder les données"
+                variant="danger"
+            />
         </PageLayout>
+
     );
 };
 

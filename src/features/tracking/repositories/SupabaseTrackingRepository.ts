@@ -726,6 +726,33 @@ export class SupabaseTrackingRepository implements ITrackingRepository {
 
         return [];
     }
+
+    /**
+     * Supprime les planifications hebdomadaires pour tous les élèves de l'enseignant pour une semaine donnée.
+     */
+    async deleteWeeklyPlanning(userId: string, weekStart: string): Promise<void> {
+        if (!this.validateUserId(userId)) return;
+
+        // 1. Récupérer les IDs des élèves de cet enseignant
+        const { data: students, error: studentError } = await supabase
+            .from('Eleve')
+            .select('id')
+            .eq('titulaire_id', userId);
+
+        if (studentError) throw studentError;
+        if (!students || students.length === 0) return;
+
+        const studentIds = students.map(s => s.id);
+
+        // 2. Supprimer les planifications pour ces élèves et cette semaine
+        const { error: deleteError } = await supabase
+            .from('PlanificationHebdo')
+            .delete()
+            .eq('semaine_debut', weekStart)
+            .in('eleve_id', studentIds);
+
+        if (deleteError) throw deleteError;
+    }
 }
 
 /**

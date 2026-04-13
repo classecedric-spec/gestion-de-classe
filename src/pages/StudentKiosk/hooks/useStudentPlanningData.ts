@@ -4,6 +4,7 @@ import { supabase } from '../../../lib/database';
 import { trackingService } from '../../../features/tracking/services/trackingService';
 import { toast } from 'sonner';
 import { calculateLuckyStatus } from '../../../lib/helpers/mobileEncodingHelpers';
+import { getMonday } from '../../../utils/dateUtils';
 
 export type PlanningStatus = 'non_demarre' | 'demarre' | 'fini' | 'corrige' | 'valide';
 
@@ -44,14 +45,6 @@ export function useStudentPlanningData(studentId: string | undefined) {
     const location = useLocation();
     const token = new URLSearchParams(location.search).get('token');
 
-    // Calculer le lundi de la semaine en cours
-    const getMonday = () => {
-        const d = new Date();
-        const day = d.getDay();
-        const diff = d.getDate() - day + (day === 0 ? -6 : 1);
-        const monday = new Date(d.setDate(diff));
-        return monday.toISOString().split('T')[0];
-    };
 
     const [weekStart] = useState(getMonday());
 

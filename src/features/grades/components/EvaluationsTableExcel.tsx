@@ -19,10 +19,11 @@ import { useGradeMutations } from '../hooks/useGrades';
 import { useUserPreferences } from '../../../hooks/useUserPreferences';
 import clsx from 'clsx';
 
-type ColumnId = 'titre' | 'branche' | 'groupe' | 'periode' | 'date' | 'note_max' | 'type_note' | 'nbQuestions' | 'nbResultats' | 'moyenne' | 'actions';
+type ColumnId = 'select' | 'titre' | 'branche' | 'groupe' | 'periode' | 'date' | 'note_max' | 'type_note' | 'nbQuestions' | 'nbResultats' | 'moyenne' | 'actions';
 type ColumnConfig = { id: ColumnId; width: number };
 
 const DEFAULT_COLUMNS: ColumnConfig[] = [
+    { id: 'select', width: 50 },
     { id: 'titre', width: 250 },
     { id: 'branche', width: 160 },
     { id: 'groupe', width: 140 },
@@ -37,6 +38,7 @@ const DEFAULT_COLUMNS: ColumnConfig[] = [
 ];
 
 const COLUMN_LABELS: Record<ColumnId, string> = {
+    select: '',
     titre: 'Titre',
     branche: 'Branche',
     groupe: 'Groupe',
@@ -58,7 +60,6 @@ interface EvaluationsTableExcelProps {
     groupFilter: string;
     setGroupFilter: (v: string) => void;
     periodeFilter: string;
-    setPeriodeFilter: (v: string) => void;
 }
 
 const EvaluationsTableExcel: React.FC<EvaluationsTableExcelProps> = ({ 
@@ -71,9 +72,34 @@ const EvaluationsTableExcel: React.FC<EvaluationsTableExcelProps> = ({
     periodeFilter,
     setPeriodeFilter
 }) => {
+    /*
+    // --- DEBUG SYSTEM ---
+    const [debugLogs, setDebugLogs] = useState<string[]>([]);
+    const [isDebugVisible, setIsDebugVisible] = useState(false);
+
+    const addDebugLog = (msg: string) => {
+        setDebugLogs(prev => [...prev, `[${new Date().toLocaleTimeString()}] ${msg}`]);
+        setIsDebugVisible(true);
+    };
+
+    const clearDebug = () => {
+        setDebugLogs([]);
+        setIsDebugVisible(false);
+    };
+
+    // Attach to window so we can trigger from exportEvaluationPDF
+    (window as any)._addDebugLog = addDebugLog;
+    (window as any)._clearDebug = clearDebug;
+    // ----------------------
+    */
+
     const { evaluations, loading } = useAllEvaluations();
     const { deleteEvaluation } = useGradeMutations();
     const [evalToDelete, setEvalToDelete] = useState<string | null>(null);
+
+    // Multi-sélection
+    const [selectedEvalIds, setSelectedEvalIds] = useState<Set<string>>(new Set());
+    const [isPrintMode, setIsPrintMode] = useState(false);
 
     // Prépare un lien avec la mémoire locale pour mémoriser et restaurer la largeur des colonnes choisie par l'utilisateur d'une session à l'autre.
     const [savedColumns, setSavedColumns, loadingColumns] = useUserPreferences<ColumnConfig[]>('evaluations_table_columns_v1', DEFAULT_COLUMNS);
@@ -81,14 +107,32 @@ const EvaluationsTableExcel: React.FC<EvaluationsTableExcelProps> = ({
 
     useEffect(() => {
         if (!loadingColumns && savedColumns) {
-            const merged = savedColumns
-                .filter(c => DEFAULT_COLUMNS.some(dc => dc.id === c.id))
-                .map(c => ({
-                    ...c,
-                    width: Math.max(c.width, getMinColumnWidth(c.id))
-                }));
-            const missing = DEFAULT_COLUMNS.filter(dc => !merged.some(mc => mc.id === dc.id));
-            setColumns([...merged, ...missing]);
+            const preserved = savedColumns
+                .filter(c => DEFAULT_COLUMNS.some(dc => dc.id === c.id));
+            
+            // On s'assure que la colonne 'select' est présente (elle est nouvelle)
+            const hasSelect = preserved.some(c => c.id === 'select');
+            let merged = preserved;
+            
+            if (!hasSelect) {
+                merged = [{ id: 'select', width: 50 }, ...preserved];
+            } else {
+                // On force 'select' à être la première colonne pour plus d'ergonomie
+                const selectIdx = merged.findIndex(c => c.id === 'select');
+                if (selectIdx > 0) {
+                    const selectCol = merged[selectIdx];
+                    merged.splice(selectIdx, 1);
+                    merged.unshift(selectCol);
+                }
+            }
+
+            const finalCols = merged.map(c => ({
+                ...c,
+                width: Math.max(c.width, getMinColumnWidth(c.id))
+            }));
+
+            const missing = DEFAULT_COLUMNS.filter(dc => !finalCols.some(mc => mc.id === dc.id));
+            setColumns([...finalCols, ...missing]);
         }
     }, [savedColumns, loadingColumns]);
 
@@ -191,9 +235,6 @@ const EvaluationsTableExcel: React.FC<EvaluationsTableExcelProps> = ({
     const [sortColumn, setSortColumn] = useState<ColumnId | null>(null);
     const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
 
-    // Calcul de la largeur totale du tableau pour forcer l'ascenseur horizontal
-    const totalTableWidth = useMemo(() => columns.reduce((acc, col) => acc + col.width, 0), [columns]);
-
     const handleSort = useCallback((colId: ColumnId) => {
         setSortColumn(current => {
             if (current === colId) {
@@ -268,6 +309,13 @@ const EvaluationsTableExcel: React.FC<EvaluationsTableExcelProps> = ({
             });
     }, [evaluations, searchQuery, branchFilter, groupFilter, periodeFilter, sortColumn, sortDirection]);
 
+    const activeColumns = useMemo(() => {
+        if (!isPrintMode) return columns.filter(c => c.id !== 'select');
+        return columns;
+    }, [columns, isPrintMode]);
+
+    const totalTableWidth = useMemo(() => activeColumns.reduce((acc, col) => acc + col.width, 0), [activeColumns]);
+
     if (loading) {
         return (
             <div className="flex flex-col items-center justify-center py-20 gap-4">
@@ -310,6 +358,39 @@ const EvaluationsTableExcel: React.FC<EvaluationsTableExcelProps> = ({
                         </p>
                     </div>
                 </div>
+
+                <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-3 pr-4 border-r border-white/10">
+                        <span className={clsx(
+                            "text-[10px] font-black uppercase tracking-widest transition-colors",
+                            isPrintMode ? "text-primary" : "text-grey-medium"
+                        )}>
+                            Mode Impression
+                        </span>
+                        <button
+                            onClick={() => setIsPrintMode(!isPrintMode)}
+                            className={clsx(
+                                "relative w-10 h-5 rounded-full transition-all duration-300 p-1",
+                                isPrintMode ? "bg-primary shadow-[0_0_12px_rgba(var(--color-primary-rgb),0.4)]" : "bg-white/10"
+                            )}
+                        >
+                            <div className={clsx(
+                                "w-3 h-3 rounded-full bg-white transition-all duration-300 transform shadow-sm",
+                                isPrintMode ? "translate-x-5" : "translate-x-0"
+                            )} />
+                        </button>
+                    </div>
+
+                    {isPrintMode && selectedEvalIds.size > 0 && (
+                        <button
+                            onClick={() => exportBulkEvaluationPDF(Array.from(selectedEvalIds), Array.from(selectedEvalIds).map(id => evaluations.find((e: any) => e.id === id)))}
+                            className="flex items-center gap-2 px-4 py-2 bg-red-600/20 text-red-400 border border-red-500/30 rounded-xl font-bold text-xs uppercase tracking-widest hover:bg-red-600/30 transition-all animate-in zoom-in-95 duration-200"
+                        >
+                            <FileText size={16} />
+                            Exporter PDF ({selectedEvalIds.size})
+                        </button>
+                    )}
+                </div>
             </div>
 
             {/* Table */}
@@ -321,7 +402,7 @@ const EvaluationsTableExcel: React.FC<EvaluationsTableExcelProps> = ({
                     >
                         <thead className="sticky top-0 z-10 bg-table-header select-none">
                             <tr>
-                                {columns.map((col, index) => (
+                                {activeColumns.map((col, index) => (
                                     <th
                                         key={col.id}
                                         style={{ width: col.width, minWidth: col.width, maxWidth: col.width }}
@@ -342,7 +423,11 @@ const EvaluationsTableExcel: React.FC<EvaluationsTableExcelProps> = ({
                                                 searchQuery, setSearchQuery, isSearchOpen, setIsSearchOpen, searchMenuRef, searchTriggerRef,
                                                 branchFilter, setBranchFilter, isBranchMenuOpen, setIsBranchMenuOpen, branchMenuRef, availableBranches,
                                                 groupFilter, setGroupFilter, isGroupMenuOpen, setIsGroupMenuOpen, groupMenuRef, availableGroups,
-                                                periodeFilter, setPeriodeFilter, isPeriodeMenuOpen, setIsPeriodeMenuOpen, periodeMenuRef, availablePeriodes
+                                                periodeFilter, setPeriodeFilter, isPeriodeMenuOpen, setIsPeriodeMenuOpen, periodeMenuRef, availablePeriodes,
+                                                // Pour la sélection
+                                                displayedEvaluations,
+                                                selectedEvalIds,
+                                                setSelectedEvalIds
                                             })}
                                         </div>
                                         <div
@@ -356,20 +441,22 @@ const EvaluationsTableExcel: React.FC<EvaluationsTableExcelProps> = ({
                         <tbody className="divide-y divide-white/5">
                             {displayedEvaluations.length === 0 ? (
                                 <tr>
-                                    <td colSpan={columns.length} className="p-12 text-center text-grey-medium">
+                                    <td colSpan={activeColumns.length} className="p-12 text-center text-grey-medium">
                                         Aucune évaluation ne correspond aux filtres.
                                     </td>
                                 </tr>
                             ) : (
                                 displayedEvaluations.map((ev: any) => (
-                                    <EvaluationRow
-                                        key={ev.id}
-                                        ev={ev}
-                                        columns={columns}
-                                        onSelectEvaluation={onSelectEvaluation}
-                                        onEditEvaluation={onEditEvaluation}
-                                        setEvalToDelete={setEvalToDelete}
-                                    />
+                                        <EvaluationRow
+                                            key={ev.id}
+                                            ev={ev}
+                                            columns={activeColumns}
+                                            onSelectEvaluation={onSelectEvaluation}
+                                            onEditEvaluation={onEditEvaluation}
+                                            setEvalToDelete={setEvalToDelete}
+                                            selectedEvalIds={selectedEvalIds}
+                                            setSelectedEvalIds={setSelectedEvalIds}
+                                        />
                                 ))
                             )}
                         </tbody>
@@ -391,6 +478,37 @@ const EvaluationsTableExcel: React.FC<EvaluationsTableExcelProps> = ({
                 confirmText="Supprimer"
                 variant="danger"
             />
+
+            {/* DEBUG OVERLAY 
+            {isDebugVisible && (
+                <div className="fixed bottom-6 right-6 w-96 bg-surface border-2 border-primary/30 rounded-2xl shadow-2xl z-[9999] overflow-hidden animate-in slide-in-from-bottom-4 duration-300">
+                    <div className="bg-primary/10 p-3 border-b border-white/10 flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                            <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />
+                            <span className="font-bold text-xs uppercase tracking-widest text-primary">Debug Export console</span>
+                        </div>
+                        <button 
+                            onClick={clearDebug}
+                            className="text-grey-medium hover:text-white transition-colors"
+                        >
+                            <X size={16} />
+                        </button>
+                    </div>
+                    <div className="p-4 max-h-[300px] overflow-y-auto font-mono text-[11px] space-y-1 custom-scrollbar bg-black/40">
+                        {debugLogs.length === 0 && <span className="text-grey-medium italic">En attente d'actions...</span>}
+                        {debugLogs.map((log, i) => (
+                            <div key={i} className={clsx(
+                                "border-l-2 pl-2 py-0.5",
+                                log.includes('❌') ? "border-rose-500 text-rose-400" : 
+                                log.includes('✅') ? "border-emerald-500 text-emerald-400" : "border-primary/30 text-text-main"
+                            )}>
+                                {log}
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+            */}
         </div>
     );
 };
@@ -398,6 +516,7 @@ const EvaluationsTableExcel: React.FC<EvaluationsTableExcelProps> = ({
 // Petite aide : convertit les informations compliquées d'une case (ex: une date) en un simple texte ou chiffre facilement triable par le système.
 function getCellSortValue(ev: any, colId: ColumnId): string | number | null {
     switch (colId) {
+        case 'select': return 0;
         case 'titre': return ev.titre || '';
         case 'branche': return ev._brancheName || '';
         case 'groupe': return ev._groupeName || '';
@@ -419,6 +538,35 @@ function renderHeaderContent(colId: ColumnId, ctx: any) {
     const SortIcon = isSorted ? (sortDirection === 'asc' ? ArrowUp : ArrowDown) : null;
 
     switch (colId) {
+        case 'select': {
+            const { displayedEvaluations, selectedEvalIds, setSelectedEvalIds } = ctx;
+            const allSelected = displayedEvaluations.length > 0 && displayedEvaluations.every((ev: any) => selectedEvalIds.has(ev.id));
+            const someSelected = displayedEvaluations.some((ev: any) => selectedEvalIds.has(ev.id)) && !allSelected;
+
+            return (
+                <div className="flex justify-center items-center">
+                    <div 
+                        onClick={() => {
+                            const newSelected = new Set(selectedEvalIds);
+                            if (allSelected) {
+                                displayedEvaluations.forEach((ev: any) => newSelected.delete(ev.id));
+                            } else {
+                                displayedEvaluations.forEach((ev: any) => newSelected.add(ev.id));
+                            }
+                            setSelectedEvalIds(newSelected);
+                        }}
+                        className={clsx(
+                            "w-5 h-5 rounded border-2 flex items-center justify-center cursor-pointer transition-all duration-200",
+                            allSelected ? "bg-primary border-primary scale-110 shadow-[0_0_10px_rgba(var(--color-primary-rgb),0.5)]" : 
+                            someSelected ? "bg-primary/20 border-primary shadow-inner" : "bg-white/5 border-white/20 hover:border-white/40"
+                        )}
+                    >
+                        {allSelected && <ChevronRight className="w-3.5 h-3.5 text-white rotate-90" strokeWidth={4} />}
+                        {someSelected && <div className="w-2.5 h-0.5 bg-primary rounded-full" />}
+                    </div>
+                </div>
+            );
+        }
         case 'titre': {
             const { searchQuery, setSearchQuery, isSearchOpen, setIsSearchOpen, searchMenuRef, searchTriggerRef } = ctx;
             
@@ -673,14 +821,18 @@ const EvaluationCell = React.memo(({
     width,
     onSelectEvaluation, 
     setEvalToDelete, 
-    onEditEvaluation 
+    onEditEvaluation,
+    selectedEvalIds,
+    setSelectedEvalIds
 }: { 
     colId: ColumnId, 
     ev: any, 
     width: number,
     onSelectEvaluation: (id: string) => void,
     setEvalToDelete: (id: string | null) => void,
-    onEditEvaluation: (ev: any) => void
+    onEditEvaluation: (ev: any) => void,
+    selectedEvalIds: Set<string>,
+    setSelectedEvalIds: (s: Set<string>) => void
 }) => {
     return (
         <td
@@ -693,7 +845,7 @@ const EvaluationCell = React.memo(({
                 if (colId === 'titre') onSelectEvaluation(ev.id);
             }}
         >
-            {renderCellContent(colId, ev, onSelectEvaluation, setEvalToDelete, onEditEvaluation)}
+            {renderCellContent(colId, ev, onSelectEvaluation, setEvalToDelete, onEditEvaluation, selectedEvalIds, setSelectedEvalIds)}
         </td>
     );
 });
@@ -705,16 +857,24 @@ const EvaluationRow = React.memo(({
     columns, 
     onSelectEvaluation, 
     onEditEvaluation, 
-    setEvalToDelete 
+    setEvalToDelete,
+    selectedEvalIds,
+    setSelectedEvalIds
 }: { 
     ev: any, 
     columns: ColumnConfig[], 
     onSelectEvaluation: (id: string) => void,
     onEditEvaluation: (ev: any) => void,
-    setEvalToDelete: (id: string | null) => void
+    setEvalToDelete: (id: string | null) => void,
+    selectedEvalIds: Set<string>,
+    setSelectedEvalIds: (s: Set<string>) => void
 }) => {
+    const isSelected = selectedEvalIds.has(ev.id);
     return (
-        <tr className="hover:bg-white/[0.02] transition-colors group">
+        <tr className={clsx(
+            "transition-colors group",
+            isSelected ? "bg-primary/5 hover:bg-primary/10" : "hover:bg-white/[0.02]"
+        )}>
             {columns.map(col => (
                 <EvaluationCell
                     key={col.id}
@@ -724,6 +884,8 @@ const EvaluationRow = React.memo(({
                     onSelectEvaluation={onSelectEvaluation}
                     onEditEvaluation={onEditEvaluation}
                     setEvalToDelete={setEvalToDelete}
+                    selectedEvalIds={selectedEvalIds}
+                    setSelectedEvalIds={setSelectedEvalIds}
                 />
             ))}
         </tr>
@@ -738,9 +900,33 @@ function renderCellContent(
     ev: any, 
     onSelectEvaluation: (id: string) => void,
     setEvalToDelete: (id: string | null) => void,
-    onEditEvaluation: (ev: any) => void
+    onEditEvaluation: (ev: any) => void,
+    selectedEvalIds: Set<string>,
+    setSelectedEvalIds: (s: Set<string>) => void
 ) {
     switch (colId) {
+        case 'select': {
+            const isSelected = selectedEvalIds.has(ev.id);
+            return (
+                <div className="flex justify-center items-center">
+                    <div 
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            const newSelected = new Set(selectedEvalIds);
+                            if (isSelected) newSelected.delete(ev.id);
+                            else newSelected.add(ev.id);
+                            setSelectedEvalIds(newSelected);
+                        }}
+                        className={clsx(
+                            "w-5 h-5 rounded border-2 flex items-center justify-center cursor-pointer transition-all duration-200",
+                            isSelected ? "bg-primary border-primary scale-110 shadow-[0_0_10px_rgba(var(--color-primary-rgb),0.3)]" : "bg-white/5 border-white/20 hover:border-white/40"
+                        )}
+                    >
+                        {isSelected && <ChevronRight className="w-3.5 h-3.5 text-white rotate-90" strokeWidth={4} />}
+                    </div>
+                </div>
+            );
+        }
         case 'titre':
             return (
                 <div
@@ -839,6 +1025,7 @@ function renderCellContent(
                     <button
                         onClick={(e) => {
                             e.stopPropagation();
+                            console.log("[UI] Excel button clicked");
                             exportEvaluationData(ev);
                         }}
                         className="p-2 rounded-lg text-emerald-400 hover:text-emerald-500 hover:bg-emerald-500/10 transition-colors mr-1"
@@ -895,47 +1082,29 @@ function renderCellContent(
 async function exportEvaluationData(ev: any) {
     try {
         const { toast } = await import('sonner');
-        toast.loading("Génération du fichier Excel/CSV...", { id: `export_${ev.id}` });
+        toast.loading("Génération du fichier Excel...", { id: `export_${ev.id}` });
 
         const { supabase, getCurrentUser } = await import('../../../lib/database');
-        const { trackingService } = await import('../../tracking/services/trackingService');
-
-        // 0. Get User
         const user = await getCurrentUser();
-        if (!user) {
-            toast.error("Utilisateur non connecté", { id: `export_${ev.id}` });
-            return;
-        }
+        if (!user) return;
 
         // 1. Get Students
-        const studentData = await trackingService.fetchStudentsInGroup(ev.group_id, user.id);
-        const students = studentData.full || [];
+        const { trackingService } = await import('../../tracking/services/trackingService');
+        const studentsData = await trackingService.fetchStudentsInGroup(ev.group_id, user.id);
+        const students = (studentsData?.full || []).sort((a: any, b: any) => a.nom.localeCompare(b.nom));
 
-        // Sort Students
-        students.sort((a: any, b: any) => {
-            const niveauA = a.Niveau?.ordre ?? 0;
-            const niveauB = b.Niveau?.ordre ?? 0;
-            if (niveauA !== niveauB) return niveauA - niveauB;
-
-            const niveauCmp = (a.Niveau?.nom || '').localeCompare(b.Niveau?.nom || '');
-            if (niveauCmp !== 0) return niveauCmp;
-            const prenomCmp = (a.prenom || '').localeCompare(b.prenom || '');
-            if (prenomCmp !== 0) return prenomCmp;
-            return (a.nom || '').localeCompare(b.nom || '');
-        });
-
-        // 2. Get Global Results
-        const { data: resultsData } = await supabase.from('Resultat').select('*').eq('evaluation_id', ev.id).eq('user_id', user.id);
+        // 2. Get Results
+        const { data: resultsData } = await supabase.from('Resultat').select('*').eq('evaluation_id', ev.id);
         const results = resultsData || [];
 
         // 3. Get Questions and Question Results
-        const { data: qData } = await supabase.from('EvaluationQuestion').select('*').eq('evaluation_id', ev.id).eq('user_id', user.id).order('ordre', { ascending: true });
+        const { data: qData } = await supabase.from('EvaluationQuestion').select('*').eq('evaluation_id', ev.id).order('ordre', { ascending: true });
         const questions = qData || [];
 
         let questionResults: any[] = [];
         if (questions.length > 0) {
             const questionIds = questions.map((q: any) => q.id);
-            const { data: qrData } = await supabase.from('ResultatQuestion').select('*').in('question_id', questionIds).eq('user_id', user.id);
+            const { data: qrData } = await supabase.from('ResultatQuestion').select('*').in('question_id', questionIds);
             questionResults = qrData || [];
         }
 
@@ -976,7 +1145,7 @@ async function exportEvaluationData(ev: any) {
                 row.push(qRes?.note ?? "");
             });
 
-            row.push(res?.commentaire || "");
+            row.push(res?.commentaires || "");
 
             csvContent += row.map(formatField).join(sep) + "\n";
         });
@@ -1001,106 +1170,163 @@ async function exportEvaluationData(ev: any) {
 }
 
 async function exportEvaluationPDF(ev: any) {
+    return exportBulkEvaluationPDF([ev.id], [ev]);
+}
+
+async function exportBulkEvaluationPDF(evalIds: string[], evalSummaryList: any[]) {
+    // On désactive les logs de debug pour la version finale
+    const log = (msg: string) => {}; 
+    /*
+    const logHelper = (msg: string) => (window as any)._addDebugLog?.(msg);
+    (window as any)._clearDebug?.();
+    logHelper(`🚀 [1/4] Démarrage export groupé (${evalIds.length} évaluations)`);
+    */
+    
     try {
+        log("📂 Chargement des dépendances...");
         const { toast } = await import('sonner');
-        toast.loading("Génération du rapport PDF...", { id: `pdf_${ev.id}` });
-
-        const { supabase, getCurrentUser } = await import('../../../lib/database');
-        const { trackingService } = await import('../../tracking/services/trackingService');
-        const { downloadFile } = await import('../../../lib/helpers/download');
         const { pdf } = await import('@react-pdf/renderer');
-        const { default: EvaluationPDF } = await import('./EvaluationPDF');
+        const { default: EvaluationPDFComponent } = await import('./EvaluationPDF');
+        const { gradeService } = await import('../services');
+        const { getCurrentUser, supabase } = await import('../../../lib/database');
+        const { trackingService } = await import('../../tracking/services/trackingService');
+        
+        const toastId = `bulk_pdf_export_${Date.now()}`;
+        toast.loading(`Préparation de l'export (${evalIds.length} évaluations)...`, { id: toastId });
 
-        // 0. Get User
+        log("👤 Identification de l'utilisateur...");
         const user = await getCurrentUser();
         if (!user) {
-            toast.error("Utilisateur non connecté", { id: `pdf_${ev.id}` });
+            log("❌ Erreur: Utilisateur non trouvé");
+            toast.error("Utilisateur non authentifié", { id: toastId });
             return;
         }
 
-        // 0.5 S'assurer d'avoir l'évaluation complète (type_note_id peut manquer dans certaines vues)
-        let contextEv = ev;
-        if (!ev.type_note_id || !ev.group_id) {
-            const { data: dbEv } = await supabase
-                .from('Evaluation')
-                .select('*')
-                .eq('id', ev.id)
-                .single();
-            if (dbEv) contextEv = { ...ev, ...dbEv };
-        }
+        log("📡 Récupération globale des données en lot...");
+        
+        // 1. Fetch all detailed evaluation data (to get group_id, type_note_id, etc.)
+        const { data: fullEvals, error: evalError } = await supabase
+            .from('Evaluation')
+            .select('*, Branche(nom), Groupe(nom)')
+            .in('id', evalIds);
+        
+        if (evalError) throw evalError;
 
-        // 1. Get All Students in Group
-        const studentData = await trackingService.fetchStudentsInGroup(contextEv.group_id, user.id);
-        const students = studentData.full || [];
-
-        // Sort Students (Same logic as Excel export)
-        students.sort((a: any, b: any) => {
-            const niveauA = a.Niveau?.ordre ?? 0;
-            const niveauB = b.Niveau?.ordre ?? 0;
-            if (niveauA !== niveauB) return niveauA - niveauB;
-            const prenomCmp = (a.prenom || '').localeCompare(b.prenom || '');
-            if (prenomCmp !== 0) return prenomCmp;
-            return (a.nom || '').localeCompare(b.nom || '');
+        // 2. Identify all groups involved to get all unique students
+        const groupIds = Array.from(new Set(fullEvals.map(e => e.group_id)));
+        log(`👥 Recherche des élèves dans ${groupIds.length} groupes...`);
+        
+        // Fetch all students for these groups
+        const studentsPromises = groupIds.map(gid => trackingService.fetchStudentsInGroup(gid, user.id));
+        const studentsResults = await Promise.all(studentsPromises);
+        
+        // Merge and unique students
+        const allStudentsMap = new Map();
+        studentsResults.forEach(res => {
+            (res?.full || []).forEach((s: any) => {
+                allStudentsMap.set(s.id, s);
+            });
         });
+        const allStudents = Array.from(allStudentsMap.values()).sort((a, b) => a.nom.localeCompare(b.nom));
+        log(`✅ ${allStudents.length} élèves identifiés au total.`);
 
-        // 2. Get Data related to Evaluation
-        const [resultsRes, questionsRes, typeNoteRes] = await Promise.all([
-            supabase.from('Resultat').select('*').eq('evaluation_id', contextEv.id).eq('user_id', user.id),
-            supabase.from('EvaluationQuestion').select('*').eq('evaluation_id', contextEv.id).order('ordre', { ascending: true }),
-            contextEv.type_note_id ? supabase.from('TypeNote').select('*').eq('id', contextEv.type_note_id).single() : Promise.resolve({ data: null, error: new Error("ID type note manquant") })
+        // 3. Fetch all questions, results, questionResults for ALL evaluations
+        log("📊 Récupération de tous les résultats et critères...");
+        const [
+            allQuestions,
+            allResults,
+            allQuestionResults,
+            noteTypes
+        ] = await Promise.all([
+            gradeService.getQuestionsForEvaluations(evalIds, user.id),
+            gradeService.getResultsForEvaluations(evalIds, user.id),
+            gradeService.getQuestionResultsForEvaluations(evalIds, user.id),
+            gradeService.getNoteTypes(user.id)
         ]);
 
-        const results = resultsRes.data || [];
-        const questions = questionsRes.data || [];
-        const typeNote = typeNoteRes.data;
+        log(`✅ Données chargées : ${allQuestions.length} critères, ${allResults.length} notes.`);
 
-        if (typeNoteRes.error && contextEv.type_note_id) {
-            console.error("TypeNote fetch error:", typeNoteRes.error);
-        }
+        // 4. Group data for the PDF component
+        // The PDF component will now expect an array of evaluations, each with its own specific data.
+        const evaluationsData = fullEvals.map(ev => {
+            const evQuestions = allQuestions.filter((q: any) => q.evaluation_id === ev.id);
+            const evResults = allResults.filter((r: any) => r.evaluation_id === ev.id);
+            const evQuestionResults = allQuestionResults.filter((qr: any) => {
+                // Since qr might not have evaluation_id directly (depending on DB structure), 
+                // we match it via question_id -> evQuestions
+                return evQuestions.some((q: any) => q.id === qr.question_id);
+            });
+            const typeNote = noteTypes.find((nt: any) => nt.id === ev.type_note_id);
 
-        if (!typeNote) {
-            toast.error("Système de notation introuvable ou non défini pour cette évaluation", { id: `pdf_${ev.id}` });
-            return;
-        }
+            return {
+                evaluation: { ...ev, _brancheName: ev.Branche?.nom },
+                questions: evQuestions,
+                results: evResults,
+                questionResults: evQuestionResults,
+                typeNote
+            };
+        });
 
-        // 3. Get Question Results
-        let questionResults: any[] = [];
-        if (questions.length > 0) {
-            const questionIds = questions.map((q: any) => q.id);
-            const { data: qrData } = await supabase.from('ResultatQuestion').select('*').in('question_id', questionIds);
-            questionResults = qrData || [];
-        }
-
-        // 4. Generate PDF
-        const doc = <EvaluationPDF 
-            evaluation={contextEv}
-            students={students}
-            questions={questions}
-            results={results}
-            questionResults={questionResults}
-            typeNote={typeNote}
-        />;
-
-        // On enveloppe dans un try/catch spécifique pour attraper les erreurs de rendu PDF
-        let blob;
+        // --- GÉNÉRATION DU FICHIER RÉEL ---
+        log("");
+        log("📁 GÉNÉRATION DES DOCUMENTS INDIVIDUELS...");
+        log("⏳ Fusion des fiches élèves (cela peut prendre quelques secondes)...");
+        
         try {
-            blob = await pdf(doc).toBlob();
-        } catch (pdfError) {
-            console.error("Rendering PDF error", pdfError);
-            toast.error("Échec du rendu du PDF. Vérifiez les données.", { id: `pdf_${ev.id}` });
-            return;
+            const { PDFDocument } = await import('pdf-lib');
+            const mergedPdf = await PDFDocument.create();
+            let processedCount = 0;
+
+            for (const student of allStudents) {
+                processedCount++;
+                log(`📄 [${processedCount}/${allStudents.length}] Génération pour ${student.prenom} ${student.nom}...`);
+                
+                const pdfBlob = await pdf(
+                    <EvaluationPDFComponent 
+                        bulkMode={true}
+                        evaluationsData={evaluationsData}
+                        student={student}
+                    />
+                ).toBlob();
+                
+                const arrayBuffer = await pdfBlob.arrayBuffer();
+                const pdfDoc = await PDFDocument.load(arrayBuffer);
+                const copiedPages = await mergedPdf.copyPages(pdfDoc, pdfDoc.getPageIndices());
+                copiedPages.forEach((page) => mergedPdf.addPage(page));
+            }
+
+            log("🔗 Fusion finale des documents...");
+            const mergedPdfBytes = await mergedPdf.save();
+            const blob = new Blob([mergedPdfBytes], { type: 'application/pdf' });
+
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `Export_Groupé_Evaluations_${new Date().toLocaleDateString('fr-FR').replace(/\//g, '-')}.pdf`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+
+            log("✅ EXPORT TERMINÉ AVEC SUCCÈS");
+            toast.success("PDF groupé téléchargé !", { id: toastId });
+        } catch (pdfError: any) {
+            log("❌ ERREUR GÉNÉRATION PDF: " + pdfError.message);
+            toast.error("Échec de génération PDF", { id: toastId });
         }
         
-        // 5. Download using the standard downloadFile helper (Save As)
-        const safeTitle = (ev.titre || 'evaluation').replace(/[^a-z0-9]/gi, '_').toLowerCase();
-        await downloadFile(blob, `fiche_${safeTitle}.pdf`, 'Document PDF');
-
-        toast.success("Rapport PDF généré avec succès !", { id: `pdf_${ev.id}` });
-    } catch (error) {
-        console.error("PDF Export error", error);
+    } catch (error: any) {
+        log("❌ ERREUR CRITIQUE: " + error.message);
         const { toast } = await import('sonner');
-        toast.error("Erreur lors de la génération du PDF", { id: `pdf_${ev.id}` });
+        toast.error(`Erreur : ${error.message}`);
     }
+}
+
+// Expose for debugging if needed
+if (typeof window !== 'undefined') {
+    (window as any)._exportEvaluationPDF = exportEvaluationPDF;
+    (window as any)._exportEvaluationData = exportEvaluationData;
+    (window as any)._exportBulkEvaluationPDF = exportBulkEvaluationPDF;
 }
 
 export default EvaluationsTableExcel;

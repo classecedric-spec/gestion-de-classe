@@ -8,6 +8,7 @@ export interface ConfirmModalProps {
     isOpen: boolean;
     onClose: () => void;
     onConfirm: () => void;
+    onCancel?: () => void;
     title?: string;
     message?: string;
     confirmText?: string;
@@ -22,6 +23,7 @@ const ConfirmModal: React.FC<ConfirmModalProps> = ({
     isOpen,
     onClose,
     onConfirm,
+    onCancel,
     title = "Confirmation",
     message = "Êtes-vous sûr de vouloir continuer ?",
     confirmText = "Confirmer",
@@ -62,7 +64,7 @@ const ConfirmModal: React.FC<ConfirmModalProps> = ({
             }
             footer={
                 <BaseModal.Footer
-                    onCancel={onClose}
+                    onCancel={onCancel || onClose}
                     onConfirm={handleConfirm}
                     confirmText={confirmText}
                     cancelText={cancelText}

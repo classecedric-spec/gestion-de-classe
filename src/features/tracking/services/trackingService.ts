@@ -231,6 +231,14 @@ export class TrackingService {
         if (!userId) throw new Error("userId is required in getUnfinishedModulesByDate");
         return await this.repository.getUnfinishedModulesByDate(studentId, date, userId);
     }
+
+    /**
+     * Supprime toutes les planifications de la semaine actuelle pour les élèves de l'enseignant.
+     */
+    async deleteWeeklyPlanning(userId: string, weekStart: string): Promise<void> {
+        if (!userId) throw new Error("userId is required in deleteWeeklyPlanning");
+        return await this.repository.deleteWeeklyPlanning(userId, weekStart);
+    }
 }
 
 // INSTANCE UNIQUE (Singleton) : On crée une seule version de ce service

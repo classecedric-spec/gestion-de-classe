@@ -13,6 +13,7 @@ interface SuiviPedagogiqueProps {
     kioskPlanningOpen?: boolean;
     toggleKioskPlanning?: () => void;
     loadingKioskPlanning?: boolean;
+    closeAllKiosks?: () => void;
 }
 
 /**

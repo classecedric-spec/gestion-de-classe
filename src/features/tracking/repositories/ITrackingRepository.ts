@@ -128,6 +128,9 @@ export interface ITrackingRepository {
     // Gestion des envois hebdomadaires
     /** Liste les exercices non terminés après une date limite. */
     getUnfinishedModulesByDate(studentId: string, date: string, userId: string): Promise<any[]>;
+
+    /** Supprime les planifications hebdomadaires pour tous les élèves d'un utilisateur à une date donnée. */
+    deleteWeeklyPlanning(userId: string, weekStart: string): Promise<void>;
 }
 
 export type { ProgressionWithDetails, StudentBasicInfo };

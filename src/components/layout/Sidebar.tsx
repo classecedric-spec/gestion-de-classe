@@ -60,13 +60,23 @@ export function Sidebar({
             isOpen ? "is-explicitly-open" : "shadow-2xl translate-x-[-100%] opacity-0 pointer-events-none"
         )}>
             {/* Header */}
-            <div className="p-6 flex items-center justify-between">
-                <h1 className="text-xl font-bold text-primary truncate">
-                    Gestion Classe
-                </h1>
+            <div className="p-6 flex items-center justify-between gap-3 overflow-hidden">
+                <div className="flex items-center gap-2 min-w-0">
+                    <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0 border border-primary/20">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-primary">
+                            <path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1-0.5-5" />
+                            <path d="M8 7h6" />
+                            <path d="M8 11h8" />
+                            <path d="M8 15h6" />
+                        </svg>
+                    </div>
+                    <h1 className="text-lg font-black text-primary truncate leading-tight">
+                        Gestion de Classe
+                    </h1>
+                </div>
                 <button
                     onClick={onClose}
-                    className="p-1.5 hover:bg-white/5 rounded-lg text-grey-medium hover:text-white transition-colors"
+                    className="p-1.5 hover:bg-white/5 rounded-lg text-grey-medium hover:text-white transition-colors shrink-0"
                     title="Fermer le menu"
                 >
                     <ChevronLeft size={20} />

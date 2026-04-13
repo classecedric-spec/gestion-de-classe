@@ -15,7 +15,7 @@
  */
 
 import React from 'react';
-import { Users, Settings2, Maximize, Minimize, Check, Loader2, Keyboard, CalendarDays } from 'lucide-react';
+import { Users, Settings2, Maximize, Minimize, Check, Loader2, Keyboard, CalendarDays, Power } from 'lucide-react';
 import { Button } from '../../../../core';
 import clsx from 'clsx';
 
@@ -33,6 +33,7 @@ interface DashboardControlsProps {
     kioskPlanningOpen?: boolean;
     toggleKioskPlanning?: () => void;
     loadingKioskPlanning?: boolean;
+    closeAllKiosks?: () => void;
 }
 
 /**
@@ -51,7 +52,8 @@ export const DashboardControls: React.FC<DashboardControlsProps> = ({
     loadingKiosk,
     kioskPlanningOpen,
     toggleKioskPlanning,
-    loadingKioskPlanning
+    loadingKioskPlanning,
+    closeAllKiosks
 }) => {
 
     /** 
@@ -193,6 +195,23 @@ export const DashboardControls: React.FC<DashboardControlsProps> = ({
                                     kioskPlanningOpen ? "bg-success animate-pulse" : "bg-danger"
                                 )} />
                             </div>
+                        )}
+                    </Button>
+                )}
+                
+                {/* BOUTON D'URGENCE : Fermeture globale si au moins un kiosque est ouvert */}
+                {closeAllKiosks && (kioskOpen || kioskPlanningOpen) && (
+                    <Button
+                        onClick={closeAllKiosks}
+                        variant="secondary"
+                        disabled={loadingKiosk || loadingKioskPlanning}
+                        className="p-2.5 h-auto backdrop-blur-xl bg-danger text-white border-danger shadow-[0_0_20px_rgba(239,68,68,0.4)] hover:bg-danger/90 animate-in fade-in slide-in-from-right-4 transition-all active:scale-95"
+                        title="TOUT FERMER (Urgence)"
+                    >
+                        {(loadingKiosk || loadingKioskPlanning) ? (
+                            <Loader2 size={20} className="animate-spin" />
+                        ) : (
+                            <Power size={20} />
                         )}
                     </Button>
                 )}
