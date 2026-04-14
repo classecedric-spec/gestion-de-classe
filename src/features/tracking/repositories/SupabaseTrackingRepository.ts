@@ -156,47 +156,81 @@ export class SupabaseTrackingRepository implements ITrackingRepository {
      * Récupère tous les élèves d'un groupe avec leurs informations de niveau scolaire.
      */
     async getStudentsInGroup(groupId: string, userId: string): Promise<{ ids: string[], full: Tables<'Eleve'>[] }> {
-        if (!this.validateUserId(userId)) return { ids: [], full: [] };
+        if (!this.validateUserId(userId)) {
+            console.warn('[TrackingRepo] getStudentsInGroup aborted: invalid userId', userId);
+            return { ids: [], full: [] };
+        }
+        
+        console.log('[TrackingRepo] Fetching students in group:', groupId, 'for teacher:', userId);
+        
+        // On récupère les liens du groupe. L'RLS s'occupe déjà de filtrer sur auth.uid()
         const { data, error } = await supabase
             .from('EleveGroupe')
             .select('eleve_id, Eleve!inner(*, Niveau(*))')
-            .eq('groupe_id', groupId)
-            .eq('Eleve.titulaire_id', userId);
+            .eq('groupe_id', groupId);
 
-        if (error) throw error;
+        if (error) {
+            console.error('[TrackingRepo] Supabase query error:', error);
+            throw error;
+        }
+        
+        console.log('[TrackingRepo] Raw join result rows:', data?.length);
 
-    return {
-      ids: data.map((d: any) => d.eleve_id),
-      full: data.map((d: any) => d.Eleve).filter(Boolean)
-    };
-  }
+        if (!data || data.length === 0) {
+            console.warn('[TrackingRepo] No students found for group:', groupId);
+            return { ids: [], full: [] };
+        }
 
-  /**
-   * Récupère tous les élèves de plusieurs groupes avec leurs informations de niveau scolaire.
-   */
-  async getStudentsInGroups(groupIds: string[], userId: string): Promise<{ ids: string[], full: Tables<'Eleve'>[] }> {
-    if (!this.validateUserId(userId) || groupIds.length === 0) return { ids: [], full: [] };
-    const { data, error } = await supabase
-      .from('EleveGroupe')
-      .select('eleve_id, Eleve!inner(*, Niveau(*))')
-      .in('groupe_id', groupIds)
-      .eq('Eleve.titulaire_id', userId);
+        const full = data.map((d: any) => {
+            const student = d.Eleve || d.eleve;
+            if (!student) return null;
+            // On s'assure que Niveau est accessible via 'niveau' ou 'Niveau'
+            student.niveau = student.Niveau || student.niveau;
+            return student;
+        }).filter(Boolean);
 
-    if (error) throw error;
+        console.log('[TrackingRepo] Valid students with data:', full.length);
 
-    // Remove duplicates if a student is in multiple groups
-    const uniqueMap = new Map();
-    data.forEach((d: any) => {
-      if (d.Eleve && !uniqueMap.has(d.eleve_id)) {
-        uniqueMap.set(d.eleve_id, d.Eleve);
-      }
-    });
+        return {
+            ids: full.map((s: any) => s.id),
+            full
+        };
+    }
 
-    return {
-      ids: Array.from(uniqueMap.keys()),
-      full: Array.from(uniqueMap.values())
-    };
-  }
+    async getStudentsInGroups(groupIds: string[], userId: string): Promise<{ ids: string[], full: Tables<'Eleve'>[] }> {
+        if (!this.validateUserId(userId) || groupIds.length === 0) {
+            return { ids: [], full: [] };
+        }
+        
+        console.log('[TrackingRepo] Fetching students in plural groups:', groupIds.length, 'groups for teacher:', userId);
+
+        const { data, error } = await supabase
+            .from('EleveGroupe')
+            .select('eleve_id, Eleve!inner(*, Niveau(*))')
+            .in('groupe_id', groupIds);
+
+        if (error) {
+            console.error('[TrackingRepo] Supabase plural error:', error);
+            throw error;
+        }
+
+        // Déduplication (au cas où un élève est dans plusieurs groupes)
+        const uniqueMap = new Map();
+        data.forEach((d: any) => {
+            const student = d.Eleve || d.eleve;
+            if (student && !uniqueMap.has(d.eleve_id)) {
+                student.niveau = student.Niveau || student.niveau;
+                uniqueMap.set(d.eleve_id, student);
+            }
+        });
+
+        console.log('[TrackingRepo] Plural query finished. Unique students:', uniqueMap.size);
+
+        return {
+            ids: Array.from(uniqueMap.keys()),
+            full: Array.from(uniqueMap.values())
+        };
+    }
 
     // ==================== PRÉFÉRENCES (RÉGLAGES) ====================
 

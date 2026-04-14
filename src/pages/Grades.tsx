@@ -217,7 +217,7 @@ const Grades: React.FC = () => {
                 </div>
             ) : selectedEvaluationId ? (
                 <EvaluationDetailTable
-                    evaluationId={selectedEvaluationId}
+                    evaluation={selectedEvaluation}
                     onBack={() => setSelectedEvaluationId(null)}
                     onEdit={handleEditClick}
                 />

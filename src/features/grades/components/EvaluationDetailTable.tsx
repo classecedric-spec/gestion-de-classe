@@ -36,7 +36,8 @@ import StudentGradeEntryModal from './StudentGradeEntryModal';
 import GradeRow from './GradeRow';
 
 interface EvaluationDetailTableProps {
-    evaluationId: string;
+    evaluation?: any;
+    evaluationId?: string;
     onBack: () => void;
     onEdit: (evaluation: any) => void;
 }
@@ -46,7 +47,8 @@ interface StudentQueryResult {
     full: any[];
 }
 
-const EvaluationDetailTable: React.FC<EvaluationDetailTableProps> = ({ evaluationId, onBack, onEdit }) => {
+const EvaluationDetailTable: React.FC<EvaluationDetailTableProps> = ({ evaluation: evaluationProp, evaluationId: idFromProp, onBack, onEdit }) => {
+    const evaluationId = evaluationProp?.id || idFromProp;
     const [selectedStudent, setSelectedStudent] = useState<any>(null);
     const [isEntryModalOpen, setIsEntryModalOpen] = useState(false);
     const [isBulkEdit, setIsBulkEdit] = useState(false);
@@ -55,23 +57,46 @@ const EvaluationDetailTable: React.FC<EvaluationDetailTableProps> = ({ evaluatio
     const { session } = useAuth();
     const userId = session?.user?.id;
 
+    console.log('[EvaluationDetail] Rendering component:', { evaluationId, hasProp: !!evaluationProp, userId });
+
     const {
+        setSelectedEvaluationId,
+        selectedEvaluationId,
+        activeEvaluation,
         questions,
         currentResults,
+        contextResults,
         questionResults,
-        setSelectedEvaluationId,
-        activeEvaluation: evaluation,
-        formatStatut,
-        noteTypes,
-        getConversionPalier,
         loading: hookLoading,
         saveResult,
         saveResults,
         saveQuestionResults,
-    } = useGrades(undefined, undefined);
+        formatStatut,
+        noteTypes,
+        getConversionPalier,
+        evaluations,
+    } = useGrades(undefined, undefined, evaluationId);
 
-    // Derived early so handlers below can reference it
-    const hasQuestions = questions.length > 0;
+    // On récupère aussi les états de chargement individuels pour plus de finesse si besoin
+    // Mais on peut utiliser hookLoading qui est déjà une aggrégation dans useGrades
+
+    // Le "coeur" de l'évaluation (les données descriptives comme le titre, la matière, le groupe).
+    // On privilégie l'objet passé en prop (façon Excel) pour éviter d'attendre le hook.
+    const evaluation = useMemo(() => {
+        const ev = evaluationProp || activeEvaluation || evaluations?.find((e: any) => e.id === evaluationId);
+        console.log('[EvaluationDetail] Resolved evaluation:', {
+            source: evaluationProp ? 'prop' : (activeEvaluation ? 'active' : 'list'),
+            id: ev?.id,
+            groupId: ev?.group_id || ev?.groupe_id
+        });
+        return ev;
+    }, [evaluationProp, activeEvaluation, evaluations, evaluationId]);
+
+    const hasQuestions = useMemo(() => {
+        const val = questions && questions.length > 0;
+        console.log('[EvaluationDetail] Questions check:', { count: questions?.length, hasQuestions: val });
+        return val;
+    }, [questions]);
 
     /* 
     const [dictatingField, setDictatingField] = useState<{ studentId: string, type: 'note' | 'commentaire' | string } | null>(null);
@@ -339,29 +364,30 @@ const EvaluationDetailTable: React.FC<EvaluationDetailTableProps> = ({ evaluatio
         }
     }, []);
 
-    // Va chercher dans la base de données numérique le "contexte" de l'évaluation (quelle matière, quel groupe d'élèves).
-    const { data: evalDetails, isLoading: loadingMeta } = useQuery({
-        queryKey: ['evaluation_meta', evaluationId, userId],
-        queryFn: () => userId ? gradeService.getEvaluationById(evaluationId, userId) : Promise.resolve(null),
-        enabled: !!evaluationId && !!userId
-    });
 
     // Identifie tous les élèves inscrits dans le groupe de l'évaluation pour constuire la liste du tableau.
     const { data: studentData, isLoading: loadingStudents } = useQuery<StudentQueryResult>({
         queryKey: ['students_group', 
-            evalDetails?.group_id || (evalDetails as any)?.groupe_id || (evalDetails as any)?.id_groupe || 
-            evaluation?.group_id || (evaluation as any)?.groupe_id || (evaluation as any)?.id_groupe,
+            evaluation?.group_id || (evaluation as any)?.groupe_id,
             userId
         ],
         queryFn: async (): Promise<StudentQueryResult> => {
-            const gid = evalDetails?.group_id || (evalDetails as any)?.groupe_id || (evalDetails as any)?.id_groupe || 
-                        evaluation?.group_id || (evaluation as any)?.groupe_id || (evaluation as any)?.id_groupe;
-            if (!gid) return { ids: [], full: [] };
-            const result = await trackingService.fetchStudentsInGroup(gid, userId!);
-            return result as StudentQueryResult;
+            const gid = evaluation?.group_id || (evaluation as any)?.groupe_id;
+            console.log('[EvaluationDetail] QueryFn Triggered - GroupID:', gid, 'UserID:', userId);
+            if (!gid) {
+                console.warn('[EvaluationDetail] QueryFn Aborted - Missing GroupID');
+                return { ids: [], full: [] };
+            }
+            try {
+                const result = await trackingService.fetchStudentsInGroup(gid, userId!);
+                console.log('[EvaluationDetail] QueryFn Result:', result);
+                return result as StudentQueryResult;
+            } catch (err) {
+                console.error('[EvaluationDetail] QueryFn Error:', err);
+                throw err;
+            }
         },
-        enabled: !!(evalDetails?.group_id || (evalDetails as any)?.groupe_id || (evalDetails as any)?.id_groupe || 
-                    evaluation?.group_id || (evaluation as any)?.groupe_id || (evaluation as any)?.id_groupe) && !!userId,
+        enabled: !!(evaluation?.group_id || (evaluation as any)?.groupe_id) && !!userId && userId !== 'undefined',
         staleTime: 1000 * 60 * 5 // 5 minutes
     });
 
@@ -432,7 +458,7 @@ const EvaluationDetailTable: React.FC<EvaluationDetailTableProps> = ({ evaluatio
         getConversionPalier(total, max, type), [getConversionPalier]);
 
 
-    const isLoading = hookLoading || loadingStudents || loadingMeta;
+    const isLoading = hookLoading || loadingStudents;
 
     if (isLoading) {
         return (
@@ -443,8 +469,8 @@ const EvaluationDetailTable: React.FC<EvaluationDetailTableProps> = ({ evaluatio
         );
     }
 
-    const brancheName = (evalDetails as any)?.Branche?.nom || (evalDetails as any)?.branche_nom || evaluation?.Branche?.nom || evaluation?.branche_nom || '';
-    const groupeName = (evalDetails as any)?.Groupe?.nom || (evalDetails as any)?.groupe_nom || evaluation?.Groupe?.nom || evaluation?.groupe_nom || '';
+    const brancheName = evaluation?.Branche?.nom || evaluation?.branche_nom || '';
+    const groupeName = evaluation?.Groupe?.nom || evaluation?.groupe_nom || '';
 
     return (
         <div className="w-full flex flex-col gap-4 overflow-hidden animate-in fade-in duration-200">

@@ -13,7 +13,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { gradeService } from '../services';
 import { TablesInsert } from '../../../types/supabase';
-import { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { toast } from 'sonner';
 import { supabase, getCurrentUser } from '../../../lib/database';
 
@@ -430,8 +430,15 @@ export const useGradeMutations = (selectedEvaluationId?: string | null) => {
  * En fonction d'une matière et d'un trimestre donnés ("context-based fetching"), 
  * il aspire tout ce qu'il faut depuis la base de données (les devoirs existants, les élèves, les notes) pour que l'interface du prof soit tout de suite prête à l'emploi.
  */
-export const useGrades = (brancheId?: string, periode?: string) => {
-    const [selectedEvaluationId, setSelectedEvaluationId] = useState<string | null>(null);
+export const useGrades = (brancheId?: string, periode?: string, initialEvaluationId?: string | null) => {
+    const [selectedEvaluationId, setSelectedEvaluationId] = React.useState<string | null>(initialEvaluationId || null);
+
+    // Synchronisation si initialEvaluationId change depuis le parent
+    React.useEffect(() => {
+        if (initialEvaluationId !== undefined) {
+            setSelectedEvaluationId(initialEvaluationId);
+        }
+    }, [initialEvaluationId]);
 
     const { data: user } = useQuery({
         queryKey: ['user'],
@@ -489,7 +496,7 @@ export const useGrades = (brancheId?: string, periode?: string) => {
     });
 
     // Fetch active evaluation details independently of context
-    const { data: activeEvalData } = useQuery({
+    const { data: activeEvalData, isLoading: loadingMeta } = useQuery({
         queryKey: ['evaluation_detail', selectedEvaluationId, user?.id],
         queryFn: () => (selectedEvaluationId && user) ? gradeService.getEvaluationById(selectedEvaluationId, user.id) : Promise.resolve(null),
         enabled: !!selectedEvaluationId && !!user
@@ -508,7 +515,7 @@ export const useGrades = (brancheId?: string, periode?: string) => {
         questionResults,
         noteTypes,
         deletedEvaluations,
-        loading: loadingEvaluations || loadingResults || loadingQuestions || loadingQuestionResults || loadingNoteTypes || loadingContextResults || loadingDeleted,
+        loading: loadingEvaluations || loadingResults || loadingQuestions || loadingQuestionResults || loadingNoteTypes || loadingContextResults || loadingDeleted || loadingMeta,
         activeEvaluation: evaluation,
         selectedEvaluationId,
         setSelectedEvaluationId,
