@@ -42,8 +42,9 @@ export function useStudentResults(studentId: string | null) {
                 // Fetch student resultats with Evaluation and Branche
                 const { data: resultats, error: resErr } = await supabase
                     .from('Resultat')
-                    .select('*, Evaluation:evaluation_id(*, Branche(nom))')
-                    .eq('eleve_id', studentId);
+                    .select('*, Evaluation:evaluation_id!inner(*, Branche(nom))')
+                    .eq('eleve_id', studentId)
+                    .is('Evaluation.deleted_at', null);
                 
                 if (resErr) throw resErr;
 
