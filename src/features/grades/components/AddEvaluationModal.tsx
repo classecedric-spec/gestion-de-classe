@@ -22,6 +22,12 @@ import { useGroupStudents } from '../../groups/hooks/useGroupStudents';
 import clsx from 'clsx';
 import { toast } from 'sonner';
 
+interface Palier {
+    label: string;
+    points: number;
+    color: string;
+}
+
 // Définit les éléments extérieurs dont cette fenêtre a besoin pour s'ouvrir et fonctionner correctement de l'extérieur.
 interface AddEvaluationModalProps {
     isOpen: boolean;
@@ -77,13 +83,16 @@ const AddEvaluationModal: React.FC<AddEvaluationModalProps> = ({
     const [typeNoteId, setTypeNoteId] = useState<string>('');
     const [withQuestions, setWithQuestions] = useState(false);
     const [showRatio, setShowRatio] = useState(true);
-    const [questions, setQuestions] = useState<any[]>([{ titre: '', note_max: 5, ratio: 1, ordre: 0 }]);
+    const [questions, setQuestions] = useState<any[]>([{ titre: '', note_max: 5, ratio: 1, ordre: 0, paliers: null }]);
+    const [editingGridIndex, setEditingGridIndex] = useState<number | null>(null);
     const [scratchpad, setScratchpad] = useState('');
-    const [associerAussi, setAssocierAussi] = useState(false);
     const [associations, setAssociations] = useState<any[]>([
         { id: `temp_${Math.random().toString(36).substr(2, 9)}`, label: '', slots: [null, null, null, null], isSuggested: false }
     ]);
     const [attemptedSubmit, setAttemptedSubmit] = useState(false);
+    const [associerAussi, setAssocierAussi] = useState(false);
+    
+    console.log("🛠️ [AddEvaluationModal] Render - associerAussi:", associerAussi);
     
     // Excel Import States
     const [activeTab, setActiveTab] = useState<'manual' | 'import'>('manual');
@@ -291,7 +300,7 @@ const AddEvaluationModal: React.FC<AddEvaluationModalProps> = ({
     // Prépare une action pour ajouter une ligne de question supplémentaire si l'enseignant veut détailler son contrôle.
     const handleAddQuestion = useCallback(() => {
         setQuestions(prev => {
-            const newQuestions = [...prev, { titre: '', note_max: 5, ratio: 1, ordre: prev.length }];
+            const newQuestions = [...prev, { titre: '', note_max: 5, ratio: 1, ordre: prev.length, paliers: null }];
             updateNoteMax(newQuestions);
             return newQuestions;
         });
@@ -360,7 +369,8 @@ const AddEvaluationModal: React.FC<AddEvaluationModalProps> = ({
                 titre: name,
                 note_max: 5,
                 ratio: 1,
-                ordre: existingQuestions.length + i
+                ordre: existingQuestions.length + i,
+                paliers: null
             }));
 
             const updated = [...existingQuestions, ...newQuestionsList];
@@ -502,7 +512,8 @@ const AddEvaluationModal: React.FC<AddEvaluationModalProps> = ({
                 titre: h || `Critère ${i + 1}`,
                 note_max: 10, // default, will be adjusted by data
                 ratio: 1,
-                ordre: i
+                ordre: i,
+                paliers: null
             }));
 
             const jobParsedData = dataRows.map(row => {
@@ -723,7 +734,7 @@ const AddEvaluationModal: React.FC<AddEvaluationModalProps> = ({
         // Remet le formulaire à zéro pour effacer les traces de ce qui a été tapé (pour le prochain contrôle) et ferme la fenêtre.
         setTitre('');
         setWithQuestions(false);
-        setQuestions([{ titre: '', note_max: 5, ratio: 1, ordre: 0 }]);
+        setQuestions([{ titre: '', note_max: 5, ratio: 1, ordre: 0, paliers: null }]);
         setScratchpad('');
         setAssociations([
             { id: `temp_${Math.random().toString(36).substr(2, 9)}`, label: '', slots: [null, null, null, null], isSuggested: false }
@@ -1042,16 +1053,18 @@ const AddEvaluationModal: React.FC<AddEvaluationModalProps> = ({
                                 </div>
                             </div>
 
+                            {/* Header de la liste */}
                             {questions.length > 0 && (
                                 <div className="flex gap-2 px-1 mb-1">
                                     <div className="w-5 flex-none"></div>
-                                    <div className="w-6 flex-none text-center"></div>
-                                    <div className="flex-1 text-xs font-medium text-grey-medium uppercase tracking-wider">
-                                        Question
+                                    <div className="w-10 flex-none text-center"></div>
+                                    <div className="flex-1 text-xs font-black text-primary/40 uppercase tracking-widest pl-4">
+                                        Critère / Question
                                     </div>
-                                    <div className="w-20 text-xs font-medium text-grey-medium uppercase tracking-wider text-center">
+                                    <div className="w-20 text-xs font-black text-primary/40 uppercase tracking-widest text-center">
                                         Max
                                     </div>
+                                    <div className="w-10 flex-none"></div>
                                     <div className="w-4"></div>
                                     <div 
                                         className="w-24 text-xs font-medium text-grey-medium uppercase tracking-wider text-center cursor-pointer hover:text-primary transition-colors flex items-center justify-center gap-1"
@@ -1073,95 +1086,226 @@ const AddEvaluationModal: React.FC<AddEvaluationModalProps> = ({
                                     <div 
                                         key={index} 
                                         className={clsx(
-                                            "flex gap-2 items-center group p-1 transition-all duration-300 rounded-2xl",
+                                            "flex flex-col group p-1 transition-all duration-300 rounded-2xl",
                                             isAssociated && "bg-primary/10 ring-1 ring-primary/20"
                                         )}
                                     >
-                                        <div 
-                                            draggable
-                                            onDragStart={(e) => handleDragStart(e, qNumber)}
-                                            className="w-5 flex-none text-grey-medium/10 group-hover:text-primary/40 transition-colors cursor-grab active:cursor-grabbing flex justify-center"
-                                            title="Glisser ce numéro pour l'associer"
-                                        >
-                                            <GripVertical size={14} />
-                                        </div>
-                                        <div 
-                                            draggable
-                                            onDragStart={(e) => e.dataTransfer.setData('text/plain', qNumber.toString())}
-                                            className="w-10 h-10 flex-none rounded-xl flex items-center justify-center text-sm font-black transition-all cursor-grab active:cursor-grabbing border-dashed border border-primary/40 bg-white/10 text-primary shadow-lg shadow-primary/5"
-                                        >
-                                            {qNumber}
-                                        </div>
-                                        
-                                        {/* Styled Question Input */}
-                                        <div className={clsx(
-                                            "flex-1 bg-input/40 rounded-xl px-4 py-2 border border-white/5 focus-within:border-primary/50 transition-all",
-                                            isInvalid(q.titre) && "bg-danger/20 border-danger/50"
-                                        )}>
+                                        <div className="flex gap-2 items-center">
+                                            <div 
+                                                draggable
+                                                onDragStart={(e) => handleDragStart(e, qNumber)}
+                                                className="w-5 flex-none text-grey-medium/10 group-hover:text-primary/40 transition-colors cursor-grab active:cursor-grabbing flex justify-center"
+                                                title="Glisser ce numéro pour l'associer"
+                                            >
+                                                <GripVertical size={14} />
+                                            </div>
+                                            <div 
+                                                draggable
+                                                onDragStart={(e) => e.dataTransfer.setData('text/plain', qNumber.toString())}
+                                                className="w-10 h-10 flex-none rounded-xl flex items-center justify-center text-sm font-black transition-all cursor-grab active:cursor-grabbing border-dashed border border-primary/40 bg-white/10 text-primary shadow-lg shadow-primary/5"
+                                            >
+                                                {qNumber}
+                                            </div>
+                                            
+                                            {/* Styled Question Input */}
+                                            <div className={clsx(
+                                                "flex-1 bg-input/40 rounded-xl px-4 py-2 border border-white/5 focus-within:border-primary/50 transition-all",
+                                                isInvalid(q.titre) && "bg-danger/20 border-danger/50"
+                                            )}>
 
-                                            <input
-                                                type="text"
-                                                value={q.titre}
-                                                onChange={(e) => handleQuestionChange(index, 'titre', e.target.value)}
-                                                placeholder={`Détails de la question ${qNumber}...`}
-                                                className="w-full bg-transparent border-none text-grey-light placeholder:text-grey-medium/30 focus:outline-none"
-                                                required
-                                            />
-                                        </div>
+                                                <input
+                                                    type="text"
+                                                    value={q.titre}
+                                                    onChange={(e) => handleQuestionChange(index, 'titre', e.target.value)}
+                                                    placeholder={`Détails de la question ${qNumber}...`}
+                                                    className="w-full bg-transparent border-none text-grey-light placeholder:text-grey-medium/30 focus:outline-none"
+                                                    required
+                                                />
+                                            </div>
 
-                                        <div className="w-20">
-                                            <Input
-                                                type="number"
-                                                placeholder="Max"
-                                                value={q.note_max}
-                                                onChange={(e) => handleQuestionChange(index, 'note_max', parseFloat(e.target.value))}
-                                                required
-                                                error={isInvalid(q.note_max) ? 'Err' : undefined}
-                                            />
-                                        </div>
-                                        
-                                        <div className="w-4"></div>
-                                        
-                                        <div className="w-24">
-                                            {showRatio ? (
+                                            <div className="w-20">
                                                 <Input
                                                     type="number"
-                                                    placeholder="Ratio"
-                                                    value={q.ratio}
-                                                    onChange={(e) => handleQuestionChange(index, 'ratio', parseFloat(e.target.value) || 0)}
-                                                    step="0.1"
-                                                    min="0"
+                                                    placeholder="Max"
+                                                    value={q.note_max}
+                                                    onChange={(e) => handleQuestionChange(index, 'note_max', parseFloat(e.target.value))}
                                                     required
-                                                    error={isInvalid(q.ratio) ? 'Err' : undefined}
+                                                    error={isInvalid(q.note_max) ? '!' : undefined}
                                                 />
-                                            ) : (
-                                                <Input
-                                                    type="number"
-                                                    placeholder="Pt Final"
-                                                    value={Number((q.note_max * q.ratio).toFixed(2))}
-                                                    onChange={(e) => {
-                                                        const finalPoints = parseFloat(e.target.value) || 0;
-                                                        const newRatio = q.note_max > 0 ? (finalPoints / q.note_max) : 0;
-                                                        handleQuestionChange(index, 'ratio', newRatio);
-                                                    }}
-                                                    step="0.5"
-                                                    min="0"
-                                                    required
-                                                    error={isInvalid(q.ratio) ? 'Err' : undefined}
-                                                />
-                                            )}
+                                            </div>
+
+                                            {/* Bouton Grille de Critères */}
+                                            <button
+                                                type="button"
+                                                onClick={() => setEditingGridIndex(editingGridIndex === index ? null : index)}
+                                                className={clsx(
+                                                    "w-10 h-10 flex-none rounded-xl border flex items-center justify-center transition-all",
+                                                    q.paliers ? "bg-primary/20 border-primary text-primary" : "bg-white/5 border-white/5 text-grey-medium hover:bg-white/10"
+                                                )}
+                                                title="Configurer une grille de critères"
+                                            >
+                                                <Grid size={18} />
+                                            </button>
+                                            
+                                            <div className="w-4"></div>
+                                            
+                                            <div className="w-24">
+                                                {showRatio ? (
+                                                    <Input
+                                                        type="number"
+                                                        placeholder="Ratio"
+                                                        value={q.ratio}
+                                                        onChange={(e) => handleQuestionChange(index, 'ratio', parseFloat(e.target.value) || 0)}
+                                                        step="0.1"
+                                                        min="0"
+                                                        required
+                                                        error={isInvalid(q.ratio) ? 'Err' : undefined}
+                                                    />
+                                                ) : (
+                                                    <Input
+                                                        type="number"
+                                                        placeholder="Pt Final"
+                                                        value={Number((q.note_max * q.ratio).toFixed(2))}
+                                                        onChange={(e) => {
+                                                            const finalPoints = parseFloat(e.target.value) || 0;
+                                                            const newRatio = q.note_max > 0 ? (finalPoints / q.note_max) : 0;
+                                                            handleQuestionChange(index, 'ratio', newRatio);
+                                                        }}
+                                                        step="0.5"
+                                                        min="0"
+                                                        required
+                                                        error={isInvalid(q.ratio) ? 'Err' : undefined}
+                                                    />
+                                                )}
+                                            </div>
+
+                                            <button
+                                                type="button"
+                                                onClick={() => handleRemoveQuestion(index)}
+                                                className="w-10 h-10 flex-none rounded-xl bg-red-500/10 text-red-500/30 hover:text-red-500 hover:bg-red-500/20 transition-all flex items-center justify-center"
+                                                title="Supprimer la question"
+                                                disabled={questions.length === 1}
+                                            >
+                                                <Trash2 size={16} />
+                                            </button>
                                         </div>
 
-                                        <Button
-                                            type="button"
-                                            variant="ghost"
-                                            size="sm"
-                                            onClick={() => handleRemoveQuestion(index)}
-                                            className="text-red-400 hover:text-red-600 h-10 w-10 p-0"
-                                            disabled={questions.length === 1}
-                                        >
-                                            <Trash2 size={16} />
-                                        </Button>
+                                        {/* ÉDITEUR DE GRILLE (Paliers) */}
+                                        {editingGridIndex === index && (
+                                            <div className="mt-2 ml-14 mr-10 p-5 bg-black/40 border border-primary/20 rounded-2xl animate-in slide-in-from-top-2 duration-300">
+                                                <div className="flex items-center justify-between mb-4">
+                                                    <div className="flex items-center gap-2">
+                                                        <Grid size={16} className="text-primary" />
+                                                        <span className="text-[10px] font-black text-primary uppercase tracking-widest">Configuration de la grille</span>
+                                                    </div>
+                                                    <div className="flex gap-2">
+                                                        <Button 
+                                                            type="button" 
+                                                            variant="ghost" 
+                                                            size="sm" 
+                                                            className="h-7 text-[9px] font-black uppercase"
+                                                            onClick={() => {
+                                                                const newQuestions = [...questions];
+                                                                newQuestions[index].paliers = [
+                                                                    { label: 'Non acquis', points: 0, color: '#ef4444' },
+                                                                    { label: 'En cours', points: q.note_max / 2, color: '#f59e0b' },
+                                                                    { label: 'Acquis', points: q.note_max, color: '#22c55e' }
+                                                                ];
+                                                                setQuestions(newQuestions);
+                                                            }}
+                                                        >
+                                                            Modèle 3 paliers
+                                                        </Button>
+                                                        <Button 
+                                                            type="button" 
+                                                            variant="ghost" 
+                                                            size="sm" 
+                                                            className="h-7 text-[9px] font-black uppercase text-red-400"
+                                                            onClick={() => {
+                                                                const newQuestions = [...questions];
+                                                                newQuestions[index].paliers = null;
+                                                                setQuestions(newQuestions);
+                                                                setEditingGridIndex(null);
+                                                            }}
+                                                        >
+                                                            Supprimer la grille
+                                                        </Button>
+                                                    </div>
+                                                </div>
+
+                                                <div className="space-y-2">
+                                                    {(q.paliers || []).map((p: any, pIdx: number) => (
+                                                        <div key={pIdx} className="flex gap-3 items-center">
+                                                            <input 
+                                                                type="color" 
+                                                                value={p.color} 
+                                                                onChange={(e) => {
+                                                                    const newQuestions = [...questions];
+                                                                    newQuestions[index].paliers[pIdx].color = e.target.value;
+                                                                    setQuestions(newQuestions);
+                                                                }}
+                                                                className="w-8 h-8 rounded-lg bg-transparent border-none cursor-pointer overflow-hidden p-0"
+                                                            />
+                                                            <input 
+                                                                type="text"
+                                                                placeholder="Libellé (ex: Acquis)"
+                                                                value={p.label}
+                                                                onChange={(e) => {
+                                                                    const newQuestions = [...questions];
+                                                                    newQuestions[index].paliers[pIdx].label = e.target.value;
+                                                                    setQuestions(newQuestions);
+                                                                }}
+                                                                className="flex-1 bg-white/5 border border-white/5 rounded-lg px-3 py-1.5 text-xs text-white focus:border-primary/50 outline-none"
+                                                            />
+                                                            <div className="w-24">
+                                                                <input 
+                                                                    type="number"
+                                                                    step="0.5"
+                                                                    placeholder="Pts"
+                                                                    value={p.points}
+                                                                    onChange={(e) => {
+                                                                        const val = parseFloat(e.target.value);
+                                                                        const newQuestions = [...questions];
+                                                                        newQuestions[index].paliers[pIdx].points = val;
+                                                                        // Auto update note_max if this is the highest
+                                                                        const maxInPaliers = Math.max(...newQuestions[index].paliers.map((pl: any) => pl.points));
+                                                                        if (maxInPaliers > 0) newQuestions[index].note_max = maxInPaliers;
+                                                                        setQuestions(newQuestions);
+                                                                    }}
+                                                                    className="w-full bg-white/5 border border-white/5 rounded-lg px-3 py-1.5 text-xs text-center text-primary font-black outline-none"
+                                                                />
+                                                            </div>
+                                                            <button 
+                                                                type="button"
+                                                                onClick={() => {
+                                                                    const newQuestions = [...questions];
+                                                                    newQuestions[index].paliers.splice(pIdx, 1);
+                                                                    if (newQuestions[index].paliers.length === 0) newQuestions[index].paliers = null;
+                                                                    setQuestions(newQuestions);
+                                                                }}
+                                                                className="p-1.5 text-red-500/50 hover:text-red-500"
+                                                            >
+                                                                <X size={14} />
+                                                            </button>
+                                                        </div>
+                                                    ))}
+                                                    
+                                                    <button 
+                                                        type="button"
+                                                        onClick={() => {
+                                                            const newQuestions = [...questions];
+                                                            if (!newQuestions[index].paliers) newQuestions[index].paliers = [];
+                                                            newQuestions[index].paliers.push({ label: '', points: 0, color: '#3b82f6' });
+                                                            setQuestions(newQuestions);
+                                                        }}
+                                                        className="w-full py-2 border border-dashed border-white/10 rounded-xl text-[10px] font-black uppercase text-grey-medium hover:border-primary/30 hover:text-primary transition-all flex items-center justify-center gap-2 mt-2"
+                                                    >
+                                                        <Plus size={12} />
+                                                        Ajouter un palier
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        )}
                                     </div>
                                 );
                             })}

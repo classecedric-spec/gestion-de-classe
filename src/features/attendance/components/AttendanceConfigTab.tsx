@@ -15,7 +15,7 @@
  */
 
 import React from 'react';
-import { Plus, Settings, Trash2, X, Save } from 'lucide-react';
+import { Plus, Settings, Trash2, X, Save, ChevronUp, ChevronDown } from 'lucide-react';
 import { Input, Button } from '../../../core';
 import { SetupPresence } from '../services/attendanceService';
 import { CategoryWithTemp } from '../hooks/useAttendanceConfig';
@@ -35,6 +35,7 @@ interface AttendanceConfigTabProps {
     categories: CategoryWithTemp[];
     loading: boolean;
     handleCreateNew: () => void;
+    handleReorder: (index: number, direction: -1 | 1) => void;
     handleEdit: (set: SetupPresence) => void;
     handleDeleteSet: (id: string, name: string) => void;
     handleSaveSet: () => void;
@@ -55,6 +56,7 @@ export const AttendanceConfigTab: React.FC<AttendanceConfigTabProps> = ({
     categories,
     loading,
     handleCreateNew,
+    handleReorder,
     handleEdit,
     handleDeleteSet,
     handleSaveSet,
@@ -82,30 +84,46 @@ export const AttendanceConfigTab: React.FC<AttendanceConfigTabProps> = ({
                     </button>
 
                     {/* Liste des configurations existantes avec options Modifier/Supprimer */}
-                    <div className="space-y-2 max-h-[300px] overflow-y-auto custom-scrollbar">
+                    <div className="space-y-2 overflow-y-auto custom-scrollbar">
                         {sets.map(set => (
                             <div key={set.id} className="flex items-center justify-between p-4 bg-surface border border-white/10 rounded-xl hover:bg-white/5 transition-colors group">
                                 <div>
-                                    <h3 className="font-bold text-text-main">{set.nom}</h3>
-                                    {set.description && <p className="text-xs text-grey-medium">{set.description}</p>}
+                                    <h3 className="font-bold text-base text-text-main">{set.nom}</h3>
+                                    {set.description && <p className="text-sm text-grey-medium mt-0.5">{set.description}</p>}
                                 </div>
-                                <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                    <Button
-                                        variant="ghost"
-                                        size="sm"
+                                <div className="flex items-center gap-1 opacity-60 group-hover:opacity-100 transition-opacity">
+                                    {/* Boutons d'ordre : monter ou descendre dans la liste */}
+                                    <button
+                                        onClick={() => handleReorder(sets.indexOf(set), -1)}
+                                        disabled={sets.indexOf(set) === 0}
+                                        className="h-8 w-8 flex items-center justify-center rounded-lg text-grey-medium hover:text-white hover:bg-white/10 transition-colors disabled:opacity-20 disabled:cursor-not-allowed"
+                                        title="Monter"
+                                    >
+                                        <ChevronUp size={18} />
+                                    </button>
+                                    <button
+                                        onClick={() => handleReorder(sets.indexOf(set), 1)}
+                                        disabled={sets.indexOf(set) === sets.length - 1}
+                                        className="h-8 w-8 flex items-center justify-center rounded-lg text-grey-medium hover:text-white hover:bg-white/10 transition-colors disabled:opacity-20 disabled:cursor-not-allowed"
+                                        title="Descendre"
+                                    >
+                                        <ChevronDown size={18} />
+                                    </button>
+                                    <div className="w-px h-6 bg-white/10 mx-1" />
+                                    <button
                                         onClick={() => handleEdit(set)}
-                                        className="h-8 w-8 p-0 text-primary"
+                                        className="h-11 w-11 flex items-center justify-center rounded-xl text-primary hover:bg-primary/10 transition-colors"
                                         title="Modifier"
-                                        icon={Settings}
-                                    />
-                                    <Button
-                                        variant="ghost"
-                                        size="sm"
+                                    >
+                                        <Settings size={20} />
+                                    </button>
+                                    <button
                                         onClick={() => handleDeleteSet(set.id, set.nom)}
-                                        className="h-8 w-8 p-0 text-danger hover:bg-danger/10"
+                                        className="h-11 w-11 flex items-center justify-center rounded-xl text-danger hover:bg-danger/10 transition-colors"
                                         title="Supprimer"
-                                        icon={Trash2}
-                                    />
+                                    >
+                                        <Trash2 size={20} />
+                                    </button>
                                 </div>
                             </div>
                         ))}

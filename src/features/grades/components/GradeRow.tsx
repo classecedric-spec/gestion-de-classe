@@ -136,30 +136,49 @@ const GradeRow: React.FC<GradeRowProps> = React.memo(({
                 {isBulkEdit ? (
                     !hasQuestions ? (
                             <div className="flex justify-center items-center gap-2">
-                                <Input
-                                    key={`${student.id}-total-${result?.note ?? 'null'}`}
-                                    type="number"
-                                    defaultValue={result?.note ?? ''}
-                                    data-student-id={student.id}
-                                    data-type="note"
-                                    onKeyDown={onKeyDown}
-                                    onFocus={() => setFocusedField({ studentId: student.id, type: 'note' })}
-                                    onBlur={(e: any) => {
-                                        setFocusedField(null);
-                                        if (e.target.value !== (result?.note ?? '').toString()) {
-                                            onNoteChange(student.id, e.target.value);
-                                        }
-                                    }}
-                                    className={clsx(
-                                        "w-20 h-10 text-center text-lg font-black bg-grey-dark border-white/20 text-primary transition-all",
-                                        evaluation?.note_max && (Number(result?.note ?? 0) > evaluation.note_max || Number(result?.note ?? 0) < 0) && "border-danger text-danger",
-                                        /* 
-                                        ((dictatingField?.studentId === student.id && dictatingField?.type === 'note' && isListening) || 
-                                         (isGlobalVoiceActive && isListening && focusedField?.studentId === student.id && focusedField?.type === 'note')) && 
-                                        "border-primary ring-4 ring-primary/20 bg-primary/10 shadow-[0_0_15px_rgba(var(--color-primary-rgb),0.3)] animate-pulse"
-                                        */
-                                    )}
-                                />
+                                {evaluation?.is_grid_mode ? (
+                                    <div className="flex gap-1.5 items-center">
+                                        {[1, 2, 3, 4, 5].map((level) => (
+                                            <button
+                                                key={level}
+                                                onClick={() => onNoteChange(student.id, String(level))}
+                                                className={clsx(
+                                                    "w-7 h-7 rounded-full border-2 transition-all duration-300",
+                                                    Number(result?.note) === level 
+                                                        ? [
+                                                            "bg-red-500 border-red-400 shadow-[0_0_10px_rgba(239,68,68,0.4)]",
+                                                            "bg-orange-500 border-orange-400 shadow-[0_0_10px_rgba(249,115,22,0.4)]",
+                                                            "bg-amber-500 border-amber-400 shadow-[0_0_10px_rgba(245,158,11,0.4)]",
+                                                            "bg-emerald-500 border-emerald-400 shadow-[0_0_10px_rgba(16,185,129,0.4)]",
+                                                            "bg-blue-500 border-blue-400 shadow-[0_0_10px_rgba(59,130,246,0.4)]"
+                                                          ][level-1]
+                                                        : "bg-white/5 border-white/10 hover:border-white/30"
+                                                )}
+                                                title={`Niveau ${level}`}
+                                            />
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <Input
+                                        key={`${student.id}-total-${result?.note ?? 'null'}`}
+                                        type="number"
+                                        defaultValue={result?.note ?? ''}
+                                        data-student-id={student.id}
+                                        data-type="note"
+                                        onKeyDown={onKeyDown}
+                                        onFocus={() => setFocusedField({ studentId: student.id, type: 'note' })}
+                                        onBlur={(e: any) => {
+                                            setFocusedField(null);
+                                            if (e.target.value !== (result?.note ?? '').toString()) {
+                                                onNoteChange(student.id, e.target.value);
+                                            }
+                                        }}
+                                        className={clsx(
+                                            "w-20 h-10 text-center text-lg font-black bg-grey-dark border-white/20 text-primary transition-all",
+                                            evaluation?.note_max && (Number(result?.note ?? 0) > evaluation.note_max || Number(result?.note ?? 0) < 0) && "border-danger text-danger",
+                                        )}
+                                    />
+                                )}
                                 {/* 
                                 {isSupported && (
                                     <button
@@ -206,6 +225,11 @@ const GradeRow: React.FC<GradeRowProps> = React.memo(({
                                                 )}
                                             </span>
                                         </span>
+                                        {palier && (
+                                            <span className={clsx("text-[10px] font-black uppercase tracking-widest mt-0.5", palierColor)}>
+                                                {palier.letter}
+                                            </span>
+                                        )}
                                     </div>
                                 );
                             })()}
@@ -233,6 +257,11 @@ const GradeRow: React.FC<GradeRowProps> = React.memo(({
                                             )}
                                         </span>
                                     </span>
+                                    {palier && (
+                                        <span className={clsx("text-xs font-black uppercase tracking-widest mt-1", palierColor)}>
+                                            {palier.letter}
+                                        </span>
+                                    )}
                                 </div>
                             );
                         })()}
@@ -249,62 +278,105 @@ const GradeRow: React.FC<GradeRowProps> = React.memo(({
                     <td key={q.id} className="p-2 text-center border-r border-white/10">
                         {isBulkEdit ? (
                             <div className="flex justify-center items-center gap-2">
-                                <Input
-                                    key={`${student.id}-${q.id}-${qResult?.note ?? 'null'}`}
-                                    type="number"
-                                    defaultValue={qResult?.note ?? ''}
-                                    data-student-id={student.id}
-                                    data-type={`question-${q.id}`}
-                                    onKeyDown={onKeyDown}
-                                    onFocus={() => setFocusedField({ studentId: student.id, type: `question-${q.id}` })}
-                                    onBlur={(e: any) => {
-                                        setFocusedField(null);
-                                        if (e.target.value !== (qResult?.note ?? '').toString()) {
-                                            onQuestionNoteChange(student.id, q.id, e.target.value);
-                                        }
-                                    }}
-                                    className={clsx(
-                                        "w-16 h-10 text-center font-black bg-grey-dark/40 border-white/10 focus:border-primary transition-all",
-                                        (Number(qResult?.note ?? 0) > q.note_max || Number(qResult?.note ?? 0) < 0) && "border-danger text-danger",
-                                        /* 
-                                        ((dictatingField?.studentId === student.id && dictatingField?.type === `question-${q.id}` && isListening) ||
-                                         (isGlobalVoiceActive && isListening && focusedField?.studentId === student.id && focusedField?.type === `question-${q.id}`)) &&
-                                        "border-primary ring-4 ring-primary/20 bg-primary/10 shadow-[0_0_15px_rgba(var(--color-primary-rgb),0.3)] animate-pulse"
-                                        */
-                                    )}
-                                />
-                                {/* 
-                                {isSupported && (
-                                    <button
-                                        onClick={() => {
-                                            if (dictatingField?.studentId === student.id && dictatingField?.type === `question-${q.id}` && isListening) {
-                                                stopListening();
-                                                setDictatingField(null);
-                                            } else {
-                                                setDictatingField({ studentId: student.id, type: `question-${q.id}` });
-                                                toggleListening();
+                                {q.paliers && Array.isArray(q.paliers) && q.paliers.length > 0 ? (
+                                    <div className="flex gap-1 items-center flex-wrap justify-center">
+                                        {q.paliers.map((palier: any, pIdx: number) => (
+                                            <button
+                                                key={pIdx}
+                                                onClick={() => onQuestionNoteChange(student.id, q.id, String(palier.points))}
+                                                className={clsx(
+                                                    "px-2 py-1 rounded text-[10px] font-black border transition-all duration-200 min-w-[32px]",
+                                                    Number(qResult?.note) === Number(palier.points)
+                                                        ? "shadow-sm scale-110 ring-1 ring-white/20"
+                                                        : "opacity-40 hover:opacity-100 bg-white/5 border-white/10"
+                                                )}
+                                                style={{
+                                                    backgroundColor: Number(qResult?.note) === Number(palier.points) ? palier.color : undefined,
+                                                    borderColor: Number(qResult?.note) === Number(palier.points) ? 'rgba(255,255,255,0.3)' : undefined,
+                                                    color: Number(qResult?.note) === Number(palier.points) ? 'white' : undefined
+                                                }}
+                                                title={`${palier.label} (${palier.points} pts)`}
+                                            >
+                                                {palier.label}
+                                            </button>
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <Input
+                                        key={`${student.id}-${q.id}-${qResult?.note ?? 'null'}`}
+                                        type="number"
+                                        defaultValue={qResult?.note ?? ''}
+                                        data-student-id={student.id}
+                                        data-type={`question-${q.id}`}
+                                        onKeyDown={onKeyDown}
+                                        onFocus={() => setFocusedField({ studentId: student.id, type: `question-${q.id}` })}
+                                        onBlur={(e: any) => {
+                                            setFocusedField(null);
+                                            if (e.target.value !== (qResult?.note ?? '').toString()) {
+                                                onQuestionNoteChange(student.id, q.id, e.target.value);
                                             }
                                         }}
                                         className={clsx(
-                                            "p-2 rounded-lg transition-all",
-                                            dictatingField?.studentId === student.id && dictatingField?.type === `question-${q.id}` && isListening
-                                                ? "bg-primary text-grey-dark"
-                                                : "text-grey-medium hover:text-primary hover:bg-primary/10"
+                                            "w-16 h-10 text-center font-black bg-grey-dark/40 border-white/10 focus:border-primary transition-all",
+                                            (Number(qResult?.note ?? 0) > q.note_max || Number(qResult?.note ?? 0) < 0) && "border-danger text-danger",
                                         )}
-                                    >
-                                        <Mic size={14} />
-                                    </button>
+                                    />
                                 )}
-                                */}
                             </div>
                         ) : (
                             qResult?.note != null ? (
                                 <div className="flex flex-col items-center">
-                                    <span className="text-base font-black text-white">{qResult.note}</span>
-                                    {palier && (
-                                        <span className={clsx("text-[10px] font-black uppercase tracking-widest mt-0.5", palierColor)}>
-                                            {palier.letter}
-                                        </span>
+                                    {q.paliers && Array.isArray(q.paliers) && q.paliers.length > 0 ? (
+                                        <div className="flex flex-col items-center">
+                                            {(() => {
+                                                const selectedPalier = q.paliers.find((p: any) => Number(p.points) === Number(qResult.note));
+                                                if (selectedPalier) {
+                                                    return (
+                                                        <Badge 
+                                                            variant="flat"
+                                                            className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5"
+                                                            style={{ 
+                                                                backgroundColor: `${selectedPalier.color}20`, 
+                                                                color: selectedPalier.color,
+                                                                border: `1px solid ${selectedPalier.color}40`
+                                                            }}
+                                                        >
+                                                            {selectedPalier.label}
+                                                        </Badge>
+                                                    );
+                                                }
+                                                return <span className="text-base font-black text-white">{qResult.note}</span>;
+                                            })()}
+                                        </div>
+                                    ) : evaluation?.is_grid_mode ? (
+                                        <div className="flex gap-0.5 items-center">
+                                            {[1, 2, 3, 4, 5].map((level) => (
+                                                <div
+                                                    key={level}
+                                                    className={clsx(
+                                                        "w-3 h-3 rounded-full border transition-all duration-300",
+                                                        Number(qResult.note) === level 
+                                                            ? [
+                                                                "bg-red-500 border-red-400",
+                                                                "bg-orange-500 border-orange-400",
+                                                                "bg-amber-500 border-amber-400",
+                                                                "bg-emerald-500 border-emerald-400",
+                                                                "bg-blue-500 border-blue-400"
+                                                              ][level-1]
+                                                            : "bg-white/5 border-white/5"
+                                                    )}
+                                                />
+                                            ))}
+                                        </div>
+                                    ) : (
+                                        <>
+                                            <span className="text-base font-black text-white">{qResult.note}</span>
+                                            {palier && (
+                                                <span className={clsx("text-[10px] font-black uppercase tracking-widest mt-0.5", palierColor)}>
+                                                    {palier.letter}
+                                                </span>
+                                            )}
+                                        </>
                                     )}
                                 </div>
                             ) : (

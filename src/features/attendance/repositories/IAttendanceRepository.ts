@@ -62,6 +62,9 @@ export interface IAttendanceRepository {
     
     /** Supprime un type d'appel. */
     deleteSetup(id: string, userId: string): Promise<void>;
+
+    /** Sauvegarde le nouvel ordre des types d'appels. */
+    updateSetupOrders(updates: { id: string; ordre: number }[], userId: string): Promise<void>;
     
     /** Enregistre ou met à jour les catégories (statuts) liées à un appel. */
     upsertCategories(categories: TablesInsert<'CategoriePresence'>[], userId: string): Promise<void>;

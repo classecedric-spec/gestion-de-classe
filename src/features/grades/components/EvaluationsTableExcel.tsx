@@ -16,6 +16,7 @@ import { CardInfo, ConfirmModal, MultiFilterSelect } from '../../../core';
 import { useAllEvaluations } from '../hooks/useAllEvaluations';
 import { useGradeMutations } from '../hooks/useGrades';
 import { useUserPreferences } from '../../../hooks/useUserPreferences';
+import { downloadFile, getFileHandle, writeToHandle } from '../../../lib/helpers/download.ts';
 import { 
     Table, 
     X, 
@@ -30,12 +31,15 @@ import {
     Trash2, 
     ChevronRight,
     Download,
-    Info as InfoIcon
+    Info as InfoIcon,
+    Loader
 } from 'lucide-react';
 import clsx from 'clsx';
+import PdfProgress from '../../../core/PdfProgress';
 
 type ColumnId = 'select' | 'titre' | 'branche' | 'groupe' | 'periode' | 'date' | 'note_max' | 'type_note' | 'nbQuestions' | 'nbResultats' | 'moyenne' | 'actions';
 type ColumnConfig = { id: ColumnId; width: number };
+type SortRule = { id: ColumnId; direction: 'asc' | 'desc' };
 
 const DEFAULT_COLUMNS: ColumnConfig[] = [
     { id: 'select', width: 50 },
@@ -65,6 +69,21 @@ const COLUMN_LABELS: Record<ColumnId, string> = {
     nbResultats: 'Résultats',
     moyenne: 'Moyenne',
     actions: ''
+};
+
+const COLUMN_ALIGN: Record<ColumnId, 'left' | 'center' | 'right'> = {
+    select: 'center',
+    titre: 'left',
+    branche: 'left',
+    groupe: 'center',
+    periode: 'center',
+    date: 'center',
+    note_max: 'center',
+    type_note: 'center',
+    nbQuestions: 'center',
+    nbResultats: 'center',
+    moyenne: 'left',
+    actions: 'center'
 };
 
 interface EvaluationsTableExcelProps {
@@ -114,6 +133,11 @@ const EvaluationsTableExcel: React.FC<EvaluationsTableExcelProps> = ({
     const { evaluations, loading } = useAllEvaluations();
     const { deleteEvaluation } = useGradeMutations();
     const [evalToDelete, setEvalToDelete] = useState<string | null>(null);
+
+    // États pour la génération de PDF
+    const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
+    const [pdfProgress, setPdfProgress] = useState(0);
+    const [pdfProgressText, setPdfProgressText] = useState('');
 
     // Multi-sélection
     const [selectedEvalIds, setSelectedEvalIds] = useState<Set<string>>(new Set());
@@ -197,12 +221,17 @@ const EvaluationsTableExcel: React.FC<EvaluationsTableExcelProps> = ({
     const [startX, setStartX] = useState<number | null>(null);
     const [startWidth, setStartWidth] = useState<number | null>(null);
 
-    const handleResizeStart = useCallback((e: React.MouseEvent, index: number) => {
+    // ✅ Correction : on cherche la colonne par son NOM (id) dans la liste complète,
+    // pas par sa position visuelle — car la liste affichée peut avoir une colonne
+    // ('Sélection') en moins, ce qui décalait toutes les positions d'un cran.
+    const handleResizeStart = useCallback((e: React.MouseEvent, colId: string) => {
         e.preventDefault();
         e.stopPropagation();
-        setResizingColumnIndex(index);
+        const realIndex = columns.findIndex(c => c.id === colId);
+        if (realIndex === -1) return;
+        setResizingColumnIndex(realIndex);
         setStartX(e.clientX);
-        setStartWidth(columns[index].width);
+        setStartWidth(columns[realIndex].width);
     }, [columns]);
 
     useEffect(() => {
@@ -250,23 +279,30 @@ const EvaluationsTableExcel: React.FC<EvaluationsTableExcelProps> = ({
     }, [resizingColumnIndex, startX, startWidth, setSavedColumns, columns]);
 
     // Prépare la mécanique pour mettre le tableau en ordre (ex: classer alphabétiquement par titre, ou par moyenne de la plus haute à la plus basse).
-    // Sorting state: Default to date_evaluation ascending (Oldest first)
-    const [sortColumn, setSortColumn] = useState<ColumnId | null>('date_evaluation');
-    const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
+    // Sorting state: Multiple rules for cascade sorting
+    const [sortRules, setSortRules] = useState<SortRule[]>([]);
 
     const handleSort = useCallback((colId: ColumnId) => {
-        if (sortColumn === colId) {
-            if (sortDirection === 'asc') {
-                setSortDirection('desc');
-            } else {
-                setSortColumn(null);
-                setSortDirection('asc');
+        setSortRules(prev => {
+            const existingRuleIndex = prev.findIndex(r => r.id === colId);
+            
+            if (existingRuleIndex === -1) {
+                // Not in sort rules: add it in 'asc'
+                return [...prev, { id: colId, direction: 'asc' }];
             }
-        } else {
-            setSortColumn(colId);
-            setSortDirection('asc');
-        }
-    }, [sortColumn, sortDirection]);
+            
+            const existingRule = prev[existingRuleIndex];
+            if (existingRule.direction === 'asc') {
+                // ASC -> DESC
+                const newRules = [...prev];
+                newRules[existingRuleIndex] = { ...existingRule, direction: 'desc' };
+                return newRules;
+            } else {
+                // DESC -> REMOVE
+                return prev.filter(r => r.id !== colId);
+            }
+        });
+    }, []);
 
     // Filters
     const [searchQuery, setSearchQuery] = useState('');
@@ -275,12 +311,20 @@ const EvaluationsTableExcel: React.FC<EvaluationsTableExcelProps> = ({
     const searchTriggerRef = useRef<HTMLDivElement>(null);
 
     // Logic for resetting all filters
-    const hasActiveFilters = searchQuery.length > 0 || selectedBranches.length > 0 || selectedGroups.length > 0 || selectedPeriodes.length > 0;
+    const hasActiveFilters = searchQuery.length > 0 || 
+        selectedBranches.length > 0 || 
+        selectedGroups.length > 0 || 
+        selectedPeriodes.length > 0 ||
+        sortRules.length > 0;
     
     const handleResetFilters = useCallback(() => {
         setSearchQuery('');
+        setSelectedBranches([]);
+        setSelectedGroups([]);
+        setSelectedPeriodes([]);
+        setSortRules([]);
         onResetFilters();
-    }, [setSearchQuery, onResetFilters]);
+    }, [setSearchQuery, setSelectedBranches, setSelectedGroups, setSelectedPeriodes, setSortRules, onResetFilters]);
 
     // Close menus when clicking outside
     useEffect(() => {
@@ -321,17 +365,29 @@ const EvaluationsTableExcel: React.FC<EvaluationsTableExcelProps> = ({
                 return true;
             })
             .sort((a: any, b: any) => {
-                if (!sortColumn) return 0;
-                const dir = sortDirection === 'asc' ? 1 : -1;
-                const valA = getCellSortValue(a, sortColumn);
-                const valB = getCellSortValue(b, sortColumn);
-                if (valA === null && valB === null) return 0;
-                if (valA === null) return 1;
-                if (valB === null) return -1;
-                if (typeof valA === 'string') return valA.localeCompare(valB as string) * dir;
-                return ((valA as number) - (valB as number)) * dir;
+                if (sortRules.length === 0) return 0;
+                
+                for (const rule of sortRules) {
+                    const dir = rule.direction === 'asc' ? 1 : -1;
+                    const valA = getCellSortValue(a, rule.id);
+                    const valB = getCellSortValue(b, rule.id);
+                    
+                    if (valA === valB) continue;
+                    
+                    if (valA === null) return 1;
+                    if (valB === null) return -1;
+                    
+                    if (typeof valA === 'string') {
+                        const cmp = valA.localeCompare(valB as string);
+                        if (cmp !== 0) return cmp * dir;
+                    } else {
+                        const diff = (valA as number) - (valB as number);
+                        if (diff !== 0) return diff * dir;
+                    }
+                }
+                return 0;
             });
-    }, [evaluations, searchQuery, selectedBranches, selectedGroups, selectedPeriodes, sortColumn, sortDirection]);
+    }, [evaluations, searchQuery, selectedBranches, selectedGroups, selectedPeriodes, sortRules]);
 
     const activeColumns = useMemo(() => {
         if (!isPrintMode) return columns.filter(c => c.id !== 'select');
@@ -339,6 +395,439 @@ const EvaluationsTableExcel: React.FC<EvaluationsTableExcelProps> = ({
     }, [columns, isPrintMode]);
 
     const totalTableWidth = useMemo(() => activeColumns.reduce((acc, col) => acc + col.width, 0), [activeColumns]);
+
+    // --- LOGIQUE D'EXPORT ---
+    
+    const exportEvaluationPDF = async (ev: any) => {
+        return exportBulkEvaluationPDF([ev.id], [ev]);
+    };
+
+    const exportBulkEvaluationPDF = async (evalIds: string[], evalSummaryList: any[]) => {
+        const setProgress = (text: string, percentage: number) => {
+            setPdfProgressText(text);
+            setPdfProgress(percentage);
+        };
+
+        try {
+            const { toast } = await import('sonner');
+            const { pdf } = await import('@react-pdf/renderer');
+            const { default: EvaluationPDFComponent } = await import('./EvaluationPDF');
+            const { gradeService } = await import('../services');
+            const { getCurrentUser, supabase } = await import('../../../lib/database');
+            const { trackingService } = await import('../../tracking/services/trackingService');
+            
+            // Capture du geste utilisateur pour le "Enregistrer sous"
+            let suggestedName = `evaluation_${(evalSummaryList[0]?.titre || 'export').replace(/[^a-z0-9]/gi, '_').toLowerCase()}.pdf`;
+            if (evalIds.length > 1) {
+                suggestedName = `evaluations_groupe_${evalIds.length}_fiches.pdf`;
+            }
+
+            let fileHandle = null;
+            try {
+                fileHandle = await getFileHandle(suggestedName, 'application/pdf', 'Document PDF');
+            } catch (err: any) {
+                if (err.name === 'AbortError') {
+                    // L'utilisateur a annulé la fenêtre de dialogue "Enregistrer sous"
+                    return;
+                }
+            }
+
+            setIsGeneratingPDF(true);
+            setProgress(`Préparation de l'export (${evalIds.length} évaluations)...`, 5);
+
+            const user = await getCurrentUser();
+            if (!user) {
+                toast.error("Utilisateur non authentifié");
+                setIsGeneratingPDF(false);
+                return;
+            }
+
+            setProgress("Récupération des données d'évaluation...", 10);
+            
+            // 1. Fetch all detailed evaluation data
+            const { data: fullEvals, error: evalError } = await supabase
+                .from('EvaluationWithStats')
+                .select('*, Branche(nom), Groupe(nom)')
+                .in('id', evalIds);
+
+            if (evalError) throw evalError;
+
+            // 2. Identify all groups involved
+            const groupIds = Array.from(new Set(fullEvals.map(e => e.group_id)));
+            setProgress(`Recherche des élèves dans ${groupIds.length} groupes...`, 20);
+            
+            const studentsPromises = groupIds.map(gid => trackingService.fetchStudentsInGroup(gid, user.id));
+            const studentsResults = await Promise.all(studentsPromises);
+            
+            const allStudentsMap = new Map();
+            studentsResults.forEach(res => {
+                (res?.full || []).forEach((s: any) => {
+                    allStudentsMap.set(s.id, s);
+                });
+            });
+            const allStudents = Array.from(allStudentsMap.values()).sort((a: any, b: any) => {
+                // 1. Sort by Level Order
+                const niveauA = a.Niveau?.ordre ?? a.niveau?.ordre ?? 0;
+                const niveauB = b.Niveau?.ordre ?? b.niveau?.ordre ?? 0;
+                if (niveauA !== niveauB) return niveauA - niveauB;
+                
+                // 2. Sort by Level Name
+                const levelNomA = a.Niveau?.nom || a.niveau?.nom || '';
+                const levelNomB = b.Niveau?.nom || b.niveau?.nom || '';
+                const levelCmp = levelNomA.localeCompare(levelNomB);
+                if (levelCmp !== 0) return levelCmp;
+
+                // 3. Sort by Name
+                return a.nom.localeCompare(b.nom);
+            });
+
+            // 3. Fetch all questions, results, questionResults
+            setProgress("Chargement des résultats et critères...", 30);
+            const [
+                allQuestions,
+                allResults,
+                allQuestionResults,
+                noteTypes
+            ] = await Promise.all([
+                gradeService.getQuestionsForEvaluations(evalIds, user.id),
+                gradeService.getResultsForEvaluations(evalIds, user.id),
+                gradeService.getQuestionResultsForEvaluations(evalIds, user.id),
+                gradeService.getNoteTypes(user.id)
+            ]);
+
+            // 4. Group data for the PDF component
+            const evaluationsData = evalSummaryList
+                .map(summary => fullEvals.find((f: any) => f.id === summary.id))
+                .filter(Boolean)
+                .map(ev => {
+                const evQuestions = allQuestions.filter((q: any) => q.evaluation_id === ev.id);
+                const evResults = allResults.filter((r: any) => r.evaluation_id === ev.id);
+                const evQuestionResults = allQuestionResults.filter((qr: any) => {
+                    return evQuestions.some((q: any) => q.id === qr.question_id);
+                });
+                const typeNote = noteTypes.find((nt: any) => nt.id === ev.type_note_id);
+
+                return {
+                    evaluation: { ...ev, _brancheName: ev.Branche?.nom },
+                    questions: evQuestions,
+                    results: evResults,
+                    questionResults: evQuestionResults,
+                    typeNote
+                };
+            }).sort((a, b) => {
+                const branchA = a.evaluation._brancheName || 'Sans matière';
+                const branchB = b.evaluation._brancheName || 'Sans matière';
+                return branchA.localeCompare(branchB);
+            });
+
+            // --- GÉNÉRATION DU FICHIER ---
+            setProgress("Génération des documents individuels...", 40);
+            
+            try {
+                const { PDFDocument } = await import('pdf-lib');
+                const mergedPdf = await PDFDocument.create();
+                let processedCount = 0;
+
+                for (const student of allStudents) {
+                    processedCount++;
+                    const percent = 40 + Math.floor((processedCount / allStudents.length) * 50);
+                    setProgress(`Fiche élève: ${student.prenom} ${student.nom}...`, percent);
+                    
+                    const pdfBlob = await pdf(
+                        <EvaluationPDFComponent 
+                            bulkMode={true}
+                            evaluationsData={evaluationsData}
+                            student={student}
+                        />
+                    ).toBlob();
+                    
+                    const arrayBuffer = await pdfBlob.arrayBuffer();
+                    const pdfDoc = await PDFDocument.load(arrayBuffer);
+                    const copiedPages = await mergedPdf.copyPages(pdfDoc, pdfDoc.getPageIndices());
+                    copiedPages.forEach((page) => mergedPdf.addPage(page));
+                }
+
+                setProgress("Fusion finale des documents...", 95);
+                const mergedPdfBytes = await mergedPdf.save();
+                const blob = new Blob([mergedPdfBytes], { type: 'application/pdf' });
+                
+                // Écriture finale
+                if (fileHandle) {
+                    await writeToHandle(fileHandle, blob);
+                } else {
+                    await downloadFile(blob, suggestedName, 'Document PDF');
+                }
+                
+                setProgress("Export terminé !", 100);
+                setTimeout(() => setIsGeneratingPDF(false), 1000);
+                toast.success("PDF exporté avec succès !");
+            } catch (pdfError: any) {
+                console.error("PDF generation error", pdfError);
+                toast.error("Échec de génération PDF");
+                setIsGeneratingPDF(false);
+            }
+        } catch (error: any) {
+            console.error("Critical error in export", error);
+            const { toast } = await import('sonner');
+            toast.error(`Erreur : ${error.message}`);
+            setIsGeneratingPDF(false);
+        }
+    };
+
+    const exportBulkEvaluationMarkdown = async (evalIds: string[], evalSummaryList: any[]) => {
+        const setProgress = (text: string, percentage: number) => {
+            setPdfProgressText(text);
+            setPdfProgress(percentage);
+        };
+
+        try {
+            const { toast } = await import('sonner');
+            const { generateEvaluationsMarkdown } = await import('../utils/markdownGenerator');
+            const { gradeService } = await import('../services');
+            const { getCurrentUser, supabase } = await import('../../../lib/database');
+            const { trackingService } = await import('../../tracking/services/trackingService');
+            
+            let suggestedName = `evaluation_${(evalSummaryList[0]?.titre || 'export').replace(/[^a-z0-9]/gi, '_').toLowerCase()}.md`;
+            if (evalIds.length > 1) {
+                suggestedName = `evaluations_groupe_${evalIds.length}_fiches.md`;
+            }
+
+            let fileHandle = null;
+            try {
+                fileHandle = await getFileHandle(suggestedName, 'text/markdown', 'Fichier Markdown');
+            } catch (err: any) {
+                if (err.name === 'AbortError') return;
+            }
+
+            setIsGeneratingPDF(true);
+            setProgress(`Préparation de l'export Markdown (${evalIds.length} évaluations)...`, 5);
+
+            const user = await getCurrentUser();
+            if (!user) {
+                toast.error("Utilisateur non authentifié");
+                setIsGeneratingPDF(false);
+                return;
+            }
+
+            setProgress("Récupération des données d'évaluation...", 10);
+            
+            // 1. Fetch all detailed evaluation data
+            const { data: fullEvals, error: evalError } = await supabase
+                .from('EvaluationWithStats')
+                .select('*, Branche(nom), Groupe(nom)')
+                .in('id', evalIds);
+
+            if (evalError) throw evalError;
+
+            // 2. Identify all groups involved
+            const groupIds = Array.from(new Set(fullEvals.map(e => e.group_id)));
+            setProgress(`Recherche des élèves dans ${groupIds.length} groupes...`, 20);
+            
+            const studentsPromises = groupIds.map(gid => trackingService.fetchStudentsInGroup(gid, user.id));
+            const studentsResults = await Promise.all(studentsPromises);
+            
+            const allStudentsMap = new Map();
+            studentsResults.forEach(res => {
+                (res?.full || []).forEach((s: any) => {
+                    allStudentsMap.set(s.id, s);
+                });
+            });
+            const allStudents = Array.from(allStudentsMap.values()).sort((a: any, b: any) => {
+                // 1. Sort by Level Order
+                const niveauA = a.Niveau?.ordre ?? a.niveau?.ordre ?? 0;
+                const niveauB = b.Niveau?.ordre ?? b.niveau?.ordre ?? 0;
+                if (niveauA !== niveauB) return niveauA - niveauB;
+                
+                // 2. Sort by Level Name
+                const levelNomA = a.Niveau?.nom || a.niveau?.nom || '';
+                const levelNomB = b.Niveau?.nom || b.niveau?.nom || '';
+                const levelCmp = levelNomA.localeCompare(levelNomB);
+                if (levelCmp !== 0) return levelCmp;
+
+                // 3. Sort by Name
+                return a.nom.localeCompare(b.nom);
+            });
+
+            // 3. Fetch all questions, results, questionResults
+            setProgress("Chargement des résultats et critères...", 30);
+            const [
+                allQuestions,
+                allResults,
+                allQuestionResults,
+                noteTypes
+            ] = await Promise.all([
+                gradeService.getQuestionsForEvaluations(evalIds, user.id),
+                gradeService.getResultsForEvaluations(evalIds, user.id),
+                gradeService.getQuestionResultsForEvaluations(evalIds, user.id),
+                gradeService.getNoteTypes(user.id)
+            ]);
+
+            // 4. Group data
+            const evaluationsData = fullEvals.map(ev => {
+                const evQuestions = allQuestions.filter((q: any) => q.evaluation_id === ev.id);
+                const evResults = allResults.filter((r: any) => r.evaluation_id === ev.id);
+                const evQuestionResults = allQuestionResults.filter((qr: any) => {
+                    return evQuestions.some((q: any) => q.id === qr.question_id);
+                });
+                const typeNote = noteTypes.find((nt: any) => nt.id === ev.type_note_id);
+
+                return {
+                    evaluation: { ...ev, _brancheName: ev.Branche?.nom },
+                    questions: evQuestions,
+                    results: evResults,
+                    questionResults: evQuestionResults,
+                    typeNote
+                };
+            });
+
+            setProgress("Génération des documents individuels...", 80);
+            
+            const markdownString = generateEvaluationsMarkdown(allStudents, evaluationsData, evalSummaryList);
+            const blob = new Blob([markdownString], { type: 'text/markdown' });
+            
+            if (fileHandle) {
+                await writeToHandle(fileHandle, blob);
+            } else {
+                await downloadFile(blob, suggestedName, 'Fichier Markdown');
+            }
+            
+            setProgress("Export terminé !", 100);
+            setTimeout(() => setIsGeneratingPDF(false), 1000);
+            toast.success("Markdown exporté avec succès !");
+            
+        } catch (error: any) {
+            console.error("Critical error in export markdown", error);
+            const { toast } = await import('sonner');
+            toast.error(`Erreur : ${error.message}`);
+            setIsGeneratingPDF(false);
+        }
+    };
+
+    const exportBulkEvaluationCSV = async (evalIds: string[], evalSummaryList: any[]) => {
+        const setProgress = (text: string, percentage: number) => {
+            setPdfProgressText(text);
+            setPdfProgress(percentage);
+        };
+
+        try {
+            const { toast } = await import('sonner');
+            const { generateMailMergeCSV } = await import('../utils/csvGenerator');
+            const { gradeService } = await import('../services');
+            const { getCurrentUser, supabase } = await import('../../../lib/database');
+            const { trackingService } = await import('../../tracking/services/trackingService');
+            
+            let suggestedName = `evaluation_${(evalSummaryList[0]?.titre || 'export').replace(/[^a-z0-9]/gi, '_').toLowerCase()}.csv`;
+            if (evalIds.length > 1) {
+                suggestedName = `evaluations_publipostage_${evalIds.length}.csv`;
+            }
+
+            let fileHandle = null;
+            try {
+                fileHandle = await getFileHandle(suggestedName, 'text/csv', 'Fichier CSV');
+            } catch (err: any) {
+                if (err.name === 'AbortError') return;
+            }
+
+            setIsGeneratingPDF(true);
+            setProgress(`Préparation de l'export CSV (${evalIds.length} évaluations)...`, 5);
+
+            const user = await getCurrentUser();
+            if (!user) {
+                toast.error("Utilisateur non authentifié");
+                setIsGeneratingPDF(false);
+                return;
+            }
+
+            setProgress("Récupération des données d'évaluation...", 10);
+            
+            // 1. Fetch all detailed evaluation data
+            const { data: fullEvals, error: evalError } = await supabase
+                .from('EvaluationWithStats')
+                .select('*, Branche(nom), Groupe(nom)')
+                .in('id', evalIds);
+
+            if (evalError) throw evalError;
+
+            // 2. Identify all groups involved
+            const groupIds = Array.from(new Set(fullEvals.map(e => e.group_id)));
+            setProgress(`Recherche des élèves dans ${groupIds.length} groupes...`, 20);
+            
+            const studentsPromises = groupIds.map(gid => trackingService.fetchStudentsInGroup(gid, user.id));
+            const studentsResults = await Promise.all(studentsPromises);
+            
+            const allStudentsMap = new Map();
+            studentsResults.forEach(res => {
+                (res?.full || []).forEach((s: any) => {
+                    allStudentsMap.set(s.id, s);
+                });
+            });
+            const allStudents = Array.from(allStudentsMap.values()).sort((a: any, b: any) => {
+                const niveauA = a.Niveau?.ordre ?? a.niveau?.ordre ?? 0;
+                const niveauB = b.Niveau?.ordre ?? b.niveau?.ordre ?? 0;
+                if (niveauA !== niveauB) return niveauA - niveauB;
+                
+                const levelNomA = a.Niveau?.nom || a.niveau?.nom || '';
+                const levelNomB = b.Niveau?.nom || b.niveau?.nom || '';
+                const levelCmp = levelNomA.localeCompare(levelNomB);
+                if (levelCmp !== 0) return levelCmp;
+
+                return a.nom.localeCompare(b.nom);
+            });
+
+            // 3. Fetch all questions, results, questionResults
+            setProgress("Chargement des résultats et critères...", 30);
+            const [
+                allQuestions,
+                allResults,
+                allQuestionResults,
+                noteTypes
+            ] = await Promise.all([
+                gradeService.getQuestionsForEvaluations(evalIds, user.id),
+                gradeService.getResultsForEvaluations(evalIds, user.id),
+                gradeService.getQuestionResultsForEvaluations(evalIds, user.id),
+                gradeService.getNoteTypes(user.id)
+            ]);
+
+            // 4. Group data
+            const evaluationsData = fullEvals.map(ev => {
+                const evQuestions = allQuestions.filter((q: any) => q.evaluation_id === ev.id);
+                const evResults = allResults.filter((r: any) => r.evaluation_id === ev.id);
+                const evQuestionResults = allQuestionResults.filter((qr: any) => {
+                    return evQuestions.some((q: any) => q.id === qr.question_id);
+                });
+                const typeNote = noteTypes.find((nt: any) => nt.id === ev.type_note_id);
+
+                return {
+                    evaluation: { ...ev, _brancheName: ev.Branche?.nom },
+                    questions: evQuestions,
+                    results: evResults,
+                    questionResults: evQuestionResults,
+                    typeNote
+                };
+            });
+
+            setProgress("Génération du fichier CSV...", 80);
+            
+            const csvString = generateMailMergeCSV(allStudents, evalSummaryList, evaluationsData);
+            const blob = new Blob([csvString], { type: 'text/csv' });
+            
+            if (fileHandle) {
+                await writeToHandle(fileHandle, blob);
+            } else {
+                await downloadFile(blob, suggestedName, 'Fichier CSV');
+            }
+            
+            setProgress("Export terminé !", 100);
+            setTimeout(() => setIsGeneratingPDF(false), 1000);
+            toast.success("CSV exporté avec succès !");
+            
+        } catch (error: any) {
+            console.error("Critical error in export CSV", error);
+            const { toast } = await import('sonner');
+            toast.error(`Erreur : ${error.message}`);
+            setIsGeneratingPDF(false);
+        }
+    };
 
     if (loading) {
         return (
@@ -417,15 +906,94 @@ const EvaluationsTableExcel: React.FC<EvaluationsTableExcelProps> = ({
                     </div>
 
                     {isPrintMode && selectedEvalIds.size > 0 && (
-                        <button
-                            onClick={() => exportBulkEvaluationPDF(Array.from(selectedEvalIds), Array.from(selectedEvalIds).map(id => evaluations.find((e: any) => e.id === id)))}
-                            className="flex items-center gap-2 px-4 py-2 bg-red-600/20 text-red-400 border border-red-500/30 rounded-xl font-bold text-xs uppercase tracking-widest hover:bg-red-600/30 transition-all animate-in zoom-in-95 duration-200"
-                        >
-                            <FileText size={16} />
-                            Exporter PDF ({selectedEvalIds.size})
-                        </button>
+                        <div className="flex items-center gap-2">
+                            <button
+                                onClick={() => {
+                                    const selectedEvals = displayedEvaluations.filter((ev: any) => selectedEvalIds.has(ev.id));
+                                    exportBulkEvaluationPDF(Array.from(selectedEvalIds), selectedEvals);
+                                }}
+                                className="flex items-center gap-2 px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-xl text-xs font-bold uppercase transition-all shadow-lg shadow-red-500/20"
+                            >
+                                <FileText size={14} />
+                                <span>PDF ({selectedEvalIds.size})</span>
+                            </button>
+                            <button
+                                onClick={() => {
+                                    const selectedEvals = displayedEvaluations.filter((ev: any) => selectedEvalIds.has(ev.id));
+                                    exportBulkEvaluationMarkdown(Array.from(selectedEvalIds), selectedEvals);
+                                }}
+                                className="flex items-center gap-2 px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-xl text-xs font-bold uppercase transition-all shadow-lg shadow-blue-500/20"
+                            >
+                                <FileText size={14} />
+                                <span>Markdown ({selectedEvalIds.size})</span>
+                            </button>
+                            <button
+                                onClick={() => {
+                                    const selectedEvals = displayedEvaluations.filter((ev: any) => selectedEvalIds.has(ev.id));
+                                    exportBulkEvaluationCSV(Array.from(selectedEvalIds), selectedEvals);
+                                }}
+                                className="flex items-center gap-2 px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl text-xs font-bold uppercase transition-all shadow-lg shadow-emerald-500/20"
+                            >
+                                <Table size={14} />
+                                <span>CSV ({selectedEvalIds.size})</span>
+                            </button>
+                        </div>
                     )}
                 </div>
+            </div>
+
+            {/* Pilules de tris et filtres actifs */}
+            {(sortRules.length > 0 || selectedGroups.length > 0 || selectedBranches.length > 0 || selectedPeriodes.length > 0 || searchQuery.length > 0) && (
+                <div className="px-6 mb-4 flex w-full items-start justify-between gap-4 text-xs">
+                    {/* Tris (gauche) */}
+                    <div className="flex flex-wrap gap-2 flex-1 items-center">
+                        {sortRules.map((rule, idx) => (
+                            <div key={`sort-${rule.id}`} className="flex items-center gap-1.5 px-3 py-1.5 bg-white/5 text-white/80 rounded-full border border-white/10 shadow-[0_2px_8px_rgba(0,0,0,0.1)] backdrop-blur-sm transition-all hover:bg-white/10">
+                                <span className="font-bold text-white/30 text-[10px]">{idx + 1}</span>
+                                <span className="font-medium tracking-wide">{COLUMN_LABELS[rule.id as ColumnId] || rule.id}</span>
+                                {rule.direction === 'asc' ? <ArrowUp size={12} className="text-white/50" /> : <ArrowDown size={12} className="text-white/50" />}
+                            </div>
+                        ))}
+                    </div>
+
+                    {/* Filtres (droite) */}
+                    <div className="flex flex-wrap gap-2 flex-1 justify-end items-center">
+                        {selectedGroups.length > 0 && (
+                            <div className="flex items-center gap-1.5 px-3 py-1.5 bg-white/5 text-white/80 rounded-full border border-white/10 shadow-[0_2px_8px_rgba(0,0,0,0.1)] backdrop-blur-sm transition-all hover:bg-white/10">
+                                <span className="font-semibold opacity-60">Groupes:</span> 
+                                <span className="font-medium">{selectedGroups.join(', ')}</span>
+                            </div>
+                        )}
+                        {selectedBranches.length > 0 && (
+                            <div className="flex items-center gap-1.5 px-3 py-1.5 bg-white/5 text-white/80 rounded-full border border-white/10 shadow-[0_2px_8px_rgba(0,0,0,0.1)] backdrop-blur-sm transition-all hover:bg-white/10">
+                                <span className="font-semibold opacity-60">Branches:</span> 
+                                <span className="font-medium">{selectedBranches.join(', ')}</span>
+                            </div>
+                        )}
+                        {selectedPeriodes.length > 0 && (
+                            <div className="flex items-center gap-1.5 px-3 py-1.5 bg-white/5 text-white/80 rounded-full border border-white/10 shadow-[0_2px_8px_rgba(0,0,0,0.1)] backdrop-blur-sm transition-all hover:bg-white/10">
+                                <span className="font-semibold opacity-60">Périodes:</span> 
+                                <span className="font-medium">{selectedPeriodes.join(', ')}</span>
+                            </div>
+                        )}
+                        {searchQuery && (
+                            <div className="flex items-center gap-1.5 px-3 py-1.5 bg-white/5 text-white/80 rounded-full border border-white/10 shadow-[0_2px_8px_rgba(0,0,0,0.1)] backdrop-blur-sm transition-all hover:bg-white/10 text-white/70">
+                                <Search size={12} className="opacity-60" />
+                                <span className="font-medium">"{searchQuery}"</span>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            )}
+
+            {/* Zone de progression PDF */}
+            <div className="px-6 mb-4">
+                <PdfProgress
+                    isGenerating={isGeneratingPDF}
+                    progressText={pdfProgressText}
+                    progressPercentage={pdfProgress}
+                    className="w-full"
+                />
             </div>
 
             {/* Table */}
@@ -443,6 +1011,7 @@ const EvaluationsTableExcel: React.FC<EvaluationsTableExcelProps> = ({
                                         style={{ width: col.width, minWidth: col.width, maxWidth: col.width }}
                                         className={clsx(
                                             "p-4 font-bold text-grey-light uppercase tracking-wider text-xs border-b border-white/10 relative transition-colors duration-200",
+                                            COLUMN_ALIGN[col.id] === 'center' && "text-center",
                                             draggedColumnIndex === index && "opacity-50 bg-white/5",
                                             col.id === 'titre' && "sticky left-0 z-30 bg-table-header after:content-[''] after:absolute after:right-0 after:top-0 after:h-full after:w-px after:bg-white/10 shadow-[4px_0_8px_-4px_rgba(0,0,0,0.5)]"
                                         )}
@@ -454,21 +1023,27 @@ const EvaluationsTableExcel: React.FC<EvaluationsTableExcelProps> = ({
                                         <div className="flex-1 w-full min-w-0">
                                             {renderHeaderContent(col.id, {
                                                 handleSort,
-                                                sortColumn, sortDirection,
+                                                sortRules,
                                                 searchQuery, setSearchQuery, isSearchOpen, setIsSearchOpen, searchMenuRef, searchTriggerRef,
                                                 selectedBranches, setSelectedBranches, availableBranches,
                                                 selectedGroups, setSelectedGroups, availableGroups,
                                                 selectedPeriodes, setSelectedPeriodes, availablePeriodes,
-                                                // Pour la sélection
                                                 displayedEvaluations,
                                                 selectedEvalIds,
                                                 setSelectedEvalIds
                                             })}
                                         </div>
                                         <div
-                                            className="absolute top-0 right-0 w-2 h-full cursor-col-resize hover:bg-primary/50 z-20"
-                                            onMouseDown={(e) => handleResizeStart(e, index)}
-                                        />
+                                            className="absolute top-0 -right-1 w-2 h-full cursor-col-resize z-20 flex items-center justify-center group/resizer"
+                                            onMouseDown={(e) => handleResizeStart(e, col.id)}
+                                        >
+                                            <div className={clsx(
+                                                "w-px transition-all duration-150",
+                                                resizingColumnIndex === index
+                                                    ? "h-full bg-primary"
+                                                    : "h-4 bg-white/15 group-hover/resizer:h-full group-hover/resizer:bg-primary/60"
+                                            )} />
+                                        </div>
                                     </th>
                                 ))}
                             </tr>
@@ -488,6 +1063,7 @@ const EvaluationsTableExcel: React.FC<EvaluationsTableExcelProps> = ({
                                             columns={activeColumns}
                                             onSelectEvaluation={onSelectEvaluation}
                                             onEditEvaluation={onEditEvaluation}
+                                            onExportPDF={exportEvaluationPDF}
                                             setEvalToDelete={setEvalToDelete}
                                             selectedEvalIds={selectedEvalIds}
                                             setSelectedEvalIds={setSelectedEvalIds}
@@ -513,42 +1089,10 @@ const EvaluationsTableExcel: React.FC<EvaluationsTableExcelProps> = ({
                 confirmText="Supprimer"
                 variant="danger"
             />
-
-            {/* DEBUG OVERLAY 
-            {isDebugVisible && (
-                <div className="fixed bottom-6 right-6 w-96 bg-surface border-2 border-primary/30 rounded-2xl shadow-2xl z-[9999] overflow-hidden animate-in slide-in-from-bottom-4 duration-300">
-                    <div className="bg-primary/10 p-3 border-b border-white/10 flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                            <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />
-                            <span className="font-bold text-xs uppercase tracking-widest text-primary">Debug Export console</span>
-                        </div>
-                        <button 
-                            onClick={clearDebug}
-                            className="text-grey-medium hover:text-white transition-colors"
-                        >
-                            <X size={16} />
-                        </button>
-                    </div>
-                    <div className="p-4 max-h-[300px] overflow-y-auto font-mono text-[11px] space-y-1 custom-scrollbar bg-black/40">
-                        {debugLogs.length === 0 && <span className="text-grey-medium italic">En attente d'actions...</span>}
-                        {debugLogs.map((log, i) => (
-                            <div key={i} className={clsx(
-                                "border-l-2 pl-2 py-0.5",
-                                log.includes('❌') ? "border-rose-500 text-rose-400" : 
-                                log.includes('✅') ? "border-emerald-500 text-emerald-400" : "border-primary/30 text-text-main"
-                            )}>
-                                {log}
-                            </div>
-                        ))}
-                    </div>
-                </div>
-            )}
-            */}
         </div>
     );
 };
 
-// Petite aide : convertit les informations compliquées d'une case (ex: une date) en un simple texte ou chiffre facilement triable par le système.
 function getCellSortValue(ev: any, colId: ColumnId): string | number | null {
     switch (colId) {
         case 'select': return 0;
@@ -566,11 +1110,21 @@ function getCellSortValue(ev: any, colId: ColumnId): string | number | null {
     }
 }
 
-// Render header content with filters
 function renderHeaderContent(colId: ColumnId, ctx: any) {
-    const { handleSort, sortColumn, sortDirection } = ctx;
-    const isSorted = sortColumn === colId;
-    const SortIcon = isSorted ? (sortDirection === 'asc' ? ArrowUp : ArrowDown) : null;
+    const { handleSort, sortRules } = ctx;
+    
+    const ruleIndex = sortRules.findIndex((r: any) => r.id === colId);
+    const isSorted = ruleIndex !== -1;
+    const rule = isSorted ? sortRules[ruleIndex] : null;
+    const SortIcon = rule ? (rule.direction === 'asc' ? ArrowUp : ArrowDown) : null;
+    const priority = ruleIndex + 1;
+    const showPriority = sortRules.length > 1 && isSorted;
+
+    const renderSortIndicator = () => (
+        <div className="flex items-center gap-1 shrink-0">
+            {SortIcon && <SortIcon size={12} className="text-primary" />}
+        </div>
+    );
 
     switch (colId) {
         case 'select': {
@@ -624,7 +1178,7 @@ function renderHeaderContent(colId: ColumnId, ctx: any) {
                     >
                         Titre
                         <Filter size={14} className={clsx(searchQuery || isSearchOpen ? "text-primary" : "text-grey-medium")} />
-                        {SortIcon && <SortIcon size={12} className="text-primary" />}
+                        {renderSortIndicator()}
                     </div>
                     {isSearchOpen && createPortal(
                         <div
@@ -662,9 +1216,8 @@ function renderHeaderContent(colId: ColumnId, ctx: any) {
                                 <button
                                     onClick={() => {
                                         handleSort('titre');
-                                        setIsSearchOpen(false);
                                     }}
-                                    className={clsx("p-2 rounded-lg border transition-colors shrink-0", isSorted ? "bg-primary/20 border-primary/30 text-primary" : "border-white/10 text-grey-medium hover:text-white hover:bg-white/5")}
+                                    className={clsx("p-2 rounded-lg border transition-colors shrink-0 relative", isSorted ? "bg-primary/20 border-primary/30 text-primary" : "border-white/10 text-grey-medium hover:text-white hover:bg-white/5")}
                                     title="Trier"
                                 >
                                     {SortIcon ? <SortIcon size={14} /> : <ArrowUp size={14} />}
@@ -679,176 +1232,103 @@ function renderHeaderContent(colId: ColumnId, ctx: any) {
         case 'branche': {
             const { selectedBranches, setSelectedBranches, availableBranches } = ctx;
             return (
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1 group/header w-full">
+                    <div 
+                        className="flex items-center gap-2 cursor-pointer hover:text-white transition-colors select-none flex-1 min-w-0"
+                        onClick={() => handleSort(colId)}
+                    >
+                        <span className="truncate">Branche</span>
+                        {isSorted ? (
+                            renderSortIndicator()
+                        ) : (
+                            <ArrowUp size={12} className="text-primary opacity-0 group-hover/header:opacity-40 shrink-0 transition-opacity" />
+                        )}
+                    </div>
                     <MultiFilterSelect
                         label="Branche"
                         options={availableBranches}
                         selectedValues={selectedBranches}
                         onChange={setSelectedBranches}
                         portal
+                        hideLabel
                         className="bg-transparent border-none !h-auto !p-0 hover:bg-transparent"
-                        icon={<Filter size={14} className={selectedBranches.length > 0 ? "text-primary" : "text-grey-light opacity-50"} />}
+                        icon={<Filter size={14} className={selectedBranches.length > 0 ? "text-primary" : "text-grey-light opacity-50 shrink-0"} />}
                     />
-                    {isSorted && <SortIcon size={12} className="text-primary cursor-pointer" onClick={() => handleSort(colId)} />}
                 </div>
             );
         }
         case 'groupe': {
             const { selectedGroups, setSelectedGroups, availableGroups } = ctx;
             return (
-                <div className="flex items-center gap-2">
+                <div className={clsx("flex items-center gap-1 group/header w-full", COLUMN_ALIGN[colId] === 'center' && "justify-center")}>
+                    <div 
+                        className="flex items-center gap-2 cursor-pointer hover:text-white transition-colors select-none flex-1 min-w-0"
+                        onClick={() => handleSort(colId)}
+                    >
+                        <span className="truncate">Groupe</span>
+                        {isSorted ? (
+                            renderSortIndicator()
+                        ) : (
+                            <ArrowUp size={12} className="text-primary opacity-0 group-hover/header:opacity-40 shrink-0 transition-opacity" />
+                        )}
+                    </div>
                     <MultiFilterSelect
                         label="Groupe"
                         options={availableGroups}
                         selectedValues={selectedGroups}
                         onChange={setSelectedGroups}
                         portal
+                        hideLabel
                         className="bg-transparent border-none !h-auto !p-0 hover:bg-transparent"
-                        icon={<Filter size={14} className={selectedGroups.length > 0 ? "text-primary" : "text-grey-light opacity-50"} />}
+                        icon={<Filter size={14} className={selectedGroups.length > 0 ? "text-primary" : "text-grey-light opacity-50 shrink-0"} />}
                     />
-                    {isSorted && <SortIcon size={12} className="text-primary cursor-pointer" onClick={() => handleSort(colId)} />}
                 </div>
             );
         }
         case 'periode': {
             const { selectedPeriodes, setSelectedPeriodes, availablePeriodes } = ctx;
             return (
-                <div className="flex items-center gap-2">
+                <div className={clsx("flex items-center gap-1 group/header w-full", COLUMN_ALIGN[colId] === 'center' && "justify-center")}>
+                    <div 
+                        className="flex items-center gap-2 cursor-pointer hover:text-white transition-colors select-none flex-1 min-w-0"
+                        onClick={() => handleSort(colId)}
+                    >
+                        <span className="truncate">Période</span>
+                        {isSorted ? (
+                            renderSortIndicator()
+                        ) : (
+                            <ArrowUp size={12} className="text-primary opacity-0 group-hover/header:opacity-40 shrink-0 transition-opacity" />
+                        )}
+                    </div>
                     <MultiFilterSelect
                         label="Période"
                         options={availablePeriodes}
                         selectedValues={selectedPeriodes}
                         onChange={setSelectedPeriodes}
                         portal
+                        hideLabel
                         className="bg-transparent border-none !h-auto !p-0 hover:bg-transparent"
-                        icon={<Filter size={14} className={selectedPeriodes.length > 0 ? "text-primary" : "text-grey-light opacity-50"} />}
+                        icon={<Filter size={14} className={selectedPeriodes.length > 0 ? "text-primary" : "text-grey-light opacity-50 shrink-0"} />}
                     />
-                    {isSorted && <SortIcon size={12} className="text-primary cursor-pointer" onClick={() => handleSort(colId)} />}
                 </div>
             );
         }
         default: {
             return (
                 <div
-                    className="flex items-center gap-2 cursor-pointer hover:text-white transition-colors select-none"
+                    className={clsx(
+                        "flex items-center gap-2 cursor-pointer hover:text-white transition-colors select-none",
+                        COLUMN_ALIGN[colId] === 'center' && "justify-center"
+                    )}
                     onClick={() => handleSort(colId)}
                 >
                     {COLUMN_LABELS[colId]}
-                    {SortIcon && <SortIcon size={12} className="text-primary" />}
+                    {renderSortIndicator()}
                 </div>
             );
         }
     }
 }
-
-const FilterDropdown = ({
-    label,
-    filter,
-    setFilter,
-    isOpen,
-    setIsOpen,
-    options,
-    handleSort,
-    colId,
-    isSorted,
-    SortIcon
-}: {
-    label: string,
-    filter: string,
-    setFilter: (v: string) => void,
-    isOpen: boolean,
-    setIsOpen: (v: boolean) => void,
-    options: string[],
-    handleSort: (id: ColumnId) => void,
-    colId: ColumnId,
-    isSorted: boolean,
-    SortIcon: any
-}) => {
-    const triggerRef = useRef<HTMLDivElement>(null);
-    const menuRef = useRef<HTMLDivElement>(null);
-
-    useEffect(() => {
-        if (!isOpen) return;
-        const handleClickOutside = (event: MouseEvent) => {
-            if (menuRef.current && !menuRef.current.contains(event.target as Node) && 
-                triggerRef.current && !triggerRef.current.contains(event.target as Node)) {
-                setIsOpen(false);
-            }
-        };
-        document.addEventListener('mousedown', handleClickOutside);
-        return () => document.removeEventListener('mousedown', handleClickOutside);
-    }, [isOpen, setIsOpen]);
-
-    const getMenuPosition = () => {
-        if (!triggerRef.current) return { top: 0, left: 0 };
-        const rect = triggerRef.current.getBoundingClientRect();
-        return {
-            top: rect.bottom + window.scrollY + 8,
-            left: rect.left + window.scrollX
-        };
-    };
-
-    const pos = getMenuPosition();
-
-    return (
-        <>
-            <div
-                ref={triggerRef}
-                className="flex items-center gap-2 cursor-pointer hover:text-white transition-colors select-none"
-                onClick={() => setIsOpen(!isOpen)}
-            >
-                {label}
-                <Filter size={14} className={clsx(filter !== 'all' || isOpen ? "text-primary" : "text-grey-medium/60")} />
-                {SortIcon && <SortIcon size={12} className="text-primary opacity-80" />}
-            </div>
-            {isOpen && createPortal(
-                <div
-                    ref={menuRef}
-                    style={{ 
-                        position: 'fixed', 
-                        top: pos.top - window.scrollY, 
-                        left: pos.left - window.scrollX,
-                        zIndex: 9999 
-                    }}
-                    className="w-56 bg-surface border border-white/20 rounded-xl py-2 shadow-2xl animate-in fade-in slide-in-from-top-2 duration-200 normal-case tracking-normal font-normal text-sm max-h-64 overflow-y-auto custom-scrollbar"
-                >
-                    <div
-                        className="px-3 py-1.5 hover:bg-white/5 cursor-pointer flex items-center gap-3 transition-colors text-text-main"
-                        onClick={() => { setFilter('all'); setIsOpen(false); }}
-                    >
-                        Tous
-                        {filter === 'all' && <ChevronRight size={14} className="ml-auto text-primary" />}
-                    </div>
-                    <div className="h-px bg-white/10 my-1 mx-3" />
-                    {options.map(opt => (
-                        <div
-                            key={opt}
-                            className={clsx(
-                                "px-3 py-1.5 hover:bg-white/5 cursor-pointer flex items-center gap-3 transition-colors",
-                                filter === opt ? "text-primary font-semibold" : "text-text-main"
-                            )}
-                            onClick={() => { setFilter(opt); setIsOpen(false); }}
-                        >
-                            <span className="truncate">{opt}</span>
-                            {filter === opt && <ChevronRight size={14} className="ml-auto" />}
-                        </div>
-                    ))}
-                    <div className="h-px bg-white/10 my-1 mx-3" />
-                    <div
-                        className="px-3 py-1.5 hover:bg-white/5 cursor-pointer flex items-center gap-2 transition-colors text-grey-medium"
-                        onClick={() => { handleSort(colId); setIsOpen(false); }}
-                    >
-                        {isSorted && SortIcon === ArrowDown ? <ArrowUp size={14} /> : <ArrowDown size={14} />}
-                        <span>Trier</span>
-                    </div>
-                </div>,
-                document.body
-            )}
-        </>
-    );
-};
-
-// --- Components memoïsés pour la performance ---
 
 const EvaluationCell = React.memo(({ 
     colId, 
@@ -857,6 +1337,7 @@ const EvaluationCell = React.memo(({
     onSelectEvaluation, 
     setEvalToDelete, 
     onEditEvaluation,
+    onExportPDF,
     selectedEvalIds,
     setSelectedEvalIds
 }: { 
@@ -866,6 +1347,7 @@ const EvaluationCell = React.memo(({
     onSelectEvaluation: (id: string) => void,
     setEvalToDelete: (id: string | null) => void,
     onEditEvaluation: (ev: any) => void,
+    onExportPDF: (ev: any) => void,
     selectedEvalIds: Set<string>,
     setSelectedEvalIds: (s: Set<string>) => void
 }) => {
@@ -874,13 +1356,14 @@ const EvaluationCell = React.memo(({
             style={{ width, minWidth: width, maxWidth: width }}
             className={clsx(
                 "p-4 relative whitespace-nowrap overflow-hidden text-ellipsis",
+                COLUMN_ALIGN[colId] === 'center' && "text-center",
                 colId === 'titre' && "sticky left-0 z-20 bg-surface group-hover:bg-white/[0.05] transition-colors after:content-[''] after:absolute after:right-0 after:top-0 after:h-full after:w-px after:bg-white/10 shadow-[4px_0_8px_-4px_rgba(0,0,0,0.5)] cursor-pointer"
             )}
             onClick={() => {
                 if (colId === 'titre') onSelectEvaluation(ev.id);
             }}
         >
-            {renderCellContent(colId, ev, onSelectEvaluation, setEvalToDelete, onEditEvaluation, selectedEvalIds, setSelectedEvalIds)}
+            {renderCellContent(colId, ev, onSelectEvaluation, setEvalToDelete, onEditEvaluation, onExportPDF, selectedEvalIds, setSelectedEvalIds)}
         </td>
     );
 });
@@ -892,6 +1375,7 @@ const EvaluationRow = React.memo(({
     columns, 
     onSelectEvaluation, 
     onEditEvaluation, 
+    onExportPDF,
     setEvalToDelete,
     selectedEvalIds,
     setSelectedEvalIds
@@ -900,6 +1384,7 @@ const EvaluationRow = React.memo(({
     columns: ColumnConfig[], 
     onSelectEvaluation: (id: string) => void,
     onEditEvaluation: (ev: any) => void,
+    onExportPDF: (ev: any) => void,
     setEvalToDelete: (id: string | null) => void,
     selectedEvalIds: Set<string>,
     setSelectedEvalIds: (s: Set<string>) => void
@@ -918,6 +1403,7 @@ const EvaluationRow = React.memo(({
                     width={col.width}
                     onSelectEvaluation={onSelectEvaluation}
                     onEditEvaluation={onEditEvaluation}
+                    onExportPDF={onExportPDF}
                     setEvalToDelete={setEvalToDelete}
                     selectedEvalIds={selectedEvalIds}
                     setSelectedEvalIds={setSelectedEvalIds}
@@ -929,13 +1415,13 @@ const EvaluationRow = React.memo(({
 
 EvaluationRow.displayName = 'EvaluationRow';
 
-// Render cell content - helper non-react function for flexibility
 function renderCellContent(
     colId: ColumnId, 
     ev: any, 
     onSelectEvaluation: (id: string) => void,
     setEvalToDelete: (id: string | null) => void,
     onEditEvaluation: (ev: any) => void,
+    onExportPDF: (ev: any) => void,
     selectedEvalIds: Set<string>,
     setSelectedEvalIds: (s: Set<string>) => void
 ) {
@@ -980,19 +1466,19 @@ function renderCellContent(
             return <span className="text-text-main truncate">{ev._groupeName}</span>;
         case 'periode':
             return ev.periode ? (
-                <span className="px-2 py-1 rounded text-xs font-semibold bg-primary/10 text-primary border border-primary/20">
+                <span className="text-text-main truncate">
                     {ev.periode}
                 </span>
             ) : <span className="text-white/20">—</span>;
         case 'date':
             return ev.date ? (
-                <span className="text-grey-light text-xs font-semibold uppercase tracking-wider">
+                <span className="text-text-main tabular-nums">
                     {new Date(ev.date).toLocaleDateString('fr-FR')}
                 </span>
             ) : <span className="text-white/20">—</span>;
         case 'note_max':
             const displayMax = ev._real_note_max !== undefined ? ev._real_note_max : ev.note_max;
-            return <span className="text-text-main font-semibold">/ {displayMax}</span>;
+            return <span className="text-text-main">/ {displayMax}</span>;
         case 'type_note':
             return (
                 <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-white/5 text-grey-medium border border-white/10 truncate inline-block">
@@ -1001,13 +1487,13 @@ function renderCellContent(
             );
         case 'nbQuestions':
             return (
-                <span className={clsx("font-semibold", ev._nbQuestions > 0 ? "text-text-main" : "text-white/20")}>
+                <span className={clsx(ev._nbQuestions > 0 ? "text-text-main" : "text-white/20")}>
                     {ev._nbQuestions}
                 </span>
             );
         case 'nbResultats':
             return (
-                <span className={clsx("font-semibold", ev._nbResultats > 0 ? "text-text-main" : "text-white/20")}>
+                <span className={clsx(ev._nbResultats > 0 ? "text-text-main" : "text-white/20")}>
                     {ev._nbResultats}
                 </span>
             );
@@ -1020,7 +1506,7 @@ function renderCellContent(
                 displayAvg = (ev._moyenne / 100) * realAvgMax;
             }
             return (
-                <div className="flex items-center gap-2 group">
+                <div className={clsx("flex items-center gap-2 group", COLUMN_ALIGN[colId] === 'center' && "justify-center")}>
                     {ev._moyenne !== null ? (
                         <div className="flex flex-col items-start justify-center gap-0.5">
                             <span className={clsx(
@@ -1069,7 +1555,7 @@ function renderCellContent(
                     <button
                         onClick={(e) => {
                             e.stopPropagation();
-                            exportEvaluationPDF(ev);
+                            onExportPDF(ev);
                         }}
                         className="p-2 rounded-lg text-red-400 hover:text-red-500 hover:bg-red-500/10 transition-colors mr-1"
                         title="Télécharger PDF"
@@ -1183,17 +1669,11 @@ async function exportEvaluationData(ev: any) {
             csvContent += row.map(formatField).join(sep) + "\n";
         });
 
-        // 5. Download
+        // 5. Download using Save As
         const blob = new Blob(["\uFEFF" + csvContent], { type: 'text/csv;charset=utf-8;' });
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement("a");
-        link.setAttribute("href", url);
         let safeTitle = (ev.titre || 'evaluation').replace(/[^a-z0-9]/gi, '_').toLowerCase();
-        link.setAttribute("download", `export_${safeTitle}.csv`);
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-
+        await downloadFile(blob, `export_${safeTitle}.csv`, 'Fichier Excel (CSV)');
+ 
         toast.success("Fichier Excel généré avec succès !", { id: `export_${ev.id}` });
     } catch (error) {
         console.error("Export error", error);
@@ -1202,165 +1682,10 @@ async function exportEvaluationData(ev: any) {
     }
 }
 
-async function exportEvaluationPDF(ev: any) {
-    return exportBulkEvaluationPDF([ev.id], [ev]);
-}
-
-async function exportBulkEvaluationPDF(evalIds: string[], evalSummaryList: any[]) {
-    // On désactive les logs de debug pour la version finale
-    const log = (msg: string) => {}; 
-    /*
-    const logHelper = (msg: string) => (window as any)._addDebugLog?.(msg);
-    (window as any)._clearDebug?.();
-    logHelper(`🚀 [1/4] Démarrage export groupé (${evalIds.length} évaluations)`);
-    */
-    
-    try {
-        log("📂 Chargement des dépendances...");
-        const { toast } = await import('sonner');
-        const { pdf } = await import('@react-pdf/renderer');
-        const { default: EvaluationPDFComponent } = await import('./EvaluationPDF');
-        const { gradeService } = await import('../services');
-        const { getCurrentUser, supabase } = await import('../../../lib/database');
-        const { trackingService } = await import('../../tracking/services/trackingService');
-        
-        const toastId = `bulk_pdf_export_${Date.now()}`;
-        toast.loading(`Préparation de l'export (${evalIds.length} évaluations)...`, { id: toastId });
-
-        log("👤 Identification de l'utilisateur...");
-        const user = await getCurrentUser();
-        if (!user) {
-            log("❌ Erreur: Utilisateur non trouvé");
-            toast.error("Utilisateur non authentifié", { id: toastId });
-            return;
-        }
-
-        log("📡 Récupération globale des données en lot...");
-        
-        // 1. Fetch all detailed evaluation data (to get group_id, type_note_id, etc.)
-        const { data: fullEvals, error: evalError } = await supabase
-            .from('EvaluationWithStats')
-            .select('*, Branche(nom), Groupe(nom)')
-            .in('id', evalIds);
-
-        
-        if (evalError) throw evalError;
-
-        // 2. Identify all groups involved to get all unique students
-        const groupIds = Array.from(new Set(fullEvals.map(e => e.group_id)));
-        log(`👥 Recherche des élèves dans ${groupIds.length} groupes...`);
-        
-        // Fetch all students for these groups
-        const studentsPromises = groupIds.map(gid => trackingService.fetchStudentsInGroup(gid, user.id));
-        const studentsResults = await Promise.all(studentsPromises);
-        
-        // Merge and unique students
-        const allStudentsMap = new Map();
-        studentsResults.forEach(res => {
-            (res?.full || []).forEach((s: any) => {
-                allStudentsMap.set(s.id, s);
-            });
-        });
-        const allStudents = Array.from(allStudentsMap.values()).sort((a, b) => a.nom.localeCompare(b.nom));
-        log(`✅ ${allStudents.length} élèves identifiés au total.`);
-
-        // 3. Fetch all questions, results, questionResults for ALL evaluations
-        log("📊 Récupération de tous les résultats et critères...");
-        const [
-            allQuestions,
-            allResults,
-            allQuestionResults,
-            noteTypes
-        ] = await Promise.all([
-            gradeService.getQuestionsForEvaluations(evalIds, user.id),
-            gradeService.getResultsForEvaluations(evalIds, user.id),
-            gradeService.getQuestionResultsForEvaluations(evalIds, user.id),
-            gradeService.getNoteTypes(user.id)
-        ]);
-
-        log(`✅ Données chargées : ${allQuestions.length} critères, ${allResults.length} notes.`);
-
-        // 4. Group data for the PDF component
-        // The PDF component will now expect an array of evaluations, each with its own specific data.
-        const evaluationsData = fullEvals.map(ev => {
-            const evQuestions = allQuestions.filter((q: any) => q.evaluation_id === ev.id);
-            const evResults = allResults.filter((r: any) => r.evaluation_id === ev.id);
-            const evQuestionResults = allQuestionResults.filter((qr: any) => {
-                // Since qr might not have evaluation_id directly (depending on DB structure), 
-                // we match it via question_id -> evQuestions
-                return evQuestions.some((q: any) => q.id === qr.question_id);
-            });
-            const typeNote = noteTypes.find((nt: any) => nt.id === ev.type_note_id);
-
-            return {
-                evaluation: { ...ev, _brancheName: ev.Branche?.nom },
-                questions: evQuestions,
-                results: evResults,
-                questionResults: evQuestionResults,
-                typeNote
-            };
-        });
-
-        // --- GÉNÉRATION DU FICHIER RÉEL ---
-        log("");
-        log("📁 GÉNÉRATION DES DOCUMENTS INDIVIDUELS...");
-        log("⏳ Fusion des fiches élèves (cela peut prendre quelques secondes)...");
-        
-        try {
-            const { PDFDocument } = await import('pdf-lib');
-            const mergedPdf = await PDFDocument.create();
-            let processedCount = 0;
-
-            for (const student of allStudents) {
-                processedCount++;
-                log(`📄 [${processedCount}/${allStudents.length}] Génération pour ${student.prenom} ${student.nom}...`);
-                
-                const pdfBlob = await pdf(
-                    <EvaluationPDFComponent 
-                        bulkMode={true}
-                        evaluationsData={evaluationsData}
-                        student={student}
-                    />
-                ).toBlob();
-                
-                const arrayBuffer = await pdfBlob.arrayBuffer();
-                const pdfDoc = await PDFDocument.load(arrayBuffer);
-                const copiedPages = await mergedPdf.copyPages(pdfDoc, pdfDoc.getPageIndices());
-                copiedPages.forEach((page) => mergedPdf.addPage(page));
-            }
-
-            log("🔗 Fusion finale des documents...");
-            const mergedPdfBytes = await mergedPdf.save();
-            const blob = new Blob([mergedPdfBytes], { type: 'application/pdf' });
-
-            const url = URL.createObjectURL(blob);
-            const link = document.createElement('a');
-            link.href = url;
-            link.download = `Export_Groupé_Evaluations_${new Date().toLocaleDateString('fr-FR').replace(/\//g, '-')}.pdf`;
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-            URL.revokeObjectURL(url);
-
-            log("✅ EXPORT TERMINÉ AVEC SUCCÈS");
-            toast.success("PDF groupé téléchargé !", { id: toastId });
-        } catch (pdfError: any) {
-            log("❌ ERREUR GÉNÉRATION PDF: " + pdfError.message);
-            toast.error("Échec de génération PDF", { id: toastId });
-        }
-        
-    } catch (error: any) {
-        log("❌ ERREUR CRITIQUE: " + error.message);
-        const { toast } = await import('sonner');
-        toast.error(`Erreur : ${error.message}`);
-    }
-}
 
 // Expose for debugging if needed
 if (typeof window !== 'undefined') {
-    (window as any)._exportEvaluationPDF = exportEvaluationPDF;
     (window as any)._exportEvaluationData = exportEvaluationData;
-    (window as any)._exportBulkEvaluationPDF = exportBulkEvaluationPDF;
 }
 
 export default EvaluationsTableExcel;

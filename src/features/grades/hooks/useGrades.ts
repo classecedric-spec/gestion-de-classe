@@ -450,7 +450,8 @@ export const useGrades = (brancheId?: string, periode?: string, initialEvaluatio
     const { data: evaluations = [], isLoading: loadingEvaluations } = useQuery({
         queryKey: ['evaluations', brancheId, periode, user?.id],
         queryFn: () => user ? gradeService.getEvaluations(user.id, brancheId, periode) : Promise.resolve([]),
-        enabled: !!brancheId && !!periode && !!user
+        enabled: !!brancheId && !!periode && !!user,
+        staleTime: 1000 * 60 * 2, // ✅ Correction #4 : 2 min — évite les re-fetch inutiles au changement d'onglet
     });
 
     // Fetch questions for selected evaluation
@@ -460,28 +461,32 @@ export const useGrades = (brancheId?: string, periode?: string, initialEvaluatio
             if (!selectedEvaluationId || !user) return [];
             return await gradeService.getQuestions(selectedEvaluationId, user.id);
         },
-        enabled: !!selectedEvaluationId && !!user
+        enabled: !!selectedEvaluationId && !!user,
+        staleTime: 1000 * 60 * 2,
     });
 
     // Fetch results for selected evaluation
     const { data: currentResults = [], isLoading: loadingResults } = useQuery({
         queryKey: ['evaluation_results', selectedEvaluationId, user?.id],
         queryFn: () => (selectedEvaluationId && user) ? gradeService.getResults(user.id, selectedEvaluationId) : Promise.resolve([]),
-        enabled: !!selectedEvaluationId && !!user
+        enabled: !!selectedEvaluationId && !!user,
+        staleTime: 1000 * 60 * 2,
     });
 
     // Fetch all results for current context (branch/period)
     const { data: contextResults = [], isLoading: loadingContextResults } = useQuery({
         queryKey: ['context_results', brancheId, periode, user?.id],
         queryFn: () => (evaluations.length > 0 && user) ? gradeService.getResultsForEvaluations(evaluations.map(e => e.id), user.id) : Promise.resolve([]),
-        enabled: !!brancheId && !!periode && evaluations.length > 0 && !!user
+        enabled: !!brancheId && !!periode && evaluations.length > 0 && !!user,
+        staleTime: 1000 * 60 * 2,
     });
 
     // Fetch individual question results
     const { data: questionResults = [], isLoading: loadingQuestionResults } = useQuery({
         queryKey: ['question_results', selectedEvaluationId, user?.id],
         queryFn: () => (selectedEvaluationId && user) ? gradeService.getQuestionResults(selectedEvaluationId, user.id) : Promise.resolve([]),
-        enabled: !!selectedEvaluationId && !!user
+        enabled: !!selectedEvaluationId && !!user,
+        staleTime: 1000 * 60 * 2,
     });
 
     // Mutations and NoteTypes via shared hooks
@@ -492,14 +497,16 @@ export const useGrades = (brancheId?: string, periode?: string, initialEvaluatio
     const { data: deletedEvaluations = [], isLoading: loadingDeleted } = useQuery({
         queryKey: ['deleted_evaluations', user?.id],
         queryFn: () => user ? gradeService.getDeletedEvaluations(user.id) : Promise.resolve([]),
-        enabled: !!user
+        enabled: !!user,
+        staleTime: 1000 * 60 * 5, // 5 min — la corbeille change très rarement
     });
 
     // Fetch active evaluation details independently of context
     const { data: activeEvalData, isLoading: loadingMeta } = useQuery({
         queryKey: ['evaluation_detail', selectedEvaluationId, user?.id],
         queryFn: () => (selectedEvaluationId && user) ? gradeService.getEvaluationById(selectedEvaluationId, user.id) : Promise.resolve(null),
-        enabled: !!selectedEvaluationId && !!user
+        enabled: !!selectedEvaluationId && !!user,
+        staleTime: 1000 * 60 * 2,
     });
 
 

@@ -96,6 +96,11 @@ export class AttendanceService {
         await this.repository.deleteSetup(id, userId);
     }
 
+    /** Sauvegarde le nouvel ordre des types d'appels après un déplacement. */
+    async updateSetupOrders(updates: { id: string; ordre: number }[], userId: string): Promise<void> {
+        await this.repository.updateSetupOrders(updates, userId);
+    }
+
     /** Enregistre plusieurs catégories de présence d'un coup. */
     async upsertCategories(categories: TablesInsert<'CategoriePresence'>[], userId: string): Promise<void> {
         await this.repository.upsertCategories(categories, userId);

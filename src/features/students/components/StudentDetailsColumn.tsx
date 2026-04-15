@@ -28,6 +28,7 @@ import { StudentDetailsInfos } from './details/StudentDetailsInfos';
 import { StudentDetailsSuivi } from './details/StudentDetailsSuivi';
 import { StudentDetailsUrgent } from './details/StudentDetailsUrgent';
 import { StudentDetailsTodo } from './details/StudentDetailsTodo';
+import { StudentDetailsResults } from './details/StudentDetailsResults';
 
 interface StudentDetailsColumnProps {
     selectedStudent: any;
@@ -122,7 +123,8 @@ export const StudentDetailsColumn: React.FC<StudentDetailsColumnProps> = ({
                     { id: 'infos', label: 'Dossier & Renseignement' },
                     { id: 'suivi', label: 'Parcours Scolaire' },
                     { id: 'urgent', label: 'Urgences & Retards' },
-                    { id: 'todo', label: 'Documents & Outils' }
+                    { id: 'todo', label: 'Documents & Outils' },
+                    { id: 'resultats', label: 'Résultats' }
                 ]}
                 activeTab={currentTab}
                 onChange={setCurrentTab}
@@ -187,6 +189,13 @@ export const StudentDetailsColumn: React.FC<StudentDetailsColumnProps> = ({
                         onShowQR={(tab) => setShowQRModal(true, tab)}
                         onGenerateTodoPDF={() => generatePDF(selectedStudent)}
                     />
+                )}
+                {/** 
+                 * ONGLET RÉSULTATS : 
+                 * Synthèse des notes par période et matière avec détail par évaluation.
+                 */}
+                {currentTab === 'resultats' && (
+                    <StudentDetailsResults studentId={selectedStudent.id} />
                 )}
             </CardTabs>
         </div>

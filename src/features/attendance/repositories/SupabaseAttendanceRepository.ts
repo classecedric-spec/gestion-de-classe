@@ -109,15 +109,28 @@ export class SupabaseAttendanceRepository implements IAttendanceRepository {
 
     // ==================== CONFIGURATION (SETUPS & CATÉGORIES) ====================
 
-    /** Liste les types d'appels configurés. */
+    /** Liste les types d'appels configurés, triés par l'ordre choisi par l'enseignant. */
     async getSetups(userId: string): Promise<SetupPresence[]> {
         const { data, error } = await supabase
             .from('SetupPresence')
             .select('*')
             .eq('user_id', userId)
+            .order('ordre', { ascending: true, nullsFirst: false })
             .order('nom');
         if (error) throw error;
         return data || [];
+    }
+
+    /** Met à jour l'ordre de tous les sets en une seule passe. */
+    async updateSetupOrders(updates: { id: string; ordre: number }[], userId: string): Promise<void> {
+        for (const { id, ordre } of updates) {
+            const { error } = await supabase
+                .from('SetupPresence')
+                .update({ ordre })
+                .eq('id', id)
+                .eq('user_id', userId);
+            if (error) throw error;
+        }
     }
 
     /** Liste les statuts (ex: Présent, Absent) liés à un type d'appel. */

@@ -128,6 +128,7 @@ const StudentGradeEntryModal: React.FC<StudentGradeEntryModalProps> = ({
     const activeNoteType = noteTypes.find(nt => nt.id === evaluation.type_note_id);
     const isConversion = activeNoteType?.systeme === 'conversion';
     const hasQuestions = questions.length > 0;
+    const hasPaliers = questions.some(q => q.paliers && Array.isArray(q.paliers) && q.paliers.length > 0);
 
 
     // Initialize local state
@@ -311,12 +312,83 @@ const StudentGradeEntryModal: React.FC<StudentGradeEntryModalProps> = ({
                         </div>
 
                         {hasQuestions ? (
-                            <div className="space-y-4 max-h-[400px] overflow-y-auto pr-4 custom-scrollbar">
+                            <div className={clsx(
+                                "pr-4 custom-scrollbar",
+                                hasPaliers ? "space-y-12 max-h-[60vh] overflow-y-auto" : "space-y-4 max-h-[400px] overflow-y-auto"
+                            )}>
                                 {questions.map((q, idx) => {
                                     const val = localQuestions[q.id] || '';
                                     const qPalier = isConversion ? getConversionPalier(val !== '' ? parseFloat(val) : null, q.note_max, activeNoteType) : null;
                                     const isInvalid = isQuestionInvalid(q.id);
+                                    const currentPaliers = q.paliers && Array.isArray(q.paliers) ? q.paliers : [];
+                                    const questionHasPaliers = currentPaliers.length > 0;
                                     
+                                    if (hasPaliers && questionHasPaliers) {
+                                        // NEW QUESTIONNAIRE MODE (VERTICAL BLOCKS)
+                                        return (
+                                            <div key={q.id} className="space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                                                <div className="flex items-center gap-4">
+                                                    <div className="w-10 h-10 rounded-xl bg-primary/20 border border-primary/20 flex items-center justify-center shrink-0">
+                                                        <span className="text-primary font-black text-sm">{idx + 1}</span>
+                                                    </div>
+                                                    <h3 className="text-xl font-black text-white leading-tight tracking-tight">{q.titre}</h3>
+                                                </div>
+
+                                                <div className="grid grid-cols-1 gap-3 ml-14">
+                                                    {currentPaliers.map((palier: any, pIdx: number) => {
+                                                        const isSelected = Number(val) === Number(palier.points);
+                                                        return (
+                                                            <button
+                                                                key={pIdx}
+                                                                onClick={() => handleQuestionChange(q.id, String(palier.points))}
+                                                                className={clsx(
+                                                                    "group relative flex items-center p-5 rounded-2xl border-2 transition-all duration-200 text-left",
+                                                                    isSelected
+                                                                        ? "bg-primary border-primary shadow-lg shadow-primary/20 scale-[1.02]"
+                                                                        : "bg-white/[0.03] border-white/5 hover:bg-white/[0.08] hover:border-white/20"
+                                                                )}
+                                                            >
+                                                                <div className="flex items-center gap-4 w-full">
+                                                                    <div className={clsx(
+                                                                        "w-8 h-8 rounded-full border-2 flex items-center justify-center shrink-0 transition-all",
+                                                                        isSelected 
+                                                                            ? "bg-white text-primary border-white" 
+                                                                            : "border-white/10 text-grey-medium group-hover:border-primary group-hover:text-primary"
+                                                                    )}>
+                                                                        {isSelected ? <CheckCircle2 size={16} /> : <span className="text-[10px] font-black">{pIdx + 1}</span>}
+                                                                    </div>
+                                                                    <div className="flex-1">
+                                                                        <div className={clsx(
+                                                                            "text-sm font-black uppercase tracking-widest",
+                                                                            isSelected ? "text-grey-dark" : "text-grey-medium"
+                                                                        )}>
+                                                                            {palier.label}
+                                                                        </div>
+                                                                        {palier.description && (
+                                                                            <div className={clsx(
+                                                                                "text-xs mt-1",
+                                                                                isSelected ? "text-grey-dark/60" : "text-grey-light/40"
+                                                                            )}>
+                                                                                {palier.description}
+                                                                            </div>
+                                                                        )}
+                                                                    </div>
+                                                                    <div className={clsx(
+                                                                        "font-black text-xs",
+                                                                        isSelected ? "text-grey-dark" : "text-primary opacity-40"
+                                                                    )}>
+                                                                        {palier.points} pts
+                                                                    </div>
+                                                                </div>
+                                                            </button>
+                                                        );
+                                                    })}
+                                                </div>
+                                            </div>
+                                        );
+                                    }
+
+                                    // CLASSIC LIST MODE
                                     return (
                                         <div 
                                             key={q.id} 
@@ -337,19 +409,21 @@ const StudentGradeEntryModal: React.FC<StudentGradeEntryModalProps> = ({
                                                         {qPalier.letter}
                                                     </Badge>
                                                 )}
-                                                <div className="w-24 relative flex items-center gap-2">
-                                                    <Input
-                                                        ref={idx === 0 ? firstInputRef : null}
-                                                        type="number"
-                                                        value={val}
-                                                        onChange={(e) => handleQuestionChange(q.id, e.target.value)}
-                                                        onKeyDown={handleKeyDown}
-                                                        placeholder="--"
-                                                        className={clsx(
-                                                            "text-center font-black text-lg h-12 bg-grey-dark/50 border-white/10 focus:border-primary focus:ring-0",
-                                                            isInvalid && "text-danger focus:border-danger"
-                                                        )}
-                                                    />
+                                                <div className="relative flex items-center gap-2">
+                                                        <div className="w-24">
+                                                            <Input
+                                                                ref={idx === 0 ? firstInputRef : null}
+                                                                type="number"
+                                                                value={val}
+                                                                onChange={(e) => handleQuestionChange(q.id, e.target.value)}
+                                                                onKeyDown={handleKeyDown}
+                                                                placeholder="--"
+                                                                className={clsx(
+                                                                    "text-center font-black text-lg h-12 bg-grey-dark/50 border-white/10 focus:border-primary focus:ring-0",
+                                                                    isInvalid && "text-danger focus:border-danger"
+                                                                )}
+                                                            />
+                                                        </div>
                                                 </div>
                                             </div>
                                         </div>
@@ -366,7 +440,8 @@ const StudentGradeEntryModal: React.FC<StudentGradeEntryModalProps> = ({
                             "mt-8 p-6 rounded-3xl border-2 relative overflow-hidden transition-all",
                             isTotalInvalid() 
                                 ? "bg-danger/10 border-danger" 
-                                : "bg-primary/10 border-primary/20"
+                                : "bg-primary/10 border-primary/20",
+                            hasPaliers && "mt-12 shadow-2xl shadow-primary/5"
                         )}>
                             <div className="relative z-10 flex items-center justify-between">
                                 <div className="space-y-1">
@@ -379,21 +454,23 @@ const StudentGradeEntryModal: React.FC<StudentGradeEntryModalProps> = ({
                                             {palierTotal.letter}
                                         </div>
                                     )}
-                                    <div className="w-32 relative flex items-center gap-2">
-                                        <Input
-                                            ref={!hasQuestions ? firstInputRef : null}
-                                            type="number"
-                                            value={localTotal}
-                                            onChange={(e) => setLocalTotal(e.target.value)}
-                                            onKeyDown={handleKeyDown}
-                                            readOnly={hasQuestions}
-                                            placeholder="--"
-                                            className={clsx(
-                                                "text-center text-3xl font-black h-14 bg-grey-dark/80 border-white/20 text-primary",
-                                                hasQuestions && "opacity-50 cursor-not-allowed grayscale",
-                                                isTotalInvalid() && "text-danger"
-                                            )}
-                                        />
+                                    <div className="relative flex items-center gap-2">
+                                            <div className="w-32">
+                                                <Input
+                                                    ref={!hasQuestions ? firstInputRef : null}
+                                                    type="number"
+                                                    value={localTotal}
+                                                    onChange={(e) => setLocalTotal(e.target.value)}
+                                                    onKeyDown={handleKeyDown}
+                                                    readOnly={hasQuestions}
+                                                    placeholder="--"
+                                                    className={clsx(
+                                                        "text-center text-3xl font-black h-14 bg-grey-dark/80 border-white/20 text-primary",
+                                                        hasQuestions && "opacity-50 cursor-not-allowed grayscale",
+                                                        isTotalInvalid() && "text-danger"
+                                                    )}
+                                                />
+                                            </div>
                                     </div>
                                 </div>
                             </div>

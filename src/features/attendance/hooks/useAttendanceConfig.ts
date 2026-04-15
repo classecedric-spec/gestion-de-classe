@@ -259,6 +259,33 @@ export const useAttendanceConfig = ({
         setView('edit');
     };
 
+    /** Déplace un élément vers le haut (-1) ou vers le bas (+1) dans la liste. */
+    const handleReorder = async (index: number, direction: -1 | 1) => {
+        const newIndex = index + direction;
+        if (newIndex < 0 || newIndex >= sets.length) return;
+
+        // On réordonne la copie locale pour l'affichage immédiat
+        const reordered = [...sets];
+        const [moved] = reordered.splice(index, 1);
+        reordered.splice(newIndex, 0, moved);
+
+        // On prépare les nouvelles valeurs d'ordre (0, 1, 2...)
+        const updates = reordered.map((s, i) => ({ id: s.id, ordre: i }));
+
+        // On met à jour le cache React Query immédiatement (sans attendre le serveur)
+        queryClient.setQueryData(['attendance-setup', user?.id], reordered);
+
+        // On sauvegarde en arrière-plan
+        try {
+            if (!user) return;
+            await attendanceService.updateSetupOrders(updates, user.id);
+        } catch (e) {
+            console.error('Erreur lors de la sauvegarde de l’ordre :', e);
+            // En cas d'échec, on recharge la liste depuis le serveur
+            queryClient.invalidateQueries({ queryKey: ['attendance-setup', user?.id] });
+        }
+    };
+
     const handleEdit = async (set: SetupPresence) => {
         setCurrentSet(set);
         try {
@@ -312,6 +339,7 @@ export const useAttendanceConfig = ({
         selectedDay, setSelectedDay,
 
         handleCreateNew,
+        handleReorder,
         handleEdit,
         handleDeleteSet: (id: string) => deleteSetupMutation.mutate(id),
         handleSaveSet: (onConfigSaved?: () => void) => {

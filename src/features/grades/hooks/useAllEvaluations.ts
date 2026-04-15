@@ -39,7 +39,7 @@ export const useAllEvaluations = () => {
 
             // Fetch data in chunks to avoid URL length limits with the .in() filter
             const fetchInChunks = async (table: string, idField: string, ids: string[], selectString: string = '*') => {
-                const CHUNK_SIZE = 20; // Réduit à 20 pour éviter les erreurs 400 "Bad Request" (limite de longueur d'URL)
+                const CHUNK_SIZE = 100; // ✅ Correction #2 : augmenté de 20 → 100 (PostgREST gère sans problème, réduit drastiquement le nb de requêtes)
                 let results: any[] = [];
                 for (let i = 0; i < ids.length; i += CHUNK_SIZE) {
                     const chunk = ids.slice(i, i + CHUNK_SIZE);
@@ -62,8 +62,11 @@ export const useAllEvaluations = () => {
                 return [];
             }
 
-            const { data: allQuestions } = await fetchInChunks('EvaluationQuestion', 'evaluation_id', evIds);
-            const { data: allResults } = await fetchInChunks('Resultat', 'evaluation_id', evIds);
+            // ✅ Correction #1 : requêtes parallèles (était séquentiel — chacune attendait l'autre inutilement)
+            const [{ data: allQuestions }, { data: allResults }] = await Promise.all([
+                fetchInChunks('EvaluationQuestion', 'evaluation_id', evIds),
+                fetchInChunks('Resultat', 'evaluation_id', evIds)
+            ]);
             
             // Get all unique question IDs to fetch their results directly without complex joins in the filter
             const questionIds = Array.from(new Set(allQuestions?.map((q: any) => q.id) || []));

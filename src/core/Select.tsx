@@ -11,7 +11,7 @@ export interface SelectProps extends Omit<React.SelectHTMLAttributes<HTMLSelectE
     options: SelectOption[];
     label?: string;
     error?: string;
-    icon?: React.ReactNode;
+    icon?: React.ElementType;
     variant?: 'default' | 'neu' | 'inset';
     fullWidth?: boolean;
     iconClassName?: string;
@@ -37,7 +37,7 @@ export interface SelectProps extends Omit<React.SelectHTMLAttributes<HTMLSelectE
  * // With label and icon
  * <Select 
  *   label="Choose a group"
- *   icon={<Users />}
+ *   icon={Users}
  *   options={groupOptions}
  * />
  * 
@@ -46,20 +46,21 @@ export interface SelectProps extends Omit<React.SelectHTMLAttributes<HTMLSelectE
  * <Select 
  *   variant="neu"
  *   options={options}
- *   icon={<Filter />}
+ *   icon={Filter}
  * />
  */
 const Select: React.FC<SelectProps> = ({
     options,
     label,
     error,
-    icon,
+    icon: Icon,
     variant = 'default',
     fullWidth = false,
     className,
     iconClassName,
     ...props
 }) => {
+    console.log("🛠️ [Select] Render - Icon present:", !!Icon, "variant:", variant);
     const selectId = React.useId();
 
     if (variant === 'neu') {
@@ -81,9 +82,9 @@ const Select: React.FC<SelectProps> = ({
                         </option>
                     ))}
                 </select>
-                {icon && (
+                {Icon && (
                     <div className={clsx("absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none group-hover:text-primary transition-colors", iconClassName || "text-grey-medium")}>
-                        {icon}
+                        <Icon size={14} />
                     </div>
                 )}
             </div>
@@ -93,9 +94,9 @@ const Select: React.FC<SelectProps> = ({
     if (variant === 'inset') {
         return (
             <div className={clsx('relative group', fullWidth ? 'w-full' : 'min-w-[140px]', className)}>
-                {icon && (
+                {Icon && (
                     <div className={clsx("absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none group-focus-within:text-primary transition-colors z-10", iconClassName || "text-grey-medium")}>
-                        {icon}
+                        <Icon size={18} />
                     </div>
                 )}
                 <select
@@ -103,8 +104,8 @@ const Select: React.FC<SelectProps> = ({
                     className={clsx(
                         'w-full input-inset rounded-xl py-2.5 pr-8 text-sm text-text-main',
                         'focus:outline-none appearance-none cursor-pointer',
-                        icon && 'pl-9',
-                        !icon && 'pl-3'
+                        Icon && 'pl-9',
+                        !Icon && 'pl-3'
                     )}
                     {...props}
                 >
@@ -140,9 +141,9 @@ const Select: React.FC<SelectProps> = ({
             )}
 
             <div className="relative group">
-                {icon && (
+                {Icon && (
                     <div className={clsx("absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none group-focus-within:text-primary transition-colors z-10", iconClassName || "text-grey-medium")}>
-                        {icon}
+                        <Icon size={18} />
                     </div>
                 )}
 
@@ -152,8 +153,8 @@ const Select: React.FC<SelectProps> = ({
                         'w-full bg-input border border-border rounded-xl py-3 pr-10 text-sm text-text-main',
                         'focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary',
                         'transition-all appearance-none cursor-pointer',
-                        icon && 'pl-10',
-                        !icon && 'pl-4',
+                        Icon && 'pl-10',
+                        !Icon && 'pl-4',
                         error && 'bg-danger/50 border-danger focus:ring-danger/50 focus:border-danger'
                     )}
                     {...props}

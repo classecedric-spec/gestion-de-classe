@@ -12,6 +12,7 @@
 
 import { Tables, TablesInsert, TablesUpdate } from '../../../types/supabase';
 import { IGradeRepository } from '../repositories/IGradeRepository';
+import { normalizeTitle } from '../../../utils/stringUtils';
 
 export interface GradeStats {
     average: number;
@@ -37,12 +38,18 @@ export class GradeService {
     }
 
     // Processus de création d'un devoir : on crée d'abord la coquille vide (l'évaluation physique en DB), puis s'il y a des petites questions dictées par le prof, le service les greffe automatiquement à la nouvelle coquille.
-    async createEvaluation(evaluation: TablesInsert<'Evaluation'>, userId: string, questions?: { id?: string, titre: string, note_max: number, ratio: number, ordre: number }[], regroupements?: any[]) {
+    async createEvaluation(evaluation: TablesInsert<'Evaluation'>, userId: string, questions?: { id?: string, titre: string, note_max: number, ratio: number, ordre: number, paliers?: any }[], regroupements?: any[]) {
+        // Normaliser les titres avant création
+        if (evaluation.titre) {
+            evaluation.titre = normalizeTitle(evaluation.titre);
+        }
+
         const ev = await this.repository.createEvaluation(evaluation, userId);
         
         if (questions && questions.length > 0) {
             await this.repository.createQuestions(questions.map(q => ({
                 ...q,
+                titre: normalizeTitle(q.titre),
                 evaluation_id: ev.id
             })) as any, userId);
         }
@@ -65,9 +72,14 @@ export class GradeService {
     async createEvaluationWithResults(
         evaluation: TablesInsert<'Evaluation'>, 
         userId: string, 
-        questions: { titre: string, note_max: number, ratio: number, ordre: number }[], 
+        questions: { titre: string, note_max: number, ratio: number, ordre: number, paliers?: any }[], 
         studentResults: { eleve_id: string, note: number | null, questionNotes?: { [titre: string]: number | null } }[]
     ) {
+        // Normalisation
+        if (evaluation.titre) {
+            evaluation.titre = normalizeTitle(evaluation.titre);
+        }
+
         // 1. Créer l'évaluation
         const ev = await this.repository.createEvaluation(evaluation, userId);
         
@@ -76,6 +88,7 @@ export class GradeService {
         if (questions.length > 0) {
             createdQuestions = await this.repository.createQuestions(questions.map(q => ({
                 ...q,
+                titre: normalizeTitle(q.titre),
                 evaluation_id: ev.id
             })) as any, userId);
         }
@@ -118,7 +131,12 @@ export class GradeService {
         return ev;
     }
 
-    async updateEvaluation(id: string, evaluation: TablesUpdate<'Evaluation'>, userId: string, questions?: { id?: string, titre: string, note_max: number, ratio: number, ordre: number }[], regroupements?: any[]) {
+    async updateEvaluation(id: string, evaluation: TablesUpdate<'Evaluation'>, userId: string, questions?: { id?: string, titre: string, note_max: number, ratio: number, ordre: number, paliers?: any }[], regroupements?: any[]) {
+        // Normalisation
+        if (evaluation.titre) {
+            evaluation.titre = normalizeTitle(evaluation.titre);
+        }
+
         const ev = await this.repository.updateEvaluation(id, evaluation, userId);
         
         // Questions handling
@@ -134,6 +152,7 @@ export class GradeService {
             if (questions.length > 0) {
                 await this.repository.upsertQuestions(questions.map(q => ({
                     ...q,
+                    titre: normalizeTitle(q.titre),
                     evaluation_id: ev.id
                 })) as any, userId);
             }

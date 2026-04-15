@@ -153,12 +153,22 @@ export const useAttendance = () => {
             }
             return { previous, queryKey };
         },
+        onSuccess: (realRecord, _variables, context) => {
+            // ✅ CORRECTION : le serveur retourne le vrai UUID (remplace l'id temporaire dans le cache)
+            // Sans ça, l'élève garde un id "temp-xxx" → le 2ème déplacement créait un doublon en base
+            if (context?.queryKey) {
+                queryClient.setQueryData<Attendance[]>(context.queryKey, (old = []) =>
+                    old.map(a => a.eleve_id === realRecord.eleve_id ? realRecord : a)
+                );
+            }
+        },
         onError: (_err, _variables, context) => {
             // En cas d'erreur serveur, on annule le changement visuel
             if (context?.previous) queryClient.setQueryData(context.queryKey, context.previous);
             queryClient.invalidateQueries({ queryKey: context?.queryKey });
         }
     });
+
 
     // Suppression (quand un élève revient dans la zone "Non assigné")
     const deleteMutation = useMutation({

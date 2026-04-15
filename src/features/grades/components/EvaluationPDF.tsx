@@ -10,14 +10,14 @@ const styles = StyleSheet.create({
     color: '#000000',
   },
   studentSection: {
-    marginBottom: 15, // Réduit de 20
+    marginBottom: 8,
     borderBottomWidth: 1,
     borderBottomColor: '#000000',
-    paddingBottom: 10,
+    paddingBottom: 4,
     alignItems: 'center',
   },
   studentName: {
-    fontSize: 20,
+    fontSize: 16,
     fontFamily: 'Helvetica-Bold',
     textTransform: 'uppercase',
   },
@@ -34,19 +34,19 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     borderBottomWidth: 1,
     borderBottomColor: '#000000',
-    height: 30,
-    alignItems: 'center',
+    minHeight: 20,
+    alignItems: 'stretch',
   },
   headerColLabel: {
     flex: 1,
     paddingLeft: 5,
+    justifyContent: 'center',
   },
   headerColGrade: {
     width: 40,
     textAlign: 'center',
     borderLeftWidth: 1,
     borderLeftColor: '#000000',
-    height: '100%',
     justifyContent: 'center',
   },
   subjectRow: {
@@ -54,11 +54,11 @@ const styles = StyleSheet.create({
     backgroundColor: '#E5E5E5',
     borderBottomWidth: 1,
     borderBottomColor: '#000000',
-    height: 30,
-    alignItems: 'center',
+    minHeight: 20,
+    alignItems: 'stretch',
   },
   subjectText: {
-    paddingLeft: 5,
+    padding: 5,
     fontFamily: 'Helvetica-Bold',
     textDecoration: 'underline',
   },
@@ -66,25 +66,25 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     borderBottomWidth: 1,
     borderBottomColor: '#000000',
-    minHeight: 35,
-    alignItems: 'center',
+    minHeight: 25,
+    alignItems: 'stretch',
   },
   questionText: {
     flex: 1,
     padding: 5,
-    fontSize: 12,
+    fontSize: 10,
+    justifyContent: 'center',
   },
   gradeCell: {
     width: 40,
     textAlign: 'center',
     borderLeftWidth: 1,
     borderLeftColor: '#000000',
-    height: '100%',
     justifyContent: 'center',
     alignItems: 'center',
   },
   markerX: {
-    fontSize: 16,
+    fontSize: 10,
     fontFamily: 'Helvetica-Bold',
   },
   footer: {
@@ -139,35 +139,64 @@ const EvaluationTable: React.FC<{
 
   const getGlobalPalierIdx = () => {
     const res = results.find(r => r.eleve_id === studentId);
-    if (!res || res.note === null) return -1;
-    const percent = evaluation.note_max > 0 ? (res.note / evaluation.note_max) * 100 : 0;
-    return paliers.findIndex((p: any) => percent >= p.minPercent && percent <= p.maxPercent);
+    let note = res?.note ?? null;
+
+    // Si la note globale est manquante mais qu'on a des critères, on recalcule le total
+    if (note === null && questions.length > 0) {
+      let weightedSum = 0;
+      let maxWeightedSum = 0;
+      let noteFound = false;
+
+      questions.forEach(q => {
+        const ratio = q.ratio != null ? parseFloat(q.ratio.toString()) : 1;
+        const qMax = parseFloat(q.note_max.toString());
+        maxWeightedSum += qMax * ratio;
+
+        const qr = questionResults.find(r => r.question_id === q.id && r.eleve_id === studentId);
+        if (qr && qr.note !== null) {
+          weightedSum += parseFloat(qr.note.toString()) * ratio;
+          noteFound = true;
+        }
+      });
+
+      if (noteFound && maxWeightedSum > 0) {
+        const evalMax = parseFloat(evaluation.note_max?.toString() || '20');
+        note = (weightedSum / maxWeightedSum) * evalMax;
+      }
+    }
+
+    if (note === null) return -1;
+    
+    const percent = evaluation.note_max > 0 ? (note / evaluation.note_max) * 100 : 0;
+    
+    // Logique harmonisée avec gradeService (min inclusive, max exclusive sauf pour 100%)
+    return paliers.findIndex((p: any) => {
+        const min = p.minPercent ?? 0;
+        const max = p.maxPercent ?? 0;
+        if (percent >= 100 && max >= 100) return percent >= min;
+        return percent >= min && percent < max;
+    });
   };
 
   const globalPalierIdx = getGlobalPalierIdx();
   const hasGlobalResult = results.some(r => r.eleve_id === studentId && r.note !== null);
   const hasDetailedResult = questionResults.some(qr => qr.eleve_id === studentId && qr.note !== null);
   
-  if (!hasGlobalResult && !hasDetailedResult) return null;
+  if (!hasGlobalResult && !hasDetailedResult && globalPalierIdx === -1) return null;
 
   return (
     <View style={styles.evaluationBlock} wrap={false}>
       <View style={styles.table}>
         <View style={styles.headerRow}>
-          <View style={styles.headerColLabel} />
+          <View style={[styles.headerColLabel, { backgroundColor: '#E5E5E5', padding: 5 }]}>
+            <Text style={{ fontFamily: 'Helvetica-Bold', textDecoration: 'underline' }}>
+              {evaluation.titre || "Évaluation"}
+            </Text>
+          </View>
           {paliers.map((p: any, idx: number) => (
             <View key={idx} style={styles.headerColGrade}>
               <Text style={{fontFamily: 'Helvetica-Bold'}}>{p.letter}</Text>
             </View>
-          ))}
-        </View>
-
-        <View style={styles.subjectRow}>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.subjectText}>{evaluation.titre || "Évaluation"}</Text>
-          </View>
-          {paliers.map((_: any, idx: number) => (
-            <View key={idx} style={styles.gradeCell} />
           ))}
         </View>
 
@@ -187,15 +216,18 @@ const EvaluationTable: React.FC<{
           );
         })}
 
-        <View style={[styles.questionRow, { backgroundColor: '#F9F9F9' }]}>
+        <View style={styles.questionRow}>
           <View style={styles.questionText}>
-            <Text style={{ fontFamily: 'Helvetica-Bold' }}>Résultat Global</Text>
+            <Text style={{ fontFamily: 'Helvetica-Bold', textAlign: 'right', paddingRight: 5 }}>Résultat Global</Text>
           </View>
-          {paliers.map((p: any, idx: number) => (
-            <View key={idx} style={styles.gradeCell}>
-              {globalPalierIdx === idx && <Text style={styles.markerX}>X</Text>}
-            </View>
-          ))}
+          {paliers.map((p: any, idx: number) => {
+            const isSelected = globalPalierIdx === idx;
+            return (
+              <View key={idx} style={[styles.gradeCell, isSelected && { backgroundColor: '#E5E5E5' }]}>
+                {isSelected && <Text style={styles.markerX}>X</Text>}
+              </View>
+            );
+          })}
         </View>
       </View>
     </View>

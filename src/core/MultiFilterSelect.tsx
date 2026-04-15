@@ -17,6 +17,7 @@ export interface MultiFilterSelectProps {
     icon?: React.ReactNode;
     className?: string;
     portal?: boolean;
+    hideLabel?: boolean;
 }
 
 export const MultiFilterSelect: React.FC<MultiFilterSelectProps> = ({
@@ -27,7 +28,8 @@ export const MultiFilterSelect: React.FC<MultiFilterSelectProps> = ({
     placeholder = "Sélectionner...",
     icon,
     className,
-    portal = true
+    portal = true,
+    hideLabel = false
 }) => {
     const [isOpen, setIsOpen] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
@@ -234,12 +236,14 @@ export const MultiFilterSelect: React.FC<MultiFilterSelectProps> = ({
                             {icon}
                         </div>
                     )}
-                    <span className={clsx(
-                        "text-sm truncate",
-                        className?.includes('bg-transparent') ? "font-bold text-grey-light group-hover:text-white" : "font-bold text-text-main"
-                    )}>
-                        {className?.includes('bg-transparent') ? label : selectionSummary}
-                    </span>
+                    {!hideLabel && (
+                        <span className={clsx(
+                            "text-sm truncate",
+                            className?.includes('bg-transparent') ? "font-bold text-grey-light group-hover:text-white" : "font-bold text-text-main"
+                        )}>
+                            {className?.includes('bg-transparent') ? label : selectionSummary}
+                        </span>
+                    )}
                     <ChevronDown size={14} className={clsx("text-grey-dark transition-transform duration-300 shrink-0", isOpen && "rotate-180")} />
                 </div>
             </button>

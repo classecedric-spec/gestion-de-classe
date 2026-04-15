@@ -70,7 +70,7 @@ export class SupabaseGradeRepository implements IGradeRepository {
         // Soft delete filter
         query = query.is('deleted_at', null);
         
-        const { data, error } = await query.order('date', { ascending: false });
+        const { data, error } = await query;
         
         if (error) throw error;
         return data || [];
@@ -82,8 +82,7 @@ export class SupabaseGradeRepository implements IGradeRepository {
             .from('EvaluationWithStats')
             .select('*')
             .eq('user_id', userId)
-            .is('deleted_at', null)
-            .order('date', { ascending: false });
+            .is('deleted_at', null);
             
         if (error) throw error;
 
@@ -398,19 +397,14 @@ export class SupabaseGradeRepository implements IGradeRepository {
     async findQuestionResultsByEvaluation(evaluationId: string, userId: string): Promise<Tables<'ResultatQuestion'>[]> {
         if (!this.validateUserId(userId)) return [];
         
-        // We first get the question IDs for this evaluation.
-        const questions = await this.findQuestionsByEvaluation(evaluationId, userId);
-        const questionIds = questions.map(q => q.id);
-        
-        if (questionIds.length === 0) return [];
-
+        // ✅ Correction #3 : une seule requête avec join (était 2 requêtes séquentielles)
         const { data, error } = await supabase
             .from('ResultatQuestion')
-            .select('*')
-            .in('question_id', questionIds);
+            .select('*, EvaluationQuestion!inner(evaluation_id)')
+            .eq('EvaluationQuestion.evaluation_id', evaluationId);
             
         if (error) throw error;
-        return data || [];
+        return (data || []).map(({ EvaluationQuestion: _, ...rest }) => rest as any);
     }
 
     async findQuestionResultsByEvaluations(evaluationIds: string[], userId: string): Promise<Tables<'ResultatQuestion'>[]> {

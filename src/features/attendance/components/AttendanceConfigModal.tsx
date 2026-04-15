@@ -72,8 +72,7 @@ const AttendanceConfigModal: React.FC<AttendanceConfigModalProps> = ({
         selectedPeriod, setSelectedPeriod,
         exportData, exportDates,
         selectedDay, setSelectedDay,
-        // Actions
-        handleCreateNew, handleEdit, handleDeleteSet, handleSaveSet,
+        handleCreateNew, handleReorder, handleEdit, handleDeleteSet, handleSaveSet,
         addCategory, removeCategory, updateCategory,
         handleCopyPeriod
     } = useAttendanceConfig({
@@ -155,6 +154,7 @@ const AttendanceConfigModal: React.FC<AttendanceConfigModalProps> = ({
                         categories={categories}
                         loading={loading}
                         handleCreateNew={handleCreateNew}
+                        handleReorder={handleReorder}
                         handleEdit={handleEdit}
                         handleDeleteSet={handleDeleteWrapper}
                         handleSaveSet={() => handleSaveSet(onConfigSaved)}

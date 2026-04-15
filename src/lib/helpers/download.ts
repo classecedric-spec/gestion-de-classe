@@ -8,17 +8,18 @@ import { saveAs } from 'file-saver';
  * @param suggestedName Le nom suggéré pour le fichier
  * @param mimeTypeDescription Description du type MIME (ex: 'Fichier Excel', 'PDF Document')
  */
-export const downloadFile = async (
-    blob: Blob,
+/**
+ * Obtient un handle de fichier via showSaveFilePicker (API moderne).
+ * Doit être appelé suite à un geste utilisateur (clic).
+ */
+export const getFileHandle = async (
     suggestedName: string,
+    mimeType: string,
     mimeTypeDescription: string = 'Fichier'
-): Promise<void> => {
+): Promise<any> => {
     try {
-        // Tentative d'utilisation de l'API moderne si supportée (Chrome/Edge/Safari récent)
         if ('showSaveFilePicker' in window) {
             const extension = suggestedName.split('.').pop() || '';
-            const mimeType = blob.type;
-
             const handle = await (window as any).showSaveFilePicker({
                 suggestedName: suggestedName,
                 types: [{
@@ -26,18 +27,49 @@ export const downloadFile = async (
                     accept: { [mimeType]: [`.${extension}`] }
                 }],
             });
-
-            const writable = await handle.createWritable();
-            await writable.write(blob);
-            await writable.close();
-            return;
+            return handle;
         }
     } catch (err: any) {
-        // L'utilisateur a annulé la fenêtre de dialogue ou erreur de geste utilisateur (si le délai est trop long)
-        if (err.name === 'AbortError' || err.name === 'SecurityError') return;
-        console.warn("Erreur inattendue avec showSaveFilePicker, utilisation du fallback:", err);
+        if (err.name === 'AbortError') throw err;
+        console.warn("L'API File System Access n'a pas pu être utilisée, passage au fallback tardif:", err);
+    }
+    return null;
+};
+
+/**
+ * Écrit un blob dans un handle précédemment obtenu.
+ */
+export const writeToHandle = async (handle: any, blob: Blob): Promise<void> => {
+    const writable = await handle.createWritable();
+    await writable.write(blob);
+    await writable.close();
+};
+
+/**
+ * Télécharge un fichier en utilisant l'API File System Access (showSaveFilePicker)
+ * avec un fallback vers file-saver (saveAs).
+ * 
+ * @param blob Les données du fichier
+ * @param suggestedName Le nom suggéré pour le fichier
+ * @param mimeTypeDescription Description du type MIME (ex: 'Fichier Excel', 'PDF Document')
+ */
+export const downloadFile = async (
+    blob: Blob,
+    suggestedName: string,
+    mimeTypeDescription: string = 'Fichier'
+): Promise<void> => {
+    try {
+        if ('showSaveFilePicker' in window) {
+            const handle = await getFileHandle(suggestedName, blob.type, mimeTypeDescription);
+            if (handle) {
+                await writeToHandle(handle, blob);
+                return;
+            }
+        }
+    } catch (err: any) {
+        if (err.name === 'AbortError') return;
+        console.warn("Erreur avec downloadFile, utilisation du fallback FileSaver:", err);
     }
 
-    // Fallback standard
     saveAs(blob, suggestedName);
 };
