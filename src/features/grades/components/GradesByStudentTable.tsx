@@ -9,6 +9,7 @@ import { useGroupsData } from '../../groups/hooks/useGroupsData';
 import { useNoteTypes } from '../hooks/useGrades';
 import { supabase, getCurrentUser } from '../../../lib/database';
 import clsx from 'clsx';
+import { getPercentageColor } from '../utils/gradeUtils';
 import StudentGradeEntryModal from './StudentGradeEntryModal';
 
 interface GradesByStudentTableProps {
@@ -197,8 +198,7 @@ TRUNCATED
             <td className="sticky right-0 z-20 bg-background w-[100px] text-center border-r border-white/10 align-middle shadow-[-4px_0_8px_rgba(0,0,0,0.2)]">
                 <span className={clsx(
                     "text-sm font-black tabular-nums",
-                    student._stats.simplePercentage >= 80 ? "text-emerald-500" :
-                    student._stats.simplePercentage >= 50 ? "text-primary" : "text-rose-500"
+                    getPercentageColor(student._stats.simplePercentage)
                 )}>
                     {student._stats.hasData ? `${Math.round(student._stats.simplePercentage)}%` : '—'}
                 </span>
@@ -427,7 +427,7 @@ const GradesByStudentTable: React.FC<GradesByStudentTableProps> = ({
         const branches = new Set<string>();
         evaluations.filter(ev => {
             if (selectedGroups.length === 0) return true;
-            return relevantGroupIds.includes(ev.group_id as string);
+            return !ev.group_id || relevantGroupIds.includes(ev.group_id as string);
         }).forEach(ev => {
             if (ev._brancheName && ev._brancheName !== '-') branches.add(ev._brancheName);
         });
@@ -438,7 +438,7 @@ const GradesByStudentTable: React.FC<GradesByStudentTableProps> = ({
         const periodes = new Set<string>();
         evaluations.filter(ev => {
             if (selectedGroups.length === 0) return true;
-            return relevantGroupIds.includes(ev.group_id as string);
+            return !ev.group_id || relevantGroupIds.includes(ev.group_id as string);
         }).forEach(ev => {
             periodes.add(ev.periode || "Sans période");
         });
@@ -451,7 +451,7 @@ const GradesByStudentTable: React.FC<GradesByStudentTableProps> = ({
 
     const filteredEvaluations = useMemo(() => {
         return evaluations.filter(ev => {
-            if (selectedGroups.length > 0 && !relevantGroupIds.includes(ev.group_id as string)) return false;
+            if (selectedGroups.length > 0 && ev.group_id && !relevantGroupIds.includes(ev.group_id as string)) return false;
             if (selectedBranches.length > 0 && !selectedBranches.includes(ev._brancheName)) return false;
             if (selectedPeriodes.length > 0 && !selectedPeriodes.includes(ev.periode || "Sans période")) return false;
             return true;
@@ -754,11 +754,9 @@ const GradesByStudentTable: React.FC<GradesByStudentTableProps> = ({
             };
         }
 
-        // Fallback: percentage-based
+        // Fallback: percentage-based (use standardized 4-level system)
         const pct = (score / (max || 20)) * 100;
-        if (pct >= 80) return { colorClass: 'text-emerald-500', letter: null };
-        if (pct >= 50) return { colorClass: 'text-primary', letter: null };
-        return { colorClass: 'text-rose-500', letter: null };
+        return { colorClass: getPercentageColor(pct), letter: null };
     }, [noteTypes]);
 
     if (loadingEvals || loadingGroups) {

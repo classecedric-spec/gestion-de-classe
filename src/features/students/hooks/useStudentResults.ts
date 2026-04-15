@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { supabase } from '../../../lib/database/supabaseClient';
+import { supabase } from '../../../lib/database';
 
 export interface ResultQuestionView {
     id: string;
@@ -39,23 +39,49 @@ export function useStudentResults(studentId: string | null) {
             }
             setLoading(true);
             try {
-                // Fetch student resultats with Evaluation and Branche
-                const { data: resultats, error: resErr } = await supabase
-                    .from('Resultat')
-                    .select('*, Evaluation:evaluation_id!inner(*, Branche(nom))')
-                    .eq('eleve_id', studentId)
-                    .is('Evaluation.deleted_at', null);
+                // 1. Fetch student's groups
+                const { data: studentGroups, error: grpErr } = await supabase
+                    .from('EleveGroupe')
+                    .select('groupe_id')
+                    .eq('eleve_id', studentId);
                 
-                if (resErr) throw resErr;
+                if (grpErr) throw grpErr;
+                const relevantGroupIds = studentGroups.map(sg => sg.groupe_id);
 
-                const evalIds = resultats.map(r => r.evaluation_id);
-                if (evalIds.length === 0) {
+                // 2. Fetch all relevant evaluations (where group_id is null OR evaluation's group_id is one of the student's groups)
+                let evalQuery = supabase
+                    .from('Evaluation')
+                    .select('*, Branche(nom)')
+                    .is('deleted_at', null);
+
+                // Handle the "OR" logic for group_id
+                if (relevantGroupIds.length > 0) {
+                    evalQuery = evalQuery.or(`group_id.in.(${relevantGroupIds.join(',')}),group_id.is.null`);
+                } else {
+                    evalQuery = evalQuery.is('group_id', null);
+                }
+
+                const { data: rawEvaluations, error: evErr } = await evalQuery;
+                if (evErr) throw evErr;
+
+                if (rawEvaluations.length === 0) {
                     setData([]);
                     setLoading(false);
                     return;
                 }
 
-                // Fetch questions for those evals
+                const evalIds = rawEvaluations.map(e => e.id);
+
+                // 3. Fetch results for this student on these evaluations (NO statut filter)
+                const { data: studentResults, error: resErr } = await supabase
+                    .from('Resultat')
+                    .select('*')
+                    .eq('eleve_id', studentId)
+                    .in('evaluation_id', evalIds);
+
+                if (resErr) throw resErr;
+
+                // 4. Fetch questions for those evals
                 const { data: questions, error: qErr } = await supabase
                     .from('EvaluationQuestion')
                     .select('*')
@@ -63,7 +89,7 @@ export function useStudentResults(studentId: string | null) {
                     .order('ordre', { ascending: true });
                 if (qErr) throw qErr;
 
-                // Fetch student specifically grouped questions
+                // 5. Fetch question results for specifically this student
                 const { data: questionResults, error: qrErr } = await supabase
                     .from('ResultatQuestion')
                     .select('*')
@@ -71,48 +97,46 @@ export function useStudentResults(studentId: string | null) {
                     .eq('eleve_id', studentId);
                 if (qrErr) throw qrErr;
 
-                // Structure data
+                // --- DATA STRUCTURING ---
                 const periodeMap = new Map<string, Map<string, ResultEvalView[]>>();
 
-                for (const res of resultats) {
-                    const ev = res.Evaluation;
-                    if (!ev) continue;
-                    
+                for (const ev of rawEvaluations) {
                     const periodeName = ev.periode || 'Toute l\'année';
                     const brancheName = ev.Branche?.nom || 'Sans matière';
 
+                    const res = studentResults.find(r => r.evaluation_id === ev.id);
+
+                    // Map questions
                     const evQuestions: ResultQuestionView[] = questions
                         .filter(q => q.evaluation_id === ev.id)
                         .map(q => {
                             const qr = questionResults.find(r => r.question_id === q.id);
-                            let points: number | null = null;
-                            if (qr && qr.note !== null) {
-                                points = Number(qr.note);
-                            }
                             return {
                                 id: q.id,
                                 titre: q.titre,
-                                points: points,
+                                points: (qr && qr.note !== null) ? Number(qr.note) : null,
                                 points_max: q.note_max ? Number(q.note_max) : null
                             };
                         });
 
-                    // Calculate percentage
+                    // Calculate percentage (align with gradeService)
                     let parsedPourcentage: number | null = null;
                     
                     if (evQuestions.length > 0) {
-                        // Calculate from questions (following gradeService logic)
                         let weightedSum = 0;
                         let maxWeightedSum = 0;
                         let noteFound = false;
 
-                        evQuestions.forEach(q => {
-                            if (q.points_max !== null) {
-                                maxWeightedSum += q.points_max;
-                                if (q.points !== null) {
-                                    weightedSum += q.points;
-                                    noteFound = true;
-                                }
+                        const relevantQuestions = questions.filter(q => q.evaluation_id === ev.id);
+                        relevantQuestions.forEach(q => {
+                            const ratio = q.ratio != null ? parseFloat(q.ratio.toString()) : 1;
+                            const qMax = parseFloat(q.note_max?.toString() || '10');
+                            maxWeightedSum += qMax * ratio;
+
+                            const qr = questionResults.find(r => r.question_id === q.id);
+                            if (qr && qr.note !== null) {
+                                weightedSum += parseFloat(qr.note.toString()) * ratio;
+                                noteFound = true;
                             }
                         });
 
@@ -121,10 +145,9 @@ export function useStudentResults(studentId: string | null) {
                         }
                     } 
                     
-                    // Fallback to global note if no questions or no notes found in questions
-                    if (parsedPourcentage === null && res.note !== null) {
+                    if (parsedPourcentage === null && res && res.note !== null && res.statut === 'present') {
                         const note = Number(res.note);
-                        const noteMax = ev.note_max ? Number(ev.note_max) : 10;
+                        const noteMax = ev.note_max ? Number(ev.note_max) : 20;
                         if (noteMax > 0) {
                             parsedPourcentage = Math.round((note / noteMax) * 100);
                         }
@@ -149,11 +172,8 @@ export function useStudentResults(studentId: string | null) {
                     branchesInPeriode.get(brancheName)!.push(evalView);
                 }
 
-                // Aggregate into Final Array
+                // Aggregate and sort
                 const finalData: ResultPeriodeView[] = [];
-
-                // Sort periods chronologically if possible. Since we don't have strict dates for periods,
-                // we sort them alphabetically (e.g. Semestre 1, Semestre 2)
                 const sortedPeriodes = Array.from(periodeMap.keys()).sort();
 
                 for (const periode of sortedPeriodes) {
@@ -162,10 +182,9 @@ export function useStudentResults(studentId: string | null) {
 
                     const branchesView: ResultBrancheView[] = sortedBranches.map(bName => {
                         const evals = branchesMap.get(bName)!;
-                        // Sort evals by date
                         evals.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
                         
-                        // Computes average of the percentages of evaluations that have a percentage
+                        // Filters out evaluaciones without percentage for the aggregate average
                         const validEvals = evals.filter(e => e.pourcentage !== null);
                         let avg: number | null = null;
                         if (validEvals.length > 0) {
@@ -189,7 +208,7 @@ export function useStudentResults(studentId: string | null) {
                 setData(finalData);
 
             } catch (err) {
-                console.error('Error fetching student results:', err);
+                console.error('Error fetching exhaustive student results:', err);
                 setData([]);
             } finally {
                 setLoading(false);

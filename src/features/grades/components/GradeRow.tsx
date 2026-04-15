@@ -9,6 +9,7 @@ import {
     MessageSquare, 
     // Mic
 } from 'lucide-react';
+import { getPercentageColor } from '../utils/gradeUtils';
 import { Badge, Input } from '../../../core';
 import clsx from 'clsx';
 
@@ -219,8 +220,8 @@ const GradeRow: React.FC<GradeRowProps> = React.memo(({
                                             <span>
                                                 {total ?? '--'}
                                                 {total !== null && (
-                                                    <span className="ml-1.5 text-[10px] text-primary/50 font-black uppercase tracking-widest">
-                                                        ({Math.round((Number(total) / noteMax) * 100)})
+                                                    <span className={`ml-1.5 text-[10px] font-bold ${getPercentageColor((Number(total) / noteMax) * 100)}`}>
+                                                        ({Math.round((Number(total) / noteMax) * 100)}%)
                                                     </span>
                                                 )}
                                             </span>
@@ -251,8 +252,8 @@ const GradeRow: React.FC<GradeRowProps> = React.memo(({
                                         <span>
                                             {total ?? '—'}
                                             {total !== null && (
-                                                <span className="ml-2 text-xs text-white/40 font-black">
-                                                    ({Math.round((Number(total) / noteMax) * 100)})
+                                                <span className={`ml-2 text-xs font-bold ${getPercentageColor((Number(total) / noteMax) * 100)}`}>
+                                                    ({Math.round((Number(total) / noteMax) * 100)}%)
                                                 </span>
                                             )}
                                         </span>
@@ -371,6 +372,9 @@ const GradeRow: React.FC<GradeRowProps> = React.memo(({
                                     ) : (
                                         <>
                                             <span className="text-base font-black text-white">{qResult.note}</span>
+                                            <span className={`text-[10px] font-bold italic ${getPercentageColor((Number(qResult.note) / q.note_max) * 100)}`}>
+                                                ({Math.round((Number(qResult.note) / q.note_max) * 100)}%)
+                                            </span>
                                             {palier && (
                                                 <span className={clsx("text-[10px] font-black uppercase tracking-widest mt-0.5", palierColor)}>
                                                     {palier.letter}

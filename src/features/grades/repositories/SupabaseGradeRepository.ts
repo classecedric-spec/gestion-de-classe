@@ -355,6 +355,7 @@ export class SupabaseGradeRepository implements IGradeRepository {
                 )
             `)
             .eq('user_id', userId)
+            .is('Evaluation.deleted_at', null)
             .order('created_at', { ascending: false });
             
         return this.recursiveFetch(query);

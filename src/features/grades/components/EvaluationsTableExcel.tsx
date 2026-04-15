@@ -35,6 +35,7 @@ import {
     Loader
 } from 'lucide-react';
 import clsx from 'clsx';
+import { getPercentageColor } from '../utils/gradeUtils';
 import PdfProgress from '../../../core/PdfProgress';
 
 type ColumnId = 'select' | 'titre' | 'branche' | 'groupe' | 'periode' | 'date' | 'note_max' | 'type_note' | 'nbQuestions' | 'nbResultats' | 'moyenne' | 'actions';
@@ -514,10 +515,6 @@ const EvaluationsTableExcel: React.FC<EvaluationsTableExcelProps> = ({
                     questionResults: evQuestionResults,
                     typeNote
                 };
-            }).sort((a, b) => {
-                const branchA = a.evaluation._brancheName || 'Sans matière';
-                const branchB = b.evaluation._brancheName || 'Sans matière';
-                return branchA.localeCompare(branchB);
             });
 
             // --- GÉNÉRATION DU FICHIER ---
@@ -1511,8 +1508,7 @@ function renderCellContent(
                         <div className="flex flex-col items-start justify-center gap-0.5">
                             <span className={clsx(
                                 "font-black text-base tabular-nums leading-none",
-                                percentage >= 80 ? "text-emerald-500" :
-                                percentage >= 50 ? "text-blue-500" : "text-rose-500"
+                                getPercentageColor(percentage)
                             )}>
                                 {Math.round(percentage)}%
                             </span>

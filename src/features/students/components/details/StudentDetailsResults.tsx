@@ -24,6 +24,7 @@ import {
 } from 'lucide-react';
 import clsx from 'clsx';
 import { useStudentResults, ResultPeriodeView, ResultBrancheView, ResultEvalView } from '../../hooks/useStudentResults';
+import { getPercentageColor } from '../../../grades/utils/gradeUtils';
 
 interface StudentDetailsResultsProps {
     studentId: string;
@@ -133,10 +134,8 @@ export const StudentDetailsResults: React.FC<StudentDetailsResultsProps> = ({ st
                                                 </div>
                                                 <div className="flex items-center gap-2">
                                                     <span className={clsx(
-                                                        "text-xs font-black px-2 py-0.5 rounded-full",
-                                                        branche.pourcentageMoyen !== null && branche.pourcentageMoyen >= 80 ? "bg-success/20 text-success" :
-                                                        branche.pourcentageMoyen !== null && branche.pourcentageMoyen >= 60 ? "bg-warning/20 text-warning" :
-                                                        branche.pourcentageMoyen !== null ? "bg-danger/20 text-danger" : "text-grey-dark"
+                                                        "text-xs font-black px-2 py-0.5 rounded-full bg-white/5",
+                                                        getPercentageColor(branche.pourcentageMoyen)
                                                     )}>
                                                         {branche.pourcentageMoyen !== null ? `${branche.pourcentageMoyen}%` : '-- %'}
                                                     </span>
@@ -165,7 +164,10 @@ export const StudentDetailsResults: React.FC<StudentDetailsResultsProps> = ({ st
                                                                         <FileText size={14} className="text-grey-dark opacity-30 group-hover:opacity-60" />
                                                                         <span className="text-sm text-grey-medium group-hover:text-grey-light truncate">{ev.titre}</span>
                                                                     </div>
-                                                                    <span className="text-xs font-bold text-grey-dark tabular-nums">
+                                                                    <span className={clsx(
+                                                                        "text-xs font-black tabular-nums transition-colors",
+                                                                        getPercentageColor(ev.pourcentage)
+                                                                    )}>
                                                                         {ev.pourcentage !== null ? `${ev.pourcentage}%` : '-- %'}
                                                                     </span>
                                                                 </div>
