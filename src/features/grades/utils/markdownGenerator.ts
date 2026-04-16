@@ -16,9 +16,12 @@ export function generateEvaluationsMarkdown(students: any[], evaluationsData: an
       // Logic to calculate global note/percentage
       const getGlobalPercent = () => {
         const res = results.find((r: any) => r.eleve_id === studentId);
-        let note = res?.note ?? null;
+        
+        // 1. Respecter le statut (Absent, Malade, etc.)
+        if (res && res.statut !== 'present') return null;
 
-        if (note === null && questions.length > 0) {
+        // 2. Priorité aux questions si elles existent
+        if (questions.length > 0) {
           let weightedSum = 0;
           let maxWeightedSum = 0;
           let noteFound = false;
@@ -36,11 +39,13 @@ export function generateEvaluationsMarkdown(students: any[], evaluationsData: an
           });
 
           if (noteFound && maxWeightedSum > 0) {
-            const evalMax = parseFloat(evaluation.note_max?.toString() || '20');
-            note = (weightedSum / maxWeightedSum) * evalMax;
+            return (weightedSum / maxWeightedSum) * 100;
           }
+          return null; // Si critères présents mais non notés, on ne remonte pas la note globale
         }
 
+        // 3. Fallback sur la note globale (seulement si pas de questions)
+        const note = res?.note ?? null;
         if (note === null) return null;
         return evaluation.note_max > 0 ? (note / evaluation.note_max) * 100 : 0;
       };

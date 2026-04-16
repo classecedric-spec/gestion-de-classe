@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { parseISO, compareAsc } from 'date-fns';
 import { supabase } from '../../../lib/database';
 
 export interface ResultQuestionView {
@@ -182,7 +183,14 @@ export function useStudentResults(studentId: string | null) {
 
                     const branchesView: ResultBrancheView[] = sortedBranches.map(bName => {
                         const evals = branchesMap.get(bName)!;
-                        evals.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+                        evals.sort((a, b) => {
+                            const dateA = a.date ? parseISO(a.date) : new Date(0);
+                            const dateB = b.date ? parseISO(b.date) : new Date(0);
+                            const dateCompare = compareAsc(dateA, dateB);
+                            
+                            if (dateCompare !== 0) return dateCompare;
+                            return a.titre.localeCompare(b.titre);
+                        });
                         
                         // Filters out evaluaciones without percentage for the aggregate average
                         const validEvals = evals.filter(e => e.pourcentage !== null);

@@ -139,10 +139,12 @@ const EvaluationTable: React.FC<{
 
   const getGlobalPalierIdx = () => {
     const res = results.find(r => r.eleve_id === studentId);
-    let note = res?.note ?? null;
+    
+    // 1. Respecter le statut (Absent, Malade, etc.)
+    if (res && res.statut !== 'present') return -1;
 
-    // Si la note globale est manquante mais qu'on a des critères, on recalcule le total
-    if (note === null && questions.length > 0) {
+    // 2. Priorité aux questions si elles existent
+    if (questions.length > 0) {
       let weightedSum = 0;
       let maxWeightedSum = 0;
       let noteFound = false;
@@ -160,11 +162,19 @@ const EvaluationTable: React.FC<{
       });
 
       if (noteFound && maxWeightedSum > 0) {
-        const evalMax = parseFloat(evaluation.note_max?.toString() || '20');
-        note = (weightedSum / maxWeightedSum) * evalMax;
+        const percent = (weightedSum / maxWeightedSum) * 100;
+        return paliers.findIndex((p: any) => {
+            const min = p.minPercent ?? 0;
+            const max = p.maxPercent ?? 0;
+            if (percent >= 100 && max >= 100) return percent >= min;
+            return percent >= min && percent < max;
+        });
       }
+      return -1; // Si critères présents mais non notés, on ne remonte pas la note globale
     }
 
+    // 3. Fallback sur la note globale (seulement si pas de questions)
+    const note = res?.note ?? null;
     if (note === null) return -1;
     
     const percent = evaluation.note_max > 0 ? (note / evaluation.note_max) * 100 : 0;
