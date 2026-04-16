@@ -251,29 +251,23 @@ export class SupabaseAttendanceRepository implements IAttendanceRepository {
      * Gère les identifiants temporaires pour une interface réactive.
      */
     async upsertAttendance(attendanceRecord: Partial<Attendance> & { id?: string }, userId: string): Promise<Attendance> {
-        if (attendanceRecord.id && !attendanceRecord.id.toString().startsWith('temp-')) {
-            // Modification d'une présence existante
-            const { error } = await supabase
-                .from('Attendance')
-                .update({
-                    categorie_id: attendanceRecord.categorie_id,
-                    status: attendanceRecord.status
-                })
-                .eq('id', attendanceRecord.id)
-                .eq('user_id', userId);
-            if (error) throw error;
-            return attendanceRecord as Attendance;
-        } else {
-            // Création d'une nouvelle ligne de présence
-            const { id: _id, ...payload } = attendanceRecord; 
-            const { data, error } = await supabase
-                .from('Attendance')
-                .insert([{ ...payload, user_id: userId } as TablesInsert<'Attendance'>])
-                .select()
-                .single();
-            if (error) throw error;
-            return data;
-        }
+        const { id, ...rest } = attendanceRecord;
+        const payload = { ...rest, user_id: userId };
+        
+        // Si l'id est temporaire, on ne l'envoie pas à Supabase pour qu'il génère un vrai UUID
+        const idToUse = id?.toString().startsWith('temp-') ? undefined : id;
+        
+        const { data, error } = await supabase
+            .from('Attendance')
+            .upsert(
+                { ...(idToUse ? { id: idToUse } : {}), ...payload },
+                { onConflict: 'eleve_id,date,periode,setup_id' }
+            )
+            .select()
+            .single();
+
+        if (error) throw error;
+        return data || (attendanceRecord as Attendance);
     }
 
     async deleteAttendance(id: string, userId: string): Promise<void> {

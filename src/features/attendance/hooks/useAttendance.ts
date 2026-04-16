@@ -100,7 +100,7 @@ export const useAttendance = () => {
     const selectedSetup = useMemo(() => setups.find(s => s.id === selectedSetupId) || (setups.length > 0 ? setups[0] : null), [setups, selectedSetupId]);
 
     // 5. Détection automatique : si un appel a déjà commencé, on verrouille le choix du type d'appel
-    const { data: existingSetupId } = useQuery({
+    const { data: existingSetupId, isLoading: isCheckingExisting } = useQuery({
         queryKey: ['attendance-check-setup', user?.id, currentDate, currentPeriod, selectedGroupId],
         queryFn: async () => {
             if (!selectedGroupId || students.length === 0 || !user) return null;
@@ -111,17 +111,23 @@ export const useAttendance = () => {
     });
 
     useEffect(() => {
+        // IMPORTANT : On attend que la vérification du setup existant soit terminée
+        // pour éviter de basculer sur un setup par défaut puis de re-basculer juste après.
+        if (isCheckingExisting) return;
+
         if (existingSetupId) {
             setSelectedSetupId(existingSetupId);
-            setIsSetupLocked(true); // Sécurité : impossible de changer de type d'appel si des données existent déjà
+            setIsSetupLocked(true); 
         } else {
             setIsSetupLocked(false);
-            if (setups.length > 0 && !selectedSetupId) setSelectedSetupId(setups[0].id);
+            if (setups.length > 0 && !selectedSetupId) {
+                setSelectedSetupId(setups[0].id);
+            }
         }
-    }, [existingSetupId, setups, selectedSetupId]);
+    }, [existingSetupId, isCheckingExisting, setups, selectedSetupId]);
 
     // 6. Chargement des données de présence réelles
-    const { data: attendances = [], isLoading: loading } = useQuery({
+    const { data: attendances = [], isLoading: isAttendanceLoading } = useQuery({
         queryKey: ['attendance', user?.id, currentDate, currentPeriod, selectedGroupId, selectedSetupId],
         queryFn: async () => {
             if (!user || !selectedGroupId || !selectedSetupId || students.length === 0) return [];
@@ -130,6 +136,13 @@ export const useAttendance = () => {
         enabled: !!user && !!selectedGroupId && !!selectedSetupId && students.length > 0,
         staleTime: 1000 * 60,
     });
+
+    // État de chargement global pour éviter les sauts d'interface
+    // On considère qu'on charge si l'utilisateur n'est pas là, ou si les données structurelles arrivent
+    const isInitialLoading = !user || 
+        (groups.length === 0 && !selectedGroupId && !isCheckingExisting) || 
+        (selectedGroupId && students.length === 0 && !attendances.length) ||
+        isCheckingExisting;
 
     // --- OPÉRATIONS DE SAUVEGARDE (MUTATIONS) ---
 
@@ -155,7 +168,6 @@ export const useAttendance = () => {
         },
         onSuccess: (realRecord, _variables, context) => {
             // ✅ CORRECTION : le serveur retourne le vrai UUID (remplace l'id temporaire dans le cache)
-            // Sans ça, l'élève garde un id "temp-xxx" → le 2ème déplacement créait un doublon en base
             if (context?.queryKey) {
                 queryClient.setQueryData<Attendance[]>(context.queryKey, (old = []) =>
                     old.map(a => a.eleve_id === realRecord.eleve_id ? realRecord : a)
@@ -165,7 +177,11 @@ export const useAttendance = () => {
         onError: (_err, _variables, context) => {
             // En cas d'erreur serveur, on annule le changement visuel
             if (context?.previous) queryClient.setQueryData(context.queryKey, context.previous);
+        },
+        onSettled: (_data, _error, _variables, context) => {
+            // ✅ SYNCHRONISATION : On invalide pour s'assurer que tout est à jour, y compris le statut du setup
             queryClient.invalidateQueries({ queryKey: context?.queryKey });
+            queryClient.invalidateQueries({ queryKey: ['attendance-check-setup', user?.id, currentDate, currentPeriod, selectedGroupId] });
         }
     });
 
@@ -194,8 +210,9 @@ export const useAttendance = () => {
             if (!user) throw new Error("User required");
             return attendanceService.bulkInsertAttendances(recs, user.id);
         },
-        onSuccess: () => {
+        onSettled: () => {
             queryClient.invalidateQueries({ queryKey: ['attendance', user?.id, currentDate, currentPeriod, selectedGroupId, selectedSetupId] });
+            queryClient.invalidateQueries({ queryKey: ['attendance-check-setup', user?.id, currentDate, currentPeriod, selectedGroupId] });
         }
     });
 
@@ -212,14 +229,16 @@ export const useAttendance = () => {
         if (targetId === 'unassigned') {
             if (currentRecord?.id) deleteMutation.mutate(currentRecord.id);
         } else {
+            const targetCategory = categories.find(c => c.id === targetId);
+            const isAbsence = targetCategory?.nom.toLowerCase().includes('absent');
             const newRecord: Attendance = {
-                id: currentRecord?.id || `temp-${Date.now()}`,
+                id: currentRecord?.id || `temp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
                 date: currentDate,
                 periode: currentPeriod,
                 eleve_id: studentId,
                 setup_id: selectedSetup.id,
-                categorie_id: targetId === 'unassigned' ? null : targetId,
-                status: 'present',
+                categorie_id: targetId,
+                status: isAbsence ? 'absent' : 'present',
                 user_id: user.id,
                 created_at: currentRecord?.created_at || new Date().toISOString(),
                 updated_at: currentRecord?.updated_at || null
@@ -278,7 +297,8 @@ export const useAttendance = () => {
 
     // Récupère les élèves qui n'ont pas encore été pointés
     const getUnassignedStudents = () => {
-        return students.filter(s => !attendances.find(a => a.eleve_id === s.id && a.status === 'present'));
+        // Un élève est "non signé" s'il n'a AUCUN enregistrement de présence pour ce moment
+        return students.filter(s => !attendances.find(a => a.eleve_id === s.id));
     };
 
     const getPureUnassignedStudents = () => {
@@ -300,7 +320,9 @@ export const useAttendance = () => {
         categories,
         attendances,
         currentDate, currentPeriod,
-        loading, error: null,
+        loading: isAttendanceLoading, 
+        isInitialLoading,
+        error: null,
         isEditing, isSetupLocked,
 
         // Actions de sélection

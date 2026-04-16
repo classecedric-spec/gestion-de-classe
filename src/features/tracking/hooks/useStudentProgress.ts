@@ -31,14 +31,26 @@ type ProgressionWithDetails = any;
 /**
  * Hook de pilotage de la fiche de progression individuelle.
  */
-export const useStudentProgress = () => {
+export const useStudentProgress = (
+    externalTab?: string,
+    setExternalTab?: (tab: string) => void,
+    externalSuiviMode?: 'journal' | 'progression',
+    setExternalSuiviMode?: (mode: 'journal' | 'progression') => void
+) => {
     // ÉTATS : Données et Chargement
     const [studentProgress, setStudentProgress] = useState<ProgressionWithDetails[]>([]);
     const [loadingProgress, setLoadingProgress] = useState(false);
     
-    // ÉTATS : Navigation dans la fiche
-    const [currentTab, setCurrentTab] = useState('infos');
-    const [suiviMode, setSuiviMode] = useState<'journal' | 'progression'>('journal');
+    // ÉTATS : Navigation dans la fiche (Internes si non fournis)
+    const [internalTab, setInternalTab] = useState('infos');
+    const [internalSuiviMode, setInternalSuiviMode] = useState<'journal' | 'progression'>('journal');
+    
+    // Mapping vers l'extérieur ou l'intérieur
+    const currentTab = externalTab !== undefined ? externalTab : internalTab;
+    const setCurrentTab = setExternalTab || setInternalTab;
+    const suiviMode = externalSuiviMode !== undefined ? externalSuiviMode : internalSuiviMode;
+    const setSuiviMode = setExternalSuiviMode || setInternalSuiviMode;
+
     const [showPendingOnly, setShowPendingOnly] = useState(false);
 
     // ÉTATS : "Accordéons" (Gestion de ce qui est déplié à l'écran)

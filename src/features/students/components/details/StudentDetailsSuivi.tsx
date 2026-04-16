@@ -14,6 +14,7 @@ import React from 'react';
 import { LayoutList, GitGraph, Activity, Loader2 } from 'lucide-react';
 import { Tabs } from '../../../../core';
 import { StudentJournalView } from '../../../tracking/components/StudentJournalView';
+import { StudentDetailsProgressionSummary } from './StudentDetailsProgressionSummary';
 
 interface StudentDetailsSuiviProps {
     studentProgress: any[];
@@ -92,7 +93,10 @@ export const StudentDetailsSuivi: React.FC<StudentDetailsSuiviProps> = ({
                             />
                         </div>
                     )}
-                    {/* Progression view could be added here if needed */}
+                    
+                    {suiviMode === 'progression' && (
+                        <StudentDetailsProgressionSummary studentProgress={studentProgress} />
+                    )}
                 </div>
             )}
         </div>

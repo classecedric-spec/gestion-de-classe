@@ -46,6 +46,8 @@ const Tabs: React.FC<TabsProps> = ({
     const measureRef = useRef<HTMLDivElement>(null);
     const [threshold, setThreshold] = useState<number | null>(null);
 
+    const hasIcons = tabs.some(tab => !!tab.icon);
+
     // Responsive Logic for Smart Mode
     useEffect(() => {
         if (smart && measureRef.current && threshold === null) {
@@ -57,7 +59,7 @@ const Tabs: React.FC<TabsProps> = ({
     useEffect(() => {
         if (!smart || !containerRef.current || threshold === null) return;
 
-        if (disableCompact) {
+        if (disableCompact || !hasIcons) {
             setIsCompact(false);
             return;
         }
@@ -76,7 +78,7 @@ const Tabs: React.FC<TabsProps> = ({
         const observer = new ResizeObserver(checkSize);
         observer.observe(parentElement);
         return () => observer.disconnect();
-    }, [threshold, smart, disableCompact]);
+    }, [threshold, smart, disableCompact, hasIcons]);
 
     // Handle the Underline variant separately (legacy or specific use case)
     if (variant === 'underline' && !smart) {

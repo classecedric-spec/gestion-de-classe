@@ -19,6 +19,7 @@
  */
 
 import React, { useState } from 'react';
+// Force reload to resolve ReferenceError
 import { DndContext, DragOverlay, useSensor, useSensors, MouseSensor, TouchSensor, DragStartEvent, DragEndEvent } from '@dnd-kit/core';
 import { Settings } from 'lucide-react';
 import { toast } from 'sonner';
@@ -45,7 +46,7 @@ const Presence: React.FC = () => {
         students,
         currentDate, setCurrentDate,
         currentPeriod, setCurrentPeriod,
-        loading, error,
+        loading, isInitialLoading, error,
         isSetupLocked,
         refreshData,
         unlockEditing,
@@ -57,6 +58,7 @@ const Presence: React.FC = () => {
 
         // Outils de filtrage des données
         getStudentsForCategory,
+        getUnassignedStudents,
     } = useAttendance();
 
     // États locaux pour l'affichage des fenêtres surgissantes (Modales)
@@ -109,17 +111,45 @@ const Presence: React.FC = () => {
         return <div className="p-10 text-center text-red-500">Erreur: {error}</div>;
     }
 
+    if (isInitialLoading) {
+        return (
+            <PageLayout
+                leftContent={
+                    <div className="z-10 truncate pr-4 pl-20">
+                        <div className="h-8 w-48 bg-white/5 animate-pulse rounded-lg mb-2" />
+                        <div className="h-4 w-32 bg-white/5 animate-pulse rounded-lg" />
+                    </div>
+                }
+                centerContent={null}
+                rightContent={null}
+                containerClassName="p-6"
+            >
+                <div className="h-[60vh] flex flex-col items-center justify-center gap-6">
+                    <div className="relative">
+                        <div className="w-16 h-16 border-4 border-primary/10 border-t-primary rounded-full animate-spin" />
+                        <div className="absolute inset-0 flex items-center justify-center">
+                            <div className="w-8 h-8 bg-primary/20 rounded-full animate-pulse" />
+                        </div>
+                    </div>
+                    <div className="text-center">
+                        <h3 className="text-xl font-bold text-white mb-2">Chargement de votre classe</h3>
+                        <p className="text-grey-medium animate-pulse">Préparation du tableau d'appel...</p>
+                    </div>
+                </div>
+            </PageLayout>
+        );
+    }
+
     if (!selectedGroup && !loading && groups.length === 0) {
         return <div className="p-10 text-center text-grey-medium">Aucun groupe trouvé. Veuillez configurez vos classes.</div>;
     }
 
-    // Calcul des élèves qui n'ont pas encore été pointés aujourd'hui
-    const trulyUnassigned = students.filter(s => !attendances.some(a => a.eleve_id === s.id));
+    const trulyUnassigned = getUnassignedStudents();
 
     /**
      * Tri les élèves par ordre du niveau (Niveau.ordre ou Niveau.nom) puis par prénom.
      */
-    const sortStudents = (list: typeof students) => {
+    const sortStudents = (list: any[]) => {
         return [...list].sort((a, b) => {
             const niveauA = a.Niveau;
             const niveauB = b.Niveau;
@@ -137,9 +167,9 @@ const Presence: React.FC = () => {
     /**
      * Groupe les élèves par niveau et retourne un tableau de { levelName, students }.
      */
-    const groupByLevel = (list: typeof students) => {
+    const groupByLevel = (list: any[]) => {
         const sorted = sortStudents(list);
-        const groups: { levelName: string; students: typeof students }[] = [];
+        const groups: { levelName: string; students: any[] }[] = [];
         for (const student of sorted) {
             const levelName = student.Niveau?.nom ?? 'Sans niveau';
             const last = groups[groups.length - 1];

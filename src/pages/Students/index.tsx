@@ -21,6 +21,10 @@ const Students: React.FC = () => {
     const [showFilters, setShowFilters] = React.useState(false);
     const [showQRModal, setShowQRModal] = React.useState(false);
     const [qrTab, setQrTab] = React.useState<'encodage' | 'planification' | 'both'>('encodage');
+    
+    // Tab Persistence States
+    const [activeDetailTab, setActiveDetailTab] = React.useState('suivi');
+    const [suiviMode, setSuiviMode] = React.useState<'journal' | 'progression'>('journal');
 
     // Data Hooks
     const {
@@ -95,6 +99,11 @@ const Students: React.FC = () => {
                         setShowQRModal(show);
                     }}
                     handleUpdateImportance={handleUpdateImportance}
+                    // Persisted Tabs
+                    activeTab={activeDetailTab}
+                    onActiveTabChange={setActiveDetailTab}
+                    suiviMode={suiviMode}
+                    onSuiviModeChange={setSuiviMode}
                 />
 
                 {/* Modals */}

@@ -41,6 +41,11 @@ interface StudentDetailsColumnProps {
     processAndSavePhoto: (file: File, student: any) => void;
     setShowQRModal: (show: boolean, tab?: 'encodage' | 'planification' | 'both') => void;
     handleUpdateImportance: (val: string) => void;
+    // Persisted Tabs Props
+    activeTab: string;
+    onActiveTabChange: (tabId: string) => void;
+    suiviMode: 'journal' | 'progression';
+    onSuiviModeChange: (mode: 'journal' | 'progression') => void;
 }
 
 /**
@@ -56,24 +61,35 @@ export const StudentDetailsColumn: React.FC<StudentDetailsColumnProps> = ({
     handlePhotoDrop,
     processAndSavePhoto,
     setShowQRModal,
-    handleUpdateImportance
+    handleUpdateImportance,
+    activeTab,
+    onActiveTabChange,
+    suiviMode,
+    onSuiviModeChange
 }) => {
     
     /** 
-     * CHARGEMENT DES DONNÉES : 
-     * On fait appel au Hook central qui calcule instantanément les progrès scolaires, 
-     * les retards et les statistiques de l'élève sélectionné.
+     * CERVEAU DU PANNEAU :
+     * On branche toute la logique complexe sur ce hook central.
      */
-    const { states, actions } = useStudentDetailsFlow(selectedStudent, students, handleUpdateImportance);
+    const { states, actions } = useStudentDetailsFlow(
+        selectedStudent, 
+        students, 
+        handleUpdateImportance,
+        activeTab,
+        onActiveTabChange,
+        suiviMode,
+        onSuiviModeChange
+    );
 
     const {
-        studentProgress, loadingProgress, currentTab, suiviMode,
+        studentProgress, loadingProgress,
         showPendingOnly, expandedModules, branches,
         studentIndices, sortedModules, totalOverdueCount, hasWork: hasOverdueWork
     } = states;
 
     const {
-        setCurrentTab, setSuiviMode, setShowPendingOnly,
+        setShowPendingOnly,
         toggleModuleExpansion, handleUrgentValidation,
         handleUpdateBranchIndex, generatePDF
     } = actions;
@@ -126,14 +142,14 @@ export const StudentDetailsColumn: React.FC<StudentDetailsColumnProps> = ({
                     { id: 'todo', label: 'Documents & Outils' },
                     { id: 'resultats', label: 'Résultats' }
                 ]}
-                activeTab={currentTab}
-                onChange={setCurrentTab}
+                activeTab={activeTab}
+                onChange={onActiveTabChange}
             >
                 {/** 
                  * ONGLET INFOS : 
                  * Coordonnées des parents et graphiques de réussite par matière.
                  */}
-                {currentTab === 'infos' && (
+                {activeTab === 'infos' && (
                     <StudentDetailsInfos
                         student={selectedStudent}
                         branches={branches}
@@ -147,12 +163,12 @@ export const StudentDetailsColumn: React.FC<StudentDetailsColumnProps> = ({
                  * ONGLET SUIVI : 
                  * Historique complet de tous les ateliers et activités validés par l'élève.
                  */}
-                {currentTab === 'suivi' && (
+                {activeTab === 'suivi' && (
                     <StudentDetailsSuivi
                         studentProgress={studentProgress}
                         loadingProgress={loadingProgress}
                         suiviMode={suiviMode}
-                        setSuiviMode={setSuiviMode}
+                        setSuiviMode={onSuiviModeChange}
                         showPendingOnly={showPendingOnly}
                         setShowPendingOnly={setShowPendingOnly}
                         expandedModules={expandedModules}
@@ -166,7 +182,7 @@ export const StudentDetailsColumn: React.FC<StudentDetailsColumnProps> = ({
                  * ONGLET URGENT : 
                  * Isole automatiquement les activités "en retard" pour un rattrapage prioritaire.
                  */}
-                {currentTab === 'urgent' && (
+                {activeTab === 'urgent' && (
                     <StudentDetailsUrgent
                         totalOverdueCount={totalOverdueCount}
                         hasOverdueWork={hasOverdueWork}
@@ -183,7 +199,7 @@ export const StudentDetailsColumn: React.FC<StudentDetailsColumnProps> = ({
                  * ONGLET DOCUMENTS : 
                  * Outils pour imprimer le plan de travail PDF ou générer les accès QR codes de l'élève.
                  */}
-                {currentTab === 'todo' && (
+                {activeTab === 'todo' && (
                     <StudentDetailsTodo 
                         student={selectedStudent}
                         onShowQR={(tab) => setShowQRModal(true, tab)}
@@ -194,7 +210,7 @@ export const StudentDetailsColumn: React.FC<StudentDetailsColumnProps> = ({
                  * ONGLET RÉSULTATS : 
                  * Synthèse des notes par période et matière avec détail par évaluation.
                  */}
-                {currentTab === 'resultats' && (
+                {activeTab === 'resultats' && (
                     <StudentDetailsResults studentId={selectedStudent.id} />
                 )}
             </CardTabs>

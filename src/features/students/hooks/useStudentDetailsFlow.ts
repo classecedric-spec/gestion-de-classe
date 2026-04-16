@@ -29,7 +29,12 @@ import { useOverdueLogger } from '../../tracking/hooks/useOverdueLogger';
 export function useStudentDetailsFlow(
     selectedStudent: any,
     students: any[],
-    handleUpdateImportance: (val: string) => void
+    handleUpdateImportance: (val: string) => void,
+    // Persisted Tabs Props
+    activeTab?: string,
+    onActiveTabChange?: (tabId: string) => void,
+    suiviModeProp?: 'journal' | 'progression',
+    onSuiviModeChange?: (mode: 'journal' | 'progression') => void
 ) {
     const location = useLocation();
 
@@ -48,7 +53,7 @@ export function useStudentDetailsFlow(
         toggleModuleExpansion,
         handleUrgentValidation,
         handleResetActivity
-    } = useStudentProgress();
+    } = useStudentProgress(activeTab, onActiveTabChange, suiviModeProp, onSuiviModeChange);
 
     // Gestion des matières (Branches) et des indicateurs de réussite
     const {
@@ -83,11 +88,9 @@ export function useStudentDetailsFlow(
             // Chargement des données pédagogiques
             fetchStudentProgress(selectedStudent.id, students, selectedStudent);
 
-            // Gestion de l'onglet de départ (soit l'onglet 'infos' par défaut, soit un onglet spécifique si on vient d'un lien)
+            // Gestion de l'onglet de départ uniquement si spécifié explicitement dans le state (ex: lien direct)
             if (location.state?.initialTab && location.state?.selectedStudentId === selectedStudent.id) {
                 setCurrentTab(location.state.initialTab);
-            } else {
-                setCurrentTab('infos');
             }
             resetProgress();
         } else {
