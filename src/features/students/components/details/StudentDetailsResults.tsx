@@ -164,11 +164,11 @@ export const StudentDetailsResults: React.FC<StudentDetailsResultsProps> = ({ st
                                                                             className={clsx("transition-transform duration-300 opacity-30", expandedEvals[evalKey] && "rotate-90 opacity-100")} 
                                                                         />
                                                                         <FileText size={14} className="text-grey-dark opacity-30 group-hover:opacity-60" />
-                                                                        <div className="flex flex-col min-w-0">
+                                                                        <div className="flex items-center gap-2 min-w-0 flex-1">
                                                                             <span className="text-sm text-grey-medium group-hover:text-grey-light truncate">{ev.titre}</span>
                                                                             {ev.date && (
-                                                                                <span className="text-[10px] text-grey-dark opacity-50 font-medium lowercase">
-                                                                                    le {format(parseISO(ev.date), 'd MMMM yyyy', { locale: fr })}
+                                                                                <span className="text-[10px] text-white/60 font-bold shrink-0">
+                                                                                    ({format(parseISO(ev.date), 'd MMMM yyyy', { locale: fr })})
                                                                                 </span>
                                                                             )}
                                                                         </div>
