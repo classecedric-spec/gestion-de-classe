@@ -107,12 +107,23 @@ const Responsabilites: React.FC = () => {
     const assignMutation = useMutation({
         mutationFn: ({ taskId, eleveIds }: { taskId: string, eleveIds: string[] }) =>
             responsabiliteService.assignStudents(session!.user.id, taskId, eleveIds),
+        onMutate: async () => {
+            // On bloque les rechargements parasites pendant l'assignation
+            const queryKey = ['responsibilities', session?.user.id];
+            await queryClient.cancelQueries({ queryKey });
+            const previous = queryClient.getQueryData<ResponsabiliteWithEleves[]>(queryKey) || [];
+            return { previous, queryKey };
+        },
+        onError: (_err, _variables, context) => {
+            // Rollback en cas d'erreur serveur
+            if (context?.previous) queryClient.setQueryData(context.queryKey, context.previous);
+            toast.error("Erreur lors de l'assignation");
+        },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['responsibilities', session?.user.id] });
             toast.success("Élèves assignés");
             setSelectedTask(null);
         },
-        onError: () => toast.error("Erreur lors de l'assignation")
     });
 
     // ACTION : Retirer un élève d'une tâche

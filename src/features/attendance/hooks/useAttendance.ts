@@ -27,8 +27,9 @@ export const useAttendance = () => {
     // On garde trace de la date et de la période (Matin/AM) choisies par l'utilisateur
     const [currentDate, setCurrentDate] = useState(new Date().toISOString().split('T')[0]);
     const [currentPeriod, setCurrentPeriod] = useState('matin');
-    const [isEditing, setIsEditing] = useState(false);
     const [isSetupLocked, setIsSetupLocked] = useState(false);
+    // forceUnlocked : l'enseignant a cliqué "Réactiver l'édition" → court-circuite isAllPlaced
+    const [forceUnlocked, setForceUnlocked] = useState(false);
 
     // Identifiants techniques de la classe et du type d'appel sélectionnés
     const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
@@ -61,6 +62,13 @@ export const useAttendance = () => {
             });
         }
     }, [groups, selectedGroupId, user]);
+
+    // Quand l'enseignant change de contexte (date, période, classe),
+    // on réinitialise le forceUnlocked pour que le verrouillage naturel reprenne
+    useEffect(() => {
+        setForceUnlocked(false);
+        setIsSetupLocked(false);
+    }, [currentDate, currentPeriod, selectedGroupId]);
 
     const selectedGroup = useMemo(() => groups.find(g => g.id === selectedGroupId) || null, [groups, selectedGroupId]);
 
@@ -167,22 +175,24 @@ export const useAttendance = () => {
             return { previous, queryKey };
         },
         onSuccess: (realRecord, _variables, context) => {
-            // ✅ CORRECTION : le serveur retourne le vrai UUID (remplace l'id temporaire dans le cache)
+            // ✅ Le serveur retourne le vrai UUID → on remplace l'id temporaire dans le cache
             if (context?.queryKey) {
                 queryClient.setQueryData<Attendance[]>(context.queryKey, (old = []) =>
                     old.map(a => a.eleve_id === realRecord.eleve_id ? realRecord : a)
                 );
             }
+            // On invalide attendance-check-setup UNIQUEMENT en cas de succès réel
+            // pour indiquer qu'un appel a commencé (verrouillage voulu)
+            queryClient.invalidateQueries({ queryKey: ['attendance-check-setup', user?.id, currentDate, currentPeriod, selectedGroupId] });
         },
         onError: (_err, _variables, context) => {
-            // En cas d'erreur serveur, on annule le changement visuel
+            // En cas d'erreur serveur : rollback visuel UNIQUEMENT, sans invalider check-setup
+            // (évite de verrouiller l'édition sur une erreur transitoire)
             if (context?.previous) queryClient.setQueryData(context.queryKey, context.previous);
         },
-        onSettled: (_data, _error, _variables, context) => {
-            // ✅ SYNCHRONISATION : On invalide pour s'assurer que tout est à jour, y compris le statut du setup
-            queryClient.invalidateQueries({ queryKey: context?.queryKey });
-            queryClient.invalidateQueries({ queryKey: ['attendance-check-setup', user?.id, currentDate, currentPeriod, selectedGroupId] });
-        }
+        // Pas de onSettled : invalider les queries ici (même en cas d'erreur) causait
+        // le rechargement de attendance-check-setup → verrouillage intempestif + saut arrière.
+        // Le bouclier Realtime (RealtimeSyncContext) gère la syncho externe.
     });
 
 
@@ -199,6 +209,10 @@ export const useAttendance = () => {
             queryClient.setQueryData<Attendance[]>(queryKey, previous.filter(a => a.id !== id.toString()));
             return { previous, queryKey };
         },
+        onSuccess: () => {
+            // Invalide check-setup pour recalculer le verrou (si plus aucun élève placé → déverrouille)
+            queryClient.invalidateQueries({ queryKey: ['attendance-check-setup', user?.id, currentDate, currentPeriod, selectedGroupId] });
+        },
         onError: (_err, _variables, context) => {
             if (context?.previous) queryClient.setQueryData(context.queryKey, context.previous);
         }
@@ -210,10 +224,48 @@ export const useAttendance = () => {
             if (!user) throw new Error("User required");
             return attendanceService.bulkInsertAttendances(recs, user.id);
         },
-        onSettled: () => {
-            queryClient.invalidateQueries({ queryKey: ['attendance', user?.id, currentDate, currentPeriod, selectedGroupId, selectedSetupId] });
+        onMutate: async (newRecords: any[]) => {
+            // Mise à jour optimiste : affichage immédiat dans les bonnes colonnes
+            const queryKey = ['attendance', user?.id, currentDate, currentPeriod, selectedGroupId, selectedSetupId];
+            await queryClient.cancelQueries({ queryKey });
+            const previous = queryClient.getQueryData<Attendance[]>(queryKey) || [];
+
+            // Construire une map des nouveaux enregistrements par eleve_id
+            const newMap = new Map(newRecords.map((r, i) => [r.eleve_id, {
+                ...r,
+                id: `bulk-temp-${Date.now()}-${i}`,
+                created_at: new Date().toISOString(),
+                updated_at: null,
+            }]));
+
+            // Mise à jour : on met à jour les existants ET on ajoute les nouveaux
+            const updated = previous.map(a =>
+                newMap.has(a.eleve_id)
+                    ? { ...a, ...newMap.get(a.eleve_id)! } // Update : écrase categorie_id + status
+                    : a
+            );
+            const existingEleveIds = new Set(previous.map(a => a.eleve_id));
+            const toAdd = Array.from(newMap.values()).filter(r => !existingEleveIds.has(r.eleve_id));
+
+            queryClient.setQueryData<Attendance[]>(queryKey, [...updated, ...toAdd]);
+            return { previous, queryKey };
+        },
+        onSuccess: (realRecords: Attendance[], _variables, context) => {
+            // Remplace les IDs temporaires par les vrais UUIDs retournés par le serveur
+            if (context?.queryKey && realRecords?.length) {
+                const realMap = new Map(realRecords.map(r => [r.eleve_id, r]));
+                queryClient.setQueryData<Attendance[]>(context.queryKey, (old = []) =>
+                    old.map(a => realMap.has(a.eleve_id) ? realMap.get(a.eleve_id)! : a)
+                );
+            }
+            // Invalide uniquement check-setup pour enregistrer que l'appel a commencé
             queryClient.invalidateQueries({ queryKey: ['attendance-check-setup', user?.id, currentDate, currentPeriod, selectedGroupId] });
-        }
+        },
+        onError: (_err, _variables, context) => {
+            // Rollback visuel si le serveur échoue
+            if (context?.previous) queryClient.setQueryData(context.queryKey, context.previous);
+        },
+        // Pas de onSettled : même raison que upsertMutation (évite le rechargement parasite)
     });
 
     // --- ACTIONS EXPOSÉES À L'INTERFACE ---
@@ -222,7 +274,12 @@ export const useAttendance = () => {
     const moveStudent = async (studentId: string, targetId: string) => {
         if (!selectedSetup || !user) return;
 
-        const currentRecord = attendances.find(a => a.eleve_id === studentId);
+        // On lit le cache React Query directement (pas la closure `attendances`)
+        // pour éviter les race conditions lors de 2 glissés rapides successifs
+        const attendanceQueryKey = ['attendance', user?.id, currentDate, currentPeriod, selectedGroupId, selectedSetupId];
+        const freshAttendances = queryClient.getQueryData<Attendance[]>(attendanceQueryKey) || [];
+
+        const currentRecord = freshAttendances.find(a => a.eleve_id === studentId);
         const currentCatId = currentRecord?.categorie_id || 'unassigned';
         if (currentCatId === targetId) return;
 
@@ -301,16 +358,16 @@ export const useAttendance = () => {
         return students.filter(s => !attendances.find(a => a.eleve_id === s.id));
     };
 
-    const getPureUnassignedStudents = () => {
-        return students.filter(s => !attendances.find(a => a.eleve_id === s.id));
-    };
-
     const getSystemAbsentStudents = () => {
         return students.filter(s => {
             const att = attendances.find(a => a.eleve_id === s.id);
             return att && att.status === 'absent';
         });
     };
+
+    // isAllPlaced : VRAI seulement quand tous les élèves de la classe ont une présence
+    // ET que l'enseignant n'a pas cliqué "Réactiver l'édition" (forceUnlocked)
+    const isAllPlaced = !forceUnlocked && students.length > 0 && students.every(s => attendances.find(a => a.eleve_id === s.id));
 
     return {
         // Données
@@ -323,7 +380,10 @@ export const useAttendance = () => {
         loading: isAttendanceLoading, 
         isInitialLoading,
         error: null,
-        isEditing, isSetupLocked,
+        isSetupLocked,
+        // isAllPlaced : vrai uniquement quand TOUS les élèves ont une présence enregistrée
+        // → c'est CE flag qui verrouille les cartes, pas isSetupLocked
+        isAllPlaced,
 
         // Actions de sélection
         setSelectedGroup: (group: Group | null) => {
@@ -335,9 +395,9 @@ export const useAttendance = () => {
         },
         setCurrentDate,
         setCurrentPeriod,
-        setIsEditing,
         unlockEditing: () => {
             setIsSetupLocked(false);
+            setForceUnlocked(true); // Déverrouille aussi les cartes (isAllPlaced devient false)
             toast.success("Édition réactivée");
         },
         refreshData: () => {
@@ -353,7 +413,6 @@ export const useAttendance = () => {
         // Sélecteurs de données
         getStudentsForCategory,
         getUnassignedStudents,
-        getPureUnassignedStudents,
         getSystemAbsentStudents
     };
 };

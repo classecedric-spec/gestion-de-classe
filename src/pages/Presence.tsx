@@ -18,7 +18,7 @@
  *   - Au centre : les différentes colonnes de présence colorées.
  */
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 // Force reload to resolve ReferenceError
 import { DndContext, DragOverlay, useSensor, useSensors, MouseSensor, TouchSensor, DragStartEvent, DragEndEvent } from '@dnd-kit/core';
 import { Settings } from 'lucide-react';
@@ -31,6 +31,45 @@ import AttendanceStudentCard from '../features/attendance/components/AttendanceS
 import AttendanceColumn from '../features/attendance/components/AttendanceColumn';
 import AttendanceConfigModal from '../features/attendance/components/AttendanceConfigModal';
 import { Student } from '../features/attendance/services/attendanceService';
+
+/**
+ * Tri les élèves par ordre du niveau (Niveau.ordre ou Niveau.nom) puis par prénom.
+ */
+const sortStudents = (list: any[]) => {
+    return [...list].sort((a, b) => {
+        const niveauA = a.Niveau;
+        const niveauB = b.Niveau;
+        // Tri par ordre du niveau, puis par nom du niveau, puis par prénom
+        const ordreA = niveauA?.ordre ?? 9999;
+        const ordreB = niveauB?.ordre ?? 9999;
+        if (ordreA !== ordreB) return ordreA - ordreB;
+        const nomNiveauA = niveauA?.nom ?? '';
+        const nomNiveauB = niveauB?.nom ?? '';
+        if (nomNiveauA !== nomNiveauB) return nomNiveauA.localeCompare(nomNiveauB, 'fr');
+        return a.prenom.localeCompare(b.prenom, 'fr');
+    });
+};
+
+/**
+ * Groupe les élèves par niveau et retourne un tableau de { levelName, students }.
+ */
+const groupByLevel = (list: any[]) => {
+    const sorted = sortStudents(list);
+    const groups: { levelName: string; students: any[] }[] = [];
+    for (const student of sorted) {
+        const levelName = student.Niveau?.nom ?? 'Sans niveau';
+        const last = groups[groups.length - 1];
+        if (last && last.levelName === levelName) {
+            last.students.push(student);
+        } else {
+            groups.push({ levelName, students: [student] });
+        }
+    }
+    return groups;
+};
+
+// Constante pour éviter de recréer l'objet à chaque rendu et ainsi préserver React.memo
+const PRESENT_STATUS = { status: 'present' };
 
 /**
  * Composant de page pour la gestion quotidienne des appels.
@@ -48,6 +87,7 @@ const Presence: React.FC = () => {
         currentPeriod, setCurrentPeriod,
         loading, isInitialLoading, error,
         isSetupLocked,
+        isAllPlaced,
         refreshData,
         unlockEditing,
 
@@ -70,6 +110,11 @@ const Presence: React.FC = () => {
         useSensor(MouseSensor, { activationConstraint: { distance: 10 } }), // Évite les déplacements accidentels
         useSensor(TouchSensor, { activationConstraint: { delay: 250, tolerance: 5 } }) // Appui long sur tablette
     );
+
+    const trulyUnassigned = getUnassignedStudents();
+
+    // Le résultat n'est recalculé que si la liste des élèves change
+    const unassignedGroups = useMemo(() => groupByLevel(trulyUnassigned), [trulyUnassigned]);
 
     /**
      * DÉBUT DU GLISSEMENT : Mémorise quel élève est en train d'être déplacé pour afficher sa photo sous le curseur.
@@ -143,46 +188,6 @@ const Presence: React.FC = () => {
     if (!selectedGroup && !loading && groups.length === 0) {
         return <div className="p-10 text-center text-grey-medium">Aucun groupe trouvé. Veuillez configurez vos classes.</div>;
     }
-
-    const trulyUnassigned = getUnassignedStudents();
-
-    /**
-     * Tri les élèves par ordre du niveau (Niveau.ordre ou Niveau.nom) puis par prénom.
-     */
-    const sortStudents = (list: any[]) => {
-        return [...list].sort((a, b) => {
-            const niveauA = a.Niveau;
-            const niveauB = b.Niveau;
-            // Tri par ordre du niveau, puis par nom du niveau, puis par prénom
-            const ordreA = niveauA?.ordre ?? 9999;
-            const ordreB = niveauB?.ordre ?? 9999;
-            if (ordreA !== ordreB) return ordreA - ordreB;
-            const nomNiveauA = niveauA?.nom ?? '';
-            const nomNiveauB = niveauB?.nom ?? '';
-            if (nomNiveauA !== nomNiveauB) return nomNiveauA.localeCompare(nomNiveauB, 'fr');
-            return a.prenom.localeCompare(b.prenom, 'fr');
-        });
-    };
-
-    /**
-     * Groupe les élèves par niveau et retourne un tableau de { levelName, students }.
-     */
-    const groupByLevel = (list: any[]) => {
-        const sorted = sortStudents(list);
-        const groups: { levelName: string; students: any[] }[] = [];
-        for (const student of sorted) {
-            const levelName = student.Niveau?.nom ?? 'Sans niveau';
-            const last = groups[groups.length - 1];
-            if (last && last.levelName === levelName) {
-                last.students.push(student);
-            } else {
-                groups.push({ levelName, students: [student] });
-            }
-        }
-        return groups;
-    };
-
-    const unassignedGroups = groupByLevel(trulyUnassigned);
 
     // --- CONSTRUCTION DES ÉLÉMENTS DE L'EN-TÊTE ---
     
@@ -298,7 +303,7 @@ const Presence: React.FC = () => {
                                                 <AttendanceStudentCard
                                                     key={student.id}
                                                     student={student}
-                                                    disabled={isSetupLocked}
+                                                    disabled={isAllPlaced}
                                                 />
                                             ))}
                                         </React.Fragment>
@@ -307,7 +312,7 @@ const Presence: React.FC = () => {
                             </div>
 
                             {/* Boutons d'action rapide pour terminer l'appel en un clic */}
-                            {trulyUnassigned.length > 0 && !isSetupLocked && (
+                            {trulyUnassigned.length > 0 && (
                                 <div className="flex flex-col gap-2">
                                     <Button
                                         onClick={markUnassignedPresent}
@@ -357,8 +362,8 @@ const Presence: React.FC = () => {
                                                             <AttendanceStudentCard
                                                                 key={student.id}
                                                                 student={student}
-                                                                currentStatus={{ status: 'present' }}
-                                                                disabled={isSetupLocked}
+                                                                currentStatus={PRESENT_STATUS}
+                                                                disabled={isAllPlaced}
                                                             />
                                                         ))}
                                                     </React.Fragment>

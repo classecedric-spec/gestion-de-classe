@@ -215,12 +215,36 @@ export const useClasses = () => {
     });
 
     /**
-     * Enregistre une nouvelle classe.
+     * Enregistre une nouvelle classe avec affichage instantané (Optimistic UI).
      */
     const addClassMutation = useMutation({
         mutationFn: (newClass: any) => classService.createClass(newClass),
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['classes', user?.id] });
+        onMutate: async (newClass) => {
+            const queryKey = ['classes', user?.id];
+            await queryClient.cancelQueries({ queryKey });
+            const previousClasses = queryClient.getQueryData<ClassWithAdults[]>(queryKey) || [];
+            // On affiche immédiatement la nouvelle classe avec un ID temporaire
+            const tempClass = {
+                id: 'temp-' + Date.now(),
+                ...newClass,
+                created_at: new Date().toISOString()
+            } as ClassWithAdults;
+            queryClient.setQueryData<ClassWithAdults[]>(queryKey, [...previousClasses, tempClass]);
+            return { previousClasses, queryKey };
+        },
+        onError: (_err, _variables, context) => {
+            // En cas d'erreur serveur, on restaure l'ancienne liste
+            if (context?.previousClasses) queryClient.setQueryData(context.queryKey, context.previousClasses);
+        },
+        onSuccess: (data) => {
+            const queryKey = ['classes', user?.id];
+            // On remplace le fantôme temporaire par la vraie classe avec son ID définitif
+            if (data?.id) {
+                queryClient.setQueryData<ClassWithAdults[]>(queryKey, (old = []) =>
+                    old.map(c => c.id.startsWith('temp-') ? { ...c, ...data } : c)
+                );
+            }
+            queryClient.invalidateQueries({ queryKey });
         }
     });
 

@@ -97,11 +97,23 @@ export const useAttendanceConfig = ({
 
     // --- ACTIONS DE MODIFICATION (MUTATIONS) ---
 
-    // Suppression d'une configuration
+    // Suppression d'une configuration avec affichage instantané (Optimistic UI)
     const deleteSetupMutation = useMutation({
         mutationFn: (id: string) => {
             if (!user) throw new Error("User required");
             return attendanceService.deleteSetup(id, user.id);
+        },
+        onMutate: async (id) => {
+            const queryKey = ['attendance-setup', user?.id];
+            await queryClient.cancelQueries({ queryKey });
+            const previous = queryClient.getQueryData<any[]>(queryKey) || [];
+            // Suppression instantanée de la liste
+            queryClient.setQueryData<any[]>(queryKey, previous.filter(s => s.id !== id));
+            return { previous, queryKey };
+        },
+        onError: (_err, _variables, context) => {
+            // Rollback si le serveur refuse la suppression
+            if (context?.previous) queryClient.setQueryData(context.queryKey, context.previous);
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['attendance-setup', user?.id] });

@@ -199,8 +199,14 @@ export function useMobileTracking() {
     /** 
      * CONFIRMATION ET ENVOI : 
      * Envoie la mise à jour finale au serveur (ou en file d'attente hors-ligne).
+     * Utilise l'Optimistic UI : l'élève disparaît de la liste immédiatement.
      */
     const handleStatusUpdate = async (req: ProgressionWithDetails, action: 'non_valide' | 'status_quo' | 'valide') => {
+        // 1. Mise à jour optimiste : on retire l'élève de la liste immédiatement
+        const helpQueryKey = ['help-requests', studentsIds];
+        const previousHelp = queryClient.getQueryData<any[]>(helpQueryKey) || [];
+        queryClient.setQueryData<any[]>(helpQueryKey, previousHelp.filter(r => r.id !== req.id));
+
         try {
             let newStatus = action === 'valide' ? 'termine' : 'a_commencer';
             let indexAdjustment = action === 'non_valide' ? 5 : (action === 'valide' ? -2 : 0);
@@ -224,13 +230,23 @@ export function useMobileTracking() {
                 toast.success("Mis à jour");
             }
             queryClient.invalidateQueries({ queryKey: ['help-requests'] });
-        } catch (err) { toast.error("Erreur"); }
+        } catch (err) {
+            // Rollback si le serveur échoue
+            queryClient.setQueryData(helpQueryKey, previousHelp);
+            toast.error("Erreur");
+        }
     };
 
     /** 
      * NETTOYAGE : Retire une demande de la tablette.
+     * Utilise l'Optimistic UI : l'élève disparaît immédiatement de la liste.
      */
     const handleClear = async (req: ProgressionWithDetails) => {
+        // 1. Mise à jour optimiste : suppression immédiate de la liste
+        const helpQueryKey = ['help-requests', studentsIds];
+        const previousHelp = queryClient.getQueryData<any[]>(helpQueryKey) || [];
+        queryClient.setQueryData<any[]>(helpQueryKey, previousHelp.filter(r => r.id !== req.id));
+
         try {
             if (!isOnline) {
                 addToQueue({ type: 'SUPABASE_CALL', table: 'Progression', method: req.is_suivi ? 'delete' : 'update', payload: req.is_suivi ? null : { etat: 'a_commencer', updated_at: new Date().toISOString() }, match: { id: req.id }, contextDescription: `Reset statut ${req.eleve?.prenom}` });
@@ -242,7 +258,11 @@ export function useMobileTracking() {
             }
             queryClient.invalidateQueries({ queryKey: ['help-requests'] });
             toast.success("Retiré");
-        } catch (err) { toast.error("Erreur"); }
+        } catch (err) {
+            // Rollback si le serveur échoue
+            queryClient.setQueryData(helpQueryKey, previousHelp);
+            toast.error("Erreur");
+        }
     };
 
     // --- LOGIQUE DE FILTRAGE DES ALERTES ---

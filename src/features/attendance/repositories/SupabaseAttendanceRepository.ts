@@ -83,28 +83,23 @@ export class SupabaseAttendanceRepository implements IAttendanceRepository {
      */
     async getStudentsByGroup(groupId: string, userId: string): Promise<Student[]> {
         if (!this.validateUserId(userId)) return [];
-        // Étape 1 : On trouve qui appartient au groupe
-        const { data: links, error: linkError } = await supabase
+
+        // Une seule requête JOIN au lieu de 2 requêtes séquentielles (-50% latence réseau)
+        const { data, error } = await supabase
             .from('EleveGroupe')
-            .select('eleve_id')
+            .select('Eleve!inner(*, Classe(nom), Niveau(nom, ordre))')
             .eq('groupe_id', groupId)
             .eq('user_id', userId);
 
-        if (linkError) throw linkError;
-
-        const studentIds = links?.map(l => l.eleve_id) || [];
-        if (studentIds.length === 0) return [];
-
-        // Étape 2 : On récupère les fiches avec le nom de la classe et du niveau pour l'affichage
-        const { data, error } = await supabase
-            .from('Eleve')
-            .select('*, Classe(nom), Niveau(nom, ordre)')
-            .in('id', studentIds)
-            .eq('titulaire_id', userId)
-            .order('nom');
-
         if (error) throw error;
-        return (data || []) as Student[];
+
+        // Extraction des objets Eleve, filtre titulaire_id (sécurité), tri par nom
+        const students = (data || [])
+            .map(row => (row as any).Eleve)
+            .filter((e: any) => e && e.titulaire_id === userId)
+            .sort((a: any, b: any) => a.nom.localeCompare(b.nom));
+
+        return students as Student[];
     }
 
     // ==================== CONFIGURATION (SETUPS & CATÉGORIES) ====================
@@ -284,7 +279,7 @@ export class SupabaseAttendanceRepository implements IAttendanceRepository {
         const recordsWithUser = records.map(r => ({ ...r, user_id: userId }));
         const { data, error } = await supabase
             .from('Attendance')
-            .insert(recordsWithUser)
+            .upsert(recordsWithUser, { onConflict: 'eleve_id,date,periode,setup_id' })
             .select();
         if (error) throw error;
         return data || [];
